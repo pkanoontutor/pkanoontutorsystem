@@ -1,0 +1,65 @@
+{% extends "core/base.html" %}
+{% load extras %}
+{% block title %}Near Complete Alerts{% endblock %}
+
+{% block content %}
+<div class="topbar">
+  <div class="card" style="flex:1; min-width:280px;">
+    <div style="font-weight:800; font-size:18px;">ใกล้ครบคอร์ส (เหลือ ≤ {{ threshold }})</div>
+    <div class="muted">กด Mark ว่าแจ้งผู้ปกครองแล้ว</div>
+  </div>
+  <div class="card">
+    <a class="btn" href="/dashboard/">กลับไป Dashboard</a>
+  </div>
+</div>
+
+<div class="card">
+  <table>
+    <thead>
+      <tr>
+        <th>คลาส</th>
+        <th>นักเรียน</th>
+        <th>คงเหลือ</th>
+        <th>สถานะการแจ้ง</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for e in near %}
+      <tr>
+        <td><b>{{ e.tutoring_class.name }}</b></td>
+        <td>
+          {% if e.remaining_sessions <= 0 %}
+            <span class="danger">{{ e.student.display_name }}</span>
+            <span class="badge">ครบคอร์สแล้ว</span>
+          {% else %}
+            <b>{{ e.student.display_name }}</b>
+          {% endif %}
+        </td>
+        <td><b class="{% if e.remaining_sessions <= 0 %}danger{% endif %}">{{ e.remaining_sessions }}</b></td>
+        <td class="muted">
+          {% if e.notified_near_complete %}
+            แจ้งแล้ว ({{ e.notified_at|date:"Y-m-d H:i" }})
+          {% else %}
+            ยังไม่แจ้ง
+          {% endif %}
+        </td>
+        <td>
+          {% if not e.notified_near_complete %}
+          <form method="post" action="/alerts/mark/" style="margin:0;">
+            {% csrf_token %}
+            <input type="hidden" name="enrollment_id" value="{{ e.id }}">
+            <button class="btn">Mark แจ้งแล้ว</button>
+          </form>
+          {% else %}
+            <span class="muted">—</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="5" class="muted">ยังไม่มีคนใกล้ครบคอร์ส</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

@@ -1,0 +1,176 @@
+{% extends "core/base.html" %}
+{% load extras %}
+{% block title %}Attendance Dashboard{% endblock %}
+
+
+{% block content %}
+<div class="topbar">
+  <div class="card" style="flex:1; min-width:280px;">
+    <div style="font-weight:800; font-size:18px;">Attendance Dashboard</div>
+    <div class="muted">เช็คชื่อแบบ 3 ปุ่ม (ติดลบได้เมื่อครบคอร์ส)</div>
+  </div>
+
+  <div class="card">
+    <form method="get" style="display:flex; gap:10px; align-items:center;">
+      <label class="muted">วันที่:</label>
+      <input type="date" name="date" value="{{ selected_date|date:'Y-m-d' }}" />
+      <button class="btn" type="submit">ไป</button>
+    </form>
+  </div>
+
+  <div class="card" id="globalSummary">
+    <div class="kpi">
+      <span class="pill">มา: <b id="g_present">{{ global_summary.present }}</b></span>
+      <span class="pill">ลา: <b id="g_excused">{{ global_summary.excused }}</b></span>
+      <span class="pill">ขาด: <b id="g_no_show">{{ global_summary.no_show }}</b></span>
+      <span class="pill">รวม: <b id="g_total">{{ global_summary.total }}</b></span>
+    </div>
+  </div>
+</div>
+
+<div class="grid" style="gap:14px;">
+  {% for cls in classes %}
+  {% with s=summary_by_class_id|get_item:cls.id %}
+  <div class="card" id="classCard-{{ cls.id }}">
+    <div class="class-header">
+      <div>
+        <div class="class-title">{{ cls.name }}</div>
+        <div class="muted">ชั่วโมงต่อครั้ง: {{ cls.hours_per_session }}</div>
+      </div>
+      <div class="kpi" id="classSummary-{{ cls.id }}">
+        <span class="pill">มา: <b class="c_present">{{ s.present|default:0 }}</b></span>
+        <span class="pill">ลา: <b class="c_excused">{{ s.excused|default:0 }}</b></span>
+        <span class="pill">ขาด: <b class="c_no_show">{{ s.no_show|default:0 }}</b></span>
+        <span class="pill">รวม: <b class="c_total">{{ s.total|default:0 }}</b></span>
+      </div>
+    </div>
+
+    <div style="overflow:auto;">
+      <table>
+        <thead>
+          <tr>
+            <th>นักเรียน</th>
+            <th>ทั้งหมด (ครั้ง)</th>
+            <th>คงเหลือ</th>
+            <th>เช็คชื่อ</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for e in enrollments %}
+            {% if e.tutoring_class_id == cls.id %}
+              {% with a=att_map|get_item:e.id %}
+              <tr id="row-{{ e.id }}">
+                <td>
+                  {% if e.remaining_sessions <= 0 %}
+                    <span class="danger">{{ e.student.full_name }}</span>
+                    <span class="badge">ครบคอร์สแล้ว</span>
+                  {% else %}
+                    <b>{{ e.student.full_name }}</b>
+                  {% endif %}
+                  <div class="muted">{{ e.get_enrollment_type_display }}</div>
+                </td>
+                <td><b>{{ e.sessions_total }}</b></td>
+                <td>
+                  <b id="remaining-{{ e.id }}" class="{% if e.remaining_sessions <= 0 %}danger{% endif %}">
+                    {{ e.remaining_sessions }}
+                  </b>
+                </td>
+                <td>
+                  <button class="btn btn-green {% if a and a.status == 'present' %}active-btn{% endif %}"
+                          onclick="return updateAtt({{ e.id }}, 'present');">มา</button>
+                  <button class="btn btn-yellow {% if a and a.status == 'excused' %}active-btn{% endif %}"
+                          onclick="return updateAtt({{ e.id }}, 'excused');">ลา</button>
+                  <button class="btn btn-red {% if a and a.status == 'no_show' %}active-btn{% endif %}"
+                          onclick="return updateAtt({{ e.id }}, 'no_show');">ขาด</button>
+                </td>
+              </tr>
+              {% endwith %}
+            {% endif %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endwith %}
+  {% endfor %}
+</div>
+
+<script>
+  // CSRF helper
+  function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+      const cookies = document.cookie.split(';');
+      for (let i = 0; i < cookies.length; i++) {
+        const cookie = cookies[i].trim();
+        if (cookie.substring(0, name.length + 1) === (name + '=')) {
+          cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+          break;
+        }
+      }
+    }
+    return cookieValue;
+  }
+  const csrftoken = getCookie('csrftoken');
+
+  function setGlobalSummary(gs){
+    document.getElementById("g_present").textContent = gs.present;
+    document.getElementById("g_excused").textContent = gs.excused;
+    document.getElementById("g_no_show").textContent = gs.no_show;
+    document.getElementById("g_total").textContent = gs.total;
+  }
+
+  function setClassSummary(classId, cs){
+    const box = document.getElementById("classSummary-" + classId);
+    box.querySelector(".c_present").textContent = cs.present;
+    box.querySelector(".c_excused").textContent = cs.excused;
+    box.querySelector(".c_no_show").textContent = cs.no_show;
+    box.querySelector(".c_total").textContent = cs.total;
+  }
+
+  function markButtons(enrollmentId, status){
+    const row = document.getElementById("row-" + enrollmentId);
+    row.querySelectorAll("button").forEach(b => b.classList.remove("active-btn"));
+    if(status === "present") row.querySelector(".btn-green").classList.add("active-btn");
+    if(status === "excused") row.querySelector(".btn-yellow").classList.add("active-btn");
+    if(status === "no_show") row.querySelector(".btn-red").classList.add("active-btn");
+  }
+
+  async function updateAtt(enrollmentId, status){
+    const selectedDate = "{{ selected_date|date:'Y-m-d' }}";
+    const form = new URLSearchParams();
+    form.append("enrollment_id", enrollmentId);
+    form.append("status", status);
+    form.append("date", selectedDate);
+
+    const res = await fetch("/attendance/update/", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "X-CSRFToken": csrftoken
+      },
+      body: form.toString()
+    });
+
+    const data = await res.json();
+    if(!data.ok){
+      alert(data.error || "Update failed");
+      return false;
+    }
+
+    // remaining
+    const remEl = document.getElementById("remaining-" + enrollmentId);
+    remEl.textContent = data.remaining;
+    remEl.classList.toggle("danger", data.remaining <= 0);
+
+    // update summaries
+    setClassSummary(data.class_id, data.class_summary);
+    setGlobalSummary(data.global_summary);
+
+    // mark buttons
+    markButtons(enrollmentId, data.status);
+
+    return false;
+  }
+</script>
+{% endblock %}

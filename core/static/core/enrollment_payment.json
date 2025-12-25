@@ -1,0 +1,86 @@
+(function(){
+  function qs(sel){ return document.querySelector(sel); }
+  function qsa(sel){ return Array.from(document.querySelectorAll(sel)); }
+
+  function setDisabled(el, disabled){
+    if(!el) return;
+    el.disabled = disabled;
+    if(disabled) el.setAttribute("disabled", "disabled");
+    else el.removeAttribute("disabled");
+  }
+
+  function toggleInstallments(){
+    const paymentFull = qs('input[name="payment_type"][value="full"]');
+    const paymentInst = qs('input[name="payment_type"][value="installment"]');
+
+    const installmentsInput = qs('#id_installments_count');
+    const installmentsRow = installmentsInput ? installmentsInput.closest('.form-row') : null;
+
+    // inline table wrapper (django admin inline)
+    const inline = qs('#installments-group') || qs('.inline-group'); // เผื่อ id ไม่ตรง
+    const allInlineGroups = qsa('.inline-group');
+
+    const isFull = paymentFull && paymentFull.checked;
+
+    // จำนวนงวด: full = disable + set 0, installment = enable
+    if(installmentsInput){
+      if(isFull){
+        installmentsInput.value = 0;
+        setDisabled(installmentsInput, true);
+        if(installmentsRow) installmentsRow.style.opacity = "0.5";
+      }else{
+        setDisabled(installmentsInput, false);
+        if(installmentsRow) installmentsRow.style.opacity = "1";
+      }
+    }
+
+    // ซ่อน/โชว์ inline งวด (อิงจากชื่อ model ของ inline: "installments")
+    // ถ้าเจอ id ที่แน่นอน: installments-group จะดีที่สุด
+    const target = inline || allInlineGroups.find(x => (x.id || "").includes("installment"));
+    if(target){
+      target.style.display = isFull ? "none" : "";
+    }
+  }
+
+  function calcNetPrice(){
+    const coursePriceEl = qs('#id_course_price');
+    const discountEl = qs('#id_discount_amount');
+    const netEl = qs('#id_net_price');
+
+    if(!coursePriceEl || !discountEl || !netEl) return;
+
+    const coursePrice = parseFloat(coursePriceEl.value || "0") || 0;
+    let discount = parseFloat(discountEl.value || "0") || 0;
+
+    if(discount < 0) discount = 0;
+    if(discount > coursePrice) discount = coursePrice;
+
+    // เขียนกลับให้เป็นค่าที่ sanitize แล้ว
+    discountEl.value = discount.toFixed(2);
+    netEl.value = (coursePrice - discount).toFixed(2);
+  }
+
+  function bind(){
+    qsa('input[name="payment_type"]').forEach(r => {
+      r.addEventListener("change", () => {
+        toggleInstallments();
+      });
+    });
+
+    const discountEl = qs('#id_discount_amount');
+    if(discountEl){
+      discountEl.addEventListener("input", calcNetPrice);
+      discountEl.addEventListener("change", calcNetPrice);
+    }
+
+    // init
+    toggleInstallments();
+    calcNetPrice();
+  }
+
+  if(document.readyState === "loading"){
+    document.addEventListener("DOMContentLoaded", bind);
+  }else{
+    bind();
+  }
+})();

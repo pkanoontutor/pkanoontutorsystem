@@ -1,0 +1,113 @@
+{% extends "core/base.html" %}
+{% load extras %}
+{% block title %}Student Attendance (Details){% endblock %}
+
+{% block head %}
+<style>
+  .stickyhead { position: sticky; top: 0; background: #fff; z-index: 2; }
+  .status-pill {
+    display:inline-block;
+    padding:3px 10px;
+    border-radius:999px;
+    font-size:12px;
+    font-weight:800;
+    margin-left:6px;
+  }
+  .s-present { background:#dcfce7; border:1px solid #22c55e; color:#166534; }
+  .s-excused { background:#fef9c3; border:1px solid #eab308; color:#854d0e; }
+  .s-no_show { background:#fee2e2; border:1px solid #ef4444; color:#991b1b; }
+  .cell { white-space:nowrap; font-size:13px; }
+  .table-wrap { overflow:auto; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="topbar">
+  <div class="card" style="flex:1; min-width:280px;">
+    <div style="font-weight:900; font-size:18px;">Student Attendance (Details)</div>
+    <div class="muted">
+      Row = นักเรียน | Column = ครั้งที่ | ช่อง = วันที่ + สถานะ (มา/ลา/ขาด)
+    </div>
+  </div>
+
+  <div class="card">
+    <a class="btn" href="/dashboard/">กลับไป Dashboard</a>
+  </div>
+</div>
+
+{% for cls in classes %}
+  <div class="card" style="margin-bottom:14px;">
+    <div style="display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap;">
+      <div style="font-weight:900; font-size:16px;">{{ cls.name }}</div>
+      <div class="muted">ข้อมูลการเช็คชื่อทั้งหมดของห้องนี้</div>
+    </div>
+
+    <div class="table-wrap" style="margin-top:10px;">
+      <table>
+        <thead class="stickyhead">
+          <tr>
+            <th style="min-width:260px;">นักเรียน</th>
+
+            {% with cols=col_numbers_by_class|get_item:cls.id %}
+              {% if cols %}
+                {% for n in cols %}
+                  <th style="min-width:140px;">ครั้งที่ {{ n }}</th>
+                {% endfor %}
+              {% else %}
+                <th>ยังไม่มีข้อมูล</th>
+              {% endif %}
+            {% endwith %}
+          </tr>
+        </thead>
+
+        <tbody>
+          {% with rows=grouped_rows|get_item:cls.id %}
+            {% if rows %}
+              {% for row in rows %}
+                <tr>
+                  <td>
+                    <b>{{ row.enrollment.student.display_name }}</b>
+                    <div class="muted">{{ row.enrollment.get_enrollment_type_display }}</div>
+                  </td>
+
+                  {% with cols=col_numbers_by_class|get_item:cls.id %}
+                    {% for n in cols %}
+                      {% with idx=n|add:"-1" %}
+                        {% with rec=row.records|index:idx %}
+                          <td class="cell">
+                            {% if rec %}
+                              {{ rec|get_item:"date"|date:"Y-m-d" }}
+
+                              {% if rec|get_item:"status" == "present" %}
+                                <span class="status-pill s-present">มา</span>
+                              {% elif rec|get_item:"status" == "excused" %}
+                                <span class="status-pill s-excused">ลา</span>
+                              {% else %}
+                                <span class="status-pill s-no_show">ขาด</span>
+                              {% endif %}
+                            {% else %}
+                              -
+                            {% endif %}
+                          </td>
+                        {% endwith %}
+                      {% endwith %}
+                    {% endfor %}
+                  {% endwith %}
+                </tr>
+              {% endfor %}
+            {% else %}
+              <tr>
+                <td colspan="50" class="muted">ยังไม่มีนักเรียนในห้องนี้</td>
+              </tr>
+            {% endif %}
+          {% endwith %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="muted" style="margin-top:8px;">
+      🟢 มา | 🟡 ลา | 🔴 ขาด
+    </div>
+  </div>
+{% endfor %}
+{% endblock %}

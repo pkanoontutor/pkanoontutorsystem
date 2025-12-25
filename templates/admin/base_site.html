@@ -1,0 +1,10 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block branding %}
+<h1 id="site-name" style="display:flex; align-items:center; gap:12px;">
+  <a href="{% url 'admin:index' %}">Admin</a>
+  <a href="/dashboard/" class="button" style="margin-left:10px;">← Back to Dashboard</a>
+  <a href="/admin-dashboard/" class="button">Admin Dashboard</a>
+</h1>
+{% endblock %}

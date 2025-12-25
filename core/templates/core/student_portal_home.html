@@ -1,0 +1,81 @@
+{% extends "core/base_portal.html" %}
+{% block title %}Student Portal{% endblock %}
+
+{% block header_actions %}
+  <a class="btn btn-dark" href="{% url 'core:student_portal_logout' %}">ออกจากระบบ</a>
+{% endblock %}
+
+{% block content %}
+  <div class="card" style="margin-bottom:14px;">
+    <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:flex-end;">
+      <div>
+        <div style="font-size:20px;font-weight:900;">{{ student.display_name }}</div>
+        <div style="opacity:.8;font-weight:700;">เบอร์ผู้ปกครอง: {{ student.parent_phone }}</div>
+      </div>
+
+      {% if selected_enrollment %}
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <span class="pill">คงเหลือ: {{ remaining_sessions }} ครั้ง</span>
+          <span class="pill">≈ {{ remaining_hours|floatformat:2 }} ชั่วโมง</span>
+          <span class="pill">/ครั้ง {{ hours_per_session|floatformat:2 }} ชม.</span>
+        </div>
+      {% else %}
+        <span class="pill">ยังไม่มีคอร์ส</span>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:14px;">
+    <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center;">
+      <div style="font-weight:900;font-size:16px;">เลือกคอร์ส</div>
+      <form method="get" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+        <select name="enrollment_id" style="border:1px solid #e5e7eb;border-radius:10px;padding:10px 12px;font-weight:800;min-width:280px;">
+          {% for e in enrollments %}
+            <option value="{{ e.id }}" {% if selected_enrollment and e.id == selected_enrollment.id %}selected{% endif %}>
+              {{ e.tutoring_class.name }} | {{ e.get_enrollment_type_display }} {% if e.is_active %}(Active){% else %}(Closed){% endif %}
+            </option>
+          {% endfor %}
+        </select>
+        <button class="btn btn-blue" type="submit">ดู</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px;">
+      <div style="font-weight:900;font-size:16px;">ประวัติการเข้าเรียน</div>
+      {% if selected_enrollment %}
+        <div style="opacity:.8;font-weight:800;">
+          คลาส: {{ selected_enrollment.tutoring_class.name }}
+        </div>
+      {% endif %}
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th style="width:140px;">วันที่</th>
+          <th style="width:220px;">สถานะ</th>
+          <th>หมายเหตุ</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for a in attendance_rows %}
+          <tr>
+            <td style="font-weight:900;">{{ a.attendance_date|date:"d M Y" }}</td>
+            <td style="font-weight:900;">
+              {{ a.get_status_display }}
+            </td>
+            <td style="opacity:.8;font-weight:700;">
+              {% if a.deducted %}หัก 1 ครั้ง{% else %}ไม่หักครั้ง{% endif %}
+            </td>
+          </tr>
+        {% empty %}
+          <tr>
+            <td colspan="3" style="opacity:.8;font-weight:800;">ยังไม่มีข้อมูลการเช็คชื่อ</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endblock %}

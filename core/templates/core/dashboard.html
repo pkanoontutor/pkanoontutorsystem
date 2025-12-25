@@ -1,0 +1,721 @@
+{% extends "core/base.html" %}
+{% load extras %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block head %}
+<style>
+  .two-col { display:flex; gap:14px; align-items:flex-start; }
+  .left { flex: 1.6; min-width: 520px; }
+  .right { flex: 1; min-width: 360px; position: sticky; top: 12px; }
+  @media (max-width: 1100px){
+    .two-col { flex-direction: column; }
+    .left, .right { min-width: unset; position: static; }
+  }
+
+  /* ✅ ปรับความสวยงามของปุ่มตามที่ขอ */
+  .btn-att { color:#fff !important; font-weight:800 !important; }
+  .btn-green { background:#16a34a !important; border-color:#16a34a !important; } /* มา */
+  .btn-yellow { background:#eab308 !important; border-color:#eab308 !important; } /* ลา */
+  .btn-red { background:#dc2626 !important; border-color:#dc2626 !important; } /* ขาด */
+  .btn-submit { background:#2563eb !important; border-color:#2563eb !important; color:#fff !important; font-weight:800 !important; }
+  .btn-go { background:#111827 !important; border-color:#111827 !important; color:#fff !important; font-weight:800 !important; }
+
+  .btn-primary { background:#2563eb !important; border-color:#2563eb !important; color:#fff !important; font-weight:800 !important; }
+  .btn-success { background:#16a34a !important; border-color:#16a34a !important; color:#fff !important; font-weight:800 !important; }
+  .btn-sheet { background:#7c3aed !important; border-color:#7c3aed !important; color:#fff !important; font-weight:800 !important; }
+
+  /* ✅ ไอคอนจบคอร์ส */
+  .enroll-icon { text-decoration:none; font-size:13px; padding:2px 6px; border-radius:6px; background:#e5e7eb; color:#111827; font-weight:900; }
+  .enroll-icon:hover { background:#d1d5db; }
+
+  /* ✅ badge คอร์สปัจจุบัน */
+  .badge-current { display:inline-block; padding:2px 8px; border-radius:999px; font-size:12px; border:1px solid #bfdbfe; background:#eff6ff; color:#1d4ed8; margin-left:6px; font-weight:800; }
+
+  /* ✅ (ข้อ 1) กดแล้วกรอบดำ + ปุ่มอื่นจางลง */
+  .active-btn { outline: 2px solid #000 !important; outline-offset: 1px; }
+  .btn-dim { opacity: .35 !important; filter: saturate(.6); }
+
+  /* ✅ รูปโปรไฟล์ (avatar) */
+  .avatar {
+    width:51px; height:51px;
+    border-radius:999px;
+    overflow:hidden;
+    border:1px solid #e5e7eb;
+    background:#f3f4f6;
+    flex:0 0 auto;
+  }
+  .avatar img {
+    width:51px; height:51px;
+    object-fit:cover;
+    display:block;
+  }
+  .avatar-fallback {
+    width:51px; height:51px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-weight:900;
+    color:#6b7280;
+    user-select:none;
+  }
+
+  /* ✅ Toolbar 4 ปุ่ม */
+  .toolbar-card { flex: 1; }
+  .toolbar-grid{
+    display:grid;
+    grid-template-columns: repeat(4, minmax(160px, 1fr));
+    gap:10px;
+    align-items:stretch;
+  }
+  @media (max-width: 1100px){
+    .toolbar-grid{ grid-template-columns: repeat(2, minmax(160px, 1fr)); }
+  }
+  @media (max-width: 520px){
+    .toolbar-grid{ grid-template-columns: 1fr; }
+  }
+  .toolbtn{
+    display:flex;
+    flex-direction:column;
+    gap:2px;
+    padding:10px 12px;
+    border-radius:10px;
+    border:1px solid rgba(255,255,255,.15);
+    text-decoration:none;
+    color:#fff !important;
+    font-weight:900;
+    line-height:1.1;
+  }
+  .toolbtn small{
+    font-weight:700;
+    opacity:.9;
+    font-size: 50%;
+  }
+  .toolbtn.t1{ background:#2563eb; }
+  .toolbtn.t2{ background:#16a34a; }
+  .toolbtn.t3{ background:#7c3aed; }
+  .toolbtn.t4{ background:#111827; }
+
+  /* ✅ แถบ % รวม (มา/ลา/ขาด) */
+  .att-bar-wrap{
+    border:1px solid #e5e7eb;
+    border-radius:999px;
+    overflow:hidden;
+    height:14px;
+    background:#f3f4f6;
+    display:flex;
+  }
+  .att-bar-seg{ height:14px; }
+  .seg-present{ background:#16a34a; }
+  .seg-excused{ background:#eab308; }
+  .seg-no-show{ background:#dc2626; }
+  .att-legend{
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+    margin-top:8px;
+    font-size:12px;
+    color:#6b7280;
+  }
+  .dot{
+    width:10px; height:10px; border-radius:999px; display:inline-block; margin-right:6px;
+  }
+
+  /* ✅ Date control ต่อห้อง (บรรทัดเดียวกับชื่อคลาส) */
+  .class-toprow{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:10px;
+    flex-wrap:wrap;
+  }
+  .class-datebox{
+    display:flex;
+    gap:8px;
+    align-items:center;
+    flex-wrap:wrap;
+  }
+  .class-datebox input[type="date"]{
+    padding:6px 8px;
+    border:1px solid #e5e7eb;
+    border-radius:8px;
+  }
+
+  /* ✅ Summary ใต้ชื่อห้อง */
+  .seat-line{
+    margin-top:6px;
+    font-size:12px;
+    color:#374151;
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+  }
+  .seat-pill{
+    background:#f3f4f6;
+    border:1px solid #e5e7eb;
+    padding:4px 8px;
+    border-radius:999px;
+    font-weight:800;
+  }
+  .att-line{
+    margin-top:6px;
+    font-size:12px;
+    display:flex;
+    gap:12px;
+    flex-wrap:wrap;
+    font-weight:900;
+  }
+  .t-present{ color:#16a34a; }
+  .t-excused{ color:#ca8a04; }
+  .t-noshow{ color:#dc2626; }
+  .t-total{ color:#111827; }
+
+  /* ✅ Summary table extra columns background */
+  .bg-soft{
+    background:#f3f4f6;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="topbar">
+  <div class="card toolbar-card" style="min-width:280px;">
+    <div class="toolbar-grid">
+      <a class="toolbtn t1" href="/admin/core/student/add/">
+        + New Student
+        <small>เพิ่มนักเรียนใหม่</small>
+      </a>
+      <a class="toolbtn t2" href="/admin/core/enrollment/add/">
+        + New Enrollment
+        <small>ขายคอร์ส</small>
+      </a>
+      <a class="toolbtn t3" href="/sheet-update/">
+        Sheet Update
+        <small>อัพเดทชีท</small>
+      </a>
+      <a class="toolbtn t4" href="/attendance-details/">
+        Student Attendance
+        <small>ตารางเช็คชื่อรวม</small>
+      </a>
+    </div>
+  </div>
+
+  <div class="card" style="min-width:280px; flex: 0.9;">
+    {% with total=global_summary.total|default:0 %}
+      {% if total > 0 %}
+        {% widthratio global_summary.present total 100 as pct_present %}
+        {% widthratio global_summary.excused total 100 as pct_excused %}
+        {% widthratio global_summary.no_show total 100 as pct_no_show %}
+      {% else %}
+        {% with pct_present=0 pct_excused=0 pct_no_show=0 %}{% endwith %}
+      {% endif %}
+    {% endwith %}
+
+    <div style="font-weight:800; margin-bottom:8px;">ภาพรวมวันนี้</div>
+
+    <div class="att-bar-wrap" aria-label="attendance percent bar">
+      <div class="att-bar-seg seg-present" style="width: {{ pct_present|default:0 }}%;"></div>
+      <div class="att-bar-seg seg-excused" style="width: {{ pct_excused|default:0 }}%;"></div>
+      <div class="att-bar-seg seg-no-show" style="width: {{ pct_no_show|default:0 }}%;"></div>
+    </div>
+
+    <div class="att-legend">
+      <span><i class="dot seg-present"></i>มา: <b id="g_present">{{ global_summary.present }}</b></span>
+      <span><i class="dot seg-excused"></i>ลา: <b id="g_excused">{{ global_summary.excused }}</b></span>
+      <span><i class="dot seg-no-show"></i>ขาด: <b id="g_no_show">{{ global_summary.no_show }}</b></span>
+      <span>รวม: <b id="g_total">{{ global_summary.total }}</b></span>
+    </div>
+  </div>
+</div>
+
+<div class="two-col">
+  <div class="left">
+
+    <!-- ✅ (1) Summary per class -->
+    <div class="card" style="margin-bottom:12px;">
+      <div style="font-weight:800; margin-bottom:8px;">สรุปวันนี้ (แยกตามห้อง)</div>
+      <div style="overflow:auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>ห้อง</th>
+              <th>มา</th>
+              <th>ลา</th>
+              <th>ขาด</th>
+              <th>รวม</th>
+              <th class="bg-soft">ที่นั่งรวม</th>
+              <th class="bg-soft">ระหว่างเรียน</th>
+              <th class="bg-soft">ที่นั่งว่าง</th>
+              <th>ไปที่ห้อง</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for cls in classes %}
+              {% with s=summary_by_class_id|get_item:cls.id %}
+              <tr id="summaryRow-{{ cls.id }}">
+                <td><b>{{ cls.name }}</b></td>
+                <td class="c_present">{{ s.present|default:0 }}</td>
+                <td class="c_excused">{{ s.excused|default:0 }}</td>
+                <td class="c_no_show">{{ s.no_show|default:0 }}</td>
+                <td class="c_total"><b>{{ s.total|default:0 }}</b></td>
+
+                <td class="bg-soft"><b>{{ cls.seats_total|default:0 }}</b></td>
+                <td class="bg-soft"><b>{{ cls.seats_in_progress|default:0 }}</b></td>
+                <td class="bg-soft"><b>{{ cls.seats_available|default:0 }}</b></td>
+
+                <td><a class="btn" href="#classCard-{{ cls.id }}">ไป</a></td>
+              </tr>
+              {% endwith %}
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ✅ (2) ใกล้ครบคอร์ส -->
+    <div class="card" style="margin-bottom:12px;">
+      <div style="font-weight:800; margin-bottom:6px;">ใกล้ครบคอร์ส (เหลือน้อยกว่า 2 ครั้ง)</div>
+      <div class="muted" style="margin-bottom:10px;">
+        แสดงเฉพาะคนที่เหลือ 1 / 0 / ติดลบ และเลือกช่องทางที่แจ้งเตือนได้เลย
+      </div>
+      <div style="overflow:auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>นักเรียน</th>
+              <th>คอร์ส</th>
+              <th>ราคา</th>
+              <th>คงเหลือ</th>
+              <th>เลือกการแจ้ง</th>
+              <th>ช่องทางที่แจ้ง</th>
+              <th>วันที่แจ้ง</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for e in near_complete %}
+            <tr>
+              <td>
+                <div style="display:flex; align-items:center; gap:10px;">
+                  <div class="avatar">
+                    {% if e.student.profile_image %}
+                      <img src="{{ e.student.profile_image.url }}" alt="profile">
+                    {% else %}
+                      <div class="avatar-fallback">?</div>
+                    {% endif %}
+                  </div>
+
+                  <div style="flex:1;">
+                    {% if e.remaining_sessions <= 0 %}
+                      <span class="danger">
+                        <b>{{ e.sale_run_no|default:"-" }}</b>
+                        {% if e.student.nickname %} | {{ e.student.nickname }}{% endif %}
+                        {% if e.student.full_name %} | {{ e.student.full_name }}{% endif %}
+                        {% if e.student.grade_level %} | {{ e.student.grade_level }}{% endif %}
+                      </span>
+                      <span class="badge">ครบคอร์สแล้ว</span>
+                    {% else %}
+                      <b>
+                        {{ e.sale_run_no|default:"-" }}
+                        {% if e.student.nickname %} | {{ e.student.nickname }}{% endif %}
+                        {% if e.student.full_name %} | {{ e.student.full_name }}{% endif %}
+                        {% if e.student.grade_level %} | {{ e.student.grade_level }}{% endif %}
+                      </b>
+                    {% endif %}
+
+                    <div class="muted">
+                      {% with seq=course_seq_by_enrollment_id|get_item:e.id %}
+                        {% with total=course_total_by_student|get_item:e.student_id %}
+                          คอร์สที่ <b>{{ seq|default:"-" }}</b> / <b>{{ total|default:"-" }}</b>
+                          {% if seq and total and seq == total %}
+                            <span class="badge-current">คอร์สปัจจุบัน</span>
+                          {% endif %}
+                        {% endwith %}
+                      {% endwith %}
+                    </div>
+
+                    <div class="muted">{{ e.get_enrollment_type_display }}</div>
+                  </div>
+
+                  <a class="enroll-icon" href="/admin/core/enrollment/{{ e.id }}/change/" title="ไปหน้าจบคอร์ส">🏁</a>
+                </div>
+              </td>
+
+              <td class="muted">{{ e.tutoring_class.name }}</td>
+              <td><b>{{ e.tutoring_class.course_price|floatformat:0 }}</b></td>
+              <td><b class="{% if e.remaining_sessions <= 0 %}danger{% endif %}">{{ e.remaining_sessions }}</b></td>
+
+              <td>
+                <form method="post" action="/alerts/mark/" style="margin:0;">
+                  {% csrf_token %}
+                  <input type="hidden" name="enrollment_id" value="{{ e.id }}">
+                  <select name="method" onchange="this.form.submit()">
+                    <option value="" {% if not e.notified_near_complete %}selected{% endif %}>ยังไม่แจ้ง</option>
+                    <option value="line" {% if e.notified_method == 'line' %}selected{% endif %}>แจ้งทาง Line</option>
+                    <option value="facebook" {% if e.notified_method == 'facebook' %}selected{% endif %}>แจ้งทาง FB</option>
+                    <option value="paper" {% if e.notified_method == 'paper' %}selected{% endif %}>แจ้งทางใบ</option>
+                  </select>
+                </form>
+              </td>
+
+              <td>
+                {% if e.notified_near_complete and e.notified_method %}
+                  {% if e.notified_method == "line" %}<b>แจ้งทาง Line</b>{% endif %}
+                  {% if e.notified_method == "facebook" %}<b>แจ้งทาง FB</b>{% endif %}
+                  {% if e.notified_method == "paper" %}<b>แจ้งทางใบ</b>{% endif %}
+                {% else %}
+                  -
+                {% endif %}
+              </td>
+
+              <td class="muted">
+                {% if e.notified_near_complete and e.notified_at %}
+                  {{ e.notified_at|date:"Y-m-d H:i" }}
+                {% else %}
+                  -
+                {% endif %}
+              </td>
+            </tr>
+            {% empty %}
+              <tr><td colspan="7" class="muted">ยังไม่มีคนใกล้ครบคอร์ส</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ✅ Class cards -->
+    <div class="grid" style="gap:14px;">
+      {% for cls in classes %}
+        {% with s=summary_by_class_id|get_item:cls.id %}
+        <div class="card" id="classCard-{{ cls.id }}">
+
+          <div class="class-header">
+            <!-- ✅ TOP ROW: ชื่อห้อง + วันที่/ไป + Submit (บรรทัดเดียว) -->
+            <div class="class-toprow">
+              <div class="class-title">{{ cls.name }}</div>
+
+              <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                <div class="class-datebox">
+                  <span class="muted">วันที่:</span>
+                  <input type="date" id="date-{{ cls.id }}" value="{{ selected_date|date:'Y-m-d' }}" />
+                  <button class="btn btn-go" type="button" onclick="return gotoDateForClass({{ cls.id }});">ไป</button>
+                </div>
+
+                <button class="btn btn-submit" onclick="return submitClass({{ cls.id }});">Submit ห้องนี้</button>
+              </div>
+            </div>
+
+            <!-- ✅ ใต้ชื่อห้อง: ที่นั่ง + มา/ลา/ขาด/รวม แบบสี -->
+            <div class="seat-line">
+              <span class="seat-pill">ที่นั่งรวม: <b>{{ cls.seats_total|default:0 }}</b></span>
+              <span class="seat-pill">ระหว่างเรียน: <b>{{ cls.seats_in_progress|default:0 }}</b></span>
+              <span class="seat-pill">ที่นั่งว่าง: <b>{{ cls.seats_available|default:0 }}</b></span>
+              <span class="muted">ชั่วโมงต่อครั้ง: {{ cls.hours_per_session }}</span>
+            </div>
+
+            <div class="att-line" id="classSummary-{{ cls.id }}">
+              <span class="t-present">มา: <b class="c_present">{{ s.present|default:0 }}</b></span>
+              <span class="t-excused">ลา: <b class="c_excused">{{ s.excused|default:0 }}</b></span>
+              <span class="t-noshow">ขาด: <b class="c_no_show">{{ s.no_show|default:0 }}</b></span>
+              <span class="t-total">รวม: <b class="c_total">{{ s.total|default:0 }}</b></span>
+            </div>
+          </div>
+
+          <div style="overflow:auto; margin-top:10px;">
+            <table>
+              <thead>
+                <tr>
+                  <th>นักเรียน</th>
+                  <th>ทั้งหมด</th>
+                  <th>คงเหลือ</th>
+                  <th>บันทึกล่าสุด</th>
+                  <th>เช็คชื่อ</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for e in enrollments %}
+                  {% if e.tutoring_class_id == cls.id %}
+                    {% with a=att_map|get_item:e.id %}
+                    <tr id="row-{{ e.id }}">
+                      <td>
+                        <div style="display:flex; align-items:center; gap:10px;">
+                          <div class="avatar">
+                            {% if e.student.profile_image %}
+                              <img src="{{ e.student.profile_image.url }}" alt="profile">
+                            {% else %}
+                              <div class="avatar-fallback">?</div>
+                            {% endif %}
+                          </div>
+
+                          <div style="flex:1;">
+                            {% if e.remaining_sessions <= 0 %}
+                              <span class="danger">
+                                <b>{{ e.sale_run_no|default:"-" }}</b>
+                                {% if e.student.nickname %} | {{ e.student.nickname }}{% endif %}
+                                {% if e.student.full_name %} | {{ e.student.full_name }}{% endif %}
+                                {% if e.student.grade_level %} | {{ e.student.grade_level }}{% endif %}
+                              </span>
+                              <span class="badge">ครบคอร์สแล้ว</span>
+                            {% else %}
+                              <b>
+                                {{ e.sale_run_no|default:"-" }}
+                                {% if e.student.nickname %} | {{ e.student.nickname }}{% endif %}
+                                {% if e.student.full_name %} | {{ e.student.full_name }}{% endif %}
+                                {% if e.student.grade_level %} | {{ e.student.grade_level }}{% endif %}
+                              </b>
+                            {% endif %}
+
+                            <div class="muted">
+                              {% with seq=course_seq_by_enrollment_id|get_item:e.id %}
+                                {% with total=course_total_by_student|get_item:e.student_id %}
+                                  คอร์สที่ <b>{{ seq|default:"-" }}</b> / <b>{{ total|default:"-" }}</b>
+                                  {% if seq and total and seq == total %}
+                                    <span class="badge-current">คอร์สปัจจุบัน</span>
+                                  {% endif %}
+                                {% endwith %}
+                              {% endwith %}
+                            </div>
+
+                            <div class="muted">{{ e.get_enrollment_type_display }}</div>
+                          </div>
+
+                          <a class="enroll-icon" href="/admin/core/enrollment/{{ e.id }}/change/" title="ไปหน้าจบคอร์ส">🏁</a>
+                        </div>
+                      </td>
+
+                      <td><b>{{ e.sessions_total }}</b></td>
+                      <td>
+                        <b id="remaining-{{ e.id }}" class="{% if e.remaining_sessions <= 0 %}danger{% endif %}">
+                          {{ e.remaining_sessions }}
+                        </b>
+                      </td>
+
+                      <td class="muted" id="last-{{ e.id }}">
+                        {% if a and a.checked_at %}
+                          {{ a.checked_at|date:"Y-m-d H:i" }}
+                        {% else %}
+                          -
+                        {% endif %}
+                      </td>
+
+                      <td>
+                        <button class="btn btn-att btn-green {% if a and a.status == 'present' %}active-btn{% endif %}" onclick="return pickStatus({{ cls.id }}, {{ e.id }}, 'present');">มา</button>
+                        <button class="btn btn-att btn-yellow {% if a and a.status == 'excused' %}active-btn{% endif %}" onclick="return pickStatus({{ cls.id }}, {{ e.id }}, 'excused');">ลา</button>
+                        <button class="btn btn-att btn-red {% if a and a.status == 'no_show' %}active-btn{% endif %}" onclick="return pickStatus({{ cls.id }}, {{ e.id }}, 'no_show');">ขาด</button>
+                      </td>
+                    </tr>
+                    {% endwith %}
+                  {% endif %}
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        {% endwith %}
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- RIGHT: Sheets -->
+  <div class="right">
+    <div class="card" style="margin-bottom:12px;">
+      <div style="font-weight:800; font-size:16px;">ชีท / ความคืบหน้า</div>
+      <div class="muted">อัปเดตได้ที่ <b>Sheet Update</b> หรือ Admin → Classes → Class Subjects</div>
+      <div style="margin-top:10px;">
+        <a class="btn btn-sheet" href="/sheet-update/">ไปหน้า Sheet Update</a>
+      </div>
+    </div>
+
+    {% for cls in classes %}
+    <div class="card" style="margin-bottom:12px;">
+      <div style="font-weight:800;">{{ cls.name }}</div>
+
+      {% if grouped_subjects|get_item:cls.id %}
+        <div style="margin-top:10px; display:flex; flex-direction:column; gap:10px;">
+          {% for cs in grouped_subjects|get_item:cls.id %}
+          <div>
+            <div style="display:flex; justify-content:space-between; gap:10px;">
+              <div><b>{{ cs.subject.name }}</b></div>
+              <div><b>{{ cs.progress_percent }}%</b></div>
+            </div>
+
+            <div class="muted" style="margin-top:2px;">
+              {% if cs.current_sheet %}
+                {{ cs.current_sheet.code }} — {{ cs.current_sheet.title }}
+              {% else %}
+                -
+              {% endif %}
+            </div>
+
+            <div class="muted" style="margin-top:2px;">
+              {% if cs.current_sheet and cs.current_sheet.total_pages %}
+                หน้า {{ cs.current_page }} / {{ cs.current_sheet.total_pages }}
+              {% elif cs.current_sheet and cs.current_sheet.total_questions %}
+                ข้อ {{ cs.current_question }} / {{ cs.current_sheet.total_questions }}
+              {% else %}
+                -
+              {% endif %}
+            </div>
+
+            <div style="height:8px; background:#f3f4f6; border-radius:999px; overflow:hidden; border:1px solid #e5e7eb; margin-top:6px;">
+              <div style="height:8px; width: {{ cs.progress_percent }}%; background:#111827;"></div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="muted" style="margin-top:8px;">ยังไม่มีวิชาในคลาสนี้</div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<script>
+  function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+      const cookies = document.cookie.split(';');
+      for (let i = 0; i < cookies.length; i++) {
+        const cookie = cookies[i].trim();
+        if (cookie.substring(0, name.length + 1) === (name + '=')) {
+          cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+          break;
+        }
+      }
+    }
+    return cookieValue;
+  }
+
+  const csrftoken = getCookie('csrftoken');
+  const picks = {};
+
+  function ensureClass(classId){
+    if(!picks[classId]) picks[classId] = {};
+  }
+
+  function getSelectedDateForClass(classId){
+    const el = document.getElementById("date-" + classId);
+    return el ? el.value : "{{ selected_date|date:'Y-m-d' }}";
+  }
+
+  function gotoDateForClass(classId){
+    const d = getSelectedDateForClass(classId);
+    const url = new URL(window.location.href);
+    url.searchParams.set("date", d);
+    window.location.href = url.toString() + "#classCard-" + classId;
+    return false;
+  }
+
+  function markButtons(enrollmentId, status){
+    const row = document.getElementById("row-" + enrollmentId);
+    if(!row) return;
+    const green = row.querySelector(".btn-green");
+    const yellow = row.querySelector(".btn-yellow");
+    const red = row.querySelector(".btn-red");
+    const btns = [green, yellow, red].filter(Boolean);
+
+    btns.forEach(b => {
+      b.classList.remove("active-btn");
+      b.classList.remove("btn-dim");
+    });
+
+    let activeBtn = null;
+    if(status === "present") activeBtn = green;
+    if(status === "excused") activeBtn = yellow;
+    if(status === "no_show") activeBtn = red;
+
+    if(activeBtn){
+      activeBtn.classList.add("active-btn");
+      btns.forEach(b => {
+        if(b !== activeBtn) b.classList.add("btn-dim");
+      });
+    }
+  }
+
+  function pickStatus(classId, enrollmentId, status){
+    ensureClass(classId);
+    picks[classId][enrollmentId] = status;
+    markButtons(enrollmentId, status);
+    return false;
+  }
+
+  function setGlobalSummary(gs){
+    document.getElementById("g_present").textContent = gs.present;
+    document.getElementById("g_excused").textContent = gs.excused;
+    document.getElementById("g_no_show").textContent = gs.no_show;
+    document.getElementById("g_total").textContent = gs.total;
+  }
+
+  function setClassSummary(classId, cs){
+    const box = document.getElementById("classSummary-" + classId);
+    if(!box) return;
+    box.querySelector(".c_present").textContent = cs.present;
+    box.querySelector(".c_excused").textContent = cs.excused;
+    box.querySelector(".c_no_show").textContent = cs.no_show;
+    box.querySelector(".c_total").textContent = cs.total;
+  }
+
+  async function submitClass(classId){
+    ensureClass(classId);
+
+    const items = Object.entries(picks[classId]).map(([eid, st]) => ({ enrollment_id: Number(eid), status: st }));
+    if(items.length === 0){
+      alert("ยังไม่ได้เลือกสถานะใครเลย");
+      return false;
+    }
+
+    const selectedDate = getSelectedDateForClass(classId);
+
+    const res = await fetch("/attendance/submit/", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-CSRFToken": csrftoken },
+      body: JSON.stringify({ date: selectedDate, class_id: classId, items })
+    });
+
+    const data = await res.json();
+    if(!data.ok){
+      alert(data.error || "Submit failed");
+      return false;
+    }
+
+    setClassSummary(data.class_id, data.class_summary);
+    setGlobalSummary(data.global_summary);
+
+    for(const [eid, remaining] of Object.entries(data.remaining_map)){
+      const remEl = document.getElementById("remaining-" + eid);
+      if(remEl){
+        remEl.textContent = remaining;
+        remEl.classList.toggle("danger", Number(remaining) <= 0);
+      }
+    }
+
+    const nowText = new Date().toLocaleString('th-TH');
+    for (const it of items) {
+      const lastEl = document.getElementById("last-" + it.enrollment_id);
+      if (lastEl) lastEl.textContent = nowText;
+    }
+
+    picks[classId] = {};
+    return false;
+  }
+
+  document.addEventListener("DOMContentLoaded", () => {
+    document.querySelectorAll("tr[id^='row-']").forEach(row => {
+      const eid = row.id.replace("row-", "");
+      const green = row.querySelector(".btn-green");
+      const yellow = row.querySelector(".btn-yellow");
+      const red = row.querySelector(".btn-red");
+
+      if(green && green.classList.contains("active-btn")) {
+        markButtons(eid, "present");
+      } else if(yellow && yellow.classList.contains("active-btn")) {
+        markButtons(eid, "excused");
+      } else if(red && red.classList.contains("active-btn")) {
+        markButtons(eid, "no_show");
+      }
+    });
+  });
+</script>
+{% endblock %}

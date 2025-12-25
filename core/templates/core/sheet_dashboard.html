@@ -1,0 +1,70 @@
+{% extends "core/base.html" %}
+{% load extras %}
+{% block title %}Sheet Progress Dashboard{% endblock %}
+
+
+{% block content %}
+<div class="topbar">
+  <div class="card" style="flex:1; min-width:280px;">
+    <div style="font-weight:800; font-size:18px;">Sheet Progress Dashboard</div>
+    <div class="muted">ดูความคืบหน้า “คลาส/วิชา/ชีท” (อัปเดตได้ใน Admin → Classes → Class Subjects)</div>
+  </div>
+</div>
+
+<div class="grid" style="gap:14px;">
+  {% for cls in classes %}
+  <div class="card">
+    <div class="class-header">
+      <div>
+        <div class="class-title">{{ cls.name }}</div>
+        <div class="muted">ชั่วโมงต่อครั้ง: {{ cls.hours_per_session }}</div>
+      </div>
+    </div>
+
+    {% if grouped|get_item:cls.id %}
+      <table>
+        <thead>
+          <tr>
+            <th>วิชา</th>
+            <th>ชีท</th>
+            <th>หน้า/ข้อ</th>
+            <th>Progress</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for cs in grouped|get_item:cls.id %}
+          <tr>
+            <td><b>{{ cs.subject.name }}</b></td>
+            <td class="muted">
+              {% if cs.current_sheet %}
+                <b>{{ cs.current_sheet.code }}</b> — {{ cs.current_sheet.title }}
+              {% else %}
+                -
+              {% endif %}
+            </td>
+            <td class="muted">
+              {% if cs.current_sheet and cs.current_sheet.total_pages %}
+                หน้า {{ cs.current_page }} / {{ cs.current_sheet.total_pages }}
+              {% elif cs.current_sheet and cs.current_sheet.total_questions %}
+                ข้อ {{ cs.current_question }} / {{ cs.current_sheet.total_questions }}
+              {% else %}
+                -
+              {% endif %}
+            </td>
+            <td>
+              <b>{{ cs.progress_percent }}%</b>
+              <div style="height:8px; background:#f3f4f6; border-radius:999px; overflow:hidden; border:1px solid #e5e7eb;">
+                <div style="height:8px; width: {{ cs.progress_percent }}%; background:#111827;"></div>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <div class="muted">ยังไม่มีวิชาในคลาสนี้ (ไปเพิ่มที่ Admin → Classes)</div>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

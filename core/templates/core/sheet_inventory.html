@@ -1,0 +1,116 @@
+{% extends "core/base.html" %}
+{% block title %}Sheet Inventory{% endblock %}
+
+{% block content %}
+  <div class="topbar">
+    <a class="btn btn-dark" href="/dashboard/">← Dashboard</a>
+    <div class="card" style="flex:1;">
+      <div style="font-size:18px;font-weight:900;">Sheet Inventory</div>
+      <div class="muted">นับจำนวนชีทคงเหลือ / เพิ่ม-ลด / แก้ไขเลข / จบชีท</div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:14px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px;">
+      <div style="font-weight:900;font-size:16px;">ชีทคงเหลือ (เรียงตามรหัส A-Z)</div>
+      <span class="pill">ทั้งหมด {{ active_items|length }} รหัส</span>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th style="width:120px;">Code</th>
+          <th>Title</th>
+          <th style="width:160px;">Subject</th>
+          <th style="width:110px;">คงเหลือ</th>
+          <th style="width:360px;">Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for it in active_items %}
+          <tr>
+            <td style="font-weight:900;">{{ it.sheet.code }}</td>
+            <td style="font-weight:800;">{{ it.sheet.title }}</td>
+            <td class="muted" style="font-weight:800;">{{ it.sheet.subject.name }}</td>
+            <td style="font-weight:900;font-size:16px;">{{ it.quantity }}</td>
+            <td>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                <form method="post" style="margin:0;">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="dec" />
+                  <input type="hidden" name="item_id" value="{{ it.id }}" />
+                  <button class="btn btn-dark" type="submit">ลด -1</button>
+                </form>
+
+                <form method="post" style="margin:0;">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="inc" />
+                  <input type="hidden" name="item_id" value="{{ it.id }}" />
+                  <button class="btn btn-blue" type="submit">เพิ่ม +1</button>
+                </form>
+
+                <form method="post" style="margin:0;display:flex;gap:8px;align-items:center;">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="set" />
+                  <input type="hidden" name="item_id" value="{{ it.id }}" />
+                  <input name="quantity" type="number" value="{{ it.quantity }}" style="width:110px;" />
+                  <button class="btn btn-dark" type="submit">แก้ไขเลข</button>
+                </form>
+
+                <form method="post" style="margin:0;">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="finish" />
+                  <input type="hidden" name="item_id" value="{{ it.id }}" />
+                  <button class="btn btn-blue" type="submit">จบชีท</button>
+                </form>
+              </div>
+            </td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="5" class="muted" style="font-weight:800;">ยังไม่มีชีท</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px;">
+      <div style="font-weight:900;font-size:16px;">ชีทที่จบแล้ว</div>
+      <span class="pill">ทั้งหมด {{ finished_items|length }} รหัส</span>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th style="width:120px;">Code</th>
+          <th>Title</th>
+          <th style="width:160px;">Subject</th>
+          <th style="width:110px;">คงเหลือ</th>
+          <th style="width:220px;">จบเมื่อ</th>
+          <th style="width:140px;">Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for it in finished_items %}
+          <tr>
+            <td style="font-weight:900;">{{ it.sheet.code }}</td>
+            <td style="font-weight:800;">{{ it.sheet.title }}</td>
+            <td class="muted" style="font-weight:800;">{{ it.sheet.subject.name }}</td>
+            <td style="font-weight:900;font-size:16px;">{{ it.quantity }}</td>
+            <td class="muted" style="font-weight:800;">{% if it.finished_at %}{{ it.finished_at|date:"d M Y H:i" }}{% else %}-{% endif %}</td>
+            <td>
+              <form method="post" style="margin:0;">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="unfinish" />
+                <input type="hidden" name="item_id" value="{{ it.id }}" />
+                <button class="btn btn-dark" type="submit">ย้ายกลับ</button>
+              </form>
+            </td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="6" class="muted" style="font-weight:800;">ยังไม่มีชีทที่จบแล้ว</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endblock %}

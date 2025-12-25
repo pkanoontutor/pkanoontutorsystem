@@ -1,0 +1,51 @@
+{% extends "core/base.html" %}
+{% block title %}Admin Dashboard{% endblock %}
+
+{% block content %}
+<div class="topbar">
+  <div class="card" style="flex:1; min-width:280px;">
+    <div style="font-weight:900; font-size:18px;">Admin Dashboard</div>
+    <div class="muted">Active Students รายสัปดาห์ (ย้อนหลัง {{ weeks }} สัปดาห์)</div>
+  </div>
+  <div class="card">
+    <a class="btn" href="/dashboard/">กลับ Dashboard</a>
+    <a class="btn" href="/admin/">ไป Admin</a>
+  </div>
+</div>
+
+<div class="card">
+  <div style="font-weight:800; margin-bottom:8px;">Active Students / Week</div>
+
+  {# กราฟแท่งแบบไม่พึ่ง lib ภายนอก #}
+  <div style="display:flex; gap:10px; align-items:flex-end; height:220px; padding:10px 6px; border:1px solid #e5e7eb; border-radius:12px;">
+    <div class="card">
+  <div style="font-weight:800; margin-bottom:8px;">Active Students / Week</div>
+
+  <div style="display:flex; gap:10px; align-items:flex-end; height:220px; padding:10px 6px; border:1px solid #e5e7eb; border-radius:12px;">
+    {% for c in counts %}
+      {% if max_count > 0 %}
+        {% widthratio c max_count 200 as h %}
+      {% else %}
+        {% widthratio 0 1 0 as h %}
+      {% endif %}
+
+      <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:6px;">
+        <div style="font-weight:800;">{{ c }}</div>
+        <div style="width:100%; height:{{ h }}px; background:#2563eb; border-radius:10px;"></div>
+        <div class="muted" style="font-size:12px;">{{ labels|slice:forloop.counter0|first }}</div>
+      </div>
+    {% endfor %}
+  </div>
+
+  <div class="muted" style="margin-top:10px;">
+    * “Active” = มีการบันทึก Attendance ในสัปดาห์นั้น (มา/ลา/ขาด)
+  </div>
+</div>
+
+  </div>
+
+  <div class="muted" style="margin-top:10px;">
+    * “Active” = มีการบันทึก Attendance ในสัปดาห์นั้น (มา/ลา/ขาด)
+  </div>
+</div>
+{% endblock %}

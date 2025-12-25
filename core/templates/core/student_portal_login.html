@@ -1,0 +1,36 @@
+{% extends "core/base_portal.html" %}
+{% block title %}Student Portal - Login{% endblock %}
+
+{% block content %}
+  <div class="card" style="max-width:520px;margin:0 auto;">
+    <h2 style="margin:0 0 8px 0;">เข้าสู่ระบบผู้ปกครอง</h2>
+    <div style="opacity:.8;font-weight:700;margin-bottom:14px;">
+      ใช้ <b>รหัสนักเรียน</b> และ <b>เบอร์ผู้ปกครอง</b> ที่ลงทะเบียนไว้
+    </div>
+
+    {% if form.errors %}
+      <div class="error">
+        {% for err in form.non_field_errors %}{{ err }}{% endfor %}
+        {% for field in form %}
+          {% for err in field.errors %}{{ err }}{% endfor %}
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    <form method="post">
+      {% csrf_token %}
+      <div class="field">
+        <label for="id_student_code">รหัสนักเรียน</label>
+        {{ form.student_code }}
+      </div>
+      <div class="field">
+        <label for="id_parent_phone">เบอร์ผู้ปกครอง</label>
+        {{ form.parent_phone }}
+      </div>
+
+      <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:14px;">
+        <button class="btn btn-blue" type="submit">เข้าสู่ระบบ</button>
+      </div>
+    </form>
+  </div>
+{% endblock %}

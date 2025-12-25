@@ -1,0 +1,46 @@
+[
+  { "model": "core.subject", "pk": 1, "fields": { "name": "คณิต", "is_active": true } },
+  { "model": "core.subject", "pk": 2, "fields": { "name": "อังกฤษ", "is_active": true } },
+  { "model": "core.subject", "pk": 3, "fields": { "name": "วิทย์", "is_active": true } },
+  { "model": "core.subject", "pk": 4, "fields": { "name": "ไทย", "is_active": true } },
+
+  { "model": "core.sheet", "pk": 1, "fields": { "code": "MATH-001", "title": "เศษส่วนพื้นฐาน", "subject": 1, "total_pages": 40, "total_questions": 0, "is_active": true } },
+  { "model": "core.sheet", "pk": 2, "fields": { "code": "ENG-001", "title": "Present Simple", "subject": 2, "total_pages": 25, "total_questions": 0, "is_active": true } },
+  { "model": "core.sheet", "pk": 3, "fields": { "code": "SCI-001", "title": "พืชและการสังเคราะห์แสง", "subject": 3, "total_pages": 30, "total_questions": 0, "is_active": true } },
+  { "model": "core.sheet", "pk": 4, "fields": { "code": "THAI-001", "title": "การอ่านจับใจความ", "subject": 4, "total_pages": 20, "total_questions": 0, "is_active": true } },
+
+  { "model": "core.tutoringclass", "pk": 1, "fields": { "name": "ป.6 ห้อง A (เสาร์บ่าย)", "hours_per_session": "3.00", "is_active": true } },
+  { "model": "core.tutoringclass", "pk": 2, "fields": { "name": "ป.5 ห้อง B (อาทิตย์บ่าย)", "hours_per_session": "3.00", "is_active": true } },
+  { "model": "core.tutoringclass", "pk": 3, "fields": { "name": "ม.3 ห้อง C (เย็น)", "hours_per_session": "2.00", "is_active": true } },
+
+  { "model": "core.classsubject", "pk": 1, "fields": { "tutoring_class": 1, "subject": 1, "current_sheet": 1, "current_page": 12, "current_question": 0, "updated_at": "2025-12-20T00:00:00Z", "updated_by": null, "is_active": true } },
+  { "model": "core.classsubject", "pk": 2, "fields": { "tutoring_class": 1, "subject": 2, "current_sheet": 2, "current_page": 5, "current_question": 0, "updated_at": "2025-12-20T00:00:00Z", "updated_by": null, "is_active": true } },
+  { "model": "core.classsubject", "pk": 3, "fields": { "tutoring_class": 2, "subject": 1, "current_sheet": 1, "current_page": 8, "current_question": 0, "updated_at": "2025-12-20T00:00:00Z", "updated_by": null, "is_active": true } },
+  { "model": "core.classsubject", "pk": 4, "fields": { "tutoring_class": 2, "subject": 4, "current_sheet": 4, "current_page": 3, "current_question": 0, "updated_at": "2025-12-20T00:00:00Z", "updated_by": null, "is_active": true } },
+  { "model": "core.classsubject", "pk": 5, "fields": { "tutoring_class": 3, "subject": 1, "current_sheet": 1, "current_page": 20, "current_question": 0, "updated_at": "2025-12-20T00:00:00Z", "updated_by": null, "is_active": true } },
+  { "model": "core.classsubject", "pk": 6, "fields": { "tutoring_class": 3, "subject": 3, "current_sheet": 3, "current_page": 10, "current_question": 0, "updated_at": "2025-12-20T00:00:00Z", "updated_by": null, "is_active": true } },
+
+  { "model": "core.student", "pk": 1, "fields": { "full_name": "ดลพร แสงทอง", "nickname": "ดอลล่า", "grade_level": "ป.6", "academic_year": "2568", "school_name": "รร.บ้านสวน", "parent_phone": "0891112222", "contact_channel": "line", "note": "", "is_active": true, "created_at": "2025-12-01T00:00:00Z" } },
+  { "model": "core.student", "pk": 2, "fields": { "full_name": "หมิงขวัญ วงศ์ดี", "nickname": "หมิง", "grade_level": "ป.6", "academic_year": "2568", "school_name": "รร.เมืองใหม่", "parent_phone": "0893334444", "contact_channel": "facebook", "note": "", "is_active": true, "created_at": "2025-12-01T00:00:00Z" } },
+  { "model": "core.student", "pk": 3, "fields": { "full_name": "อลิษา วัฒนะ", "nickname": "อลิษ", "grade_level": "ป.6", "academic_year": "2568", "school_name": "รร.วัดกลาง", "parent_phone": "0865556666", "contact_channel": "line", "note": "", "is_active": true, "created_at": "2025-12-02T00:00:00Z" } },
+  { "model": "core.student", "pk": 4, "fields": { "full_name": "ธีรเดช คงดี", "nickname": "เฟิร์ส", "grade_level": "ป.5", "academic_year": "2568", "school_name": "รร.สามัคคี", "parent_phone": "0817778888", "contact_channel": "line", "note": "", "is_active": true, "created_at": "2025-12-02T00:00:00Z" } },
+  { "model": "core.student", "pk": 5, "fields": { "full_name": "โอภาส อินทร์ทอง", "nickname": "โอโร่", "grade_level": "ป.5", "academic_year": "2568", "school_name": "รร.บ้านดอน", "parent_phone": "0829990000", "contact_channel": "facebook", "note": "", "is_active": true, "created_at": "2025-12-03T00:00:00Z" } },
+  { "model": "core.student", "pk": 6, "fields": { "full_name": "ปังปอนด์ ศรีสุข", "nickname": "ปังปอนด์", "grade_level": "ป.5", "academic_year": "2568", "school_name": "รร.บ้านคลอง", "parent_phone": "0891212121", "contact_channel": "line", "note": "", "is_active": true, "created_at": "2025-12-03T00:00:00Z" } },
+  { "model": "core.student", "pk": 7, "fields": { "full_name": "กิตติพงศ์ ศิริชัย", "nickname": "กิต", "grade_level": "ม.3", "academic_year": "2568", "school_name": "รร.มัธยมเมือง", "parent_phone": "0834545454", "contact_channel": "line", "note": "", "is_active": true, "created_at": "2025-12-04T00:00:00Z" } },
+  { "model": "core.student", "pk": 8, "fields": { "full_name": "ณัฐชา พรหมศรี", "nickname": "นัท", "grade_level": "ม.3", "academic_year": "2568", "school_name": "รร.มัธยมเมือง", "parent_phone": "0845656565", "contact_channel": "facebook", "note": "", "is_active": true, "created_at": "2025-12-04T00:00:00Z" } },
+
+  { "model": "core.enrollment", "pk": 1, "fields": { "student": 1, "tutoring_class": 1, "enrollment_type": "normal_10", "sessions_total": 10, "created_at": "2025-12-05T00:00:00Z", "remark": "", "notified_near_complete": false, "notified_at": null } },
+  { "model": "core.enrollment", "pk": 2, "fields": { "student": 2, "tutoring_class": 1, "enrollment_type": "normal_20", "sessions_total": 20, "created_at": "2025-12-05T00:00:00Z", "remark": "", "notified_near_complete": false, "notified_at": null } },
+  { "model": "core.enrollment", "pk": 3, "fields": { "student": 3, "tutoring_class": 1, "enrollment_type": "first_trial_11", "sessions_total": 11, "created_at": "2025-12-06T00:00:00Z", "remark": "ทดลองเรียน", "notified_near_complete": false, "notified_at": null } },
+
+  { "model": "core.enrollment", "pk": 4, "fields": { "student": 4, "tutoring_class": 2, "enrollment_type": "normal_10", "sessions_total": 10, "created_at": "2025-12-06T00:00:00Z", "remark": "", "notified_near_complete": false, "notified_at": null } },
+  { "model": "core.enrollment", "pk": 5, "fields": { "student": 5, "tutoring_class": 2, "enrollment_type": "first_bonus_12", "sessions_total": 12, "created_at": "2025-12-07T00:00:00Z", "remark": "แถมครั้ง", "notified_near_complete": false, "notified_at": null } },
+  { "model": "core.enrollment", "pk": 6, "fields": { "student": 6, "tutoring_class": 2, "enrollment_type": "normal_20", "sessions_total": 20, "created_at": "2025-12-07T00:00:00Z", "remark": "", "notified_near_complete": false, "notified_at": null } },
+
+  { "model": "core.enrollment", "pk": 7, "fields": { "student": 7, "tutoring_class": 3, "enrollment_type": "normal_20", "sessions_total": 20, "created_at": "2025-12-08T00:00:00Z", "remark": "", "notified_near_complete": false, "notified_at": null } },
+  { "model": "core.enrollment", "pk": 8, "fields": { "student": 8, "tutoring_class": 3, "enrollment_type": "normal_10", "sessions_total": 10, "created_at": "2025-12-08T00:00:00Z", "remark": "", "notified_near_complete": false, "notified_at": null } },
+
+  { "model": "core.attendance", "pk": 1, "fields": { "student": 1, "enrollment": 1, "attendance_date": "2025-12-20", "status": "present", "deducted": true, "checked_at": "2025-12-20T05:00:00Z" } },
+  { "model": "core.attendance", "pk": 2, "fields": { "student": 2, "enrollment": 2, "attendance_date": "2025-12-20", "status": "excused", "deducted": false, "checked_at": "2025-12-20T05:01:00Z" } },
+  { "model": "core.attendance", "pk": 3, "fields": { "student": 3, "enrollment": 3, "attendance_date": "2025-12-20", "status": "no_show", "deducted": true, "checked_at": "2025-12-20T05:02:00Z" } }
+]

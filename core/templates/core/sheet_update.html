@@ -1,0 +1,103 @@
+{% extends "core/base.html" %}
+{% block title %}Sheet Update{% endblock %}
+
+{% block content %}
+<div class="topbar">
+  <div class="card" style="flex:1; min-width:280px;">
+    <div style="font-weight:800; font-size:18px;">Sheet Update</div>
+    <div class="muted">กรอกความคืบหน้าชีทแบบรายวัน (ข้อมูลล่าสุดไปโชว์ใน Dashboard)</div>
+  </div>
+
+  <div class="card">
+    <form method="get" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+      <label class="muted">วันที่:</label>
+      <input type="date" name="date" value="{{ selected_date|date:'Y-m-d' }}" />
+      <button class="btn" type="submit">ไป</button>
+      <a class="btn" href="/">กลับ Dashboard</a>
+    </form>
+
+    <div class="muted" style="margin-top:6px;">
+      ค่าเริ่มต้นจะเป็น “วันที่ล่าสุดที่เคยหยอด”: {{ default_date|date:"Y-m-d" }}
+    </div>
+
+    {% if selected_date %}
+      <div class="muted" style="margin-top:2px;">
+        กำลังกรอกของวันที่: <b>{{ selected_date|date:"Y-m-d" }}</b>
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+<form method="post">
+  {% csrf_token %}
+  <input type="hidden" name="date" value="{{ selected_date|date:'Y-m-d' }}">
+
+  {% for g in grouped %}
+    <div class="card" style="margin-top:12px;">
+      <div style="font-weight:800;">{{ g.class.name }}</div>
+
+      <div style="overflow:auto; margin-top:10px;">
+        <table>
+          <thead>
+            <tr>
+              <th>วิชา</th>
+              <th>รหัสชีท</th>
+              <th>เลขหน้าที่สอนถึง</th>
+              <th>เลขข้อที่สอนถึง</th>
+              <th>เลขหน้าทั้งหมด</th>
+              <th>คนที่สอนครั้งล่าสุด</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            {% for row in g.forms %}
+              {% with cs=row.class_subject f=row.form total=row.total_pages %}
+              <tr>
+                <td style="min-width:160px;">
+                  <b>{{ f.subject_name.value }}</b>
+                  {{ f.class_subject_id }}
+                </td>
+
+                <td style="min-width:240px;">
+                  {{ f.sheet }}
+                </td>
+
+                <td style="min-width:180px;">
+                  {{ f.page_taught_to }}
+                </td>
+
+                <td style="min-width:180px;">
+                  {{ f.question_taught_to }}
+                </td>
+
+                <td style="min-width:150px;">
+                  {% if total and total > 0 %}
+                    <b>{{ total }}</b>
+                  {% else %}
+                    -
+                  {% endif %}
+                  <div class="muted" style="font-size:12px;">(ดึงจากชีทที่เลือก)</div>
+                </td>
+
+                <td style="min-width:220px;">
+                  {{ f.last_teacher }}
+                </td>
+              </tr>
+              {% endwith %}
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  {% empty %}
+    <div class="card" style="margin-top:12px;">
+      <div class="muted">ยังไม่มีข้อมูลคลาส/วิชา (ตรวจว่า ClassSubject ถูกสร้างแล้วหรือยัง)</div>
+    </div>
+  {% endfor %}
+
+  <div style="margin:14px 0; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+    <button class="btn" type="submit">Save</button>
+    <span class="muted">บันทึกแล้ว Dashboard จะใช้ “วันที่ล่าสุดที่หยอด” เป็นข้อมูลหลัก</span>
+  </div>
+</form>
+{% endblock %}

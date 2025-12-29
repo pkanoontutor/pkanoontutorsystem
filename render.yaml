@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: pkanoontutor
+    env: python
+    pythonVersion: 3.12.8
+    buildCommand: |
+      pip install -r requirements.txt
+      python manage.py collectstatic --no-input
+      python manage.py migrate
+    startCommand: gunicorn config.wsgi:application

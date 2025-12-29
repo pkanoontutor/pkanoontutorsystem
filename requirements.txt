@@ -7,3 +7,4 @@ asgiref==3.8.1
 sqlparse==0.5.1
 tzdata==2025.2
 packaging==24.2
+Pillow==10.4.0

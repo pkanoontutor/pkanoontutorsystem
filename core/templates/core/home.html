@@ -6,25 +6,76 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>PKanoon Tutor</title>
   <style>
-    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:#fafafa;color:#111}
-    .wrap{max-width:980px;margin:0 auto;padding:24px}
-    .logo{display:flex;justify-content:center;align-items:center;margin:18px 0 24px}
-    .logo img{max-height:84px;object-fit:contain}
-    .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
-    .tile{background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 6px 20px rgba(0,0,0,.06);aspect-ratio:1/1}
-    .tile img{width:100%;height:100%;object-fit:cover;display:block}
-    .actions{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin:26px 0 6px}
-    .btn{
-      display:inline-flex;align-items:center;justify-content:center;gap:10px;
-      padding:14px 22px;border-radius:14px;text-decoration:none;font-weight:700;
-      border:1px solid rgba(0,0,0,.08);box-shadow:0 10px 26px rgba(0,0,0,.08);
-      transition:transform .08s ease, box-shadow .08s ease;
-      min-width:220px;
+    /* 🔶 เปลี่ยนพื้นหลัง */
+    body{
+      margin:0;
+      font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+      background:#FDCF72;
+      color:#111
     }
-    .btn:hover{transform:translateY(-1px);box-shadow:0 14px 30px rgba(0,0,0,.12)}
+
+    .wrap{max-width:980px;margin:0 auto;padding:24px}
+
+    .logo{
+      display:flex;
+      justify-content:center;
+      align-items:center;
+      margin:18px 0 24px
+    }
+
+    /* 🔶 ขยาย logo 4 เท่า */
+    .logo img{
+      max-height:336px; /* เดิม 84px */
+      object-fit:contain
+    }
+
+    .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+    .tile{
+      background:#fff;
+      border-radius:16px;
+      overflow:hidden;
+      box-shadow:0 6px 20px rgba(0,0,0,.06);
+      aspect-ratio:1/1
+    }
+    .tile img{width:100%;height:100%;object-fit:cover;display:block}
+
+    .actions{
+      display:flex;
+      gap:14px;
+      justify-content:center;
+      flex-wrap:wrap;
+      margin:26px 0 6px
+    }
+
+    .btn{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      gap:10px;
+      padding:14px 22px;
+      border-radius:14px;
+      text-decoration:none;
+      font-weight:700;
+      border:1px solid rgba(0,0,0,.08);
+      box-shadow:0 10px 26px rgba(0,0,0,.08);
+      transition:transform .08s ease, box-shadow .08s ease;
+      min-width:220px
+    }
+
+    .btn:hover{
+      transform:translateY(-1px);
+      box-shadow:0 14px 30px rgba(0,0,0,.12)
+    }
+
     .btn-student{background:#ffffff}
     .btn-tutor{background:#111;color:#fff;border-color:#111}
-    .hint{font-size:12px;color:#666;text-align:center;margin-top:10px}
+
+    .hint{
+      font-size:12px;
+      color:#333;
+      text-align:center;
+      margin-top:10px
+    }
   </style>
 </head>
 <body>

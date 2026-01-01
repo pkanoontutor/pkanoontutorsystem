@@ -5,87 +5,125 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>PKanoon Tutor</title>
+
   <style>
-    /* 🔶 เปลี่ยนพื้นหลัง */
     body{
       margin:0;
-      font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+      font-family:'Poppins', system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
       background:#FDCF72;
-      color:#111
+      color:#111;
     }
 
-    .wrap{max-width:980px;margin:0 auto;padding:24px}
+    .wrap{
+      max-width:1100px;
+      margin:0 auto;
+      padding:16px;
+    }
 
+    /* ===== LOGO ===== */
     .logo{
       display:flex;
       justify-content:center;
       align-items:center;
-      margin:18px 0 24px
+      margin:12px 0 20px;
     }
 
-    /* 🔶 ขยาย logo 4 เท่า */
     .logo img{
-      max-height:336px; /* เดิม 84px */
-      object-fit:contain
+      max-height:260px;
+      width:auto;
     }
 
-    .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+    /* ===== IMAGE GRID ===== */
+    .grid{
+      display:grid;
+      grid-template-columns:repeat(2, 1fr); /* mobile */
+      gap:10px;
+      margin-bottom:28px;
+    }
+
     .tile{
       background:#fff;
-      border-radius:16px;
+      border-radius:18px;
       overflow:hidden;
-      box-shadow:0 6px 20px rgba(0,0,0,.06);
-      aspect-ratio:1/1
+      box-shadow:0 6px 18px rgba(0,0,0,.08);
+      aspect-ratio:1/1;
     }
-    .tile img{width:100%;height:100%;object-fit:cover;display:block}
 
+    .tile img{
+      width:100%;
+      height:100%;
+      object-fit:cover;
+      display:block;
+    }
+
+    /* tablet+ */
+    @media (min-width: 640px){
+      .grid{
+        grid-template-columns:repeat(3, 1fr);
+      }
+      .logo img{
+        max-height:320px;
+      }
+    }
+
+    /* ===== BUTTONS ===== */
     .actions{
       display:flex;
+      flex-direction:column;
       gap:14px;
-      justify-content:center;
-      flex-wrap:wrap;
-      margin:26px 0 6px
+      align-items:center;
+      margin-bottom:8px;
     }
 
     .btn{
-      display:inline-flex;
-      align-items:center;
-      justify-content:center;
-      gap:10px;
-      padding:14px 22px;
-      border-radius:14px;
-      text-decoration:none;
+      width:100%;
+      max-width:360px;
+      padding:16px 22px;
+      border-radius:20px;
+      font-size:18px;
       font-weight:700;
-      border:1px solid rgba(0,0,0,.08);
-      box-shadow:0 10px 26px rgba(0,0,0,.08);
-      transition:transform .08s ease, box-shadow .08s ease;
-      min-width:220px
+      text-decoration:none;
+      text-align:center;
+      letter-spacing:.3px;
+      box-shadow:0 10px 26px rgba(0,0,0,.15);
+      transition:transform .15s ease, box-shadow .15s ease;
     }
 
     .btn:hover{
-      transform:translateY(-1px);
-      box-shadow:0 14px 30px rgba(0,0,0,.12)
+      transform:translateY(-2px);
+      box-shadow:0 16px 34px rgba(0,0,0,.22);
     }
 
-    .btn-student{background:#ffffff}
-    .btn-tutor{background:#111;color:#fff;border-color:#111}
+    /* Student Portal */
+    .btn-student{
+      color:#fff;
+      background:linear-gradient(135deg,#22c55e,#16a34a);
+    }
+
+    /* Tutor Portal */
+    .btn-tutor{
+      color:#fff;
+      background:linear-gradient(135deg,#6366f1,#4f46e5);
+    }
 
     .hint{
-      font-size:12px;
+      font-size:13px;
       color:#333;
       text-align:center;
-      margin-top:10px
+      margin-top:10px;
     }
   </style>
 </head>
+
 <body>
   <div class="wrap">
-    <!-- โลโก้ -->
+
+    <!-- LOGO -->
     <div class="logo">
       <img src="{% static 'core/logo.png' %}" alt="PKanoon Tutor">
     </div>
 
-    <!-- รูป 9 รูป 3x3 -->
+    <!-- IMAGE GRID -->
     <div class="grid">
       {% for i in "123456789" %}
         <div class="tile">
@@ -94,13 +132,16 @@
       {% endfor %}
     </div>
 
-    <!-- ปุ่ม -->
+    <!-- ACTION BUTTONS -->
     <div class="actions">
       <a class="btn btn-student" href="/student-portal/">👨‍👩‍👧 Student Portal</a>
       <a class="btn btn-tutor" href="/admin/login/?next=/admin/">🧑‍🏫 Tutor Portal</a>
     </div>
 
-    <div class="hint">หากเข้าระบบไม่ได้ กรุณาติดต่อพี่ขนุนติวเตอร์</div>
+    <div class="hint">
+      หากเข้าระบบไม่ได้ กรุณาติดต่อพี่ขนุนติวเตอร์
+    </div>
+
   </div>
 </body>
 </html>

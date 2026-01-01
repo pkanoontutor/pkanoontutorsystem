@@ -33,6 +33,8 @@ def _parse_date(s: str | None) -> date:
     except ValueError:
         return timezone.localdate()
 
+def home(request):
+    return render(request, "core/home.html")
 
 def home_redirect(request: HttpRequest) -> HttpResponse:
     # หน้าแรกให้ไป dashboard ใหม่
@@ -840,3 +842,4 @@ def sheet_inventory(request: HttpRequest) -> HttpResponse:
         "finished_items": finished_items,
     }
     return render(request, "core/sheet_inventory.html", context)
+    

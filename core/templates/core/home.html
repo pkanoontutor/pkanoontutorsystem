@@ -15,7 +15,7 @@
     }
 
     .wrap{
-      max-width:1100px;
+      max-width:1200px;
       margin:0 auto;
       padding:16px;
     }
@@ -24,7 +24,6 @@
     .logo{
       display:flex;
       justify-content:center;
-      align-items:center;
       margin:12px 0 20px;
     }
 
@@ -36,8 +35,8 @@
     /* ===== IMAGE GRID ===== */
     .grid{
       display:grid;
-      grid-template-columns:repeat(2, 1fr); /* mobile */
-      gap:10px;
+      grid-template-columns:repeat(2, 1fr); /* 📱 mobile: 2x4 */
+      gap:12px;
       margin-bottom:28px;
     }
 
@@ -56,10 +55,10 @@
       display:block;
     }
 
-    /* tablet+ */
-    @media (min-width: 640px){
+    /* 🖥 desktop / tablet */
+    @media (min-width: 768px){
       .grid{
-        grid-template-columns:repeat(3, 1fr);
+        grid-template-columns:repeat(4, 1fr); /* 4x2 */
       }
       .logo img{
         max-height:320px;
@@ -94,13 +93,11 @@
       box-shadow:0 16px 34px rgba(0,0,0,.22);
     }
 
-    /* Student Portal */
     .btn-student{
       color:#fff;
       background:linear-gradient(135deg,#22c55e,#16a34a);
     }
 
-    /* Tutor Portal */
     .btn-tutor{
       color:#fff;
       background:linear-gradient(135deg,#6366f1,#4f46e5);
@@ -123,9 +120,9 @@
       <img src="{% static 'core/logo.png' %}" alt="PKanoon Tutor">
     </div>
 
-    <!-- IMAGE GRID -->
+    <!-- IMAGE GRID (8 images) -->
     <div class="grid">
-      {% for i in "123456789" %}
+      {% for i in "12345678" %}
         <div class="tile">
           <img src="{% static 'core/home/'|add:i|add:'.jpg' %}" alt="home {{ i }}">
         </div>
@@ -139,7 +136,7 @@
     </div>
 
     <div class="hint">
-      หากเข้าระบบไม่ได้ กรุณาติดต่อพี่ขนุนติวเตอร์
+      หากเข้าระบบไม่ได้ กรุณาติดต่อพี่ขนุนติวเตอร์ Line : @pkanoontutor
     </div>
 
   </div>

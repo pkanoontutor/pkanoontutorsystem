@@ -26,29 +26,61 @@ class Command(BaseCommand):
                 remark,
             ) = row
 
+            # -----------------------
+            # Validate student
+            # -----------------------
             try:
-                student = Student.objects.get(student_code=str(student_code))
+                student = Student.objects.get(student_code=str(student_code).strip())
             except Student.DoesNotExist:
                 self.stderr.write(f"❌ ไม่พบ student_code {student_code}")
                 continue
 
+            # -----------------------
+            # Validate class
+            # -----------------------
             try:
-                tutoring_class = TutoringClass.objects.get(name=class_name)
+                tutoring_class = TutoringClass.objects.get(name=str(class_name).strip())
             except TutoringClass.DoesNotExist:
                 self.stderr.write(f"❌ ไม่พบ class {class_name}")
                 continue
 
+            # -----------------------
+            # Normalize numeric fields
+            # -----------------------
+            try:
+                sessions_total = int(sessions_total)
+            except Exception:
+                self.stderr.write(f"❌ sessions_total ไม่ถูกต้อง ({sessions_total}) สำหรับ {student_code}")
+                continue
+
+            try:
+                course_price = int(course_price) if course_price not in (None, "") else 0
+            except Exception:
+                self.stderr.write(f"❌ course_price ไม่ถูกต้อง ({course_price}) สำหรับ {student_code}")
+                continue
+
+            try:
+                discount_amount = int(discount_amount) if discount_amount not in (None, "") else 0
+            except Exception:
+                self.stderr.write(f"❌ discount_amount ไม่ถูกต้อง ({discount_amount}) สำหรับ {student_code}")
+                continue
+
+            # -----------------------
+            # Create Enrollment
+            # -----------------------
             Enrollment.objects.create(
                 student=student,
                 tutoring_class=tutoring_class,
-                enrollment_type=enrollment_type,
-                sessions_total=int(sessions_total),
-                payment_type=payment_type,
+                enrollment_type=str(enrollment_type).strip(),
+                sessions_total=sessions_total,
+                payment_type=str(payment_type).strip(),
                 course_price=course_price,
-                discount_amount=discount_amount or 0,
-                remark=remark or "",
+                discount_amount=discount_amount,
+                remark=str(remark).strip() if remark else "",
                 created_at=timezone.now(),
             )
             count += 1
 
-        self.stdout.write(self.style.SUCCESS(f"✅ Import enrollments สำเร็จ {count} รายการ"))
+        self.stdout.write(
+            self.style.SUCCESS(f"✅ Import enrollments สำเร็จ {count} รายการ")
+        )

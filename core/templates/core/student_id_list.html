@@ -57,7 +57,9 @@
     <tr>
       <td><strong>{{ s.student_code }}</strong></td>
       <td>{{ s.nickname }}</td>
-      <td>{{ s.full_name }}</td>
+      <td>
+        {{ s.full_name|slice:":3" }}****
+      </td>
       <td>{{ s.grade_level }}</td>
     </tr>
     {% empty %}

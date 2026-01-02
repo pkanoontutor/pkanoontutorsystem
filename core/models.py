@@ -1,6 +1,6 @@
 from django.db import models, transaction
 from django.utils import timezone
-
+from .models import School
 
 class School(models.Model):
     name = models.CharField("ชื่อโรงเรียน", max_length=255, unique=True)
@@ -23,7 +23,6 @@ class Student(models.Model):
         FACEBOOK = "facebook", "Facebook"
         LINE = "line", "Line"
 
-    # ✅ ช่องทางที่รู้จัก
     class ReferralSource(models.TextChoices):
         REFERRAL = "referral", "คนแนะนำ"
         FACEBOOK = "facebook", "Facebook"
@@ -31,7 +30,9 @@ class Student(models.Model):
         FLYER = "flyer", "ใบปลิว"
         WALKIN = "walkin", "เดินผ่าน"
 
-    # ✅ รหัสนักเรียนอัตโนมัติ: YY + 3 หลัก เช่น 25001
+    # -----------------------
+    # รหัสนักเรียนอัตโนมัติ: YY + 3 หลัก เช่น 25001
+    # -----------------------
     student_code = models.CharField(
         "รหัสนักเรียน",
         max_length=5,
@@ -42,12 +43,28 @@ class Student(models.Model):
 
     full_name = models.CharField("ชื่อจริงนามสกุล", max_length=255)
     nickname = models.CharField("ชื่อเล่น", max_length=100, blank=True)
-    profile_image = models.ImageField("รูปประจำตัว", upload_to="student_profiles/", blank=True, null=True)
+
+    profile_image = models.ImageField(
+        "รูปประจำตัว",
+        upload_to="student_profiles/",
+        blank=True,
+        null=True,
+    )
 
     grade_level = models.CharField("ระดับชั้น", max_length=50, blank=True)
     academic_year = models.CharField("ปีการศึกษา", max_length=20, blank=True)
 
-    school_name = models.CharField("โรงเรียน", max_length=255, blank=True)
+    # -----------------------
+    # ✅ โรงเรียน (ค้นหา / เพิ่มได้)
+    # -----------------------
+    school = models.ForeignKey(
+        School,
+        verbose_name="โรงเรียน",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="students",
+    )
 
     parent_phone = models.CharField("เบอร์ผู้ปกครอง", max_length=50)
 
@@ -58,8 +75,11 @@ class Student(models.Model):
         default=ContactChannel.LINE,
     )
 
-    # ✅ วันที่สมัคร + ช่องทางที่รู้จัก
-    enroll_date = models.DateField("วันที่สมัคร", default=timezone.localdate)
+    enroll_date = models.DateField(
+        "วันที่สมัคร",
+        default=timezone.localdate,
+    )
+
     referral_source = models.CharField(
         "ช่องทางที่รู้จัก",
         max_length=20,
@@ -78,47 +98,39 @@ class Student(models.Model):
     def __str__(self) -> str:
         return self.display_name
 
+    # -----------------------
+    # แสดงชื่อรวม
+    # -----------------------
     @property
     def display_name(self) -> str:
-        code = (self.student_code or "").strip()
-        nick = (self.nickname or "").strip()
-        full = (self.full_name or "").strip()
-        grade = (self.grade_level or "").strip()
+        parts = filter(
+            None,
+            [
+                self.student_code,
+                self.nickname,
+                self.full_name,
+                self.grade_level,
+                self.school.name if self.school else None,
+            ],
+        )
+        return " | ".join(parts)
 
-        parts = []
-        if code:
-            parts.append(code)
-        if nick:
-            parts.append(nick)
-        if full:
-            parts.append(full)
-        if grade:
-            parts.append(grade)
-
-        return " | ".join(parts) if parts else "-"
-
+    # -----------------------
+    # Auto student_code
+    # -----------------------
     @staticmethod
     def _next_student_code_for_year(two_digit_year: str) -> str:
-        """
-        หา student_code ล่าสุดของปีนั้น แล้ว +1
-        - ปี 2025 => "25"
-        - คนแรก => 25001
-        """
         last = (
             Student.objects.filter(student_code__startswith=two_digit_year)
             .order_by("-student_code")
             .values_list("student_code", flat=True)
             .first()
         )
-        if not last:
-            seq = 1
-        else:
-            seq = int(last[-3:]) + 1
+        seq = int(last[-3:]) + 1 if last else 1
         return f"{two_digit_year}{seq:03d}"
 
     def save(self, *args, **kwargs):
-        is_new = self._state.adding  # เพิ่มใหม่หรือแก้ไข
-        if is_new:
+        if self._state.adding and not self.student_code:
             yy = str(timezone.localdate().year)[-2:]
             with transaction.atomic():
                 self.student_code = Student._next_student_code_for_year(yy)

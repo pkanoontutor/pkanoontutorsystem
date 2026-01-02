@@ -30,7 +30,7 @@ class StudentAdminForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        # หน้า Add (ยังไม่มี pk) → prefill ตัวอย่างรหัส
+        # หน้า Add → prefill ตัวอย่างรหัส
         if not self.instance.pk:
             yy = str(timezone.localdate().year)[-2:]
             try:
@@ -39,8 +39,7 @@ class StudentAdminForm(forms.ModelForm):
                 preview = ""
             self.fields["student_code"].initial = preview
         else:
-            # หน้า Edit → โชว์รหัสจริง
-            self.fields["student_code"].initial = getattr(self.instance, "student_code", "")
+            self.fields["student_code"].initial = self.instance.student_code
 
 
 # -----------------------
@@ -51,36 +50,96 @@ class StudentAdmin(admin.ModelAdmin):
     form = StudentAdminForm
 
     list_display = (
-        "id",
+        "student_code",
         "nickname",
         "full_name",
         "grade_level",
+        "school_name",
         "profile_image_thumb",
         "parent_phone",
         "is_active",
     )
-    search_fields = ("nickname", "full_name", "parent_phone")
-    list_filter = ("grade_level", "is_active")
+
+    search_fields = (
+        "student_code",
+        "nickname",
+        "full_name",
+        "school_name",
+        "parent_phone",
+    )
+
+    list_filter = (
+        "grade_level",
+        "is_active",
+        "contact_channel",
+        "referral_source",
+    )
+
     list_per_page = 50
 
-    readonly_fields = ("profile_image_thumb_large",)
+    readonly_fields = (
+        "student_code",
+        "profile_image_thumb_large",
+        "created_at",
+    )
 
     fieldsets = (
-        ("รูปโปรไฟล์", {"fields": ("profile_image", "profile_image_thumb_large")}),
-        ("ข้อมูลนักเรียน", {"fields": ("nickname", "full_name", "grade_level", "parent_phone", "is_active")}),
+        ("รูปโปรไฟล์", {
+            "fields": ("profile_image", "profile_image_thumb_large"),
+        }),
+        ("ข้อมูลนักเรียน", {
+            "fields": (
+                "student_code",
+                "nickname",
+                "full_name",
+                "grade_level",
+                "academic_year",
+                "school_name",
+                "parent_phone",
+                "is_active",
+            ),
+        }),
+        ("ข้อมูลการติดต่อ", {
+            "fields": (
+                "contact_channel",
+                "referral_source",
+                "enroll_date",
+            ),
+        }),
+        ("หมายเหตุ", {
+            "fields": ("note",),
+        }),
+        ("ระบบ", {
+            "fields": ("created_at",),
+        }),
     )
 
     def profile_image_thumb(self, obj):
-        if getattr(obj, "profile_image", None):
-            return mark_safe(f'<img src="{obj.profile_image.url}" style="width:40px;height:40px;border-radius:999px;object-fit:cover;border:1px solid #e5e7eb;" />')
+        if obj.profile_image:
+            return mark_safe(
+                f'<img src="{obj.profile_image.url}" '
+                f'style="width:40px;height:40px;border-radius:999px;'
+                f'object-fit:cover;border:1px solid #e5e7eb;" />'
+            )
         return "-"
+
     profile_image_thumb.short_description = "รูป"
 
     def profile_image_thumb_large(self, obj):
-        if getattr(obj, "profile_image", None):
-            return mark_safe(f'<img src="{obj.profile_image.url}" style="width:160px;height:160px;border-radius:18px;object-fit:cover;border:1px solid #e5e7eb;" />')
+        if obj.profile_image:
+            return mark_safe(
+                f'<img src="{obj.profile_image.url}" '
+                f'style="width:160px;height:160px;border-radius:18px;'
+                f'object-fit:cover;border:1px solid #e5e7eb;" />'
+            )
         return "ยังไม่มีรูป"
+
     profile_image_thumb_large.short_description = ""
+
+
+# -----------------------
+# Subject
+# -----------------------
 @admin.register(Subject)
 class SubjectAdmin(admin.ModelAdmin):
     list_display = ("name", "is_active")
@@ -89,9 +148,19 @@ class SubjectAdmin(admin.ModelAdmin):
     ordering = ("name",)
 
 
+# -----------------------
+# Sheet
+# -----------------------
 @admin.register(Sheet)
 class SheetAdmin(admin.ModelAdmin):
-    list_display = ("code", "title", "subject", "total_pages", "total_questions", "is_active")
+    list_display = (
+        "code",
+        "title",
+        "subject",
+        "total_pages",
+        "total_questions",
+        "is_active",
+    )
     search_fields = ("code", "title")
     list_filter = ("subject", "is_active")
     ordering = ("subject__name", "code")
@@ -120,7 +189,6 @@ class ClassSubjectInline(admin.TabularInline):
     def save_model(self, request, obj, form, change):
         obj.updated_at = timezone.now()
         obj.updated_by = request.user
-        # ถ้าอยากให้ last_teacher auto จาก user ก็ทำเพิ่มได้ภายหลัง
         super().save_model(request, obj, form, change)
 
 
@@ -129,7 +197,13 @@ class ClassSubjectInline(admin.TabularInline):
 # -----------------------
 @admin.register(TutoringClass)
 class TutoringClassAdmin(admin.ModelAdmin):
-    list_display = ("name", "total_seats", "course_price", "hours_per_session", "is_active")
+    list_display = (
+        "name",
+        "total_seats",
+        "course_price",
+        "hours_per_session",
+        "is_active",
+    )
     search_fields = ("name",)
     list_filter = ("is_active",)
     inlines = (ClassSubjectInline,)
@@ -180,7 +254,14 @@ class ClassSubjectAdmin(admin.ModelAdmin):
 class EnrollmentInstallmentInline(admin.TabularInline):
     model = EnrollmentInstallment
     extra = 0
-    fields = ("installment_no", "amount_due", "amount_paid", "is_paid", "paid_at", "note")
+    fields = (
+        "installment_no",
+        "amount_due",
+        "amount_paid",
+        "is_paid",
+        "paid_at",
+        "note",
+    )
     readonly_fields = ("is_paid", "paid_at")
     ordering = ("installment_no",)
 
@@ -202,18 +283,52 @@ class EnrollmentAdmin(admin.ModelAdmin):
         "remaining",
         "created_at",
     )
-    list_filter = ("tutoring_class", "enrollment_type", "is_active", "payment_type")
-    search_fields = ("student__full_name", "student__nickname", "tutoring_class__name")
+    list_filter = (
+        "tutoring_class",
+        "enrollment_type",
+        "is_active",
+        "payment_type",
+    )
+    search_fields = (
+        "student__full_name",
+        "student__nickname",
+        "tutoring_class__name",
+    )
     ordering = ("-created_at",)
     radio_fields = {"enrollment_type": admin.VERTICAL}
     autocomplete_fields = ("student", "tutoring_class")
     inlines = (EnrollmentInstallmentInline,)
 
     fieldsets = (
-        ("ข้อมูลคอร์ส", {"fields": ("student", "tutoring_class", "enrollment_type", "sessions_total", "remark", "is_active")}),
-        ("การชำระเงิน", {"fields": ("payment_type", "installments_count", "course_price", "discount_amount", "net_price")}),
-        ("จบคอร์ส", {"fields": ("closed_reason", "closed_at")}),
-        ("แจ้งเตือนใกล้ครบ", {"fields": ("notified_near_complete", "notified_method", "notified_at")}),
+        ("ข้อมูลคอร์ส", {
+            "fields": (
+                "student",
+                "tutoring_class",
+                "enrollment_type",
+                "sessions_total",
+                "remark",
+                "is_active",
+            )
+        }),
+        ("การชำระเงิน", {
+            "fields": (
+                "payment_type",
+                "installments_count",
+                "course_price",
+                "discount_amount",
+                "net_price",
+            )
+        }),
+        ("จบคอร์ส", {
+            "fields": ("closed_reason", "closed_at")
+        }),
+        ("แจ้งเตือนใกล้ครบ", {
+            "fields": (
+                "notified_near_complete",
+                "notified_method",
+                "notified_at",
+            )
+        }),
     )
 
     @admin.display(description="Used (ครั้ง)")
@@ -225,11 +340,24 @@ class EnrollmentAdmin(admin.ModelAdmin):
         return obj.remaining_sessions()
 
 
+# -----------------------
+# EnrollmentInstallment
+# -----------------------
 @admin.register(EnrollmentInstallment)
 class EnrollmentInstallmentAdmin(admin.ModelAdmin):
-    list_display = ("enrollment", "installment_no", "amount_due", "amount_paid", "is_paid", "paid_at")
+    list_display = (
+        "enrollment",
+        "installment_no",
+        "amount_due",
+        "amount_paid",
+        "is_paid",
+        "paid_at",
+    )
     list_filter = ("is_paid",)
-    search_fields = ("enrollment__student__full_name", "enrollment__tutoring_class__name")
+    search_fields = (
+        "enrollment__student__full_name",
+        "enrollment__tutoring_class__name",
+    )
     ordering = ("-created_at", "enrollment_id", "installment_no")
     autocomplete_fields = ("enrollment",)
 
@@ -239,19 +367,35 @@ class EnrollmentInstallmentAdmin(admin.ModelAdmin):
 # -----------------------
 @admin.register(Attendance)
 class AttendanceAdmin(admin.ModelAdmin):
-    list_display = ("attendance_date", "student", "enrollment", "status", "deducted", "checked_at")
+    list_display = (
+        "attendance_date",
+        "student",
+        "enrollment",
+        "status",
+        "deducted",
+        "checked_at",
+    )
     list_filter = ("attendance_date", "status", "deducted")
-    search_fields = ("student__full_name", "enrollment__tutoring_class__name")
+    search_fields = (
+        "student__full_name",
+        "enrollment__tutoring_class__name",
+    )
     ordering = ("-attendance_date", "-checked_at")
     autocomplete_fields = ("student", "enrollment")
 
 
 # -----------------------
-# ✅ Sheet Inventory
+# Sheet Inventory
 # -----------------------
 @admin.register(SheetInventory)
 class SheetInventoryAdmin(admin.ModelAdmin):
-    list_display = ("sheet", "quantity", "is_finished", "finished_at", "updated_at")
+    list_display = (
+        "sheet",
+        "quantity",
+        "is_finished",
+        "finished_at",
+        "updated_at",
+    )
     list_filter = ("is_finished", "sheet__subject")
     search_fields = ("sheet__code", "sheet__title")
     autocomplete_fields = ("sheet",)

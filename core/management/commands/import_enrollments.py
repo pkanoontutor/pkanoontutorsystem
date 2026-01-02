@@ -14,7 +14,8 @@ class Command(BaseCommand):
         ws = wb.active
 
         count = 0
-        for row in ws.iter_rows(min_row=2, values_only=True):
+
+        for row_no, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
             (
                 student_code,
                 class_name,
@@ -32,7 +33,7 @@ class Command(BaseCommand):
             try:
                 student = Student.objects.get(student_code=str(student_code).strip())
             except Student.DoesNotExist:
-                self.stderr.write(f"❌ ไม่พบ student_code {student_code}")
+                self.stderr.write(f"❌ Row {row_no}: ไม่พบ student_code {student_code}")
                 continue
 
             # -----------------------
@@ -41,7 +42,7 @@ class Command(BaseCommand):
             try:
                 tutoring_class = TutoringClass.objects.get(name=str(class_name).strip())
             except TutoringClass.DoesNotExist:
-                self.stderr.write(f"❌ ไม่พบ class {class_name}")
+                self.stderr.write(f"❌ Row {row_no}: ไม่พบ class {class_name}")
                 continue
 
             # -----------------------
@@ -50,35 +51,50 @@ class Command(BaseCommand):
             try:
                 sessions_total = int(sessions_total)
             except Exception:
-                self.stderr.write(f"❌ sessions_total ไม่ถูกต้อง ({sessions_total}) สำหรับ {student_code}")
+                self.stderr.write(f"❌ Row {row_no}: sessions_total ไม่ถูกต้อง ({sessions_total})")
                 continue
 
             try:
-                course_price = int(course_price) if course_price not in (None, "") else 0
+                course_price = float(course_price) if course_price not in (None, "") else 0
             except Exception:
-                self.stderr.write(f"❌ course_price ไม่ถูกต้อง ({course_price}) สำหรับ {student_code}")
+                self.stderr.write(f"❌ Row {row_no}: course_price ไม่ถูกต้อง ({course_price})")
                 continue
 
             try:
-                discount_amount = int(discount_amount) if discount_amount not in (None, "") else 0
+                discount_amount = float(discount_amount) if discount_amount not in (None, "") else 0
             except Exception:
-                self.stderr.write(f"❌ discount_amount ไม่ถูกต้อง ({discount_amount}) สำหรับ {student_code}")
+                self.stderr.write(f"❌ Row {row_no}: discount_amount ไม่ถูกต้อง ({discount_amount})")
                 continue
+
+            enrollment_type = str(enrollment_type).strip() if enrollment_type else Enrollment.EnrollmentType.SPECIAL
+            payment_type = str(payment_type).strip() if payment_type else Enrollment.PaymentType.FULL
+            remark = str(remark).strip() if remark else ""
 
             # -----------------------
-            # Create Enrollment
+            # Create Enrollment (สำคัญ)
             # -----------------------
             Enrollment.objects.create(
                 student=student,
                 tutoring_class=tutoring_class,
-                enrollment_type=str(enrollment_type).strip(),
+                enrollment_type=enrollment_type,
+
+                # ✅ ใช้ค่าจริงจาก Excel ห้ามแก้
                 sessions_total=sessions_total,
-                payment_type=str(payment_type).strip(),
+
+                payment_type=payment_type,
                 course_price=course_price,
                 discount_amount=discount_amount,
-                remark=str(remark).strip() if remark else "",
+                net_price=max(course_price - discount_amount, 0),
+
+                # ✅ FIX fields ที่ DB บังคับ NOT NULL
+                is_active=True,
+                notified_near_complete=False,
+                installments_count=1,
+
+                remark=remark,
                 created_at=timezone.now(),
             )
+
             count += 1
 
         self.stdout.write(

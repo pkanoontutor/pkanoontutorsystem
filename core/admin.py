@@ -5,6 +5,7 @@ from django.utils import timezone
 
 from .models import (
     Student,
+    School,
     TutoringClass,
     Subject,
     Sheet,
@@ -41,11 +42,24 @@ class StudentAdminForm(forms.ModelForm):
 
 
 # -----------------------
+# School
+# -----------------------
+@admin.register(School)
+class SchoolAdmin(admin.ModelAdmin):
+    search_fields = ("name",)
+    list_display = ("name", "is_active")
+    list_filter = ("is_active",)
+    ordering = ("name",)
+
+
+# -----------------------
 # Student
 # -----------------------
 @admin.register(Student)
 class StudentAdmin(admin.ModelAdmin):
     form = StudentAdminForm
+
+    autocomplete_fields = ["school"]
 
     list_display = (
         "student_code",

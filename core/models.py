@@ -2,6 +2,19 @@ from django.db import models, transaction
 from django.utils import timezone
 
 
+class School(models.Model):
+    name = models.CharField("ชื่อโรงเรียน", max_length=255, unique=True)
+    is_active = models.BooleanField("ใช้งาน", default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "School"
+        verbose_name_plural = "Schools"
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
+
 # -----------------------
 # Student
 # -----------------------

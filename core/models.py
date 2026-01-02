@@ -1,6 +1,5 @@
 from django.db import models, transaction
 from django.utils import timezone
-from .models import School
 
 class School(models.Model):
     name = models.CharField("ชื่อโรงเรียน", max_length=255, unique=True)

@@ -302,26 +302,14 @@ class Enrollment(models.Model):
         default=EnrollmentType.NORMAL_10,
     )
 
-    # ✅ จำนวนครั้งคงเหลือ (นำเข้าตามจริง)
-    sessions_total = models.IntegerField("จำนวนครั้งทั้งหมด", default=0)
+    # ✅ ใช้ค่าที่ import มา “ตรงตามจริง”
+    sessions_total = models.IntegerField("จำนวนครั้งคงเหลือ", default=0)
 
     created_at = models.DateTimeField(default=timezone.now)
     remark = models.TextField("หมายเหตุ", blank=True)
 
+    # ❗ active จะเปลี่ยนได้เฉพาะจากการกดจบคอร์ส
     is_active = models.BooleanField("Active", default=True)
-
-    class CloseReason(models.TextChoices):
-        RENEW = "renew", "ต่อคอร์ส"
-        NOT_RENEW = "not_renew", "ไม่ต่อคอร์ส"
-
-    closed_reason = models.CharField(
-        "ผลการจบคอร์ส",
-        max_length=20,
-        choices=CloseReason.choices,
-        null=True,
-        blank=True,
-    )
-    closed_at = models.DateTimeField("วันที่จบคอร์ส", null=True, blank=True)
 
     class PaymentType(models.TextChoices):
         FULL = "full", "ชำระเต็ม"
@@ -340,21 +328,6 @@ class Enrollment(models.Model):
     discount_amount = models.DecimalField("ส่วนลด", max_digits=10, decimal_places=2, default=0)
     net_price = models.DecimalField("ราคาสุทธิ", max_digits=10, decimal_places=2, default=0)
 
-    class NotifyMethod(models.TextChoices):
-        LINE = "line", "แจ้งทาง Line"
-        FACEBOOK = "facebook", "แจ้งทาง FB"
-        PAPER = "paper", "แจ้งทางใบ"
-
-    notified_near_complete = models.BooleanField("แจ้งเตือนครบคอร์สแล้ว", default=False)
-    notified_method = models.CharField(
-        "ช่องทางที่แจ้งเตือน",
-        max_length=20,
-        choices=NotifyMethod.choices,
-        null=True,
-        blank=True,
-    )
-    notified_at = models.DateTimeField("วันที่แจ้งเตือน", null=True, blank=True)
-
     class Meta:
         verbose_name = "Enrollment"
         verbose_name_plural = "Enrollments"
@@ -364,7 +337,7 @@ class Enrollment(models.Model):
         is_new = self._state.adding
 
         # -----------------------
-        # sale_run_no (สร้างครั้งแรกเท่านั้น)
+        # sale_run_no (เฉพาะตอนสร้างใหม่)
         # -----------------------
         if is_new and not self.sale_run_no:
             student_code = (self.student.student_code or "").strip() if self.student_id else ""
@@ -373,7 +346,10 @@ class Enrollment(models.Model):
                     last = (
                         Enrollment.objects
                         .select_for_update()
-                        .filter(student_id=self.student_id, sale_run_no__startswith=f"{student_code}-")
+                        .filter(
+                            student_id=self.student_id,
+                            sale_run_no__startswith=f"{student_code}-"
+                        )
                         .order_by("-sale_run_no")
                         .values_list("sale_run_no", flat=True)
                         .first()
@@ -382,19 +358,16 @@ class Enrollment(models.Model):
                     self.sale_run_no = f"{student_code}-{seq:02d}"
 
         # -----------------------
-        # ✅ FIX สำคัญที่สุด
-        # ❌ ห้าม override sessions_total ที่ import มา
+        # ❌ ห้าม override sessions_total
+        # ใช้ค่าที่กรอก / import มาเท่านั้น
         # -----------------------
-        if is_new and self.sessions_total == 0:
-            # กรณีไม่ได้กรอกมาเลย → ค่อย auto ตาม type
-            self.sessions_total = self.TYPE_TO_SESSIONS.get(self.enrollment_type, 10)
+        if self.sessions_total is None:
+            self.sessions_total = 0
 
         # -----------------------
-        # ถ้า ≤ 0 ถือว่าครบคอร์ส
+        # ถ้า <= 0 → แค่ใส่หมายเหตุ (ไม่ปิดคอร์ส)
         # -----------------------
         if self.sessions_total <= 0:
-            self.is_active = False
-
             auto_note = "ครบคอร์สแล้ว (นำเข้าข้อมูลย้อนหลัง)"
             note = (self.remark or "").strip()
             if auto_note not in note:
@@ -413,21 +386,15 @@ class Enrollment(models.Model):
         # net_price
         cp = self.course_price or 0
         disc = self.discount_amount or 0
-        np = cp - disc
-        self.net_price = np if np > 0 else 0
+        self.net_price = max(cp - disc, 0)
 
         super().save(*args, **kwargs)
-
-    def __str__(self):
-        return f"{self.sale_run_no or '-'} | {self.student.full_name} - {self.tutoring_class.name}"
 
     def used_sessions(self):
         return self.attendances.filter(deducted=True).count()
 
     def remaining_sessions(self):
         return self.sessions_total - self.used_sessions()
-
-
 
 
 # -----------------------

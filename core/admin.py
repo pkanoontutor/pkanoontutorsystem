@@ -20,7 +20,6 @@ from .models import (
 # Student (Form for prefill student_code)
 # -----------------------
 class StudentAdminForm(forms.ModelForm):
-    # แสดงในฟอร์ม แต่ disable ไม่ให้แก้
     student_code = forms.CharField(label="รหัสนักเรียน", required=False, disabled=True)
 
     class Meta:
@@ -30,7 +29,6 @@ class StudentAdminForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        # หน้า Add → prefill ตัวอย่างรหัส
         if not self.instance.pk:
             yy = str(timezone.localdate().year)[-2:]
             try:
@@ -54,7 +52,7 @@ class StudentAdmin(admin.ModelAdmin):
         "nickname",
         "full_name",
         "grade_level",
-        "school_name",
+        "school_display",
         "profile_image_thumb",
         "parent_phone",
         "is_active",
@@ -64,7 +62,7 @@ class StudentAdmin(admin.ModelAdmin):
         "student_code",
         "nickname",
         "full_name",
-        "school_name",
+        "school__name",
         "parent_phone",
     )
 
@@ -94,7 +92,7 @@ class StudentAdmin(admin.ModelAdmin):
                 "full_name",
                 "grade_level",
                 "academic_year",
-                "school_name",
+                "school",
                 "parent_phone",
                 "is_active",
             ),
@@ -113,6 +111,10 @@ class StudentAdmin(admin.ModelAdmin):
             "fields": ("created_at",),
         }),
     )
+
+    @admin.display(description="โรงเรียน")
+    def school_display(self, obj):
+        return obj.school.name if obj.school else "-"
 
     def profile_image_thumb(self, obj):
         if obj.profile_image:
@@ -210,7 +212,7 @@ class TutoringClassAdmin(admin.ModelAdmin):
 
 
 # -----------------------
-# ClassSubject (optional menu for bulk edit)
+# ClassSubject
 # -----------------------
 @admin.register(ClassSubject)
 class ClassSubjectAdmin(admin.ModelAdmin):

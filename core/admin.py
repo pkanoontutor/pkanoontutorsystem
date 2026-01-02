@@ -1,4 +1,3 @@
-from django import forms
 from django.contrib import admin
 from django.utils.safestring import mark_safe
 from django.utils import timezone
@@ -18,30 +17,6 @@ from .models import (
 
 
 # -----------------------
-# Student (Form for prefill student_code)
-# -----------------------
-class StudentAdminForm(forms.ModelForm):
-    student_code = forms.CharField(label="รหัสนักเรียน", required=False, disabled=True)
-
-    class Meta:
-        model = Student
-        fields = "__all__"
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-        if not self.instance.pk:
-            yy = str(timezone.localdate().year)[-2:]
-            try:
-                preview = Student._next_student_code_for_year(yy)
-            except Exception:
-                preview = ""
-            self.fields["student_code"].initial = preview
-        else:
-            self.fields["student_code"].initial = self.instance.student_code
-
-
-# -----------------------
 # School
 # -----------------------
 @admin.register(School)
@@ -57,8 +32,6 @@ class SchoolAdmin(admin.ModelAdmin):
 # -----------------------
 @admin.register(Student)
 class StudentAdmin(admin.ModelAdmin):
-    form = StudentAdminForm
-
     autocomplete_fields = ["school"]
 
     list_display = (
@@ -125,6 +98,19 @@ class StudentAdmin(admin.ModelAdmin):
             "fields": ("created_at",),
         }),
     )
+
+    # ✅ Prefill student_code โดยไม่ชน autocomplete
+    def get_form(self, request, obj=None, **kwargs):
+        form = super().get_form(request, obj, **kwargs)
+
+        if obj is None:
+            yy = str(timezone.localdate().year)[-2:]
+            try:
+                form.base_fields["student_code"].initial = Student._next_student_code_for_year(yy)
+            except Exception:
+                pass
+
+        return form
 
     @admin.display(description="โรงเรียน")
     def school_display(self, obj):

@@ -7,154 +7,165 @@
 
 {% block content %}
 
+{% if selected_enrollment %}
+
   {# ============================= #}
   {# 🔥 Remaining Sessions Highlight #}
   {# ============================= #}
-  {% if selected_enrollment %}
-    {% if remaining_sessions > 5 %}
-      {% set bg_color = "#dcfce7" %} {# green #}
-      {% set text_color = "#166534" %}
-    {% elif remaining_sessions >= 3 %}
-      {% set bg_color = "#fef9c3" %} {# yellow #}
-      {% set text_color = "#854d0e" %}
-    {% else %}
-      {% set bg_color = "#fee2e2" %} {# red #}
-      {% set text_color = "#991b1b" %}
-    {% endif %}
+
+  {% if remaining_sessions > 5 %}
+    <div style="background:#dcfce7;border:3px solid #166534;">
+  {% elif remaining_sessions >= 3 %}
+    <div style="background:#fef9c3;border:3px solid #854d0e;">
+  {% else %}
+    <div style="background:#fee2e2;border:3px solid #991b1b;">
+  {% endif %}
 
     <div
       style="
-        background:{{ bg_color }};
-        border:3px solid {{ text_color }};
-        border-radius:20px;
-        padding:22px;
+        border-radius:22px;
+        padding:24px;
         margin-bottom:18px;
         text-align:center;
       "
     >
-      <div style="font-size:18px;font-weight:900;opacity:.9;margin-bottom:6px;">
+
+      <div style="font-size:18px;font-weight:900;opacity:.85;">
         จำนวนครั้งคงเหลือ
       </div>
 
-      <div style="font-size:52px;font-weight:900;color:{{ text_color }};line-height:1;">
+      <div style="font-size:56px;font-weight:900;line-height:1;margin:6px 0;">
         {{ remaining_sessions }}
       </div>
 
-      <div style="font-size:18px;font-weight:800;margin-top:6px;">
+      <div style="font-size:18px;font-weight:800;margin-bottom:8px;">
         ครั้ง
       </div>
+
+      {# ⚠️ Warning #}
+      {% if remaining_sessions <= 2 %}
+        <div style="color:#991b1b;font-weight:900;margin-bottom:8px;">
+          ⚠️ ใกล้ครบคอร์ส กรุณาติดต่อพี่ขนุนติวเตอร์
+        </div>
+      {% endif %}
+
+      {# ⏳ Progress Bar #}
+      {% with total=selected_enrollment.sessions_total %}
+        {% if total > 0 %}
+          {% widthratio remaining_sessions total 100 as percent %}
+          <div style="margin-top:10px;">
+            <div style="font-weight:800;font-size:14px;margin-bottom:6px;">
+              ความคืบหน้าคอร์ส
+            </div>
+            <div style="background:#e5e7eb;border-radius:999px;height:14px;overflow:hidden;">
+              <div
+                style="
+                  height:14px;
+                  width:{{ percent }}%;
+                  background:
+                    {% if remaining_sessions > 5 %}
+                      #22c55e
+                    {% elif remaining_sessions >= 3 %}
+                      #f59e0b
+                    {% else %}
+                      #ef4444
+                    {% endif %};
+                "
+              ></div>
+            </div>
+            <div style="font-size:13px;font-weight:800;margin-top:4px;opacity:.85;">
+              เหลือ {{ remaining_sessions }} จาก {{ total }} ครั้ง
+            </div>
+          </div>
+        {% endif %}
+      {% endwith %}
 
       <div style="margin-top:10px;font-weight:800;opacity:.85;">
         ≈ {{ remaining_hours|floatformat:2 }} ชั่วโมง
         ({{ hours_per_session|floatformat:2 }} ชม. / ครั้ง)
       </div>
-    </div>
-  {% endif %}
 
-  {# ============================= #}
-  {# 👤 Student Info #}
-  {# ============================= #}
-  <div class="card" style="margin-bottom:14px;">
-    <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:flex-end;">
-      <div>
-        <div style="font-size:20px;font-weight:900;">
-          {{ student.display_name }}
-        </div>
-        <div style="opacity:.8;font-weight:700;">
-          เบอร์ผู้ปกครอง: {{ student.parent_phone }}
-        </div>
-      </div>
-
-      {% if not selected_enrollment %}
-        <span class="pill">ยังไม่มีคอร์ส</span>
-      {% endif %}
     </div>
   </div>
 
-  {# ============================= #}
-  {# 🎓 Select Enrollment #}
-  {# ============================= #}
-  <div class="card" style="margin-bottom:14px;">
-    <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center;">
-      <div style="font-weight:900;font-size:16px;">เลือกคอร์ส</div>
-      <form method="get" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
-        <select
-          name="enrollment_id"
-          style="
-            border:1px solid #e5e7eb;
-            border-radius:10px;
-            padding:10px 12px;
-            font-weight:800;
-            min-width:280px;
-          "
-        >
-          {% for e in enrollments %}
-            <option value="{{ e.id }}" {% if selected_enrollment and e.id == selected_enrollment.id %}selected{% endif %}>
-              {{ e.tutoring_class.name }} | {{ e.get_enrollment_type_display }}
-              {% if e.is_active %}(Active){% else %}(Closed){% endif %}
-            </option>
-          {% endfor %}
-        </select>
-        <button class="btn btn-blue" type="submit">ดู</button>
-      </form>
+{% endif %}
+
+{# ============================= #}
+{# 👤 Student Info #}
+{# ============================= #}
+<div class="card" style="margin-bottom:14px;">
+  <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:flex-end;">
+    <div>
+      <div style="font-size:20px;font-weight:900;">
+        {{ student.display_name }}
+      </div>
+      <div style="opacity:.8;font-weight:700;">
+        เบอร์ผู้ปกครอง: {{ student.parent_phone }}
+      </div>
     </div>
   </div>
+</div>
 
-  {# ============================= #}
-  {# 📅 Attendance History #}
-  {# ============================= #}
-  <div class="card">
-    <div
-      style="
-        display:flex;
-        justify-content:space-between;
-        align-items:center;
-        gap:12px;
-        flex-wrap:wrap;
-        margin-bottom:10px;
-      "
-    >
-      <div style="font-weight:900;font-size:16px;">
-        ประวัติการเข้าเรียน
-      </div>
-
-      {% if selected_enrollment %}
-        <div style="opacity:.8;font-weight:800;">
-          คลาส: {{ selected_enrollment.tutoring_class.name }}
-        </div>
-      {% endif %}
-    </div>
-
-    <table>
-      <thead>
-        <tr>
-          <th style="width:140px;">วันที่</th>
-          <th style="width:220px;">สถานะ</th>
-          <th>หมายเหตุ</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for a in attendance_rows %}
-          <tr>
-            <td style="font-weight:900;">
-              {{ a.attendance_date|date:"d M Y" }}
-            </td>
-            <td style="font-weight:900;">
-              {{ a.get_status_display }}
-            </td>
-            <td style="opacity:.8;font-weight:700;">
-              {% if a.deducted %}หัก 1 ครั้ง{% else %}ไม่หักครั้ง{% endif %}
-            </td>
-          </tr>
-        {% empty %}
-          <tr>
-            <td colspan="3" style="opacity:.8;font-weight:800;">
-              ยังไม่มีข้อมูลการเช็คชื่อ
-            </td>
-          </tr>
+{# ============================= #}
+{# 🎓 Select Enrollment #}
+{# ============================= #}
+<div class="card" style="margin-bottom:14px;">
+  <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center;">
+    <div style="font-weight:900;font-size:16px;">เลือกคอร์ส</div>
+    <form method="get" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+      <select
+        name="enrollment_id"
+        style="
+          border:1px solid #e5e7eb;
+          border-radius:10px;
+          padding:10px 12px;
+          font-weight:800;
+          min-width:280px;
+        "
+      >
+        {% for e in enrollments %}
+          <option value="{{ e.id }}" {% if selected_enrollment and e.id == selected_enrollment.id %}selected{% endif %}>
+            {{ e.tutoring_class.name }} | {{ e.get_enrollment_type_display }}
+            {% if e.is_active %}(Active){% else %}(Closed){% endif %}
+          </option>
         {% endfor %}
-      </tbody>
-    </table>
+      </select>
+      <button class="btn btn-blue" type="submit">ดู</button>
+    </form>
   </div>
+</div>
+
+{# ============================= #}
+{# 📅 Attendance History #}
+{# ============================= #}
+<div class="card">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+    <div style="font-weight:900;font-size:16px;">ประวัติการเข้าเรียน</div>
+    <div style="opacity:.8;font-weight:800;">
+      คลาส: {{ selected_enrollment.tutoring_class.name }}
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>วันที่</th>
+        <th>สถานะ</th>
+        <th>หมายเหตุ</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for a in attendance_rows %}
+        <tr>
+          <td>{{ a.attendance_date|date:"d M Y" }}</td>
+          <td>{{ a.get_status_display }}</td>
+          <td>{% if a.deducted %}หัก 1 ครั้ง{% else %}ไม่หัก{% endif %}</td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="3">ยังไม่มีข้อมูล</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
 
 {% endblock %}

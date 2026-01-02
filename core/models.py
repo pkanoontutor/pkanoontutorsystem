@@ -279,7 +279,7 @@ class Enrollment(models.Model):
         EnrollmentType.NORMAL_20: 20,
         EnrollmentType.FIRST_TRIAL_11: 11,
         EnrollmentType.FIRST_BONUS_12: 12,
-        EnrollmentType.SPECIAL: 10,  # ค่าเริ่มต้นของกรณีพิเศษ (แก้ได้เอง)
+        EnrollmentType.SPECIAL: 10,
     }
 
     student = models.ForeignKey(Student, on_delete=models.PROTECT, related_name="enrollments")
@@ -302,13 +302,12 @@ class Enrollment(models.Model):
         default=EnrollmentType.NORMAL_10,
     )
 
-    # snapshot จำนวนครั้ง ณ วันที่สมัคร (กรณีพิเศษแก้เองได้)
-    sessions_total = models.IntegerField("จำนวนครั้งทั้งหมด", default=10)
+    # ✅ จำนวนครั้งคงเหลือ ณ วันที่เริ่มใช้ระบบ
+    sessions_total = models.IntegerField("จำนวนครั้งทั้งหมด", default=0)
 
     created_at = models.DateTimeField(default=timezone.now)
     remark = models.TextField("หมายเหตุ", blank=True)
 
-    # ✅ สถานะคอร์ส (จบคอร์ส)
     is_active = models.BooleanField("Active", default=True)
 
     class CloseReason(models.TextChoices):
@@ -324,9 +323,6 @@ class Enrollment(models.Model):
     )
     closed_at = models.DateTimeField("วันที่จบคอร์ส", null=True, blank=True)
 
-    # -----------------------
-    # ✅ (A) Payment / Pricing (ตามที่ขอ)
-    # -----------------------
     class PaymentType(models.TextChoices):
         FULL = "full", "ชำระเต็ม"
         INSTALLMENT = "installment", "แบ่งชำระ"
@@ -340,14 +336,10 @@ class Enrollment(models.Model):
 
     installments_count = models.PositiveIntegerField("จำนวนงวด", default=1)
 
-    # ✅ ราคาคอร์ส (snapshot จาก class ตอนสมัคร), ส่วนลด, ราคาสุทธิ
-    course_price = models.DecimalField("ราคาคอร์ส (จาก Class)", max_digits=10, decimal_places=2, default=0)
+    course_price = models.DecimalField("ราคาคอร์ส", max_digits=10, decimal_places=2, default=0)
     discount_amount = models.DecimalField("ส่วนลด", max_digits=10, decimal_places=2, default=0)
     net_price = models.DecimalField("ราคาสุทธิ", max_digits=10, decimal_places=2, default=0)
 
-    # -----------------------
-    # ✅ แจ้งเตือนใกล้ครบคอร์ส
-    # -----------------------
     class NotifyMethod(models.TextChoices):
         LINE = "line", "แจ้งทาง Line"
         FACEBOOK = "facebook", "แจ้งทาง FB"
@@ -369,19 +361,15 @@ class Enrollment(models.Model):
         ordering = ("-created_at",)
 
     def save(self, *args, **kwargs):
-        """
-        ✅ เพิ่มเลขรายการขายคอร์สอัตโนมัติ (sale_run_no)
-        รูปแบบ: {student_code}-{seq} เช่น 25001-01, 25001-02
-        """
         is_new = self._state.adding
 
-        # ✅ สร้างเลข run number เฉพาะตอน "เพิ่มใหม่" เท่านั้น
-        if is_new and (not self.sale_run_no):
-            # ต้องมี student_code ก่อน
+        # -----------------------
+        # sale_run_no
+        # -----------------------
+        if is_new and not self.sale_run_no:
             student_code = (self.student.student_code or "").strip() if self.student_id else ""
             if student_code:
                 with transaction.atomic():
-                    # lock แถวของ enrollment ของนักเรียนคนนี้กันชนกัน
                     last = (
                         Enrollment.objects
                         .select_for_update()
@@ -390,65 +378,43 @@ class Enrollment(models.Model):
                         .values_list("sale_run_no", flat=True)
                         .first()
                     )
-                    if not last:
-                        seq = 1
-                    else:
-                        try:
-                            seq = int(str(last).split("-")[-1]) + 1
-                        except Exception:
-                            seq = 1
+                    seq = int(str(last).split("-")[-1]) + 1 if last else 1
                     self.sale_run_no = f"{student_code}-{seq:02d}"
 
-        # ตั้งค่า sessions_total อัตโนมัติสำหรับ type ปกติ
-        # แต่ถ้าเป็น special ให้คงค่าที่ผู้ใช้กรอกไว้ (ไม่ทับ)
-        if self.enrollment_type != self.EnrollmentType.SPECIAL:
+        # -----------------------
+        # ✅ FIX จุดสำคัญ
+        # ตั้งค่า sessions_total เฉพาะตอน "ยังไม่มีค่า"
+        # -----------------------
+        if not self.sessions_total or self.sessions_total <= 0:
             self.sessions_total = self.TYPE_TO_SESSIONS.get(self.enrollment_type, 10)
 
-        # snapshot course_price จาก class (ถ้ายังเป็น 0 หรือยังไม่เคยตั้ง)
+        # snapshot course_price
         if self.tutoring_class_id and (self.course_price is None or self.course_price == 0):
             self.course_price = self.tutoring_class.course_price or 0
 
-        # normalize installments_count
+        # normalize installments
         if self.payment_type == self.PaymentType.FULL:
             self.installments_count = 1
-        else:
-            if not self.installments_count or self.installments_count < 1:
-                self.installments_count = 1
+        elif not self.installments_count or self.installments_count < 1:
+            self.installments_count = 1
 
-        # net_price = course_price - discount (กันติดลบ)
+        # net_price
         cp = self.course_price or 0
         disc = self.discount_amount or 0
         np = cp - disc
-        if np < 0:
-            np = 0
-        self.net_price = np
+        self.net_price = np if np > 0 else 0
 
         super().save(*args, **kwargs)
 
-    def __str__(self) -> str:
-        return f"{self.sale_run_no or '-'} | {self.student.full_name} - {self.tutoring_class.name} - {self.get_enrollment_type_display()}"
+    def __str__(self):
+        return f"{self.sale_run_no or '-'} | {self.student.full_name} - {self.tutoring_class.name}"
 
-    def used_sessions(self) -> int:
+    def used_sessions(self):
         return self.attendances.filter(deducted=True).count()
 
-    def remaining_sessions(self) -> int:
+    def remaining_sessions(self):
         return self.sessions_total - self.used_sessions()
 
-    def total_hours(self) -> float:
-        return float(self.sessions_total * self.tutoring_class.hours_per_session)
-
-    def avg_hours_per_session(self) -> float:
-        return float(self.tutoring_class.hours_per_session)
-
-    @property
-    def revenue_per_hour(self) -> float:
-        """
-        ✅ รายได้ต่อชั่วโมง = ราคาสุทธิ / ชั่วโมงรวมของคอร์ส
-        """
-        th = self.total_hours()
-        if th <= 0:
-            return 0.0
-        return float(self.net_price) / float(th)
 
 
 # -----------------------

@@ -40,6 +40,30 @@ def home_redirect(request: HttpRequest) -> HttpResponse:
     # หน้าแรกให้ไป dashboard ใหม่
     return redirect("core:dashboard")
 
+def student_id_list(request: HttpRequest) -> HttpResponse:
+    """
+    หน้า Public สำหรับผู้ปกครอง:
+    แสดงเฉพาะ
+    - Student ID
+    - ชื่อเล่น
+    - ชื่อจริงนามสกุล
+    - ระดับชั้น
+    ❌ ไม่แสดงเบอร์โทร / การเงิน
+    """
+    students = (
+        Student.objects
+        .filter(is_active=True)
+        .only("student_code", "nickname", "full_name", "grade_level")
+        .order_by("grade_level", "student_code")
+    )
+
+    return render(
+        request,
+        "core/student_id_list.html",
+        {"students": students}
+    )
+
+
 
 # -----------------------
 # ✅ Dashboard (ข้อ C)

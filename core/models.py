@@ -302,7 +302,7 @@ class Enrollment(models.Model):
         default=EnrollmentType.NORMAL_10,
     )
 
-    # ✅ จำนวนครั้งคงเหลือ ณ วันที่เริ่มใช้ระบบ
+    # ✅ จำนวนครั้งคงเหลือ (นำเข้าตามจริง)
     sessions_total = models.IntegerField("จำนวนครั้งทั้งหมด", default=0)
 
     created_at = models.DateTimeField(default=timezone.now)
@@ -364,7 +364,7 @@ class Enrollment(models.Model):
         is_new = self._state.adding
 
         # -----------------------
-        # sale_run_no
+        # sale_run_no (สร้างครั้งแรกเท่านั้น)
         # -----------------------
         if is_new and not self.sale_run_no:
             student_code = (self.student.student_code or "").strip() if self.student_id else ""
@@ -382,14 +382,26 @@ class Enrollment(models.Model):
                     self.sale_run_no = f"{student_code}-{seq:02d}"
 
         # -----------------------
-        # ✅ FIX จุดสำคัญ
-        # ตั้งค่า sessions_total เฉพาะตอน "ยังไม่มีค่า"
+        # ✅ FIX สำคัญที่สุด
+        # ❌ ห้าม override sessions_total ที่ import มา
         # -----------------------
-        if not self.sessions_total or self.sessions_total <= 0:
+        if is_new and self.sessions_total == 0:
+            # กรณีไม่ได้กรอกมาเลย → ค่อย auto ตาม type
             self.sessions_total = self.TYPE_TO_SESSIONS.get(self.enrollment_type, 10)
 
+        # -----------------------
+        # ถ้า ≤ 0 ถือว่าครบคอร์ส
+        # -----------------------
+        if self.sessions_total <= 0:
+            self.is_active = False
+
+            auto_note = "ครบคอร์สแล้ว (นำเข้าข้อมูลย้อนหลัง)"
+            note = (self.remark or "").strip()
+            if auto_note not in note:
+                self.remark = f"{note}\n{auto_note}".strip()
+
         # snapshot course_price
-        if self.tutoring_class_id and (self.course_price is None or self.course_price == 0):
+        if self.tutoring_class_id and not self.course_price:
             self.course_price = self.tutoring_class.course_price or 0
 
         # normalize installments
@@ -414,6 +426,7 @@ class Enrollment(models.Model):
 
     def remaining_sessions(self):
         return self.sessions_total - self.used_sessions()
+
 
 
 

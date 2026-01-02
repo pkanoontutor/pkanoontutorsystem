@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <title>ตรวจสอบ Username นักเรียน</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <style>
+    body{
+      font-family:system-ui,-apple-system,Segoe UI,Roboto;
+      background:#f8fafc;
+      margin:0;
+      padding:20px;
+    }
+    h1{text-align:center}
+    table{
+      width:100%;
+      border-collapse:collapse;
+      margin-top:20px;
+      background:#fff;
+      border-radius:12px;
+      overflow:hidden;
+    }
+    th,td{
+      padding:12px;
+      border-bottom:1px solid #e5e7eb;
+      text-align:left;
+    }
+    th{
+      background:#1d4ed8;
+      color:#fff;
+    }
+    tr:hover{background:#f1f5f9}
+    .hint{
+      text-align:center;
+      margin-top:12px;
+      color:#555;
+      font-size:14px;
+    }
+  </style>
+</head>
+<body>
+
+<h1>🔍 ตรวจสอบ Username ของนักเรียน</h1>
+
+<table>
+  <thead>
+    <tr>
+      <th>Student ID</th>
+      <th>ชื่อเล่น</th>
+      <th>ชื่อ–นามสกุล</th>
+      <th>ระดับชั้น</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for s in students %}
+    <tr>
+      <td><strong>{{ s.student_code }}</strong></td>
+      <td>{{ s.nickname }}</td>
+      <td>{{ s.full_name }}</td>
+      <td>{{ s.grade_level }}</td>
+    </tr>
+    {% empty %}
+    <tr>
+      <td colspan="4" style="text-align:center">ยังไม่มีข้อมูล</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<div class="hint">
+  ใช้ Student ID นี้ในการเข้าสู่ Student Portal
+</div>
+
+</body>
+</html>

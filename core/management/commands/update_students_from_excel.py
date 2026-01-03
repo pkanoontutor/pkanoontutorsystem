@@ -1,10 +1,10 @@
 import openpyxl
 from django.core.management.base import BaseCommand
-from core.models import Student, School
+from core.models import Student
 
 
 class Command(BaseCommand):
-    help = "Update students from Excel using student_code (NO CREATE)"
+    help = "Update students from Excel using student_code as key (NO CREATE)"
 
     def handle(self, *args, **options):
         path = "data/students_update.xlsx"
@@ -15,50 +15,43 @@ class Command(BaseCommand):
         skipped = 0
 
         for row in ws.iter_rows(min_row=2, values_only=True):
-            (
-                student_code,
-                full_name,
-                nickname,
-                grade_level,
-                academic_year,
-                school_name,
-            ) = row
+            # รองรับไฟล์ที่มีแค่ 4 คอลัมน์
+            student_code = str(row[0]).strip() if row[0] else ""
+            nickname = row[1] if len(row) > 1 else None
+            full_name = row[2] if len(row) > 2 else None
+            grade_level = row[3] if len(row) > 3 else None
 
             if not student_code:
+                skipped += 1
                 continue
-
-            student_code = str(student_code).strip()
 
             try:
                 student = Student.objects.get(student_code=student_code)
             except Student.DoesNotExist:
-                self.stderr.write(f"❌ ไม่พบ student_code {student_code} → ข้าม")
+                self.stderr.write(f"❌ ไม่พบ student_code {student_code}")
                 skipped += 1
                 continue
 
-            # ---------- Update เฉพาะ field ที่มีค่า ----------
-            if full_name:
-                student.full_name = str(full_name).strip()
+            changed = False
 
-            if nickname:
-                student.nickname = str(nickname).strip()
+            if nickname not in (None, ""):
+                student.nickname = nickname
+                changed = True
 
-            if grade_level:
-                student.grade_level = str(grade_level).strip()
+            if full_name not in (None, ""):
+                student.full_name = full_name
+                changed = True
 
-            if academic_year:
-                student.academic_year = str(academic_year).strip()
+            if grade_level not in (None, ""):
+                student.grade_level = grade_level
+                changed = True
 
-            if school_name:
-                school_name = str(school_name).strip()
-                school, _ = School.objects.get_or_create(name=school_name)
-                student.school = school
-
-            student.save()
-            updated += 1
+            if changed:
+                student.save()
+                updated += 1
 
         self.stdout.write(
             self.style.SUCCESS(
-                f"✅ Update สำเร็จ {updated} คน | ⏭ ข้าม {skipped} คน"
+                f"✅ Update สำเร็จ {updated} คน | ⏭ ข้าม {skipped} แถว"
             )
         )

@@ -172,17 +172,39 @@ global_summary = {
 }
 
 
-    # Summary รวมทั้งหมด (วันนี้)
-    global_summary = Attendance.objects.filter(
-        attendance_date=selected_date,
-        enrollment__tutoring_class__is_active=True,
-        student__is_active=True,
-    ).aggregate(
-        present=Count("id", filter=Q(status=Attendance.Status.PRESENT)),
-        excused=Count("id", filter=Q(status=Attendance.Status.EXCUSED)),
-        no_show=Count("id", filter=Q(status=Attendance.Status.NO_SHOW)),
-        total=Count("id"),
-    )
+    # Summary ต่อ class (enrollment-first)
+    summary_by_class_id = {}
+    global_present = global_excused = global_no_show = global_total = 0
+
+    for cls in classes:
+        cls_enrollments = enrollments.filter(tutoring_class=cls)
+        total = cls_enrollments.count()
+
+        atts = todays_att.filter(enrollment__in=cls_enrollments)
+
+        present = atts.filter(status=Attendance.Status.PRESENT).count()
+        excused = atts.filter(status=Attendance.Status.EXCUSED).count()
+        no_show = atts.filter(status=Attendance.Status.NO_SHOW).count()
+
+        summary_by_class_id[cls.id] = {
+            "present": present,
+            "excused": excused,
+            "no_show": no_show,
+            "total": total,
+        }
+
+        global_present += present
+        global_excused += excused
+        global_no_show += no_show
+        global_total += total
+
+    global_summary = {
+        "present": global_present,
+        "excused": global_excused,
+        "no_show": global_no_show,
+        "total": global_total,
+    }
+
 
     # -----------------------
     # ✅ (ข้อ C) ด้านขวา: sheet progress จาก "SheetUpdateEntry วันที่ล่าสุด"
@@ -553,7 +575,7 @@ def alerts_dashboard(request: HttpRequest) -> HttpResponse:
 
     near = []
     for e in enrollments:
-        if e.remaining_sessions() < 2:
+        if e.remaining_sessions < 2:
             near.append(e)
 
     return render(request, "core/alerts_dashboard.html", {

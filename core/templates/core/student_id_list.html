@@ -18,13 +18,34 @@
       margin-bottom:10px;
     }
 
+    /* ===== Top Actions ===== */
+    .top-actions{
+      display:flex;
+      gap:12px;
+      justify-content:center;
+      margin-bottom:18px;
+      flex-wrap:wrap;
+    }
+
+    .top-btn{
+      padding:12px 18px;
+      border-radius:16px;
+      font-weight:700;
+      text-decoration:none;
+      color:#fff;
+      box-shadow:0 6px 16px rgba(0,0,0,.15);
+    }
+
+    .home-btn{background:#64748b}
+    .portal-btn{background:#16a34a}
+
     /* ===== Grade Buttons ===== */
     .grade-buttons{
       display:grid;
       grid-template-columns:repeat(2,1fr);
       gap:12px;
       max-width:520px;
-      margin:0 auto 20px;
+      margin:0 auto 24px;
     }
 
     .grade-btn{
@@ -63,6 +84,7 @@
       background:#fff;
       border-radius:14px;
       overflow:hidden;
+      margin-top:10px;
     }
 
     th,td{
@@ -84,11 +106,24 @@
       color:#555;
       font-size:14px;
     }
+
+    .choose-hint{
+      text-align:center;
+      color:#475569;
+      margin-top:10px;
+      font-size:15px;
+    }
   </style>
 </head>
 <body>
 
 <h1>🔍 ตรวจสอบ Username ของนักเรียน</h1>
+
+<!-- 🔙 Navigation -->
+<div class="top-actions">
+  <a class="top-btn home-btn" href="/">⬅ กลับหน้า Home</a>
+  <a class="top-btn portal-btn" href="/student-portal/">👨‍👩‍👧 Student Portal</a>
+</div>
 
 <!-- 🎨 Grade Filters -->
 <div class="grade-buttons">
@@ -102,34 +137,40 @@
   <a class="grade-btn m4" href="?grade=ม.4">ม.4</a>
 </div>
 
-<table>
-  <thead>
-    <tr>
-      <th>Student ID</th>
-      <th>ชื่อเล่น</th>
-      <th>ชื่อ–นามสกุล</th>
-      <th>ระดับชั้น</th>
-    </tr>
-  </thead>
-  <tbody>
-    {% for s in students %}
-    <tr>
-      <td><strong>{{ s.student_code }}</strong></td>
-      <td>{{ s.nickname }}</td>
-      <td>{{ s.full_name|slice:":3" }}****</td>
-      <td>{{ s.grade_level }}</td>
-    </tr>
-    {% empty %}
-    <tr>
-      <td colspan="4" style="text-align:center">ไม่พบข้อมูลนักเรียนระดับนี้</td>
-    </tr>
-    {% endfor %}
-  </tbody>
-</table>
+{% if selected_grade %}
+  <table>
+    <thead>
+      <tr>
+        <th>Student ID</th>
+        <th>ชื่อเล่น</th>
+        <th>ชื่อ–นามสกุล</th>
+        <th>ระดับชั้น</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in students %}
+      <tr>
+        <td><strong>{{ s.student_code }}</strong></td>
+        <td>{{ s.nickname }}</td>
+        <td>{{ s.full_name|slice:":3" }}****</td>
+        <td>{{ s.grade_level }}</td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="4" style="text-align:center">ไม่พบข้อมูลนักเรียนระดับนี้</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
 
-<div class="hint">
-  ใช้ Student ID นี้ในการเข้าสู่ Student Portal
-</div>
+  <div class="hint">
+    ใช้ Student ID นี้ในการเข้าสู่ Student Portal
+  </div>
+{% else %}
+  <div class="choose-hint">
+    👆 กรุณาเลือกระดับชั้นเพื่อแสดงรายชื่อนักเรียน
+  </div>
+{% endif %}
 
 </body>
 </html>

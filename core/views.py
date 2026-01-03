@@ -157,7 +157,7 @@ def dashboard(request: HttpRequest) -> HttpResponse:
             "total": in_progress,
         }
 
-        seats_total = cls.total_seats or 0
+        seats_total = cls.seats_total or 0
         seats_available = max(seats_total - in_progress, 0)
 
         seats_summary_by_class_id[cls.id] = {

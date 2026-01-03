@@ -99,17 +99,14 @@ class StudentAdmin(admin.ModelAdmin):
         }),
     )
 
-    # ✅ Prefill student_code โดยไม่ชน autocomplete
     def get_form(self, request, obj=None, **kwargs):
         form = super().get_form(request, obj, **kwargs)
-
         if obj is None:
             yy = str(timezone.localdate().year)[-2:]
             try:
                 form.base_fields["student_code"].initial = Student._next_student_code_for_year(yy)
             except Exception:
                 pass
-
         return form
 
     @admin.display(description="โรงเรียน")
@@ -125,8 +122,6 @@ class StudentAdmin(admin.ModelAdmin):
             )
         return "-"
 
-    profile_image_thumb.short_description = "รูป"
-
     def profile_image_thumb_large(self, obj):
         if obj.profile_image:
             return mark_safe(
@@ -135,8 +130,6 @@ class StudentAdmin(admin.ModelAdmin):
                 f'object-fit:cover;border:1px solid #e5e7eb;" />'
             )
         return "ยังไม่มีรูป"
-
-    profile_image_thumb_large.short_description = ""
 
 
 # -----------------------
@@ -170,7 +163,7 @@ class SheetAdmin(admin.ModelAdmin):
 
 
 # -----------------------
-# ClassSubject inline within Class
+# ClassSubject inline
 # -----------------------
 class ClassSubjectInline(admin.TabularInline):
     model = ClassSubject
@@ -188,14 +181,9 @@ class ClassSubjectInline(admin.TabularInline):
     )
     readonly_fields = ("updated_at", "updated_by")
 
-    def save_model(self, request, obj, form, change):
-        obj.updated_at = timezone.now()
-        obj.updated_by = request.user
-        super().save_model(request, obj, form, change)
-
 
 # -----------------------
-# Classes
+# TutoringClass
 # -----------------------
 @admin.register(TutoringClass)
 class TutoringClassAdmin(admin.ModelAdmin):
@@ -222,11 +210,9 @@ class ClassSubjectAdmin(admin.ModelAdmin):
         "current_sheet",
         "current_page",
         "current_question",
-        "progress",
         "last_teacher",
-        "updated_at",
-        "updated_by",
         "is_active",
+        "updated_at",
     )
     list_filter = ("tutoring_class", "subject", "is_active")
     search_fields = (
@@ -234,20 +220,10 @@ class ClassSubjectAdmin(admin.ModelAdmin):
         "subject__name",
         "current_sheet__code",
         "current_sheet__title",
-        "last_teacher",
     )
     autocomplete_fields = ("tutoring_class", "subject", "current_sheet")
     readonly_fields = ("updated_at", "updated_by")
     ordering = ("tutoring_class__name", "subject__name")
-
-    @admin.display(description="Progress (%)")
-    def progress(self, obj: ClassSubject):
-        return obj.progress_percent()
-
-    def save_model(self, request, obj, form, change):
-        obj.updated_at = timezone.now()
-        obj.updated_by = request.user
-        super().save_model(request, obj, form, change)
 
 
 # -----------------------
@@ -270,46 +246,55 @@ class EnrollmentInstallmentInline(admin.TabularInline):
 
 @admin.register(Enrollment)
 class EnrollmentAdmin(admin.ModelAdmin):
+    autocomplete_fields = ("student", "tutoring_class")
+    inlines = (EnrollmentInstallmentInline,)
+
     list_display = (
+        "sale_run_no",
         "student",
         "tutoring_class",
-        "enrollment_type",
+        "sessions_total",
         "is_active",
         "payment_type",
-        "installments_count",
         "course_price",
-        "discount_amount",
         "net_price",
-        "sessions_total",
-        "used",
-        "remaining",
         "created_at",
     )
+
     list_filter = (
         "tutoring_class",
-        "enrollment_type",
         "is_active",
         "payment_type",
     )
+
     search_fields = (
+        "sale_run_no",
+        "student__student_code",
         "student__full_name",
         "student__nickname",
         "tutoring_class__name",
     )
-    ordering = ("-created_at",)
-    radio_fields = {"enrollment_type": admin.VERTICAL}
-    autocomplete_fields = ("student", "tutoring_class")
-    inlines = (EnrollmentInstallmentInline,)
+
+    readonly_fields = (
+        "sale_run_no",
+        "created_at",
+        "net_price",
+    )
 
     fieldsets = (
-        ("ข้อมูลคอร์ส", {
+        ("ข้อมูลนักเรียน", {
             "fields": (
                 "student",
                 "tutoring_class",
-                "enrollment_type",
+                "sale_run_no",
+                "created_at",
+                "is_active",
+            )
+        }),
+        ("จำนวนครั้ง", {
+            "fields": (
                 "sessions_total",
                 "remark",
-                "is_active",
             )
         }),
         ("การชำระเงิน", {
@@ -321,47 +306,7 @@ class EnrollmentAdmin(admin.ModelAdmin):
                 "net_price",
             )
         }),
-        ("จบคอร์ส", {
-            "fields": ("closed_reason", "closed_at")
-        }),
-        ("แจ้งเตือนใกล้ครบ", {
-            "fields": (
-                "notified_near_complete",
-                "notified_method",
-                "notified_at",
-            )
-        }),
     )
-
-    @admin.display(description="Used (ครั้ง)")
-    def used(self, obj: Enrollment):
-        return obj.used_sessions()
-
-    @admin.display(description="Remaining (ครั้ง)")
-    def remaining(self, obj: Enrollment):
-        return obj.remaining_sessions()
-
-
-# -----------------------
-# EnrollmentInstallment
-# -----------------------
-@admin.register(EnrollmentInstallment)
-class EnrollmentInstallmentAdmin(admin.ModelAdmin):
-    list_display = (
-        "enrollment",
-        "installment_no",
-        "amount_due",
-        "amount_paid",
-        "is_paid",
-        "paid_at",
-    )
-    list_filter = ("is_paid",)
-    search_fields = (
-        "enrollment__student__full_name",
-        "enrollment__tutoring_class__name",
-    )
-    ordering = ("-created_at", "enrollment_id", "installment_no")
-    autocomplete_fields = ("enrollment",)
 
 
 # -----------------------
@@ -395,7 +340,6 @@ class SheetInventoryAdmin(admin.ModelAdmin):
         "sheet",
         "quantity",
         "is_finished",
-        "finished_at",
         "updated_at",
     )
     list_filter = ("is_finished", "sheet__subject")

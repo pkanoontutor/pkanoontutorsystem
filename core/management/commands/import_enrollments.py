@@ -9,6 +9,8 @@ class Command(BaseCommand):
     help = "Import enrollments from Excel"
 
     def handle(self, *args, **options):
+        print("🔥 USING NEW IMPORT FILE VERSION 🔥")
+
         path = "data/enrollments.xlsx"
         wb = openpyxl.load_workbook(path)
         ws = wb.active
@@ -28,7 +30,7 @@ class Command(BaseCommand):
             ) = row
 
             # -----------------------
-            # Validate student
+            # Student
             # -----------------------
             try:
                 student = Student.objects.get(student_code=str(student_code).strip())
@@ -37,7 +39,7 @@ class Command(BaseCommand):
                 continue
 
             # -----------------------
-            # Validate class
+            # Class
             # -----------------------
             try:
                 tutoring_class = TutoringClass.objects.get(name=str(class_name).strip())
@@ -46,50 +48,38 @@ class Command(BaseCommand):
                 continue
 
             # -----------------------
-            # Normalize numeric fields
+            # Numbers
             # -----------------------
             try:
                 sessions_total = int(sessions_total)
             except Exception:
-                self.stderr.write(f"❌ Row {row_no}: sessions_total ไม่ถูกต้อง ({sessions_total})")
+                self.stderr.write(f"❌ Row {row_no}: sessions_total ไม่ถูกต้อง")
                 continue
 
-            try:
-                course_price = float(course_price) if course_price not in (None, "") else 0
-            except Exception:
-                self.stderr.write(f"❌ Row {row_no}: course_price ไม่ถูกต้อง ({course_price})")
-                continue
-
-            try:
-                discount_amount = float(discount_amount) if discount_amount not in (None, "") else 0
-            except Exception:
-                self.stderr.write(f"❌ Row {row_no}: discount_amount ไม่ถูกต้อง ({discount_amount})")
-                continue
+            course_price = float(course_price or 0)
+            discount_amount = float(discount_amount or 0)
 
             enrollment_type = str(enrollment_type).strip() if enrollment_type else Enrollment.EnrollmentType.SPECIAL
             payment_type = str(payment_type).strip() if payment_type else Enrollment.PaymentType.FULL
             remark = str(remark).strip() if remark else ""
 
-            # -----------------------
-            # Create Enrollment (สำคัญ)
-            # -----------------------
             Enrollment.objects.create(
                 student=student,
                 tutoring_class=tutoring_class,
                 enrollment_type=enrollment_type,
 
-                # ✅ ใช้ค่าจริงจาก Excel ห้ามแก้
+                # ✅ ใช้ค่าจริงจาก Excel
                 sessions_total=sessions_total,
 
                 payment_type=payment_type,
+                installments_count=1,
+
                 course_price=course_price,
                 discount_amount=discount_amount,
                 net_price=max(course_price - discount_amount, 0),
 
-                # ✅ FIX fields ที่ DB บังคับ NOT NULL
+                # ❌ ไม่ส่ง field ที่ DB ไม่รู้จัก
                 is_active=True,
-                notified_near_complete=False,
-                installments_count=1,
 
                 remark=remark,
                 created_at=timezone.now(),
@@ -97,6 +87,4 @@ class Command(BaseCommand):
 
             count += 1
 
-        self.stdout.write(
-            self.style.SUCCESS(f"✅ Import enrollments สำเร็จ {count} รายการ")
-        )
+        self.stdout.write(self.style.SUCCESS(f"✅ Import enrollments สำเร็จ {count} รายการ"))

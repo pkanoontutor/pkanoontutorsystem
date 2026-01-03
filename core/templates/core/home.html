@@ -35,7 +35,7 @@
     /* ===== IMAGE GRID ===== */
     .grid{
       display:grid;
-      grid-template-columns:repeat(2, 1fr); /* 📱 mobile: 2x4 */
+      grid-template-columns:repeat(2, 1fr);
       gap:12px;
       margin-bottom:28px;
     }
@@ -55,10 +55,9 @@
       display:block;
     }
 
-    /* 🖥 desktop / tablet */
     @media (min-width: 768px){
       .grid{
-        grid-template-columns:repeat(4, 1fr); /* 4x2 */
+        grid-template-columns:repeat(4, 1fr);
       }
       .logo img{
         max-height:320px;
@@ -98,11 +97,6 @@
       background:linear-gradient(135deg,#22c55e,#16a34a);
     }
 
-    .btn-tutor{
-      color:#fff;
-      background:linear-gradient(135deg,#6366f1,#4f46e5);
-    }
-
     .btn-check{
       color:#fff;
       background:linear-gradient(135deg,#0ea5e9,#0369a1);
@@ -125,7 +119,7 @@
       <img src="{% static 'core/logo.png' %}" alt="PKanoon Tutor">
     </div>
 
-    <!-- IMAGE GRID (8 images) -->
+    <!-- IMAGE GRID -->
     <div class="grid">
       {% for i in "12345678" %}
         <div class="tile">
@@ -138,8 +132,7 @@
     <div class="actions">
       <a class="btn btn-check" href="/student-id-list/">🔍 ตรวจสอบ Username ของนักเรียน</a>
       <a class="btn btn-student" href="/student-portal/">👨‍👩‍👧 Student Portal</a>
-      <a class="btn btn-tutor" href="/admin/login/?next=/admin/">🧑‍🏫 Tutor Portal</a>
-          </div>
+    </div>
 
     <div class="hint">
       หากเข้าระบบไม่ได้ กรุณาติดต่อพี่ขนุนติวเตอร์ Line : @pkanoontutor

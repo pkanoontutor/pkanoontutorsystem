@@ -252,7 +252,7 @@
           </thead>
           <tbody>
             {% for cls in classes %}
-              {% with s=summary_by_class_id|get_item:cls.id %}
+              {% with s=summary_by_class_id|get_item:cls.id seat=seats_summary_by_class_id|get_item:cls.id %}
               <tr id="summaryRow-{{ cls.id }}">
                 <td><b>{{ cls.name }}</b></td>
                 <td class="c_present">{{ s.present|default:0 }}</td>

@@ -140,36 +140,36 @@ def dashboard(request: HttpRequest) -> HttpResponse:
 
     # Summary ต่อ class (วันนี้)
     summary_by_class_id = {}
-global_present = global_excused = global_no_show = global_total = 0
+    global_present = global_excused = global_no_show = global_total = 0
 
-for cls in classes:
-    cls_enrollments = enrollments.filter(tutoring_class=cls)
-    total = cls_enrollments.count()
+    for cls in classes:
+        cls_enrollments = enrollments.filter(tutoring_class=cls)
+        total = cls_enrollments.count()
 
-    atts = todays_att.filter(enrollment__in=cls_enrollments)
+        atts = todays_att.filter(enrollment__in=cls_enrollments)
 
-    present = atts.filter(status=Attendance.Status.PRESENT).count()
-    excused = atts.filter(status=Attendance.Status.EXCUSED).count()
-    no_show = atts.filter(status=Attendance.Status.NO_SHOW).count()
+        present = atts.filter(status=Attendance.Status.PRESENT).count()
+        excused = atts.filter(status=Attendance.Status.EXCUSED).count()
+        no_show = atts.filter(status=Attendance.Status.NO_SHOW).count()
 
-    summary_by_class_id[cls.id] = {
-        "present": present,
-        "excused": excused,
-        "no_show": no_show,
-        "total": total,
+        summary_by_class_id[cls.id] = {
+            "present": present,
+            "excused": excused,
+            "no_show": no_show,
+            "total": total,
+        }
+
+        global_present += present
+        global_excused += excused
+        global_no_show += no_show
+        global_total += total
+
+    global_summary = {
+        "present": global_present,
+        "excused": global_excused,
+        "no_show": global_no_show,
+        "total": global_total,
     }
-
-    global_present += present
-    global_excused += excused
-    global_no_show += no_show
-    global_total += total
-
-global_summary = {
-    "present": global_present,
-    "excused": global_excused,
-    "no_show": global_no_show,
-    "total": global_total,
-}
 
 
     # Summary ต่อ class (enrollment-first)

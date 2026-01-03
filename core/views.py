@@ -50,18 +50,30 @@ def student_id_list(request: HttpRequest) -> HttpResponse:
     - ระดับชั้น
     ❌ ไม่แสดงเบอร์โทร / การเงิน
     """
-    students = (
+
+    grade = request.GET.get("grade")
+
+    qs = (
         Student.objects
         .filter(is_active=True)
         .only("student_code", "nickname", "full_name", "grade_level")
-        .order_by("grade_level", "student_code")
     )
+
+    # ✅ filter ตามระดับชั้น (ถ้ามีการกดปุ่ม)
+    if grade:
+        qs = qs.filter(grade_level=grade)
+
+    students = qs.order_by("grade_level", "student_code")
 
     return render(
         request,
         "core/student_id_list.html",
-        {"students": students}
+        {
+            "students": students,
+            "selected_grade": grade,  # เผื่อใช้ highlight ปุ่มภายหลัง
+        }
     )
+
 
 
 

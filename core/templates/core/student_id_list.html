@@ -12,28 +12,75 @@
       margin:0;
       padding:20px;
     }
-    h1{text-align:center}
+
+    h1{
+      text-align:center;
+      margin-bottom:10px;
+    }
+
+    /* ===== Grade Buttons ===== */
+    .grade-buttons{
+      display:grid;
+      grid-template-columns:repeat(2,1fr);
+      gap:12px;
+      max-width:520px;
+      margin:0 auto 20px;
+    }
+
+    .grade-btn{
+      padding:16px;
+      font-size:18px;
+      font-weight:700;
+      border-radius:18px;
+      border:none;
+      color:#fff;
+      cursor:pointer;
+      text-align:center;
+      text-decoration:none;
+      box-shadow:0 8px 20px rgba(0,0,0,.15);
+      transition:transform .12s ease, box-shadow .12s ease;
+    }
+
+    .grade-btn:hover{
+      transform:translateY(-2px);
+      box-shadow:0 14px 30px rgba(0,0,0,.22);
+    }
+
+    /* 🌈 Rainbow colors */
+    .p3{background:linear-gradient(135deg,#22c55e,#16a34a)}
+    .p4{background:linear-gradient(135deg,#06b6d4,#0284c7)}
+    .p5{background:linear-gradient(135deg,#6366f1,#4f46e5)}
+    .p6{background:linear-gradient(135deg,#a855f7,#7c3aed)}
+    .m1{background:linear-gradient(135deg,#f59e0b,#d97706)}
+    .m2{background:linear-gradient(135deg,#ef4444,#dc2626)}
+    .m3{background:linear-gradient(135deg,#ec4899,#db2777)}
+    .m4{background:linear-gradient(135deg,#14b8a6,#0d9488)}
+
+    /* ===== Table ===== */
     table{
       width:100%;
       border-collapse:collapse;
-      margin-top:20px;
       background:#fff;
-      border-radius:12px;
+      border-radius:14px;
       overflow:hidden;
     }
+
     th,td{
       padding:12px;
       border-bottom:1px solid #e5e7eb;
       text-align:left;
     }
+
     th{
       background:#1d4ed8;
       color:#fff;
     }
+
     tr:hover{background:#f1f5f9}
+
     .hint{
       text-align:center;
-      margin-top:12px;
+      margin-top:14px;
       color:#555;
       font-size:14px;
     }
@@ -42,6 +89,18 @@
 <body>
 
 <h1>🔍 ตรวจสอบ Username ของนักเรียน</h1>
+
+<!-- 🎨 Grade Filters -->
+<div class="grade-buttons">
+  <a class="grade-btn p3" href="?grade=ป.3">ป.3</a>
+  <a class="grade-btn p4" href="?grade=ป.4">ป.4</a>
+  <a class="grade-btn p5" href="?grade=ป.5">ป.5</a>
+  <a class="grade-btn p6" href="?grade=ป.6">ป.6</a>
+  <a class="grade-btn m1" href="?grade=ม.1">ม.1</a>
+  <a class="grade-btn m2" href="?grade=ม.2">ม.2</a>
+  <a class="grade-btn m3" href="?grade=ม.3">ม.3</a>
+  <a class="grade-btn m4" href="?grade=ม.4">ม.4</a>
+</div>
 
 <table>
   <thead>
@@ -57,14 +116,12 @@
     <tr>
       <td><strong>{{ s.student_code }}</strong></td>
       <td>{{ s.nickname }}</td>
-      <td>
-        {{ s.full_name|slice:":3" }}****
-      </td>
+      <td>{{ s.full_name|slice:":3" }}****</td>
       <td>{{ s.grade_level }}</td>
     </tr>
     {% empty %}
     <tr>
-      <td colspan="4" style="text-align:center">ยังไม่มีข้อมูล</td>
+      <td colspan="4" style="text-align:center">ไม่พบข้อมูลนักเรียนระดับนี้</td>
     </tr>
     {% endfor %}
   </tbody>

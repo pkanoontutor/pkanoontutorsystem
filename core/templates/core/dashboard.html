@@ -260,7 +260,7 @@
                 <td class="c_no_show">{{ s.no_show|default:0 }}</td>
                 <td class="c_total"><b>{{ s.total|default:0 }}</b></td>
 
-                <td class="bg-soft"><b>{{ cls.seats_total|default:0 }}</b></td>
+                <td class="bg-soft"><b>{{ seat.seats_total|default:0 }}</b></td>
                 <td class="bg-soft"><b>{{ cls.seats_in_progress|default:0 }}</b></td>
                 <td class="bg-soft"><b>{{ cls.seats_available|default:0 }}</b></td>
 
@@ -387,11 +387,11 @@
     <!-- ✅ Class cards -->
     <div class="grid" style="gap:14px;">
       {% for cls in classes %}
-        {% with s=summary_by_class_id|get_item:cls.id %}
+        {% with s=summary_by_class_id|get_item:cls.id seat=seats_summary_by_class_id|get_item:cls.id %}
         <div class="card" id="classCard-{{ cls.id }}">
 
           <div class="class-header">
-            <!-- ✅ TOP ROW: ชื่อห้อง + วันที่/ไป + Submit (บรรทัดเดียว) -->
+            <!-- ✅ TOP ROW -->
             <div class="class-toprow">
               <div class="class-title">{{ cls.name }}</div>
 
@@ -399,26 +399,47 @@
                 <div class="class-datebox">
                   <span class="muted">วันที่:</span>
                   <input type="date" id="date-{{ cls.id }}" value="{{ selected_date|date:'Y-m-d' }}" />
-                  <button class="btn btn-go" type="button" onclick="return gotoDateForClass({{ cls.id }});">ไป</button>
+                  <button class="btn btn-go" type="button"
+                          onclick="return gotoDateForClass({{ cls.id }});">ไป</button>
                 </div>
 
-                <button class="btn btn-submit" onclick="return submitClass({{ cls.id }});">Submit ห้องนี้</button>
+                <button class="btn btn-submit"
+                        onclick="return submitClass({{ cls.id }});">
+                  Submit ห้องนี้
+                </button>
               </div>
             </div>
 
-            <!-- ✅ ใต้ชื่อห้อง: ที่นั่ง + มา/ลา/ขาด/รวม แบบสี -->
+            <!-- ✅ ใต้ชื่อห้อง: ที่นั่ง -->
             <div class="seat-line">
-              <span class="seat-pill">ที่นั่งรวม: <b>{{ cls.seats_total|default:0 }}</b></span>
-              <span class="seat-pill">ระหว่างเรียน: <b>{{ cls.seats_in_progress|default:0 }}</b></span>
-              <span class="seat-pill">ที่นั่งว่าง: <b>{{ cls.seats_available|default:0 }}</b></span>
-              <span class="muted">ชั่วโมงต่อครั้ง: {{ cls.hours_per_session }}</span>
+              <span class="seat-pill">
+                ที่นั่งรวม: <b>{{ seat.seats_total|default:0 }}</b>
+              </span>
+              <span class="seat-pill">
+                ระหว่างเรียน: <b>{{ seat.seats_in_progress|default:0 }}</b>
+              </span>
+              <span class="seat-pill">
+                ที่นั่งว่าง: <b>{{ seat.seats_available|default:0 }}</b>
+              </span>
+              <span class="muted">
+                ชั่วโมงต่อครั้ง: {{ cls.hours_per_session }}
+              </span>
             </div>
 
+            <!-- ✅ มา / ลา / ขาด -->
             <div class="att-line" id="classSummary-{{ cls.id }}">
-              <span class="t-present">มา: <b class="c_present">{{ s.present|default:0 }}</b></span>
-              <span class="t-excused">ลา: <b class="c_excused">{{ s.excused|default:0 }}</b></span>
-              <span class="t-noshow">ขาด: <b class="c_no_show">{{ s.no_show|default:0 }}</b></span>
-              <span class="t-total">รวม: <b class="c_total">{{ s.total|default:0 }}</b></span>
+              <span class="t-present">
+                มา: <b class="c_present">{{ s.present|default:0 }}</b>
+              </span>
+              <span class="t-excused">
+                ลา: <b class="c_excused">{{ s.excused|default:0 }}</b>
+              </span>
+              <span class="t-noshow">
+                ขาด: <b class="c_no_show">{{ s.no_show|default:0 }}</b>
+              </span>
+              <span class="t-total">
+                รวม: <b class="c_total">{{ s.total|default:0 }}</b>
+              </span>
             </div>
           </div>
 
@@ -469,7 +490,8 @@
                             <div class="muted">
                               {% with seq=course_seq_by_enrollment_id|get_item:e.id %}
                                 {% with total=course_total_by_student|get_item:e.student_id %}
-                                  คอร์สที่ <b>{{ seq|default:"-" }}</b> / <b>{{ total|default:"-" }}</b>
+                                  คอร์สที่ <b>{{ seq|default:"-" }}</b> /
+                                  <b>{{ total|default:"-" }}</b>
                                   {% if seq and total and seq == total %}
                                     <span class="badge-current">คอร์สปัจจุบัน</span>
                                   {% endif %}
@@ -477,16 +499,21 @@
                               {% endwith %}
                             </div>
 
-                            <div class="muted">{{ e.get_enrollment_type_display }}</div>
+                            <div class="muted">
+                              {{ e.get_enrollment_type_display }}
+                            </div>
                           </div>
 
-                          <a class="enroll-icon" href="/admin/core/enrollment/{{ e.id }}/change/" title="ไปหน้าจบคอร์ส">🏁</a>
+                          <a class="enroll-icon"
+                             href="/admin/core/enrollment/{{ e.id }}/change/"
+                             title="ไปหน้าจบคอร์ส">🏁</a>
                         </div>
                       </td>
 
                       <td><b>{{ e.sessions_total }}</b></td>
                       <td>
-                        <b id="remaining-{{ e.id }}" class="{% if e.remaining_sessions <= 0 %}danger{% endif %}">
+                        <b id="remaining-{{ e.id }}"
+                           class="{% if e.remaining_sessions <= 0 %}danger{% endif %}">
                           {{ e.remaining_sessions }}
                         </b>
                       </td>
@@ -500,9 +527,17 @@
                       </td>
 
                       <td>
-                        <button class="btn btn-att btn-green {% if a and a.status == 'present' %}active-btn{% endif %}" onclick="return pickStatus({{ cls.id }}, {{ e.id }}, 'present');">มา</button>
-                        <button class="btn btn-att btn-yellow {% if a and a.status == 'excused' %}active-btn{% endif %}" onclick="return pickStatus({{ cls.id }}, {{ e.id }}, 'excused');">ลา</button>
-                        <button class="btn btn-att btn-red {% if a and a.status == 'no_show' %}active-btn{% endif %}" onclick="return pickStatus({{ cls.id }}, {{ e.id }}, 'no_show');">ขาด</button>
+                        <button class="btn btn-att btn-green
+                          {% if a and a.status == 'present' %}active-btn{% endif %}"
+                          onclick="return pickStatus({{ cls.id }}, {{ e.id }}, 'present');">มา</button>
+
+                        <button class="btn btn-att btn-yellow
+                          {% if a and a.status == 'excused' %}active-btn{% endif %}"
+                          onclick="return pickStatus({{ cls.id }}, {{ e.id }}, 'excused');">ลา</button>
+
+                        <button class="btn btn-att btn-red
+                          {% if a and a.status == 'no_show' %}active-btn{% endif %}"
+                          onclick="return pickStatus({{ cls.id }}, {{ e.id }}, 'no_show');">ขาด</button>
                       </td>
                     </tr>
                     {% endwith %}

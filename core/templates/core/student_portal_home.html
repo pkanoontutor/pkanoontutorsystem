@@ -45,8 +45,29 @@
           padding:22px;
           margin-bottom:16px;
           text-align:center;
+          position:relative;
         "
       >
+
+        {# 🔖 รหัสคอร์ส (Enrollment.sale_run_no) #}
+        {% if e.sale_run_no %}
+          <div
+            style="
+              position:absolute;
+              top:12px;
+              left:14px;
+              background:#111827;
+              color:#ffffff;
+              font-size:12px;
+              font-weight:900;
+              padding:4px 10px;
+              border-radius:999px;
+              letter-spacing:.3px;
+            "
+          >
+            รหัสคอร์ส {{ e.sale_run_no }}
+          </div>
+        {% endif %}
 
         <div style="font-size:18px;font-weight:900;margin-bottom:4px;">
           {{ e.tutoring_class.name }}

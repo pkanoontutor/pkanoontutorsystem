@@ -394,6 +394,7 @@ class Enrollment(models.Model):
     def used_sessions(self):
         return self.attendances.filter(deducted=True).count()
 
+    @property
     def remaining_sessions(self):
         return self.sessions_total - self.used_sessions()
 

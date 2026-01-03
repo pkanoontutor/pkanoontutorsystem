@@ -302,13 +302,13 @@ class Enrollment(models.Model):
         default=EnrollmentType.NORMAL_10,
     )
 
-    # ✅ ใช้ค่าที่ import มา “ตรงตามจริง”
+    # ✅ ใช้ค่าที่ import / กรอกมา “ตรงตามจริง”
     sessions_total = models.IntegerField("จำนวนครั้งคงเหลือ", default=0)
 
     created_at = models.DateTimeField(default=timezone.now)
     remark = models.TextField("หมายเหตุ", blank=True)
 
-    # ❗ active จะเปลี่ยนได้เฉพาะจากการกดจบคอร์ส
+    # ❗ จะ inactive ก็ต่อเมื่อกดจบคอร์สเท่านั้น
     is_active = models.BooleanField("Active", default=True)
 
     class PaymentType(models.TextChoices):
@@ -359,13 +359,14 @@ class Enrollment(models.Model):
 
         # -----------------------
         # ❌ ห้าม override sessions_total
-        # ใช้ค่าที่กรอก / import มาเท่านั้น
+        # ใช้ค่าที่ import / กรอกมาเท่านั้น
         # -----------------------
         if self.sessions_total is None:
             self.sessions_total = 0
 
         # -----------------------
-        # ถ้า <= 0 → แค่ใส่หมายเหตุ (ไม่ปิดคอร์ส)
+        # ถ้า <= 0 → ใส่หมายเหตุว่า "ครบคอร์ส"
+        # (❗ ไม่เปลี่ยน is_active)
         # -----------------------
         if self.sessions_total <= 0:
             auto_note = "ครบคอร์สแล้ว (นำเข้าข้อมูลย้อนหลัง)"

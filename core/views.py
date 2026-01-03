@@ -139,18 +139,38 @@ def dashboard(request: HttpRequest) -> HttpResponse:
     att_map = {a.enrollment_id: a for a in todays_att}
 
     # Summary ต่อ class (วันนี้)
-    class_summaries = (
-        Attendance.objects
-        .filter(attendance_date=selected_date, enrollment__tutoring_class__is_active=True, student__is_active=True)
-        .values("enrollment__tutoring_class_id")
-        .annotate(
-            present=Count("id", filter=Q(status=Attendance.Status.PRESENT)),
-            excused=Count("id", filter=Q(status=Attendance.Status.EXCUSED)),
-            no_show=Count("id", filter=Q(status=Attendance.Status.NO_SHOW)),
-            total=Count("id"),
-        )
-    )
-    summary_by_class_id = {row["enrollment__tutoring_class_id"]: row for row in class_summaries}
+    summary_by_class_id = {}
+global_present = global_excused = global_no_show = global_total = 0
+
+for cls in classes:
+    cls_enrollments = enrollments.filter(tutoring_class=cls)
+    total = cls_enrollments.count()
+
+    atts = todays_att.filter(enrollment__in=cls_enrollments)
+
+    present = atts.filter(status=Attendance.Status.PRESENT).count()
+    excused = atts.filter(status=Attendance.Status.EXCUSED).count()
+    no_show = atts.filter(status=Attendance.Status.NO_SHOW).count()
+
+    summary_by_class_id[cls.id] = {
+        "present": present,
+        "excused": excused,
+        "no_show": no_show,
+        "total": total,
+    }
+
+    global_present += present
+    global_excused += excused
+    global_no_show += no_show
+    global_total += total
+
+global_summary = {
+    "present": global_present,
+    "excused": global_excused,
+    "no_show": global_no_show,
+    "total": global_total,
+}
+
 
     # Summary รวมทั้งหมด (วันนี้)
     global_summary = Attendance.objects.filter(
@@ -204,7 +224,7 @@ def dashboard(request: HttpRequest) -> HttpResponse:
     THRESHOLD = 2
     near_complete = []
     for e in enrollments:
-        if e.remaining_sessions() < 2:
+        if e.remaining_sessions < 2:
             near_complete.append(e)
 
     context = {
@@ -505,7 +525,7 @@ def attendance_submit(request: HttpRequest) -> JsonResponse:
         total=Count("id"),
     )
 
-    remaining_map = {eid: enroll_map[eid].remaining_sessions() for eid in enroll_map.keys()}
+    remaining_map = {eid: enroll_map[eid].remaining_sessions for eid in enroll_map.keys()}
 
     return JsonResponse({
         "ok": True,

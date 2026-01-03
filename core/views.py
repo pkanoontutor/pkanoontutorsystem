@@ -129,40 +129,47 @@ def dashboard(request: HttpRequest) -> HttpResponse:
         course_seq_by_enrollment_id[eid] = seq
         course_total_by_student[sid] = seq
 
-    # Attendance ของวันนั้น (เอามาโชว์สถานะที่เคย submit แล้ว)
-    todays_att = (
-        Attendance.objects
-        .select_related("enrollment", "student")
-        .filter(attendance_date=selected_date)
-        .all()
-    )
+    # ----- attendance today -----
+    todays_att = Attendance.objects.filter(attendance_date=selected_date)
     att_map = {a.enrollment_id: a for a in todays_att}
 
     # Summary ต่อ class (วันนี้)
     summary_by_class_id = {}
+    seats_summary_by_class_id = {}
+
     global_present = global_excused = global_no_show = global_total = 0
 
     for cls in classes:
         cls_enrollments = enrollments.filter(tutoring_class=cls)
-        total = cls_enrollments.count()
+        total_enroll = cls_enrollments.count()
 
         atts = todays_att.filter(enrollment__in=cls_enrollments)
 
         present = atts.filter(status=Attendance.Status.PRESENT).count()
         excused = atts.filter(status=Attendance.Status.EXCUSED).count()
         no_show = atts.filter(status=Attendance.Status.NO_SHOW).count()
+        in_progress = present + excused + no_show
 
         summary_by_class_id[cls.id] = {
             "present": present,
             "excused": excused,
             "no_show": no_show,
-            "total": total,
+            "total": in_progress,
+        }
+
+        seats_total = cls.total_seats or 0
+        seats_available = max(seats_total - in_progress, 0)
+
+        seats_summary_by_class_id[cls.id] = {
+            "seats_total": seats_total,
+            "seats_in_progress": in_progress,
+            "seats_available": seats_available,
         }
 
         global_present += present
         global_excused += excused
         global_no_show += no_show
-        global_total += total
+        global_total += in_progress
 
     global_summary = {
         "present": global_present,
@@ -170,41 +177,6 @@ def dashboard(request: HttpRequest) -> HttpResponse:
         "no_show": global_no_show,
         "total": global_total,
     }
-
-
-    # Summary ต่อ class (enrollment-first)
-    summary_by_class_id = {}
-    global_present = global_excused = global_no_show = global_total = 0
-
-    for cls in classes:
-        cls_enrollments = enrollments.filter(tutoring_class=cls)
-        total = cls_enrollments.count()
-
-        atts = todays_att.filter(enrollment__in=cls_enrollments)
-
-        present = atts.filter(status=Attendance.Status.PRESENT).count()
-        excused = atts.filter(status=Attendance.Status.EXCUSED).count()
-        no_show = atts.filter(status=Attendance.Status.NO_SHOW).count()
-
-        summary_by_class_id[cls.id] = {
-            "present": present,
-            "excused": excused,
-            "no_show": no_show,
-            "total": total,
-        }
-
-        global_present += present
-        global_excused += excused
-        global_no_show += no_show
-        global_total += total
-
-    global_summary = {
-        "present": global_present,
-        "excused": global_excused,
-        "no_show": global_no_show,
-        "total": global_total,
-    }
-
 
     # -----------------------
     # ✅ (ข้อ C) ด้านขวา: sheet progress จาก "SheetUpdateEntry วันที่ล่าสุด"

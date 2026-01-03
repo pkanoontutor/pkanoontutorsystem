@@ -227,6 +227,7 @@ def dashboard(request: HttpRequest) -> HttpResponse:
         "enrollments": enrollments,
         "att_map": att_map,
         "summary_by_class_id": summary_by_class_id,
+        "seats_summary_by_class_id": seats_summary_by_class_id,
         "global_summary": global_summary,
 
         # ✅ ฝั่งขวา

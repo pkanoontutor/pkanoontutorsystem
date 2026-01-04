@@ -1,5 +1,6 @@
 from django.db import migrations, models
 
+
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -16,7 +17,7 @@ class Migration(migrations.Migration):
                     ('sat_morning', 'เสาร์เช้า'),
                     ('sat_afternoon', 'เสาร์บ่าย'),
                     ('sun_morning', 'อาทิตย์เช้า'),
-                    ('sun_after_noon', 'อาทิตย์บ่าย'),
+                    ('sun_afternoon', 'อาทิตย์บ่าย'),
                 ],
                 default='sat_morning',
             ),

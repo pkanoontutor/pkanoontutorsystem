@@ -157,8 +157,9 @@ def dashboard(request: HttpRequest) -> HttpResponse:
             "total": in_progress,
         }
 
-        seats_total = cls_enrollments.count()
-        seats_available = max(seats_total - in_progress, 0)
+        capacity = cls.total_seats or 0        # ← ใช้ capacity จาก TutoringClass
+        in_progress = enrollment_count      # ← เด็กที่ลงเรียนอยู่
+        available = max(capacity - in_progress, 0)
 
         seats_summary_by_class_id[cls.id] = {
             "seats_total": seats_total,

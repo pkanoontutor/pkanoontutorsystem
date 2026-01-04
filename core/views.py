@@ -93,10 +93,10 @@ def dashboard(request: HttpRequest) -> HttpResponse:
 
     classes = TutoringClass.objects.filter(is_active=True).order_by("name").all()
 
-	# =======================
-	# ✅ STEP 2: group classes by time_slot
-	# =======================
-        TIME_SLOT_ORDER = [
+# =======================
+# ✅ STEP 2: group classes by time_slot
+# =======================
+TIME_SLOT_ORDER = [
 		TutoringClass.TimeSlot.SAT_MORNING,
 		TutoringClass.TimeSlot.SAT_AFTERNOON,
 		TutoringClass.TimeSlot.SUN_MORNING,

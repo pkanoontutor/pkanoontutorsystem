@@ -7,15 +7,21 @@ register = template.Library()
 def get_item(obj, key):
     """
     ใช้กับ dict: mydict|get_item:somekey
-    และใช้กับ object ที่มี attribute: myobj|get_item:"field"
+    ใช้กับ object attribute: myobj|get_item:"field"
+    ปลอดภัยกับ key ที่เป็น int
     """
     if obj is None:
         return None
-    # dict
+
+    # dict access
     if isinstance(obj, dict):
         return obj.get(key)
-    # object attribute
-    return getattr(obj, key, None)
+
+    # attribute access (ต้องเป็น str เท่านั้น)
+    if isinstance(key, str):
+        return getattr(obj, key, None)
+
+    return None
 
 
 @register.filter

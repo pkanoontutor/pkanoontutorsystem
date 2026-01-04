@@ -1,5 +1,5 @@
-from collections import OrderedDict
 from __future__ import annotations
+from collections import OrderedDict
 
 import json
 from dataclasses import dataclass

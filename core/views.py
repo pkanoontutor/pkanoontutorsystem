@@ -93,28 +93,27 @@ def dashboard(request: HttpRequest) -> HttpResponse:
 
     classes = TutoringClass.objects.filter(is_active=True).order_by("name").all()
 
-    # =======================
+	# =======================
 	# ✅ STEP 2: group classes by time_slot
 	# =======================
 	TIME_SLOT_ORDER = [
-    	TutoringClass.TimeSlot.SAT_MORNING,
-    	TutoringClass.TimeSlot.SAT_AFTERNOON,
-    	TutoringClass.TimeSlot.SUN_MORNING,
-    	TutoringClass.TimeSlot.SUN_AFTERNOON,
+		TutoringClass.TimeSlot.SAT_MORNING,
+		TutoringClass.TimeSlot.SAT_AFTERNOON,
+		TutoringClass.TimeSlot.SUN_MORNING,
+		TutoringClass.TimeSlot.SUN_AFTERNOON,
 	]
 
 	classes_by_time_slot = OrderedDict()
 
-	# เตรียม bucket ตามลำดับที่อยากให้โชว์
 	for ts in TIME_SLOT_ORDER:
-    	classes_by_time_slot[ts] = {
-        	"label": TutoringClass.TimeSlot(ts).label,
-        	"classes": [],
-    	}
+		classes_by_time_slot[ts] = {
+			"label": TutoringClass.TimeSlot(ts).label,
+			"classes": [],
+		}
 
-	# เอา class ใส่ bucket
 	for cls in classes:
-    	classes_by_time_slot[cls.time_slot]["classes"].append(cls)
+		classes_by_time_slot[cls.time_slot]["classes"].append(cls)
+
 
 
     # Enrollment เรียงตาม: คลาส -> ชื่อเล่น -> ชื่อจริง -> ระดับชั้น

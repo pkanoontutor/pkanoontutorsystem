@@ -142,6 +142,12 @@ class Student(models.Model):
 # Class (ห้อง/กลุ่ม)
 # -----------------------
 class TutoringClass(models.Model):
+    class TimeSlot(models.TextChoices):
+        SAT_MORNING = "sat_morning", "เสาร์เช้า"
+        SAT_AFTERNOON = "sat_afternoon", "เสาร์บ่าย"
+        SUN_MORNING = "sun_morning", "อาทิตย์เช้า"
+        SUN_AFTERNOON = "sun_afternoon", "อาทิตย์บ่าย"
+    
     name = models.CharField("ชื่อคลาส", max_length=100, unique=True)  # เช่น "ป.6 ห้อง A"
 
     # ✅ เพิ่ม: ราคาคอร์สเต็ม (ใช้ดึงไปใส่ใน Enrollment)
@@ -152,6 +158,11 @@ class TutoringClass(models.Model):
         "ที่นั่งรวม",
         default=0,
         help_text="จำนวนที่นั่งทั้งหมดของห้องนี้ (ใช้คำนวณ ระหว่างเรียน/ที่นั่งว่าง บน Dashboard)",
+    time_slot = models.CharField(
+        "รอบเวลา",
+        max_length=20,
+        choices=TimeSlot.choices,
+        default=TimeSlot.SAT_MORNING,
     )
 
     hours_per_session = models.DecimalField("ชั่วโมงต่อครั้ง", max_digits=4, decimal_places=2, default=3.00)

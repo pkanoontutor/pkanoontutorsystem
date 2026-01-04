@@ -141,29 +141,28 @@ def dashboard(request: HttpRequest) -> HttpResponse:
 
     for cls in classes:
         cls_enrollments = enrollments.filter(tutoring_class=cls)
-        total_enroll = cls_enrollments.count()
+        enrollment_count = cls_enrollments.count()
 
         atts = todays_att.filter(enrollment__in=cls_enrollments)
 
         present = atts.filter(status=Attendance.Status.PRESENT).count()
         excused = atts.filter(status=Attendance.Status.EXCUSED).count()
         no_show = atts.filter(status=Attendance.Status.NO_SHOW).count()
-        in_progress = present + excused + no_show
-
+        
         summary_by_class_id[cls.id] = {
             "present": present,
             "excused": excused,
             "no_show": no_show,
-            "total": in_progress,
+            "total": present + excused + no_show,
         }
 
-        capacity = cls.total_seats or 0        # ← ใช้ capacity จาก TutoringClass
-        in_progress = enrollment_count      # ← เด็กที่ลงเรียนอยู่
-        available = max(capacity - in_progress, 0)
+        seats_total = cls.total_seats or 0        # ← ใช้ capacity จาก TutoringClass
+        seats_in_progress = enrollment_count      # ← เด็กที่ลงเรียนอยู่
+        seats_available = max(seats_total - seats_in_progress, 0)
 
         seats_summary_by_class_id[cls.id] = {
             "seats_total": seats_total,
-            "seats_in_progress": in_progress,
+            "seats_in_progress": seats_in_progress,
             "seats_available": seats_available,
         }
 

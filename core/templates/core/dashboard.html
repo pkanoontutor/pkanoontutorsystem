@@ -232,45 +232,60 @@
 <div class="two-col">
   <div class="left">
 
-    <!-- ✅ (1) Summary per class -->
+    <!-- ✅ (1) Summary per class : แยกตามรอบเวลา -->
     <div class="card" style="margin-bottom:12px;">
-      <div style="font-weight:800; margin-bottom:8px;">สรุปวันนี้ (แยกตามห้อง)</div>
-      <div style="overflow:auto;">
-        <table>
-          <thead>
-            <tr>
-              <th>ห้อง</th>
-              <th>มา</th>
-              <th>ลา</th>
-              <th>ขาด</th>
-              <th>รวม</th>
-              <th class="bg-soft">ที่นั่งรวม</th>
-              <th class="bg-soft">ระหว่างเรียน</th>
-              <th class="bg-soft">ที่นั่งว่าง</th>
-              <th>ไปที่ห้อง</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for cls in classes %}
-              {% with s=summary_by_class_id|get_item:cls.id seat=seats_summary_by_class_id|get_item:cls.id %}
-              <tr id="summaryRow-{{ cls.id }}">
-                <td><b>{{ cls.name }}</b></td>
-                <td class="c_present">{{ s.present|default:0 }}</td>
-                <td class="c_excused">{{ s.excused|default:0 }}</td>
-                <td class="c_no_show">{{ s.no_show|default:0 }}</td>
-                <td class="c_total"><b>{{ s.total|default:0 }}</b></td>
-
-                <td class="bg-soft"><b>{{ seat.seats_total|default:0 }}</b></td>
-                <td class="bg-soft"><b>{{ seat.seats_in_progress|default:0 }}</b></td>
-                <td class="bg-soft"><b>{{ seat.seats_available|default:0 }}</b></td>
-
-                <td><a class="btn" href="#classCard-{{ cls.id }}">ไป</a></td>
-              </tr>
-              {% endwith %}
-            {% endfor %}
-          </tbody>
-        </table>
+      <div style="font-weight:800; margin-bottom:8px;">
+        สรุปวันนี้ (แยกตามรอบเวลา)
       </div>
+    
+      {% for slot_key, slot in classes_by_time_slot.items %}
+        {% if slot.classes %}
+          <!-- 🔹 หัวข้อรอบเวลา -->
+          <div style="margin-top:14px; font-weight:800; color:#111827;">
+            {{ slot.label }}
+          </div>
+    
+          <div style="overflow:auto; margin-top:6px;">
+            <table>
+              <thead>
+                <tr>
+                  <th>ห้อง</th>
+                  <th>มา</th>
+                  <th>ลา</th>
+                  <th>ขาด</th>
+                  <th>รวม</th>
+                  <th class="bg-soft">ที่นั่งรวม</th>
+                  <th class="bg-soft">ระหว่างเรียน</th>
+                  <th class="bg-soft">ที่นั่งว่าง</th>
+                  <th>ไปที่ห้อง</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for cls in slot.classes %}
+                  {% with s=summary_by_class_id|get_item:cls.id seat=seats_summary_by_class_id|get_item:cls.id %}
+                  <tr id="summaryRow-{{ cls.id }}">
+                    <td><b>{{ cls.name }}</b></td>
+    
+                    <td class="c_present">{{ s.present|default:0 }}</td>
+                    <td class="c_excused">{{ s.excused|default:0 }}</td>
+                    <td class="c_no_show">{{ s.no_show|default:0 }}</td>
+                    <td class="c_total"><b>{{ s.total|default:0 }}</b></td>
+    
+                    <td class="bg-soft"><b>{{ seat.seats_total|default:0 }}</b></td>
+                    <td class="bg-soft"><b>{{ seat.seats_in_progress|default:0 }}</b></td>
+                    <td class="bg-soft"><b>{{ seat.seats_available|default:0 }}</b></td>
+    
+                    <td>
+                      <a class="btn" href="#classCard-{{ cls.id }}">ไป</a>
+                    </td>
+                  </tr>
+                  {% endwith %}
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% endif %}
+      {% endfor %}
     </div>
 
     <!-- ✅ (2) ใกล้ครบคอร์ส -->

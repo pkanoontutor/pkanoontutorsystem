@@ -74,14 +74,17 @@ def student_id_list(request: HttpRequest) -> HttpResponse:
             "selected_grade": grade,  # เผื่อใช้ highlight ปุ่มภายหลัง
         }
     )
+# =======================
+# Time slot order (GLOBAL)
+# =======================
+TIME_SLOT_ORDER = [
+    TutoringClass.TimeSlot.SAT_MORNING,
+    TutoringClass.TimeSlot.SAT_AFTERNOON,
+    TutoringClass.TimeSlot.SUN_MORNING,
+    TutoringClass.TimeSlot.SUN_AFTERNOON,
+]
 
 
-
-
-# -----------------------
-# ✅ Dashboard (ข้อ C)
-# - ฝั่งขวาใช้ข้อมูลจาก "SheetUpdateEntry ของวันที่ล่าสุดที่หยอด"
-# -----------------------
 @login_required
 def dashboard(request: HttpRequest) -> HttpResponse:
     """
@@ -93,71 +96,43 @@ def dashboard(request: HttpRequest) -> HttpResponse:
 
     classes = TutoringClass.objects.filter(is_active=True).order_by("name").all()
 
-# =======================
-# ✅ STEP 2: group classes by time_slot
-# =======================
-TIME_SLOT_ORDER = [
-		TutoringClass.TimeSlot.SAT_MORNING,
-		TutoringClass.TimeSlot.SAT_AFTERNOON,
-		TutoringClass.TimeSlot.SUN_MORNING,
-		TutoringClass.TimeSlot.SUN_AFTERNOON,
-	]
+    # =======================
+    # STEP 2: group classes by time_slot
+    # =======================
+    classes_by_time_slot = OrderedDict()
+    for ts in TIME_SLOT_ORDER:
+        classes_by_time_slot[ts] = {
+            "label": TutoringClass.TimeSlot(ts).label,
+            "classes": [],
+        }
 
-	classes_by_time_slot = OrderedDict()
+    for cls in classes:
+        if cls.time_slot in classes_by_time_slot:
+            classes_by_time_slot[cls.time_slot]["classes"].append(cls)
 
-	for ts in TIME_SLOT_ORDER:
-		classes_by_time_slot[ts] = {
-			"label": TutoringClass.TimeSlot(ts).label,
-			"classes": [],
-		}
-
-	for cls in classes:
-		classes_by_time_slot[cls.time_slot]["classes"].append(cls)
-
-
-
-    # Enrollment เรียงตาม: คลาส -> ชื่อเล่น -> ชื่อจริง -> ระดับชั้น
+    # -----------------------
+    # Enrollment
+    # -----------------------
     enrollments = (
         Enrollment.objects
         .select_related("student", "tutoring_class")
-        .filter(is_active=True, student__is_active=True, tutoring_class__is_active=True)
+        .filter(
+            is_active=True,
+            student__is_active=True,
+            tutoring_class__is_active=True,
+        )
         .order_by(
             "tutoring_class__name",
             "student__nickname",
             "student__full_name",
             "student__grade_level",
         )
-        .all()
     )
-
-    # ✅ Course order per student (คอร์สลำดับที่)
-    student_ids = list({e.student_id for e in enrollments})
-    all_enrollments_for_students = (
-        Enrollment.objects
-        .filter(student_id__in=student_ids)
-        .order_by("student_id", "created_at", "id")
-        .values("id", "student_id")
-    )
-
-    course_seq_by_enrollment_id: dict[int, int] = {}
-    course_total_by_student: dict[int, int] = {}
-    current_sid: int | None = None
-    seq = 0
-    for row in all_enrollments_for_students:
-        sid = int(row["student_id"])
-        if sid != current_sid:
-            current_sid = sid
-            seq = 0
-        seq += 1
-        eid = int(row["id"])
-        course_seq_by_enrollment_id[eid] = seq
-        course_total_by_student[sid] = seq
 
     # ----- attendance today -----
     todays_att = Attendance.objects.filter(attendance_date=selected_date)
     att_map = {a.enrollment_id: a for a in todays_att}
 
-    # Summary ต่อ class (วันนี้)
     summary_by_class_id = {}
     seats_summary_by_class_id = {}
 
@@ -172,7 +147,7 @@ TIME_SLOT_ORDER = [
         present = atts.filter(status=Attendance.Status.PRESENT).count()
         excused = atts.filter(status=Attendance.Status.EXCUSED).count()
         no_show = atts.filter(status=Attendance.Status.NO_SHOW).count()
-        
+
         summary_by_class_id[cls.id] = {
             "present": present,
             "excused": excused,
@@ -180,8 +155,8 @@ TIME_SLOT_ORDER = [
             "total": present + excused + no_show,
         }
 
-        seats_total = cls.total_seats or 0        # ← ใช้ capacity จาก TutoringClass
-        seats_in_progress = enrollment_count      # ← เด็กที่ลงเรียนอยู่
+        seats_total = cls.total_seats or 0
+        seats_in_progress = enrollment_count
         seats_available = max(seats_total - seats_in_progress, 0)
 
         seats_summary_by_class_id[cls.id] = {
@@ -203,7 +178,7 @@ TIME_SLOT_ORDER = [
     }
 
     # -----------------------
-    # ✅ (ข้อ C) ด้านขวา: sheet progress จาก "SheetUpdateEntry วันที่ล่าสุด"
+    # Sheet progress (right side)
     # -----------------------
     sheet_latest_date = (
         SheetUpdateEntry.objects
@@ -212,60 +187,54 @@ TIME_SLOT_ORDER = [
         .first()
     )
 
-    # grouped_subjects ต้องคงชื่อเดิมเพื่อใช้กับ dashboard.html ของคุณ
-    # และต้องมี field ตามที่ template ใช้: subject, current_sheet, current_page, current_question, progress_percent
     grouped_subjects: dict[int, list[dict]] = {}
 
     if sheet_latest_date:
         latest_entries = (
             SheetUpdateEntry.objects
             .select_related("tutoring_class", "subject", "sheet")
-            .filter(date=sheet_latest_date, tutoring_class__is_active=True, subject__is_active=True)
+            .filter(
+                date=sheet_latest_date,
+                tutoring_class__is_active=True,
+                subject__is_active=True,
+            )
             .order_by("tutoring_class__name", "subject__name")
-            .all()
         )
 
         for e in latest_entries:
             grouped_subjects.setdefault(e.tutoring_class_id, []).append({
                 "subject": e.subject,
-                "current_sheet": e.sheet,  # ให้ template ใช้ชื่อเดิม
+                "current_sheet": e.sheet,
                 "current_page": e.page_taught_to,
                 "current_question": e.question_taught_to,
                 "progress_percent": e.progress_percent(),
                 "last_teacher": e.last_teacher,
             })
-    else:
-        # ถ้ายังไม่เคยหยอด Sheet Update เลย → ยังไม่โชว์อะไร (หรือจะ fallback ไป ClassSubject ก็ได้)
-        grouped_subjects = {}
 
-    # ใกล้ครบคอร์ส (ไว้โชว์เป็น list ฝั่งซ้าย) — น้อยกว่า 2 ครั้ง
+    # -----------------------
+    # Near complete
+    # -----------------------
     THRESHOLD = 2
-    near_complete = []
-    for e in enrollments:
-        if e.remaining_sessions < 2:
-            near_complete.append(e)
+    near_complete = [e for e in enrollments if e.remaining_sessions < THRESHOLD]
 
     context = {
         "selected_date": selected_date,
         "classes": classes,
-		"classes_by_time_slot": classes_by_time_slot,
+        "classes_by_time_slot": classes_by_time_slot,
+
         "enrollments": enrollments,
         "att_map": att_map,
         "summary_by_class_id": summary_by_class_id,
         "seats_summary_by_class_id": seats_summary_by_class_id,
         "global_summary": global_summary,
 
-        # ✅ ฝั่งขวา
         "grouped_subjects": grouped_subjects,
-        "sheet_latest_date": sheet_latest_date,  # (ถ้าคุณอยากโชว์ว่าอัปเดตล่าสุดวันไหนใน template)
+        "sheet_latest_date": sheet_latest_date,
 
         "near_complete": near_complete,
         "threshold": THRESHOLD,
-        "course_seq_by_enrollment_id": course_seq_by_enrollment_id,
-        "course_total_by_student": course_total_by_student,
     }
     return render(request, "core/dashboard.html", context)
-
 
 # -----------------------
 # ✅ Sheet Update (ข้อ 1)

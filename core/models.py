@@ -158,6 +158,8 @@ class TutoringClass(models.Model):
         "ที่นั่งรวม",
         default=0,
         help_text="จำนวนที่นั่งทั้งหมดของห้องนี้ (ใช้คำนวณ ระหว่างเรียน/ที่นั่งว่าง บน Dashboard)",
+    )
+    
     time_slot = models.CharField(
         "รอบเวลา",
         max_length=20,

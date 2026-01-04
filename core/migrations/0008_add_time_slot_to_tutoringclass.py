@@ -4,7 +4,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('core', '0007_school_remove_enrollment_closed_at_and_more'),
+        ('core', '0006_sheetinventory'),
     ]
 
     operations = [

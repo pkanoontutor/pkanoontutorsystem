@@ -805,7 +805,7 @@ def student_portal_home(request: HttpRequest) -> HttpResponse:
         )
 
     # คำนวณชั่วโมงคงเหลือจาก enrollment ที่เลือก (ถ้าไม่มี enrollment ก็เป็น 0)
-    remaining_sessions = selected_enrollment.remaining_sessions() if selected_enrollment else 0
+    remaining_sessions = selected_enrollment.remaining_sessions if selected_enrollment else 0
     hours_per_session = float(selected_enrollment.tutoring_class.hours_per_session) if selected_enrollment else 0.0
     remaining_hours = remaining_sessions * hours_per_session
 

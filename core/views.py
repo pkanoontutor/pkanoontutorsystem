@@ -169,7 +169,7 @@ def dashboard(request: HttpRequest) -> HttpResponse:
         global_present += present
         global_excused += excused
         global_no_show += no_show
-        global_total += in_progress
+        global_total += present + excused + no_show
 
     global_summary = {
         "present": global_present,

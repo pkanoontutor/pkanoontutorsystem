@@ -387,7 +387,7 @@ def sheet_update(request: HttpRequest) -> HttpResponse:
                 "total_pages": total_pages,
             })
 
-    grouped = sorted(class_bucket.values(), key=lambda x: x["class"].name)
+    grouped = sorted(class_bucket.values(), key=lambda x: x["class"].name, reverse=True)
 
     return render(request, "core/sheet_update.html", {
         "grouped": grouped,              # [{class: TutoringClass, forms:[{class_subject, form, total_pages}, ...]}, ...]

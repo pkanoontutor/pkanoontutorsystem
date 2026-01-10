@@ -415,7 +415,7 @@ def attendance_submit(request: HttpRequest) -> JsonResponse:
     หลักการ:
     - ปุ่ม 3 แบบบนหน้าเว็บ = แค่เลือก (ยังไม่หัก)
     - กด Submit = ค่อย create/update Attendance ของทั้งห้องในวันนั้น
-    - ✅ บังคับ: ต้องส่งสถานะมาครบทุกคนในห้องนี้ก่อน Submit
+    - ✅ บังคับ: ต้องส่งสถานะมาครบ "เฉพาะคนที่ยังไม่มี Attendance record ของวันนั้น"
     - ✅ แก้บั๊ก: normalize enrollment_id เป็น int เสมอ (กัน string/int mismatch)
     """
     try:
@@ -458,9 +458,24 @@ def attendance_submit(request: HttpRequest) -> JsonResponse:
     )
     enroll_map = {e.id: e for e in enrollments}
 
+    # ✅ NEW: หาคนที่เช็คชื่อไปแล้วในวันนั้น เพื่อลด requirement ให้เหลือเฉพาะ "คนที่ยังไม่ถูกเช็ค"
+    already_checked_ids = set(
+        Attendance.objects
+        .filter(
+            attendance_date=selected_date,
+            enrollment__tutoring_class_id=class_id,
+            student__is_active=True,
+        )
+        .values_list("enrollment_id", flat=True)
+    )
+
+    # ✅ คนที่ต้องส่งในครั้งนี้ = คนในห้อง - คนที่มี record แล้ว
+    required_ids = set(enroll_map.keys()) - already_checked_ids
+
     submitted_ids = {it["enrollment_id"] for it in normalized_items}
-    all_ids = set(enroll_map.keys())
-    missing = sorted(list(all_ids - submitted_ids))
+
+    # ✅ ถ้ามีคนที่ "ยังไม่มี record วันนี้" แต่ไม่ได้ส่งมา → ค่อยฟ้อง
+    missing = sorted(list(required_ids - submitted_ids))
 
     if missing:
         return JsonResponse({
@@ -468,8 +483,8 @@ def attendance_submit(request: HttpRequest) -> JsonResponse:
             "error": "กรุณาเลือกสถานะให้ครบทุกคนในห้องนี้ก่อนกด Submit",
             "missing_enrollment_ids": missing,
             "debug": {
-                "submitted_count": len(submitted_ids),
-                "expected_count": len(all_ids),
+                "required_today": len(required_ids),
+                "submitted_today": len(submitted_ids),
             }
         }, status=400)
 
@@ -890,4 +905,3 @@ def sheet_inventory(request: HttpRequest) -> HttpResponse:
         "finished_items": finished_items,
     }
     return render(request, "core/sheet_inventory.html", context)
-    

@@ -34,12 +34,15 @@ def _parse_date(s: str | None) -> date:
     except ValueError:
         return timezone.localdate()
 
+
 def home(request):
     return render(request, "core/home.html")
+
 
 def home_redirect(request: HttpRequest) -> HttpResponse:
     # หน้าแรกให้ไป dashboard ใหม่
     return redirect("core:dashboard")
+
 
 def student_id_list(request: HttpRequest) -> HttpResponse:
     """
@@ -74,6 +77,8 @@ def student_id_list(request: HttpRequest) -> HttpResponse:
             "selected_grade": grade,  # เผื่อใช้ highlight ปุ่มภายหลัง
         }
     )
+
+
 # =======================
 # Time slot order (GLOBAL)
 # =======================
@@ -91,6 +96,7 @@ def dashboard(request: HttpRequest) -> HttpResponse:
     หน้าเดียว:
     - ซ้าย: เช็คชื่อ (ทุกห้องทุกคน เรียงตามคลาส) แต่ submit แยกทีละห้อง
     - ขวา: ความคืบหน้าชีท (ใช้ข้อมูลจาก Sheet Update วันที่ล่าสุดที่มีการบันทึก)
+    - ✅ เพิ่ม: slot_totals (รวมต่อรอบเวลา) + รวมรายวัน/รวมสองวัน (เสาร์+อาทิตย์)
     """
     selected_date = _parse_date(request.GET.get("date"))
 
@@ -129,7 +135,7 @@ def dashboard(request: HttpRequest) -> HttpResponse:
         )
     )
 
-    # ----- attendance today -----
+    # ----- attendance selected_date -----
     todays_att = Attendance.objects.filter(attendance_date=selected_date)
     att_map = {a.enrollment_id: a for a in todays_att}
 
@@ -137,6 +143,12 @@ def dashboard(request: HttpRequest) -> HttpResponse:
     seats_summary_by_class_id = {}
 
     global_present = global_excused = global_no_show = global_total = 0
+
+    # ✅ รวมต่อรอบเวลา
+    slot_totals: dict[str, dict[str, int]] = {
+        ts: {"present": 0, "excused": 0, "no_show": 0, "total": 0}
+        for ts in TIME_SLOT_ORDER
+    }
 
     for cls in classes:
         cls_enrollments = enrollments.filter(tutoring_class=cls)
@@ -170,12 +182,52 @@ def dashboard(request: HttpRequest) -> HttpResponse:
         global_no_show += no_show
         global_total += present + excused + no_show
 
+        # ✅ accumulate slot totals
+        if cls.time_slot in slot_totals:
+            slot_totals[cls.time_slot]["present"] += present
+            slot_totals[cls.time_slot]["excused"] += excused
+            slot_totals[cls.time_slot]["no_show"] += no_show
+            slot_totals[cls.time_slot]["total"] += (present + excused + no_show)
+
     global_summary = {
         "present": global_present,
         "excused": global_excused,
         "no_show": global_no_show,
         "total": global_total,
     }
+
+    # -----------------------
+    # ✅ (ข้อ 2) รวมรายวัน/รวมสองวัน (เสาร์+อาทิตย์)
+    # -----------------------
+    other_day_date: date | None = None
+    other_day_summary: dict | None = None
+    two_day_summary: dict | None = None
+
+    # weekday(): Mon=0 ... Sun=6
+    wd = selected_date.weekday()
+    if wd == 5:  # Saturday
+        other_day_date = selected_date + timedelta(days=1)
+    elif wd == 6:  # Sunday
+        other_day_date = selected_date - timedelta(days=1)
+
+    if other_day_date:
+        other_day_summary = Attendance.objects.filter(
+            attendance_date=other_day_date,
+            enrollment__tutoring_class__is_active=True,
+            student__is_active=True,
+        ).aggregate(
+            present=Count("id", filter=Q(status=Attendance.Status.PRESENT)),
+            excused=Count("id", filter=Q(status=Attendance.Status.EXCUSED)),
+            no_show=Count("id", filter=Q(status=Attendance.Status.NO_SHOW)),
+            total=Count("id"),
+        )
+
+        two_day_summary = {
+            "present": (global_summary.get("present", 0) or 0) + (other_day_summary.get("present", 0) or 0),
+            "excused": (global_summary.get("excused", 0) or 0) + (other_day_summary.get("excused", 0) or 0),
+            "no_show": (global_summary.get("no_show", 0) or 0) + (other_day_summary.get("no_show", 0) or 0),
+            "total": (global_summary.get("total", 0) or 0) + (other_day_summary.get("total", 0) or 0),
+        }
 
     # -----------------------
     # Sheet progress (right side)
@@ -228,6 +280,12 @@ def dashboard(request: HttpRequest) -> HttpResponse:
         "seats_summary_by_class_id": seats_summary_by_class_id,
         "global_summary": global_summary,
 
+        # ✅ NEW: subtotal ต่อรอบเวลา + รวมสองวัน
+        "slot_totals": slot_totals,
+        "other_day_date": other_day_date,
+        "other_day_summary": other_day_summary,
+        "two_day_summary": two_day_summary,
+
         "grouped_subjects": grouped_subjects,
         "sheet_latest_date": sheet_latest_date,
 
@@ -235,6 +293,7 @@ def dashboard(request: HttpRequest) -> HttpResponse:
         "threshold": THRESHOLD,
     }
     return render(request, "core/dashboard.html", context)
+
 
 # -----------------------
 # ✅ Sheet Update (ข้อ 1)
@@ -751,7 +810,7 @@ class StudentPortalLoginForm(forms.Form):
 
         # ถ้าไม่ใช่ master password → ค่อยเช็คเบอร์จริง
         if phone != MASTER_PASSWORD and digits(student.parent_phone) != digits(phone):
-            raise forms.ValidationError("เบอร์ผู้ปกครองไม่ถูกต้อง")    
+            raise forms.ValidationError("เบอร์ผู้ปกครองไม่ถูกต้อง")
 
         cleaned["student"] = student
         return cleaned

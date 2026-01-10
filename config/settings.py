@@ -166,7 +166,7 @@ STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 # -------------------------------------------------------------------
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-LOGIN_URL = "/admin/login/"
+LOGIN_URL = "/adminlublub/login/"
 LOGIN_REDIRECT_URL = "/dashboard/"
 
 MEDIA_URL = "/media/"

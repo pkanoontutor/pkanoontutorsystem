@@ -2,6 +2,39 @@
 {% block title %}Sheet Update{% endblock %}
 
 {% block content %}
+
+<style>
+  /* ✅ ทำให้ summary ดูเหมือนหัวการ์ดกดได้ */
+  .cls-acc summary{
+    cursor:pointer;
+    font-weight:900;
+    font-size:16px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    user-select:none;
+  }
+
+  /* ✅ ซ่อน marker ลูกศร default ของ browser (บางตัว) */
+  .cls-acc summary::-webkit-details-marker { display:none; }
+
+  /* ✅ ไอคอนสามเหลี่ยม */
+  .chev{
+    display:inline-block;
+    transform: rotate(-90deg);
+    transition: transform .15s ease;
+    font-weight:900;
+  }
+  details[open] .chev{ transform: rotate(0deg); }
+
+  .hint{
+    font-size:12px;
+    font-weight:800;
+    opacity:.8;
+  }
+</style>
+
 <div class="topbar">
   <div class="card" style="flex:1; min-width:280px;">
     <div style="font-weight:800; font-size:18px;">Sheet Update</div>
@@ -33,8 +66,15 @@
   <input type="hidden" name="date" value="{{ selected_date|date:'Y-m-d' }}">
 
   {% for g in grouped %}
-    <div class="card" style="margin-top:12px;">
-      <div style="font-weight:800;">{{ g.class.name }}</div>
+    <!-- ✅ Accordion ต่อคลาส: ต้องกด expand ก่อน -->
+    <details class="card cls-acc" style="margin-top:12px;">
+      <summary>
+        <span>{{ g.class.name }}</span>
+        <span style="display:flex; align-items:center; gap:10px;">
+          <span class="muted hint">กดเพื่อเปิด/ปิด</span>
+          <span class="chev">▸</span>
+        </span>
+      </summary>
 
       <div style="overflow:auto; margin-top:10px;">
         <table>
@@ -88,7 +128,8 @@
           </tbody>
         </table>
       </div>
-    </div>
+    </details>
+
   {% empty %}
     <div class="card" style="margin-top:12px;">
       <div class="muted">ยังไม่มีข้อมูลคลาส/วิชา (ตรวจว่า ClassSubject ถูกสร้างแล้วหรือยัง)</div>

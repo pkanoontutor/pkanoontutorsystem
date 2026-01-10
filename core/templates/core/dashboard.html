@@ -171,8 +171,36 @@
   .t-total{ color:#111827; }
 
   /* ✅ Summary table extra columns background */
-  .bg-soft{
-    background:#f3f4f6;
+  .bg-soft{ background:#f3f4f6; }
+
+  /* =====================================================
+     ✅ (ข้อ 1) Accordion สำหรับการเช็คชื่อ (default ย่อ)
+     ===================================================== */
+  .acc summary{
+    cursor:pointer;
+    user-select:none;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    font-weight:900;
+    font-size:16px;
+    list-style:none;
+  }
+  .acc summary::-webkit-details-marker{ display:none; }
+  .chev{
+    display:inline-block;
+    transform: rotate(-90deg);
+    transition: transform .15s ease;
+    font-weight:900;
+  }
+  details[open] .chev{ transform: rotate(0deg); }
+
+  /* ✅ subtotal row */
+  .subtotal-row td{
+    background:#f9fafb;
+    font-weight:900;
+    border-top:2px solid #e5e7eb;
   }
 </style>
 {% endblock %}
@@ -226,27 +254,72 @@
       <span><i class="dot seg-no-show"></i>ขาด: <b id="g_no_show">{{ global_summary.no_show }}</b></span>
       <span>รวม: <b id="g_total">{{ global_summary.total }}</b></span>
     </div>
+
+    {# ✅ (ข้อ 2) รวมรายวัน/รวมสองวัน (ต้องมี context จาก backend) #}
+    {% if two_day_summary %}
+      <div style="margin-top:10px; border-top:1px solid #e5e7eb; padding-top:10px;">
+        <div style="font-weight:900; margin-bottom:6px;">สรุปรวมรายวัน / รวมสองวัน</div>
+        <div style="overflow:auto;">
+          <table>
+            <thead>
+              <tr>
+                <th>ช่วง</th>
+                <th>มา</th>
+                <th>ลา</th>
+                <th>ขาด</th>
+                <th>รวม</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><b>{{ selected_date|date:"Y-m-d" }}</b></td>
+                <td>{{ global_summary.present|default:0 }}</td>
+                <td>{{ global_summary.excused|default:0 }}</td>
+                <td>{{ global_summary.no_show|default:0 }}</td>
+                <td><b>{{ global_summary.total|default:0 }}</b></td>
+              </tr>
+              {% if other_day_summary %}
+              <tr>
+                <td><b>{{ other_day_date|date:"Y-m-d" }}</b></td>
+                <td>{{ other_day_summary.present|default:0 }}</td>
+                <td>{{ other_day_summary.excused|default:0 }}</td>
+                <td>{{ other_day_summary.no_show|default:0 }}</td>
+                <td><b>{{ other_day_summary.total|default:0 }}</b></td>
+              </tr>
+              {% endif %}
+              <tr class="subtotal-row">
+                <td><b>รวมสองวัน</b></td>
+                <td>{{ two_day_summary.present|default:0 }}</td>
+                <td>{{ two_day_summary.excused|default:0 }}</td>
+                <td>{{ two_day_summary.no_show|default:0 }}</td>
+                <td><b>{{ two_day_summary.total|default:0 }}</b></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    {% endif %}
   </div>
 </div>
 
 <div class="two-col">
   <div class="left">
 
-    <!-- ✅ (1) Summary per class : แยกตามรอบเวลา -->
+    <!-- ✅ (1) Summary per class : แยกตามรอบเวลา + subtotal ต่อรอบเวลา -->
     <div class="card" style="margin-bottom:12px;">
       <div style="font-weight:800; margin-bottom:8px;">
         สรุปวันนี้ (แยกตามรอบเวลา)
       </div>
-    
+
       {% for slot_key, slot in classes_by_time_slot.items %}
         {% if slot.classes %}
           <!-- 🔹 หัวข้อรอบเวลา -->
           <div style="margin-top:14px; font-weight:800; color:#111827;">
             {{ slot.label }}
           </div>
-    
+
           <div style="overflow:auto; margin-top:6px;">
-            <table>
+            <table class="slot-table" data-slot="{{ slot_key }}">
               <thead>
                 <tr>
                   <th>ห้อง</th>
@@ -265,16 +338,16 @@
                   {% with s=summary_by_class_id|get_item:cls.id seat=seats_summary_by_class_id|get_item:cls.id %}
                   <tr id="summaryRow-{{ cls.id }}">
                     <td><b>{{ cls.name }}</b></td>
-    
+
                     <td class="c_present">{{ s.present|default:0 }}</td>
                     <td class="c_excused">{{ s.excused|default:0 }}</td>
                     <td class="c_no_show">{{ s.no_show|default:0 }}</td>
                     <td class="c_total"><b>{{ s.total|default:0 }}</b></td>
-    
+
                     <td class="bg-soft"><b>{{ seat.seats_total|default:0 }}</b></td>
                     <td class="bg-soft"><b>{{ seat.seats_in_progress|default:0 }}</b></td>
                     <td class="bg-soft"><b>{{ seat.seats_available|default:0 }}</b></td>
-    
+
                     <td>
                       <a class="btn" href="#classCard-{{ cls.id }}">ไป</a>
                     </td>
@@ -282,6 +355,18 @@
                   {% endwith %}
                 {% endfor %}
               </tbody>
+
+              <tfoot>
+                {# ✅ subtotal ต่อรอบเวลา (fallback: JS จะคำนวณให้ด้วย) #}
+                <tr class="subtotal-row">
+                  <td><b>รวมรอบเวลา: {{ slot.label }}</b></td>
+                  <td id="slot-{{ slot_key }}-present">{{ slot_totals|get_item:slot_key|get_item:"present"|default:0 }}</td>
+                  <td id="slot-{{ slot_key }}-excused">{{ slot_totals|get_item:slot_key|get_item:"excused"|default:0 }}</td>
+                  <td id="slot-{{ slot_key }}-no_show">{{ slot_totals|get_item:slot_key|get_item:"no_show"|default:0 }}</td>
+                  <td id="slot-{{ slot_key }}-total"><b>{{ slot_totals|get_item:slot_key|get_item:"total"|default:0 }}</b></td>
+                  <td colspan="4"></td>
+                </tr>
+              </tfoot>
             </table>
           </div>
         {% endif %}
@@ -399,13 +484,22 @@
       </div>
     </div>
 
-    <!-- ✅ Class cards -->
+    <!-- ✅ (ข้อ 1) Class cards (เช็คชื่อ): เปลี่ยนเป็น accordion default ย่อ -->
     <div class="grid" style="gap:14px;">
       {% for cls in classes %}
         {% with s=summary_by_class_id|get_item:cls.id seat=seats_summary_by_class_id|get_item:cls.id %}
-        <div class="card" id="classCard-{{ cls.id }}">
+        <details class="card acc" id="classCard-{{ cls.id }}">
+          <summary>
+            <span>{{ cls.name }}</span>
+            <span style="display:flex; align-items:center; gap:10px;">
+              <span class="muted" style="font-size:12px; font-weight:800;">
+                มา {{ s.present|default:0 }} | ลา {{ s.excused|default:0 }} | ขาด {{ s.no_show|default:0 }} | รวม {{ s.total|default:0 }}
+              </span>
+              <span class="chev">▸</span>
+            </span>
+          </summary>
 
-          <div class="class-header">
+          <div class="class-header" style="margin-top:10px;">
             <!-- ✅ TOP ROW -->
             <div class="class-toprow">
               <div class="class-title">{{ cls.name }}</div>
@@ -520,7 +614,7 @@
                           </div>
 
                           <a class="enroll-icon"
-                             href="/admin/core/enrollment/{{ e.id }}/change/"
+                             href="/adminlublub/core/enrollment/{{ e.id }}/change/"
                              title="ไปหน้าจบคอร์ส">🏁</a>
                         </div>
                       </td>
@@ -561,7 +655,7 @@
               </tbody>
             </table>
           </div>
-        </div>
+        </details>
         {% endwith %}
       {% endfor %}
     </div>
@@ -707,6 +801,32 @@
     box.querySelector(".c_total").textContent = cs.total;
   }
 
+  // ✅ คำนวณ subtotal ต่อรอบเวลา (fallback / update หลัง submit)
+  function recomputeSlotTotals(){
+    document.querySelectorAll("table.slot-table").forEach(tbl => {
+      const slotKey = tbl.dataset.slot;
+      let p=0,e=0,n=0,t=0;
+      tbl.querySelectorAll("tbody tr").forEach(r => {
+        const gp = r.querySelector(".c_present");
+        const ge = r.querySelector(".c_excused");
+        const gn = r.querySelector(".c_no_show");
+        const gt = r.querySelector(".c_total");
+        p += Number(gp ? gp.textContent : 0);
+        e += Number(ge ? ge.textContent : 0);
+        n += Number(gn ? gn.textContent : 0);
+        t += Number(gt ? gt.textContent : 0);
+      });
+      const elP = document.getElementById(`slot-${slotKey}-present`);
+      const elE = document.getElementById(`slot-${slotKey}-excused`);
+      const elN = document.getElementById(`slot-${slotKey}-no_show`);
+      const elT = document.getElementById(`slot-${slotKey}-total`);
+      if(elP) elP.textContent = p;
+      if(elE) elE.textContent = e;
+      if(elN) elN.textContent = n;
+      if(elT) elT.innerHTML = `<b>${t}</b>`;
+    });
+  }
+
   async function submitClass(classId){
     ensureClass(classId);
 
@@ -733,6 +853,22 @@
     setClassSummary(data.class_id, data.class_summary);
     setGlobalSummary(data.global_summary);
 
+    // ✅ update table summary row of that class (บนตารางสรุปบนสุด)
+    const sumRow = document.getElementById("summaryRow-" + classId);
+    if(sumRow){
+      const cp = sumRow.querySelector(".c_present");
+      const ce = sumRow.querySelector(".c_excused");
+      const cn = sumRow.querySelector(".c_no_show");
+      const ct = sumRow.querySelector(".c_total");
+      if(cp) cp.textContent = data.class_summary.present;
+      if(ce) ce.textContent = data.class_summary.excused;
+      if(cn) cn.textContent = data.class_summary.no_show;
+      if(ct) ct.innerHTML = "<b>" + data.class_summary.total + "</b>";
+    }
+
+    // ✅ recompute subtotal ต่อรอบเวลา หลัง submit
+    recomputeSlotTotals();
+
     for(const [eid, remaining] of Object.entries(data.remaining_map)){
       const remEl = document.getElementById("remaining-" + eid);
       if(remEl){
@@ -752,6 +888,16 @@
   }
 
   document.addEventListener("DOMContentLoaded", () => {
+    // ✅ เปิด accordion อัตโนมัติเมื่อกด "ไป" (hash)
+    if(window.location.hash && window.location.hash.startsWith("#classCard-")){
+      const el = document.querySelector(window.location.hash);
+      if(el && el.tagName.toLowerCase() === "details"){
+        el.open = true;
+        setTimeout(() => el.scrollIntoView({behavior:"smooth", block:"start"}), 50);
+      }
+    }
+
+    // init button styles based on active
     document.querySelectorAll("tr[id^='row-']").forEach(row => {
       const eid = row.id.replace("row-", "");
       const green = row.querySelector(".btn-green");
@@ -766,6 +912,9 @@
         markButtons(eid, "no_show");
       }
     });
+
+    // ✅ คำนวณ subtotal ต่อรอบเวลา ตอนโหลดหน้า
+    recomputeSlotTotals();
   });
 </script>
 {% endblock %}

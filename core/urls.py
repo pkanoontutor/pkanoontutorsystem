@@ -39,4 +39,7 @@ urlpatterns = [
 
     # Sheet Inventory
     path("sheet-inventory/", views.sheet_inventory, name="sheet_inventory"),
+
+    # ✅ NEW: Generate course notice (prefill by enrollment_id)
+    path("generate/course-notice/", views.generate_course_notice, name="generate_course_notice"),
 ]

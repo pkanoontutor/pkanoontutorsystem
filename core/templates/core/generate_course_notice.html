@@ -1,0 +1,150 @@
+{% load static %}
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>แจ้งวันครบคอร์สและการต่อคอร์ส</title>
+  <style>
+    /* ทำให้เหมือนเอกสาร A4 และตัวใหญ่ */
+    .page {
+      width: 900px;            /* ปรับให้ใหญ่สำหรับแคป */
+      margin: 20px auto;
+      padding: 28px;
+      border: 2px solid #111;
+      font-family: Arial, sans-serif;
+      font-size: 20px;
+      line-height: 1.5;
+      background: #fff;
+    }
+    h1 { font-size: 30px; margin: 0 0 14px; }
+    .row { margin: 10px 0; }
+    .label { display:inline-block; width: 260px; font-weight: 700; vertical-align: top; }
+    input[type="date"], input[type="text"], input[type="number"] {
+      font-size: 20px; padding: 6px 10px; width: 320px;
+    }
+    .qr-big { width: 420px; border: 2px solid #111; padding: 10px; }
+    .qr-small { width: 220px; border: 2px solid #111; padding: 10px; }
+    .muted { color:#333; }
+    .btnbar { text-align:center; margin: 10px 0 18px; }
+    .btn { font-size: 18px; padding: 10px 14px; margin: 0 6px; }
+    @media print {
+      .btnbar { display:none; }
+      .page { border: none; width: auto; margin: 0; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="btnbar">
+  <button class="btn" onclick="window.print()">พิมพ์ / Save เป็น PDF</button>
+  <a class="btn" href="/dashboard/">กลับไป Dashboard</a>
+</div>
+
+<div class="page">
+  <h1>แจ้งวันครบคอร์สและการต่อคอร์ส</h1>
+
+  <form method="post">
+    {% csrf_token %}
+    <input type="hidden" name="enrollment_id" value="{{ enrollment.id }}">
+
+    <div class="row">
+      <span class="label">ชื่อนักเรียน:</span>
+      <span>{{ student.nickname }} {{ student.full_name }} ({{ student.student_code }})</span>
+    </div>
+
+    <div class="row">
+      <span class="label">ระดับชั้น:</span>
+      <span>{{ student.grade_level }}</span>
+    </div>
+
+    <div class="row">
+      <span class="label">ชื่อคอร์ส:</span>
+      <span>
+        {{ tutoring_class.name }} |
+        Enrollment: {{ enrollment.sale_run_no }}
+        <span class="muted"> (เหลือ {{ remaining_sessions }} ครั้ง)</span>
+      </span>
+    </div>
+
+    <div class="row">
+      <span class="label">วันครบคอร์ส:</span>
+      <input type="date" name="course_end_date" value="{{ course_end_date|date:'Y-m-d' }}">
+    </div>
+
+    <div class="row">
+      <span class="label">วันเริ่มต้นคอร์สต่อไป:</span>
+      <span>{{ next_course_start_date|date:'d/m/Y' }}</span>
+    </div>
+
+    <hr>
+
+    <div class="row"><b>แบบ 10 สัปดาห์</b></div>
+    <div class="row">
+      <span class="label">ยอดชำระ (10 สัปดาห์):</span>
+      <input type="number" step="0.01" name="amount_10" value="{{ amount_10 }}">
+    </div>
+    <div class="row">
+      <span class="label">ส่วนลด (10 สัปดาห์):</span>
+      <input type="number" step="0.01" name="discount_10" value="{{ discount_10 }}">
+    </div>
+    <div class="row">
+      <span class="label">ยอดชำระสุทธิ (10 สัปดาห์):</span>
+      <span><b>{{ net_10 }}</b></span>
+    </div>
+
+    <hr>
+
+    <div class="row"><b>แบบ 20 สัปดาห์</b></div>
+    <div class="row">
+      <span class="label">ยอดชำระ (20 สัปดาห์):</span>
+      <input type="number" step="0.01" name="amount_20" value="{{ amount_20 }}">
+    </div>
+    <div class="row">
+      <span class="label">ส่วนลด (20 สัปดาห์):</span>
+      <input type="number" step="0.01" name="discount_20" value="{{ discount_20 }}">
+    </div>
+    <div class="row">
+      <span class="label">ยอดชำระสุทธิ (20 สัปดาห์):</span>
+      <span><b>{{ net_20 }}</b></span>
+    </div>
+
+    <div class="btnbar">
+      <button class="btn" type="submit">อัปเดตยอด/วันที่</button>
+    </div>
+  </form>
+
+  <hr>
+
+  <div class="row">
+    <div class="label">ช่องทางชำระเงิน:</div>
+    <div>
+      1) เงินสด<br>
+      2) QR Promtpay<br>
+      3) QR บัตรเครดิต (ต้องนำแอพบัตรเครดิตมาสแกนที่โรงเรียน)
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="label">สอบถามข้อมูลเพิ่มเติม:</div>
+    <div>
+      <div style="margin:10px 0;"><img class="qr-small" src="{% static qr_line_static %}" alt="LINE QR"></div>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="label">หมายเหตุ:</div>
+    <div>
+      ผู้ปกครองสามารถขอชะลอจ่าย เลื่อนจ่ายเป็นสิ้นเดือนได้โดยนักเรียนไม่ต้องเว้นวรรคการเรียนครับ ติดต่อแจ้งพี่ขนุนทาง Line @ ครับ
+    </div>
+  </div>
+
+  <div class="row" style="margin-top:16px;">
+    <div class="label">QR PromptPay:</div>
+    <div>
+      <img class="qr-big" src="{% static qr_promptpay_static %}" alt="PromptPay QR">
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

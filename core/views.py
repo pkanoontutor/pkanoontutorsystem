@@ -4,6 +4,7 @@ from collections import OrderedDict
 import json
 from dataclasses import dataclass
 from datetime import date, timedelta
+from decimal import Decimal  # ✅ NEW
 
 from django import forms
 from django.contrib.auth.decorators import login_required
@@ -470,12 +471,6 @@ def attendance_submit(request: HttpRequest) -> JsonResponse:
         ...
       ]
     }
-
-    หลักการ:
-    - ปุ่ม 3 แบบบนหน้าเว็บ = แค่เลือก (ยังไม่หัก)
-    - กด Submit = ค่อย create/update Attendance ของทั้งห้องในวันนั้น
-    - ✅ บังคับ: ต้องส่งสถานะมาครบ "เฉพาะคนที่ยังไม่มี Attendance record ของวันนั้น"
-    - ✅ แก้บั๊ก: normalize enrollment_id เป็น int เสมอ (กัน string/int mismatch)
     """
     try:
         payload = json.loads(request.body.decode("utf-8"))
@@ -517,7 +512,6 @@ def attendance_submit(request: HttpRequest) -> JsonResponse:
     )
     enroll_map = {e.id: e for e in enrollments}
 
-    # ✅ NEW: หาคนที่เช็คชื่อไปแล้วในวันนั้น เพื่อลด requirement ให้เหลือเฉพาะ "คนที่ยังไม่ถูกเช็ค"
     already_checked_ids = set(
         Attendance.objects
         .filter(
@@ -528,14 +522,10 @@ def attendance_submit(request: HttpRequest) -> JsonResponse:
         .values_list("enrollment_id", flat=True)
     )
 
-    # ✅ คนที่ต้องส่งในครั้งนี้ = คนในห้อง - คนที่มี record แล้ว
     required_ids = set(enroll_map.keys()) - already_checked_ids
-
     submitted_ids = {it["enrollment_id"] for it in normalized_items}
 
-    # ✅ ถ้ามีคนที่ "ยังไม่มี record วันนี้" แต่ไม่ได้ส่งมา → ค่อยฟ้อง
     missing = sorted(list(required_ids - submitted_ids))
-
     if missing:
         return JsonResponse({
             "ok": False,
@@ -660,7 +650,6 @@ def sheet_dashboard(request: HttpRequest) -> HttpResponse:
     """
     classes = TutoringClass.objects.filter(is_active=True).order_by("name").all()
 
-    # แสดงจาก ClassSubject แบบเดิม (หน้าแยกนี้ยังใช้แบบเดิมได้)
     class_subjects = (
         ClassSubject.objects
         .select_related("tutoring_class", "subject", "current_sheet")
@@ -681,15 +670,10 @@ def sheet_dashboard(request: HttpRequest) -> HttpResponse:
 
 @login_required
 def admin_dashboard(request: HttpRequest) -> HttpResponse:
-    """
-    Admin Dashboard: กราฟจำนวนนักเรียน active รายสัปดาห์ (ย้อนหลัง 8 สัปดาห์)
-    นิยาม "Active รายสัปดาห์": มี Attendance record ในสัปดาห์นั้น (สถานะอะไรก็ได้)
-    """
     today = timezone.localdate()
     weeks = 8
 
     monday_this_week = today - timedelta(days=today.weekday())
-
     week_starts = [monday_this_week - timedelta(weeks=i) for i in range(weeks - 1, -1, -1)]
     buckets = {ws: set() for ws in week_starts}
 
@@ -722,13 +706,6 @@ def admin_dashboard(request: HttpRequest) -> HttpResponse:
 
 @login_required
 def attendance_details(request: HttpRequest) -> HttpResponse:
-    """
-    Student Attendance (Details)
-    - หน้าเดียวเห็นครบทุกห้องทุกคน
-    - Row = นักเรียน (ตาม Enrollment)
-    - Column = ครั้งที่ 1..N (ตามจำนวน Attendance ที่มีจริงในห้องนั้น)
-    - Cell = วันที่ + สถานะ (มา/ลา/ขาด)
-    """
     classes = TutoringClass.objects.filter(is_active=True).order_by("name").all()
 
     enrollments = (
@@ -786,8 +763,6 @@ def attendance_details(request: HttpRequest) -> HttpResponse:
 
 # =========================================================
 # ✅ Student Portal (ผู้ปกครอง)
-# - Login ด้วย: รหัสนักเรียน + เบอร์ผู้ปกครอง (ที่กรอกไว้ใน Student.parent_phone)
-# - แสดง: ชั่วโมง/ครั้งคงเหลือ + ประวัติมา/ลา/ขาด (จาก Attendance)
 # =========================================================
 class StudentPortalLoginForm(forms.Form):
     student_code = forms.CharField(label="รหัสนักเรียน", max_length=20)
@@ -802,13 +777,11 @@ class StudentPortalLoginForm(forms.Form):
         if not student:
             raise forms.ValidationError("ไม่พบรหัสนักเรียนนี้")
 
-        # ✅ เช็คเบอร์ (normalize แบบง่าย: เอาแต่ตัวเลข)
         def digits(x: str) -> str:
             return "".join(ch for ch in x if ch.isdigit())
-        # ✅ master password สำหรับ admin / test
+
         MASTER_PASSWORD = "kanoon"
 
-        # ถ้าไม่ใช่ master password → ค่อยเช็คเบอร์จริง
         if phone != MASTER_PASSWORD and digits(student.parent_phone) != digits(phone):
             raise forms.ValidationError("เบอร์ผู้ปกครองไม่ถูกต้อง")
 
@@ -849,7 +822,6 @@ def student_portal_home(request: HttpRequest) -> HttpResponse:
     if not student:
         return redirect("core:student_portal_login")
 
-    # enrollments ของนักเรียน (active ก่อน)
     enrollments = (
         Enrollment.objects
         .select_related("tutoring_class")
@@ -858,7 +830,6 @@ def student_portal_home(request: HttpRequest) -> HttpResponse:
         .all()
     )
 
-    # เลือก enrollment ที่ดูรายละเอียด (default: ตัวแรก)
     selected_enrollment_id = request.GET.get("enrollment_id")
     selected_enrollment = None
     if selected_enrollment_id:
@@ -875,7 +846,6 @@ def student_portal_home(request: HttpRequest) -> HttpResponse:
             .all()
         )
 
-    # คำนวณชั่วโมงคงเหลือจาก enrollment ที่เลือก (ถ้าไม่มี enrollment ก็เป็น 0)
     remaining_sessions = selected_enrollment.remaining_sessions if selected_enrollment else 0
     hours_per_session = float(selected_enrollment.tutoring_class.hours_per_session) if selected_enrollment else 0.0
     remaining_hours = remaining_sessions * hours_per_session
@@ -894,8 +864,6 @@ def student_portal_home(request: HttpRequest) -> HttpResponse:
 
 # =========================================================
 # ✅ Sheet Inventory
-# - แสดงชีทคงเหลือเรียงตาม code (A-Z)
-# - มี action: เพิ่ม/ลด/แก้ไขเลขโดยตรง/จบชีท (ย้ายไปส่วน "ชีทที่จบแล้ว")
 # =========================================================
 @require_POST
 @login_required
@@ -932,7 +900,6 @@ def _sheet_inventory_action(request: HttpRequest) -> HttpResponse:
 
 @login_required
 def sheet_inventory(request: HttpRequest) -> HttpResponse:
-    # ✅ ensure ทุก Sheet มี inventory record (เฉพาะที่ยังไม่มี)
     sheets = Sheet.objects.filter(is_active=True).select_related("subject").order_by("code").all()
     existing_ids = set(SheetInventory.objects.values_list("sheet_id", flat=True))
     to_create = [SheetInventory(sheet=s, quantity=0, is_finished=False) for s in sheets if s.id not in existing_ids]
@@ -956,7 +923,6 @@ def sheet_inventory(request: HttpRequest) -> HttpResponse:
     )
 
     if request.method == "POST":
-        # route action ผ่าน helper เพื่อให้ template ง่าย
         return _sheet_inventory_action(request)
 
     context = {
@@ -964,3 +930,85 @@ def sheet_inventory(request: HttpRequest) -> HttpResponse:
         "finished_items": finished_items,
     }
     return render(request, "core/sheet_inventory.html", context)
+
+
+# =========================================================
+# ✅ NEW: Generate ใบแจ้งครบคอร์ส (เอกสาร 1)
+# - รับ enrollment_id จาก dashboard แล้ว prefill เด็ก + คอร์ส
+# - คำนวณ: วันเริ่มคอร์สต่อไป = วันครบคอร์ส + 7
+# - คำนวณยอดสุทธิ 10/20 สัปดาห์ (แก้ได้ แต่ไม่กระทบ DB)
+# =========================================================
+@login_required
+def generate_course_notice(request: HttpRequest) -> HttpResponse:
+    enrollment_id = request.GET.get("enrollment_id") or request.POST.get("enrollment_id")
+    if not enrollment_id:
+        return render(request, "core/generate_course_notice.html", {"error": "missing enrollment_id"})
+
+    enrollment = get_object_or_404(
+        Enrollment.objects.select_related("student", "tutoring_class"),
+        id=enrollment_id,
+        is_active=True,  # ✅ requirement: ใช้เฉพาะ enrollment ที่ true
+        student__is_active=True,
+        tutoring_class__is_active=True,
+    )
+
+    student = enrollment.student
+    tutoring_class = enrollment.tutoring_class
+
+    # base price (อ่านมา prefill อย่างเดียว ไม่บันทึกกลับ)
+    base_price = enrollment.course_price if enrollment.course_price is not None else (tutoring_class.course_price if tutoring_class else 0)
+
+    def to_decimal(x, default: Decimal) -> Decimal:
+        try:
+            s = str(x).strip()
+            if s == "":
+                return default
+            return Decimal(s)
+        except Exception:
+            return default
+
+    # วันครบคอร์ส (เลือกเอง)
+    if request.method == "POST":
+        course_end_date = _parse_date(request.POST.get("course_end_date"))
+    else:
+        course_end_date = timezone.localdate()
+
+    next_course_start_date = course_end_date + timedelta(days=7)
+
+    # 10 weeks
+    amount_10 = to_decimal(request.POST.get("amount_10") if request.method == "POST" else None, Decimal(str(base_price or 0)))
+    discount_10 = to_decimal(request.POST.get("discount_10") if request.method == "POST" else None, Decimal("0"))
+    net_10 = amount_10 - discount_10
+    if net_10 < 0:
+        net_10 = Decimal("0")
+
+    # 20 weeks (default = 2 เท่า แต่แก้ได้)
+    amount_20_default = Decimal(str(base_price or 0)) * 2
+    amount_20 = to_decimal(request.POST.get("amount_20") if request.method == "POST" else None, amount_20_default)
+    discount_20 = to_decimal(request.POST.get("discount_20") if request.method == "POST" else None, Decimal("0"))
+    net_20 = amount_20 - discount_20
+    if net_20 < 0:
+        net_20 = Decimal("0")
+
+    context = {
+        "student": student,
+        "enrollment": enrollment,
+        "tutoring_class": tutoring_class,
+        "remaining_sessions": enrollment.remaining_sessions,
+
+        "course_end_date": course_end_date,
+        "next_course_start_date": next_course_start_date,
+
+        "amount_10": amount_10,
+        "discount_10": discount_10,
+        "net_10": net_10,
+
+        "amount_20": amount_20,
+        "discount_20": discount_20,
+        "net_20": net_20,
+
+        # ✅ ให้ template เอาไปอ้าง static
+        "qr_promptpay_static": "core/img/qr_promptpay.png",
+        "qr_line_static": "core/img/qr_line.png",
+    }
+    return render(request, "core/generate_course_notice.html", context)

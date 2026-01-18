@@ -17,14 +17,13 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # -------------------------------------------------------------------
 # SECURITY
 # -------------------------------------------------------------------
-# อ่านค่าจาก Environment Variable เป็นหลัก
-# (ตอนรันในเครื่องยังใช้ค่า default ได้)
 SECRET_KEY = os.getenv(
     "SECRET_KEY",
     "django-insecure-dev-only-change-this-in-production"
 )
 
-DEBUG = True
+# ✅ แนะนำ: ให้ DEBUG อ่านจาก env (กัน production พัง/เผลอเปิด debug)
+DEBUG = os.getenv("DEBUG", "True").lower() in ("1", "true", "yes", "y")
 
 ALLOWED_HOSTS = (
     os.getenv("ALLOWED_HOSTS", "")
@@ -71,7 +70,10 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
-    "core.middleware.BlockDefaultAdminMiddleware",
+
+    # ✅ FIX: ปิด middleware ตัวนี้ไปก่อน เพื่อไม่ให้ redirect หน้า "/" ไป admin
+    # ถ้าคุณยังต้องการใช้จริง ให้ไปแก้ logic ใน core/middleware.py ให้ยกเว้น path "/"
+    # "core.middleware.BlockDefaultAdminMiddleware",
 ]
 
 
@@ -102,34 +104,23 @@ WSGI_APPLICATION = "config.wsgi.application"
 # -------------------------------------------------------------------
 # DATABASE
 # -------------------------------------------------------------------
-# ค่า default = SQLite (ใช้ในเครื่อง)
-# ถ้าขึ้น Cloud (Render / Railway) ให้ตั้ง DATABASE_URL
 DATABASES = {
     "default": dj_database_url.config(
         default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}",
         conn_max_age=600,
-        ssl_require=True,   # ปลอดภัยขึ้น
+        ssl_require=True,
     )
 }
-
 
 
 # -------------------------------------------------------------------
 # PASSWORD VALIDATION
 # -------------------------------------------------------------------
 AUTH_PASSWORD_VALIDATORS = [
-    {
-        "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
-    },
-    {
-        "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
-    },
-    {
-        "NAME": "django.contrib.auth.password_validation.CommonPasswordValidator",
-    },
-    {
-        "NAME": "django.contrib.auth.password_validation.NumericPasswordValidator",
-    },
+    {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
+    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
+    {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
+    {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 
 
@@ -145,19 +136,16 @@ USE_TZ = True
 
 
 # -------------------------------------------------------------------
-# STATIC FILES (IMPORTANT FOR PRODUCTION)
+# STATIC FILES
 # -------------------------------------------------------------------
 STATIC_URL = "/static/"
 
-# สำหรับ local dev
 STATICFILES_DIRS = [
     BASE_DIR / "core" / "static",
 ]
 
-# สำหรับ production (collectstatic)
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
-# WhiteNoise optimization
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
 
@@ -169,5 +157,8 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 LOGIN_URL = "/adminlublub/login/"
 LOGIN_REDIRECT_URL = "/dashboard/"
 
+# -------------------------------------------------------------------
+# MEDIA FILES
+# -------------------------------------------------------------------
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"

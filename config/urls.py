@@ -3,19 +3,18 @@ from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import path, include
 
-from core.views import home_redirect
+from core import views as core_views
 
 urlpatterns = [
-    # ✅ หน้าแรกของเว็บ (www.pkanoontutor.com)
-    path("", home_redirect, name="home"),
+    # ✅ หน้าแรกของเว็บให้เป็น Home จริงๆ (Public)
+    path("", core_views.home, name="site_home"),
 
     # Admin
     path("adminlublub/", admin.site.urls),
 
-    # URL ทั้งหมดของ core (dashboard, student-portal, ฯลฯ)
+    # Core app URLs (dashboard, student-portal, ฯลฯ)
     path("", include("core.urls")),
 ]
 
-# ✅ serve media files ตอน DEBUG
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

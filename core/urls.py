@@ -4,10 +4,11 @@ from . import views
 app_name = "core"
 
 urlpatterns = [
-    path("", views.home_redirect, name="home"),
+    # ✅ หน้าแรกของ core ให้เป็น Home (Public) เช่นกัน
+    path("", views.home, name="home_page"),
 
-    # หน้า Home
-    path("home/", views.home, name="home_page"),
+    # ถ้าต้องการลิงก์สำหรับ redirect ไป dashboard ค่อยใช้ path แยก
+    path("go-dashboard/", views.home_redirect, name="home_redirect"),
 
     # Dashboard
     path("dashboard/", views.dashboard, name="dashboard"),
@@ -34,12 +35,12 @@ urlpatterns = [
     path("student-portal/home/", views.student_portal_home, name="student_portal_home"),
     path("student-portal/logout/", views.student_portal_logout, name="student_portal_logout"),
 
-    # ✅ NEW: Student ID List (Public)
+    # Student ID List (Public)
     path("student-id-list/", views.student_id_list, name="student_id_list"),
 
     # Sheet Inventory
     path("sheet-inventory/", views.sheet_inventory, name="sheet_inventory"),
 
-    # ✅ NEW: Generate course notice (prefill by enrollment_id)
+    # Generate course notice
     path("generate/course-notice/", views.generate_course_notice, name="generate_course_notice"),
 ]

@@ -6,10 +6,15 @@ from django.urls import path, include
 from core import views as core_views
 
 urlpatterns = [
+    # หน้าแรกของเว็บ
     path("", core_views.home, name="site_home"),
+
+    # Admin
     path("adminlublub/", admin.site.urls),
+
+    # Core URLs ทั้งหมด
     path("", include("core.urls")),
 ]
 
-# ✅ serve media ALWAYS (ไม่ผูกกับ DEBUG)
+# ✅ สำคัญ: serve MEDIA เสมอ (ไม่ผูกกับ DEBUG)
 urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

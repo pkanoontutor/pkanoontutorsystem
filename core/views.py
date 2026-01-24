@@ -5,15 +5,20 @@ import json
 from dataclasses import dataclass
 from datetime import date, timedelta
 from decimal import Decimal  # ✅ NEW
+from io import BytesIO
+from datetime import datetime
 
 from django import forms
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
-from django.db.models import Count, Q
+from django.db.models import Count, Q, Sum
 from django.http import JsonResponse, HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
+
+from openpyxl import Workbook
+from openpyxl.utils import get_column_letter
 
 from .models import (
     Student,
@@ -55,7 +60,6 @@ def student_id_list(request: HttpRequest) -> HttpResponse:
     - ระดับชั้น
     ❌ ไม่แสดงเบอร์โทร / การเงิน
     """
-
     grade = request.GET.get("grade")
 
     qs = (
@@ -64,7 +68,6 @@ def student_id_list(request: HttpRequest) -> HttpResponse:
         .only("student_code", "nickname", "full_name", "grade_level")
     )
 
-    # ✅ filter ตามระดับชั้น (ถ้ามีการกดปุ่ม)
     if grade:
         qs = qs.filter(grade_level=grade)
 
@@ -75,7 +78,7 @@ def student_id_list(request: HttpRequest) -> HttpResponse:
         "core/student_id_list.html",
         {
             "students": students,
-            "selected_grade": grade,  # เผื่อใช้ highlight ปุ่มภายหลัง
+            "selected_grade": grade,
         }
     )
 
@@ -103,9 +106,6 @@ def dashboard(request: HttpRequest) -> HttpResponse:
 
     classes = TutoringClass.objects.filter(is_active=True).order_by("name").all()
 
-    # =======================
-    # STEP 2: group classes by time_slot
-    # =======================
     classes_by_time_slot = OrderedDict()
     for ts in TIME_SLOT_ORDER:
         classes_by_time_slot[ts] = {
@@ -117,9 +117,6 @@ def dashboard(request: HttpRequest) -> HttpResponse:
         if cls.time_slot in classes_by_time_slot:
             classes_by_time_slot[cls.time_slot]["classes"].append(cls)
 
-    # -----------------------
-    # Enrollment
-    # -----------------------
     enrollments = (
         Enrollment.objects
         .select_related("student", "tutoring_class")
@@ -136,7 +133,6 @@ def dashboard(request: HttpRequest) -> HttpResponse:
         )
     )
 
-    # ----- attendance selected_date -----
     todays_att = Attendance.objects.filter(attendance_date=selected_date)
     att_map = {a.enrollment_id: a for a in todays_att}
 
@@ -145,7 +141,6 @@ def dashboard(request: HttpRequest) -> HttpResponse:
 
     global_present = global_excused = global_no_show = global_total = 0
 
-    # ✅ รวมต่อรอบเวลา
     slot_totals: dict[str, dict[str, int]] = {
         ts: {"present": 0, "excused": 0, "no_show": 0, "total": 0}
         for ts in TIME_SLOT_ORDER
@@ -183,7 +178,6 @@ def dashboard(request: HttpRequest) -> HttpResponse:
         global_no_show += no_show
         global_total += present + excused + no_show
 
-        # ✅ accumulate slot totals
         if cls.time_slot in slot_totals:
             slot_totals[cls.time_slot]["present"] += present
             slot_totals[cls.time_slot]["excused"] += excused
@@ -197,18 +191,14 @@ def dashboard(request: HttpRequest) -> HttpResponse:
         "total": global_total,
     }
 
-    # -----------------------
-    # ✅ (ข้อ 2) รวมรายวัน/รวมสองวัน (เสาร์+อาทิตย์)
-    # -----------------------
     other_day_date: date | None = None
     other_day_summary: dict | None = None
     two_day_summary: dict | None = None
 
-    # weekday(): Mon=0 ... Sun=6
     wd = selected_date.weekday()
-    if wd == 5:  # Saturday
+    if wd == 5:
         other_day_date = selected_date + timedelta(days=1)
-    elif wd == 6:  # Sunday
+    elif wd == 6:
         other_day_date = selected_date - timedelta(days=1)
 
     if other_day_date:
@@ -230,9 +220,6 @@ def dashboard(request: HttpRequest) -> HttpResponse:
             "total": (global_summary.get("total", 0) or 0) + (other_day_summary.get("total", 0) or 0),
         }
 
-    # -----------------------
-    # Sheet progress (right side)
-    # -----------------------
     sheet_latest_date = (
         SheetUpdateEntry.objects
         .order_by("-date")
@@ -264,9 +251,6 @@ def dashboard(request: HttpRequest) -> HttpResponse:
                 "last_teacher": e.last_teacher,
             })
 
-    # -----------------------
-    # Near complete
-    # -----------------------
     THRESHOLD = 2
     near_complete = [e for e in enrollments if e.remaining_sessions < THRESHOLD]
 
@@ -281,7 +265,6 @@ def dashboard(request: HttpRequest) -> HttpResponse:
         "seats_summary_by_class_id": seats_summary_by_class_id,
         "global_summary": global_summary,
 
-        # ✅ NEW: subtotal ต่อรอบเวลา + รวมสองวัน
         "slot_totals": slot_totals,
         "other_day_date": other_day_date,
         "other_day_summary": other_day_summary,
@@ -296,15 +279,136 @@ def dashboard(request: HttpRequest) -> HttpResponse:
     return render(request, "core/dashboard.html", context)
 
 
+# =========================================================
+# ✅ NEW: Export ข้อมูลออก Excel (สำคัญ: remaining_sessions)
+# - ไฟล์มี 2 ชีท: Enrollments และ Students
+# - เน้น remaining_sessions ต่อ enrollment และรวมต่อ student (เฉพาะ enrollment is_active=True)
+# =========================================================
+def _autosize(ws):
+    for col in range(1, ws.max_column + 1):
+        max_len = 0
+        col_letter = get_column_letter(col)
+        for row in range(1, ws.max_row + 1):
+            v = ws.cell(row=row, column=col).value
+            if v is None:
+                continue
+            max_len = max(max_len, len(str(v)))
+        ws.column_dimensions[col_letter].width = min(max_len + 2, 60)
+
+
+@login_required
+def export_excel(request: HttpRequest) -> HttpResponse:
+    wb = Workbook()
+
+    # ---------------------------
+    # Sheet 1: Enrollments
+    # ---------------------------
+    ws1 = wb.active
+    ws1.title = "Enrollments"
+
+    ws1.append([
+        "Enrollment ID",
+        "Student Code",
+        "Nickname",
+        "Full Name",
+        "Grade",
+        "Class",
+        "Time Slot",
+        "Enrollment Type",
+        "Sessions Total",
+        "Remaining Sessions",
+        "Is Active",
+        "Created At",
+        "Notified?",
+        "Notified Method",
+        "Notified At",
+    ])
+
+    enrollments = (
+        Enrollment.objects
+        .select_related("student", "tutoring_class")
+        .order_by("-is_active", "tutoring_class__name", "student__nickname", "student__full_name")
+    )
+
+    for e in enrollments:
+        s = e.student
+        c = e.tutoring_class
+        ws1.append([
+            e.id,
+            getattr(s, "student_code", "") or "",
+            getattr(s, "nickname", "") or "",
+            getattr(s, "full_name", "") or "",
+            getattr(s, "grade_level", "") or "",
+            getattr(c, "name", "") or "",
+            getattr(c, "time_slot", "") or "",
+            e.get_enrollment_type_display() if hasattr(e, "get_enrollment_type_display") else "",
+            getattr(e, "sessions_total", "") or "",
+            getattr(e, "remaining_sessions", "") if getattr(e, "remaining_sessions", None) is not None else "",
+            bool(getattr(e, "is_active", False)),
+            e.created_at.strftime("%Y-%m-%d %H:%M:%S") if getattr(e, "created_at", None) else "",
+            bool(getattr(e, "notified_near_complete", False)),
+            getattr(e, "notified_method", "") or "",
+            e.notified_at.strftime("%Y-%m-%d %H:%M:%S") if getattr(e, "notified_at", None) else "",
+        ])
+
+    _autosize(ws1)
+
+    # ---------------------------
+    # Sheet 2: Students (summary)
+    # ---------------------------
+    ws2 = wb.create_sheet("Students")
+    ws2.append([
+        "Student ID",
+        "Student Code",
+        "Nickname",
+        "Full Name",
+        "Grade",
+        "Is Active",
+        "Active Enrollments",
+        "Remaining Sessions (Active Total)",
+    ])
+
+    students = (
+        Student.objects
+        .order_by("-is_active", "grade_level", "student_code")
+        .annotate(
+            active_enrollments=Count("enrollment", filter=Q(enrollment__is_active=True)),
+            remaining_total=Sum("enrollment__remaining_sessions", filter=Q(enrollment__is_active=True)),
+        )
+    )
+
+    for s in students:
+        ws2.append([
+            s.id,
+            getattr(s, "student_code", "") or "",
+            getattr(s, "nickname", "") or "",
+            getattr(s, "full_name", "") or "",
+            getattr(s, "grade_level", "") or "",
+            bool(getattr(s, "is_active", False)),
+            int(getattr(s, "active_enrollments", 0) or 0),
+            int(getattr(s, "remaining_total", 0) or 0),
+        ])
+
+    _autosize(ws2)
+
+    buff = BytesIO()
+    wb.save(buff)
+    buff.seek(0)
+
+    filename = f"pkanoon_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    resp = HttpResponse(
+        buff.getvalue(),
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+    resp["Content-Disposition"] = f'attachment; filename="{filename}"'
+    return resp
+
+
 # -----------------------
 # ✅ Sheet Update (ข้อ 1)
-# - มีเลือกวันที่ (default = วันที่ล่าสุดที่เคยหยอด)
-# - ช่อง page / question / teacher เป็นช่องให้พิมพ์ (รายวัน)
-# - ไม่ทับ ClassSubject
 # -----------------------
 class _SheetUpdateRowForm(forms.Form):
     class_subject_id = forms.IntegerField(widget=forms.HiddenInput)
-
     subject_name = forms.CharField(required=False, disabled=True)
 
     sheet = forms.ModelChoiceField(
@@ -318,7 +422,6 @@ class _SheetUpdateRowForm(forms.Form):
 
     def __init__(self, *args, subject_id: int | None = None, **kwargs):
         super().__init__(*args, **kwargs)
-        # ให้ dropdown แสดงเฉพาะชีทของวิชานั้น (สวยและใช้ง่าย)
         if subject_id:
             self.fields["sheet"].queryset = Sheet.objects.filter(
                 is_active=True, subject_id=subject_id
@@ -327,25 +430,14 @@ class _SheetUpdateRowForm(forms.Form):
 
 @login_required
 def sheet_update(request: HttpRequest) -> HttpResponse:
-    """
-    Sheet Update แบบรายวัน:
-    - เลือกวันที่ได้ (default = วันที่ล่าสุดที่เคยบันทึก)
-    - แสดงเป็น section ตามคลาส (ดึงคู่คลาส/วิชาจาก ClassSubject)
-    - กรอก: sheet, page_taught_to, question_taught_to, last_teacher
-    - บันทึกลง SheetUpdateEntry (unique ต่อ class+subject+date)
-    """
-
-    # ✅ default date = วันที่ล่าสุดที่เคยหยอด
     latest_date = SheetUpdateEntry.objects.order_by("-date").values_list("date", flat=True).first()
     default_date = latest_date or timezone.localdate()
 
-    # รับ date จาก GET (เปลี่ยนวันที่ดู/กรอก)
     if request.method == "GET":
         selected_date = _parse_date(request.GET.get("date")) if request.GET.get("date") else default_date
     else:
         selected_date = _parse_date(request.POST.get("date")) if request.POST.get("date") else default_date
 
-    # แถวที่จะโชว์: ดึงจาก ClassSubject เพื่อให้ "มี class ใหม่ → section มาเอง"
     class_subjects = (
         ClassSubject.objects
         .select_related("tutoring_class", "subject")
@@ -354,7 +446,6 @@ def sheet_update(request: HttpRequest) -> HttpResponse:
         .all()
     )
 
-    # โหลดค่าที่เคยกรอกของวันนั้น (prefill)
     existing = (
         SheetUpdateEntry.objects
         .select_related("sheet")
@@ -363,14 +454,9 @@ def sheet_update(request: HttpRequest) -> HttpResponse:
     )
     existing_map = {(e.tutoring_class_id, e.subject_id): e for e in existing}
 
-    # group แบบเดิมที่ template คุณคุ้นเคย: [{class:..., forms:[...]}, ...]
-    grouped: list[dict] = []
-
-    # helper: map class_id -> dict bucket
     class_bucket: dict[int, dict] = {}
 
     if request.method == "POST":
-        # สร้าง form ตามจำนวนแถว และ validate รวม
         rows: list[tuple[ClassSubject, _SheetUpdateRowForm]] = []
         for cs in class_subjects:
             prefix = f"cs{cs.id}"
@@ -402,13 +488,11 @@ def sheet_update(request: HttpRequest) -> HttpResponse:
 
             return redirect(f"/sheet-update/?date={selected_date.isoformat()}")
 
-        # ถ้าไม่ผ่าน → render โดยยังคงค่าที่พิมพ์ไว้
         for cs, f in rows:
             cls = cs.tutoring_class
             if cls.id not in class_bucket:
                 class_bucket[cls.id] = {"class": cls, "forms": []}
 
-            # แสดง total_pages จาก sheet ที่เลือก (ถ้าเลือกแล้ว)
             chosen_sheet = f.cleaned_data.get("sheet") if f.is_bound and f.is_valid() else None
             total_pages = chosen_sheet.total_pages if chosen_sheet else 0
 
@@ -419,7 +503,6 @@ def sheet_update(request: HttpRequest) -> HttpResponse:
             })
 
     else:
-        # GET → build initial
         for cs in class_subjects:
             key = (cs.tutoring_class_id, cs.subject_id)
             entry = existing_map.get(key)
@@ -450,28 +533,15 @@ def sheet_update(request: HttpRequest) -> HttpResponse:
     grouped = sorted(class_bucket.values(), key=lambda x: x["class"].name, reverse=True)
 
     return render(request, "core/sheet_update.html", {
-        "grouped": grouped,              # [{class: TutoringClass, forms:[{class_subject, form, total_pages}, ...]}, ...]
-        "selected_date": selected_date,  # ✅ ให้ template ใช้ใส่ value date
-        "default_date": default_date,    # ✅ วันที่ล่าสุดที่เคยหยอด
+        "grouped": grouped,
+        "selected_date": selected_date,
+        "default_date": default_date,
     })
 
 
 @require_POST
 @login_required
 def attendance_submit(request: HttpRequest) -> JsonResponse:
-    """
-    Submit แยกทีละห้อง:
-    รับ JSON:
-    {
-      "date": "YYYY-MM-DD",
-      "class_id": 123,
-      "items": [
-        {"enrollment_id": 1, "status": "present"},
-        {"enrollment_id": 2, "status": "excused"},
-        ...
-      ]
-    }
-    """
     try:
         payload = json.loads(request.body.decode("utf-8"))
     except Exception:
@@ -592,9 +662,6 @@ def attendance_submit(request: HttpRequest) -> JsonResponse:
 
 @login_required
 def alerts_dashboard(request: HttpRequest) -> HttpResponse:
-    """
-    หน้า list นักเรียนที่ใกล้ครบคอร์ส + สถานะว่าแจ้งแล้วหรือยัง
-    """
     THRESHOLD = 2
     enrollments = (
         Enrollment.objects
@@ -618,13 +685,6 @@ def alerts_dashboard(request: HttpRequest) -> HttpResponse:
 @require_POST
 @login_required
 def alerts_mark(request: HttpRequest) -> HttpResponse:
-    """
-    ใช้ได้ทั้งจากหน้า /alerts/ และ dropdown ใน dashboard
-
-    POST:
-      - enrollment_id
-      - method: "line" | "facebook" | "paper" | "" (ยังไม่แจ้ง)
-    """
     eid = request.POST.get("enrollment_id")
     method = (request.POST.get("method") or "").strip()
 
@@ -645,9 +705,6 @@ def alerts_mark(request: HttpRequest) -> HttpResponse:
 
 @login_required
 def sheet_dashboard(request: HttpRequest) -> HttpResponse:
-    """
-    หน้าชีทแบบเต็มหน้า (เผื่ออยากดูแยก) — dashboard หลักก็มีฝั่งขวาอยู่แล้ว
-    """
     classes = TutoringClass.objects.filter(is_active=True).order_by("name").all()
 
     class_subjects = (
@@ -934,9 +991,6 @@ def sheet_inventory(request: HttpRequest) -> HttpResponse:
 
 # =========================================================
 # ✅ NEW: Generate ใบแจ้งครบคอร์ส (เอกสาร 1)
-# - รับ enrollment_id จาก dashboard แล้ว prefill เด็ก + คอร์ส
-# - คำนวณ: วันเริ่มคอร์สต่อไป = วันครบคอร์ส + 7
-# - คำนวณยอดสุทธิ 10/20 สัปดาห์ (แก้ได้ แต่ไม่กระทบ DB)
 # =========================================================
 @login_required
 def generate_course_notice(request: HttpRequest) -> HttpResponse:
@@ -947,7 +1001,7 @@ def generate_course_notice(request: HttpRequest) -> HttpResponse:
     enrollment = get_object_or_404(
         Enrollment.objects.select_related("student", "tutoring_class"),
         id=enrollment_id,
-        is_active=True,  # ✅ requirement: ใช้เฉพาะ enrollment ที่ true
+        is_active=True,
         student__is_active=True,
         tutoring_class__is_active=True,
     )
@@ -955,7 +1009,6 @@ def generate_course_notice(request: HttpRequest) -> HttpResponse:
     student = enrollment.student
     tutoring_class = enrollment.tutoring_class
 
-    # base price (อ่านมา prefill อย่างเดียว ไม่บันทึกกลับ)
     base_price = enrollment.course_price if enrollment.course_price is not None else (tutoring_class.course_price if tutoring_class else 0)
 
     def to_decimal(x, default: Decimal) -> Decimal:
@@ -967,7 +1020,6 @@ def generate_course_notice(request: HttpRequest) -> HttpResponse:
         except Exception:
             return default
 
-    # วันครบคอร์ส (เลือกเอง)
     if request.method == "POST":
         course_end_date = _parse_date(request.POST.get("course_end_date"))
     else:
@@ -975,14 +1027,12 @@ def generate_course_notice(request: HttpRequest) -> HttpResponse:
 
     next_course_start_date = course_end_date + timedelta(days=7)
 
-    # 10 weeks
     amount_10 = to_decimal(request.POST.get("amount_10") if request.method == "POST" else None, Decimal(str(base_price or 0)))
     discount_10 = to_decimal(request.POST.get("discount_10") if request.method == "POST" else None, Decimal("0"))
     net_10 = amount_10 - discount_10
     if net_10 < 0:
         net_10 = Decimal("0")
 
-    # 20 weeks (default = 2 เท่า แต่แก้ได้)
     amount_20_default = Decimal(str(base_price or 0)) * 2
     amount_20 = to_decimal(request.POST.get("amount_20") if request.method == "POST" else None, amount_20_default)
     discount_20 = to_decimal(request.POST.get("discount_20") if request.method == "POST" else None, Decimal("0"))
@@ -1007,7 +1057,6 @@ def generate_course_notice(request: HttpRequest) -> HttpResponse:
         "discount_20": discount_20,
         "net_20": net_20,
 
-        # ✅ ให้ template เอาไปอ้าง static
         "qr_promptpay_static": "core/img/qr_promptpay.png",
         "qr_line_static": "core/img/qr_line.png",
     }

@@ -43,4 +43,6 @@ urlpatterns = [
 
     # Generate course notice
     path("generate/course-notice/", views.generate_course_notice, name="generate_course_notice"),
+
+    path("export/excel/", views.export_excel, name="export_excel"),
 ]

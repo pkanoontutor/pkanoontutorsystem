@@ -1,4 +1,3 @@
-```html
 {% extends "core/base.html" %}
 {% load extras %}
 
@@ -229,6 +228,9 @@
       <a class="toolbtn t4" href="/attendance-details/">
         Student Attendance
         <small>ตารางเช็คชื่อรวม</small>
+      <a class="toolbtn t4" href="{% url 'core:export_excel' %}">
+        Export Excel
+        <small>ดาวน์โหลดข้อมูลทั้งหมด</small>
       </a>
     </div>
   </div>

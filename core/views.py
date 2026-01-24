@@ -372,8 +372,9 @@ def export_excel(request: HttpRequest) -> HttpResponse:
         Student.objects
         .order_by("-is_active", "grade_level", "student_code")
         .annotate(
-            active_enrollments=Count("enrollment", filter=Q(enrollment__is_active=True)),
-            remaining_total=Sum("enrollment__remaining_sessions", filter=Q(enrollment__is_active=True)),
+            # ✅ FIX: ชื่อ reverse relation จริงในระบบคุณคือ 'enrollments'
+            active_enrollments=Count("enrollments", filter=Q(enrollments__is_active=True)),
+            remaining_total=Sum("enrollments__remaining_sessions", filter=Q(enrollments__is_active=True)),
         )
     )
 

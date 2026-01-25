@@ -1,23 +1,18 @@
 # core/forms.py
 from django import forms
-
 from .models import Sheet
 
-
 class SheetUpdateRowForm(forms.Form):
-    """
-    ฟอร์ม 1 แถว สำหรับหน้า Sheet Update
-    """
-    class_subject_id = forms.IntegerField(widget=forms.HiddenInput())
-    subject_name = forms.CharField(required=False, widget=forms.HiddenInput())
+    class_subject_id = forms.IntegerField(widget=forms.HiddenInput(), required=False)
+    subject_name = forms.CharField(required=False)
 
     sheet = forms.ModelChoiceField(
-        queryset=Sheet.objects.all().order_by("code"),
+        queryset=Sheet.objects.filter(is_active=True).select_related("subject").order_by("subject__name", "code"),
         required=False,
         widget=forms.Select(attrs={
-            "class": "sheet-select",  # ✅ ให้ Select2 จับได้
+            "class": "sheet-select",
             "data-placeholder": "พิมพ์รหัส / ชื่อชีท",
-        })
+        }),
     )
 
     page_taught_to = forms.IntegerField(required=False, min_value=0)

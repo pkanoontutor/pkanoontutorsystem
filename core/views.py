@@ -16,11 +16,11 @@ from django.http import JsonResponse, HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST, require_GET
-from .forms import SheetUpdateRowForm
-from django.forms import formset_factory
 
 from openpyxl import Workbook
 from openpyxl.utils import get_column_letter
+
+from .forms import SheetUpdateRowForm  # ✅ ใช้ฟอร์มจาก forms.py ตัวเดียวให้จบ
 
 from .models import (
     Student,
@@ -29,7 +29,7 @@ from .models import (
     TutoringClass,
     ClassSubject,
     Sheet,
-    SheetUpdateEntry,  # ✅ ใหม่: ใช้เก็บ Sheet Update แบบรายวัน
+    SheetUpdateEntry,  # ✅ เก็บ Sheet Update แบบรายวัน
     SheetInventory,
 )
 
@@ -283,8 +283,6 @@ def dashboard(request: HttpRequest) -> HttpResponse:
 
 # =========================================================
 # ✅ NEW: Export ข้อมูลออก Excel (สำคัญ: remaining_sessions)
-# - ไฟล์มี 2 ชีท: Enrollments และ Students
-# - เน้น remaining_sessions ต่อ enrollment และรวมต่อ student (เฉพาะ enrollment is_active=True)
 # =========================================================
 def _autosize(ws):
     for col in range(1, ws.max_column + 1):
@@ -302,9 +300,6 @@ def _autosize(ws):
 def export_excel(request: HttpRequest) -> HttpResponse:
     wb = Workbook()
 
-    # ---------------------------
-    # Sheet 1: Enrollments
-    # ---------------------------
     ws1 = wb.active
     ws1.title = "Enrollments"
 
@@ -355,9 +350,6 @@ def export_excel(request: HttpRequest) -> HttpResponse:
 
     _autosize(ws1)
 
-    # ---------------------------
-    # Sheet 2: Students (summary)
-    # ---------------------------
     ws2 = wb.create_sheet("Students")
     ws2.append([
         "Student ID",
@@ -374,7 +366,6 @@ def export_excel(request: HttpRequest) -> HttpResponse:
         Student.objects
         .order_by("-is_active", "grade_level", "student_code")
         .annotate(
-            # ✅ FIX: ชื่อ reverse relation จริงในระบบคุณคือ 'enrollments'
             active_enrollments=Count("enrollments", filter=Q(enrollments__is_active=True)),
             remaining_total=Sum("enrollments__remaining_sessions", filter=Q(enrollments__is_active=True)),
         )
@@ -444,25 +435,6 @@ def sheet_search_api(request: HttpRequest) -> JsonResponse:
     return JsonResponse({"results": results})
 
 
-class _SheetUpdateRowForm(forms.Form):
-    class_subject_id = forms.IntegerField(widget=forms.HiddenInput)
-    subject_name = forms.CharField(required=False, disabled=True)
-
-    # ✅ เลือกชีทได้ทุกวิชา (ไม่ filter ตาม subject)
-    sheet = forms.ModelChoiceField(
-        queryset=Sheet.objects.filter(is_active=True).select_related("subject").order_by("subject__name", "code"),
-        required=False,
-        empty_label="-- เลือกชีท (พิมพ์ค้นหาได้) --",
-        widget=forms.Select(attrs={
-            "class": "sheet-select",  # ✅ สำหรับผูก Select2/JS ฝั่ง template
-            "data-placeholder": "พิมพ์รหัส / ชื่อชีท",
-        }),
-    )
-    page_taught_to = forms.IntegerField(required=False, min_value=0)
-    question_taught_to = forms.IntegerField(required=False, min_value=0)
-    last_teacher = forms.CharField(required=False)
-
-
 @login_required
 def sheet_update(request: HttpRequest) -> HttpResponse:
     latest_date = SheetUpdateEntry.objects.order_by("-date").values_list("date", flat=True).first()
@@ -492,10 +464,10 @@ def sheet_update(request: HttpRequest) -> HttpResponse:
     class_bucket: dict[int, dict] = {}
 
     if request.method == "POST":
-        rows: list[tuple[ClassSubject, _SheetUpdateRowForm]] = []
+        rows: list[tuple[ClassSubject, SheetUpdateRowForm]] = []
         for cs in class_subjects:
             prefix = f"cs{cs.id}"
-            f = _SheetUpdateRowForm(request.POST, prefix=prefix)  # ✅ remove subject_id filter
+            f = SheetUpdateRowForm(request.POST, prefix=prefix)  # ✅ ใช้ฟอร์มจาก forms.py
             rows.append((cs, f))
 
         all_valid = all(f.is_valid() for _, f in rows)
@@ -523,6 +495,7 @@ def sheet_update(request: HttpRequest) -> HttpResponse:
 
             return redirect(f"/sheet-update/?date={selected_date.isoformat()}")
 
+        # ❌ ฟอร์มไม่ผ่าน: คืนค่าเดิมให้ template
         for cs, f in rows:
             cls = cs.tutoring_class
             if cls.id not in class_bucket:
@@ -552,7 +525,7 @@ def sheet_update(request: HttpRequest) -> HttpResponse:
             }
 
             prefix = f"cs{cs.id}"
-            f = _SheetUpdateRowForm(prefix=prefix, initial=initial)  # ✅ remove subject_id filter
+            f = SheetUpdateRowForm(prefix=prefix, initial=initial)  # ✅ ใช้ฟอร์มจาก forms.py
 
             cls = cs.tutoring_class
             if cls.id not in class_bucket:

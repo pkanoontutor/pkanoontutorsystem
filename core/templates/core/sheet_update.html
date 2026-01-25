@@ -91,12 +91,23 @@
     justify-content:space-between;
     gap:10px;
   }
+
+  /* ✅ grid: default = 2 columns (ใช้บน desktop/จอใหญ่) */
   .row-card .grid{
     display:grid;
     grid-template-columns: 1fr 1fr;
     gap:10px;
     margin-top:10px;
   }
+
+  /* ✅ mobile: แยกเป็น 2 บรรทัด (กันล้น card) */
+  @media (max-width: 768px){
+    .row-card .grid{
+      grid-template-columns: 1fr;   /* ✅ 1 คอลัมน์ = 2 บรรทัด */
+      gap: 8px;
+    }
+  }
+
   .row-card .field{
     margin-top:10px;
   }
@@ -276,6 +287,7 @@
                 {{ f.sheet }}
               </div>
 
+              <!-- ✅ ตอนนี้บนมือถือจะเป็น 2 บรรทัดอัตโนมัติจาก CSS -->
               <div class="grid">
                 <div>
                   <div class="label">หน้าที่สอนถึง</div>
@@ -341,12 +353,9 @@
     else $el.removeClass("is-invalid");
   }
 
-  // ✅ rule: ถ้าเลือกชีทแล้ว ควรกรอก page_taught_to อย่างน้อย 1
-  // (คุณจะปรับเงื่อนไขได้ง่าย ๆ ในฟังก์ชันนี้)
   function validateRow($scope) {
     let hasWarn = false;
 
-    // ล้าง highlight ก่อน
     $scope.find(".is-invalid").removeClass("is-invalid");
     $scope.removeClass("is-invalid-card");
 
@@ -359,16 +368,13 @@
     const pageVal = ($page.val() || "").toString().trim();
     const qVal = ($q.val() || "").toString().trim();
 
-    // เงื่อนไขเตือน: เลือกชีทแล้ว แต่ยังไม่กรอกหน้าที่สอนถึง
     if (sheetVal && !pageVal) {
       hasWarn = true;
       markInvalid($page, true);
-      // highlight select2 (ตัวจริงถูกซ่อน) -> highlight container
       $sheet.next(".select2-container").find(".select2-selection").addClass("is-invalid");
       $scope.addClass("is-invalid-card");
     }
 
-    // เงื่อนไขเตือน: กรอกข้อ แต่ไม่กรอกหน้า (มักพิมพ์ผิด)
     if (qVal && !pageVal) {
       hasWarn = true;
       markInvalid($page, true);
@@ -388,7 +394,6 @@
       return;
     }
 
-    // card view
     const $card = $sheetEl.closest(".row-card");
     const $cell2 = $card.find(".total-pages-cell");
     if ($cell2.length) {
@@ -420,22 +425,19 @@
             return { q: params.term || "" };
           },
           processResults: function(data) {
-            return data; // {results:[...]}
+            return data;
           },
           cache: true
         },
         minimumInputLength: 1
       });
 
-      // ✅ เปลี่ยนชีทแล้วอัปเดต total pages + ล้าง highlight
       $el.on("select2:select", function(e) {
         const total = (e.params.data && e.params.data.total_pages) ? e.params.data.total_pages : 0;
         updateTotalPages($el, total);
 
-        // ล้าง invalid ของ select2 container ถ้ามี
         $el.next(".select2-container").find(".select2-selection").removeClass("is-invalid");
 
-        // validate row ทันที (ช่วยบนมือถือ)
         const $scope = $el.closest("tr").length ? $el.closest("tr") : $el.closest(".row-card");
         validateRow($scope);
       });
@@ -450,13 +452,11 @@
   }
 
   function wireLiveValidation() {
-    // validate ตอนพิมพ์
     $(document).on("input", 'input[name$="page_taught_to"], input[name$="question_taught_to"]', function() {
       const $scope = $(this).closest("tr").length ? $(this).closest("tr") : $(this).closest(".row-card");
       validateRow($scope);
     });
 
-    // validate ตอนออกจากช่อง
     $(document).on("blur", 'input[name$="page_taught_to"], input[name$="question_taught_to"]', function() {
       const $scope = $(this).closest("tr").length ? $(this).closest("tr") : $(this).closest(".row-card");
       validateRow($scope);
@@ -466,19 +466,16 @@
   function validateBeforeSubmit() {
     let ok = true;
 
-    // validate table rows
     $(".table-desktop tr.row-wrap").each(function() {
       if (!validateRow($(this))) ok = false;
     });
 
-    // validate cards
     $(".cards-mobile .row-card").each(function() {
       if (!validateRow($(this))) ok = false;
     });
 
     $("#save-warn").toggle(!ok);
 
-    // scroll ไปที่ตัวแรกที่ผิด
     if (!ok) {
       const $first = $(".is-invalid-card").first();
       if ($first.length) {
@@ -495,17 +492,13 @@
     initSheetSelect2();
     wireLiveValidation();
 
-    // ✅ เผื่อ accordion render ตอนเปิดค่อย init
     $(document).on("toggle", "details", function() {
       if (this.open) initSheetSelect2(this);
     });
 
-    // ✅ ก่อน submit: highlight ช่องที่น่าจะกรอกไม่ครบ
     $("#sheet-update-form").on("submit", function(e) {
       const ok = validateBeforeSubmit();
-      if (!ok) {
-        e.preventDefault();
-      }
+      if (!ok) e.preventDefault();
     });
   });
 })();

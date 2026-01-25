@@ -15,8 +15,6 @@
     gap:10px;
     user-select:none;
   }
-
-  /* ✅ ซ่อน marker ลูกศร default ของ browser (บางตัว) */
   .cls-acc summary::-webkit-details-marker { display:none; }
 
   /* ✅ ไอคอนสามเหลี่ยม */
@@ -34,18 +32,134 @@
     opacity:.8;
   }
 
+  /* ✅ ทำให้เลื่อนตารางบนมือถือดีขึ้น */
+  .table-wrap{
+    overflow:auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* ✅ sticky header เวลาสไลด์ */
+  table{
+    border-collapse: separate;
+    border-spacing: 0;
+    width: 100%;
+  }
+  thead th{
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: var(--card-bg, #fff);
+  }
+
   /* ✅ กัน Select2 กว้างไม่เต็มในตาราง */
   .select2-container { min-width: 240px; }
   .select2-container--default .select2-selection--single{
-    height: 36px;
+    min-height: 40px; /* ✅ แตะง่าย */
     display:flex;
     align-items:center;
   }
   .select2-container--default .select2-selection--single .select2-selection__rendered{
-    line-height: 36px;
+    line-height: 40px;
   }
   .select2-container--default .select2-selection--single .select2-selection__arrow{
-    height: 36px;
+    height: 40px;
+  }
+
+  /* ✅ input แตะง่าย + กัน iOS ซูม */
+  input, select{
+    min-height: 40px;
+    font-size: 16px;
+  }
+
+  /* ✅ โหมด desktop / mobile */
+  .table-desktop{ display:block; }
+  .cards-mobile{ display:none; }
+
+  /* ✅ card mobile */
+  .row-card{
+    padding: 12px;
+    border: 1px solid rgba(0,0,0,.08);
+    border-radius: 14px;
+    background: var(--card-bg, #fff);
+    margin: 10px 0;
+  }
+  .row-card .title{
+    font-weight: 900;
+    font-size: 16px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+  }
+  .row-card .grid{
+    display:grid;
+    grid-template-columns: 1fr 1fr;
+    gap:10px;
+    margin-top:10px;
+  }
+  .row-card .field{
+    margin-top:10px;
+  }
+  .row-card .label{
+    font-size:12px;
+    font-weight:900;
+    opacity:.7;
+    margin-bottom:4px;
+  }
+
+  /* ✅ highlight invalid */
+  .is-invalid{
+    outline: 2px solid rgba(220, 38, 38, .65);
+    outline-offset: 2px;
+    border-radius: 8px;
+  }
+  .row-card.is-invalid-card{
+    border-color: rgba(220, 38, 38, .55);
+    box-shadow: 0 0 0 3px rgba(220, 38, 38, .12);
+  }
+
+  /* ✅ sticky save bar */
+  .sticky-save{
+    position: sticky;
+    bottom: 0;
+    z-index: 10;
+    padding: 10px;
+    margin-top: 14px;
+    background: var(--card-bg, #fff);
+    border-top: 1px solid rgba(0,0,0,.08);
+    border-radius: 14px;
+  }
+  .sticky-save .row{
+    display:flex;
+    gap:10px;
+    align-items:center;
+    flex-wrap:wrap;
+  }
+  .sticky-save .btn{
+    flex:1;
+    min-width: 160px;
+  }
+  .save-msg{
+    font-size:12px;
+    font-weight:800;
+    opacity:.8;
+    margin-top:6px;
+  }
+  .save-warn{
+    display:none;
+    margin-top:8px;
+    font-size:12px;
+    font-weight:900;
+    color: #b91c1c;
+  }
+
+  /* ✅ responsive: mobile => ใช้ card */
+  @media (max-width: 768px){
+    .table-desktop{ display:none; }
+    .cards-mobile{ display:block; }
+
+    /* ลด min-width บางคอลัมน์บนจอเล็ก */
+    .select2-container{ min-width: 200px; }
   }
 </style>
 
@@ -75,12 +189,11 @@
   </div>
 </div>
 
-<form method="post">
+<form method="post" id="sheet-update-form">
   {% csrf_token %}
   <input type="hidden" name="date" value="{{ selected_date|date:'Y-m-d' }}">
 
   {% for g in grouped %}
-    <!-- ✅ Accordion ต่อคลาส: ต้องกด expand ก่อน -->
     <details class="card cls-acc" style="margin-top:12px;">
       <summary>
         <span>{{ g.class.name }}</span>
@@ -90,7 +203,10 @@
         </span>
       </summary>
 
-      <div style="overflow:auto; margin-top:10px;">
+      <!-- =======================
+           DESKTOP TABLE VIEW
+           ======================= -->
+      <div class="table-desktop table-wrap" style="margin-top:10px;">
         <table>
           <thead>
             <tr>
@@ -106,7 +222,7 @@
           <tbody>
             {% for row in g.forms %}
               {% with cs=row.class_subject f=row.form total=row.total_pages %}
-              <tr>
+              <tr class="row-wrap">
                 <td style="min-width:160px;">
                   <b>{{ f.subject_name.value }}</b>
                   {{ f.class_subject_id }}
@@ -142,6 +258,58 @@
           </tbody>
         </table>
       </div>
+
+      <!-- =======================
+           MOBILE CARD VIEW
+           ======================= -->
+      <div class="cards-mobile" style="margin-top:10px;">
+        {% for row in g.forms %}
+          {% with cs=row.class_subject f=row.form total=row.total_pages %}
+            <div class="row-card" data-row="1">
+              <div class="title">
+                <span>{{ f.subject_name.value }}</span>
+                <span class="muted" style="font-size:12px;">{{ g.class.name }}</span>
+              </div>
+
+              <div class="field">
+                <div class="label">ชีท (พิมพ์ค้นหาได้)</div>
+                {{ f.sheet }}
+              </div>
+
+              <div class="grid">
+                <div>
+                  <div class="label">หน้าที่สอนถึง</div>
+                  {{ f.page_taught_to }}
+                </div>
+                <div>
+                  <div class="label">ข้อที่สอนถึง</div>
+                  {{ f.question_taught_to }}
+                </div>
+              </div>
+
+              <div class="field">
+                <div class="label">เลขหน้าทั้งหมด</div>
+                <div class="total-pages-cell">
+                  {% if total and total > 0 %}
+                    <b>{{ total }}</b>
+                  {% else %}
+                    -
+                  {% endif %}
+                  <span class="muted" style="font-size:12px;"> (ดึงจากชีทที่เลือก)</span>
+                </div>
+              </div>
+
+              <div class="field">
+                <div class="label">คนที่สอนครั้งล่าสุด</div>
+                {{ f.last_teacher }}
+              </div>
+
+              {{ f.class_subject_id }}
+            </div>
+          {% endwith %}
+        {% endfor %}
+      </div>
+
     </details>
 
   {% empty %}
@@ -150,35 +318,94 @@
     </div>
   {% endfor %}
 
-  <div style="margin:14px 0; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-    <button class="btn" type="submit">Save</button>
-    <span class="muted">บันทึกแล้ว Dashboard จะใช้ “วันที่ล่าสุดที่หยอด” เป็นข้อมูลหลัก</span>
+  <!-- ✅ Sticky save bar (mobile-friendly) -->
+  <div class="sticky-save">
+    <div class="row">
+      <button class="btn" type="submit" id="btn-save">Save</button>
+      <a class="btn" href="/" style="text-align:center;">กลับ Dashboard</a>
+    </div>
+    <div class="save-msg">บันทึกแล้ว Dashboard จะใช้ “วันที่ล่าสุดที่หยอด” เป็นข้อมูลหลัก</div>
+    <div class="save-warn" id="save-warn">ยังมีช่องที่น่าจะกรอกไม่ครบ — ผมไฮไลต์ให้แล้วครับ</div>
   </div>
 </form>
 
-<!-- ✅ jQuery + Select2 (ทำให้เสิร์ชได้แน่นอน แม้ base.html ไม่มี jQuery) -->
+<!-- ✅ jQuery + Select2 -->
 <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
 <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 
 <script>
 (function() {
+  function markInvalid($el, on) {
+    if (on) $el.addClass("is-invalid");
+    else $el.removeClass("is-invalid");
+  }
+
+  // ✅ rule: ถ้าเลือกชีทแล้ว ควรกรอก page_taught_to อย่างน้อย 1
+  // (คุณจะปรับเงื่อนไขได้ง่าย ๆ ในฟังก์ชันนี้)
+  function validateRow($scope) {
+    let hasWarn = false;
+
+    // ล้าง highlight ก่อน
+    $scope.find(".is-invalid").removeClass("is-invalid");
+    $scope.removeClass("is-invalid-card");
+
+    const $sheet = $scope.find("select.sheet-select");
+    const sheetVal = ($sheet.val() || "").toString().trim();
+
+    const $page = $scope.find('input[name$="page_taught_to"]');
+    const $q = $scope.find('input[name$="question_taught_to"]');
+
+    const pageVal = ($page.val() || "").toString().trim();
+    const qVal = ($q.val() || "").toString().trim();
+
+    // เงื่อนไขเตือน: เลือกชีทแล้ว แต่ยังไม่กรอกหน้าที่สอนถึง
+    if (sheetVal && !pageVal) {
+      hasWarn = true;
+      markInvalid($page, true);
+      // highlight select2 (ตัวจริงถูกซ่อน) -> highlight container
+      $sheet.next(".select2-container").find(".select2-selection").addClass("is-invalid");
+      $scope.addClass("is-invalid-card");
+    }
+
+    // เงื่อนไขเตือน: กรอกข้อ แต่ไม่กรอกหน้า (มักพิมพ์ผิด)
+    if (qVal && !pageVal) {
+      hasWarn = true;
+      markInvalid($page, true);
+      markInvalid($q, true);
+      $scope.addClass("is-invalid-card");
+    }
+
+    return !hasWarn;
+  }
+
+  function updateTotalPages($sheetEl, total) {
+    const $cell = $sheetEl.closest("tr").find(".total-pages-cell");
+    if ($cell.length) {
+      $cell.find("b").remove();
+      $cell.contents().filter(function(){ return this.nodeType === 3; }).first().remove();
+      $cell.prepend(total > 0 ? ("<b>"+total+"</b>") : document.createTextNode("-"));
+      return;
+    }
+
+    // card view
+    const $card = $sheetEl.closest(".row-card");
+    const $cell2 = $card.find(".total-pages-cell");
+    if ($cell2.length) {
+      $cell2.find("b").remove();
+      $cell2.contents().filter(function(){ return this.nodeType === 3; }).first().remove();
+      $cell2.prepend(total > 0 ? ("<b>"+total+"</b>") : document.createTextNode("-"));
+    }
+  }
+
   function initSheetSelect2(ctx) {
-    if (typeof window.jQuery === "undefined") {
-      console.error("jQuery not loaded -> Select2 won't work");
-      return;
-    }
-    if (!$.fn.select2) {
-      console.error("Select2 not loaded -> $.fn.select2 is undefined");
-      return;
-    }
+    if (typeof window.jQuery === "undefined") return;
+    if (!$.fn.select2) return;
 
     const $ctx = ctx ? $(ctx) : $(document);
 
     $ctx.find("select.sheet-select").each(function() {
       const $el = $(this);
-
-      // กัน init ซ้ำ (select2 จะใส่ class นี้ให้)
       if ($el.hasClass("select2-hidden-accessible")) return;
 
       $el.select2({
@@ -193,48 +420,92 @@
             return { q: params.term || "" };
           },
           processResults: function(data) {
-            // ต้อง return {results:[...]}
-            return data;
+            return data; // {results:[...]}
           },
           cache: true
         },
         minimumInputLength: 1
       });
 
-      // ✅ อัปเดต "เลขหน้าทั้งหมด" ทันทีเมื่อเลือกชีท
+      // ✅ เปลี่ยนชีทแล้วอัปเดต total pages + ล้าง highlight
       $el.on("select2:select", function(e) {
         const total = (e.params.data && e.params.data.total_pages) ? e.params.data.total_pages : 0;
-        const $cell = $el.closest("tr").find(".total-pages-cell");
+        updateTotalPages($el, total);
 
-        // ลบค่าที่แสดงเดิม (ตัวหนา/ขีด)
-        $cell.find("b").remove();
-        $cell.contents().filter(function(){ return this.nodeType === 3; }).first().remove();
+        // ล้าง invalid ของ select2 container ถ้ามี
+        $el.next(".select2-container").find(".select2-selection").removeClass("is-invalid");
 
-        if (total > 0) {
-          $cell.prepend("<b>" + total + "</b>");
-        } else {
-          $cell.prepend(document.createTextNode("-"));
-        }
+        // validate row ทันที (ช่วยบนมือถือ)
+        const $scope = $el.closest("tr").length ? $el.closest("tr") : $el.closest(".row-card");
+        validateRow($scope);
       });
 
-      // ✅ เคลียร์แล้วให้ total pages กลับเป็น -
       $el.on("select2:clear", function() {
-        const $cell = $el.closest("tr").find(".total-pages-cell");
-        $cell.find("b").remove();
-        $cell.contents().filter(function(){ return this.nodeType === 3; }).first().remove();
-        $cell.prepend(document.createTextNode("-"));
+        updateTotalPages($el, 0);
+        $el.next(".select2-container").find(".select2-selection").removeClass("is-invalid");
+        const $scope = $el.closest("tr").length ? $el.closest("tr") : $el.closest(".row-card");
+        validateRow($scope);
       });
     });
+  }
 
-    console.log("Select2 initialized:", $ctx.find("select.sheet-select").length);
+  function wireLiveValidation() {
+    // validate ตอนพิมพ์
+    $(document).on("input", 'input[name$="page_taught_to"], input[name$="question_taught_to"]', function() {
+      const $scope = $(this).closest("tr").length ? $(this).closest("tr") : $(this).closest(".row-card");
+      validateRow($scope);
+    });
+
+    // validate ตอนออกจากช่อง
+    $(document).on("blur", 'input[name$="page_taught_to"], input[name$="question_taught_to"]', function() {
+      const $scope = $(this).closest("tr").length ? $(this).closest("tr") : $(this).closest(".row-card");
+      validateRow($scope);
+    });
+  }
+
+  function validateBeforeSubmit() {
+    let ok = true;
+
+    // validate table rows
+    $(".table-desktop tr.row-wrap").each(function() {
+      if (!validateRow($(this))) ok = false;
+    });
+
+    // validate cards
+    $(".cards-mobile .row-card").each(function() {
+      if (!validateRow($(this))) ok = false;
+    });
+
+    $("#save-warn").toggle(!ok);
+
+    // scroll ไปที่ตัวแรกที่ผิด
+    if (!ok) {
+      const $first = $(".is-invalid-card").first();
+      if ($first.length) {
+        $first[0].scrollIntoView({ behavior: "smooth", block: "center" });
+      } else {
+        const $firstInput = $(".is-invalid").first();
+        if ($firstInput.length) $firstInput[0].scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    }
+    return ok;
   }
 
   $(document).ready(function() {
     initSheetSelect2();
+    wireLiveValidation();
 
-    // ✅ เผื่อ accordion บาง browser render ตอนเปิดค่อย init
+    // ✅ เผื่อ accordion render ตอนเปิดค่อย init
     $(document).on("toggle", "details", function() {
       if (this.open) initSheetSelect2(this);
+    });
+
+    // ✅ ก่อน submit: highlight ช่องที่น่าจะกรอกไม่ครบ
+    $("#sheet-update-form").on("submit", function(e) {
+      const ok = validateBeforeSubmit();
+      if (!ok) {
+        e.preventDefault();
+      }
     });
   });
 })();

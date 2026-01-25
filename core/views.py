@@ -406,30 +406,107 @@ def export_excel(request: HttpRequest) -> HttpResponse:
 @login_required
 def sheet_search_api(request: HttpRequest) -> JsonResponse:
     """
-    API สำหรับค้นหา Sheet (ใช้กับ dropdown แบบ search เช่น Select2)
-    - ค้นหาได้ทั้ง code และ name
-    - ไม่จำกัด subject (เลือกข้ามวิชาได้)
+    ✅ FIX เวอร์ชันชัวร์: search แล้วไม่ว่าง
+    - รองรับชื่อฟิลด์หลายแบบ (กันโมเดลไม่ใช้ code/name)
+    - ถ้ามี is_active จะ filter True, ถ้าไม่มีจะไม่ filter
+    - คืนรูปแบบ {results:[{id,text,total_pages},...]} ตามที่ Select2 ต้องการ
     """
     q = (request.GET.get("q") or "").strip()
 
-    qs = Sheet.objects.filter(is_active=True)
+    # helper: เช็ก field จริงในโมเดล
+    def has_field(model, field_name: str) -> bool:
+        try:
+            model._meta.get_field(field_name)
+            return True
+        except Exception:
+            return False
+
+    # ชื่อฟิลด์ที่พบบ่อย
+    code_fields = ["code", "sheet_code", "sheet_id", "sheet_code_text"]
+    name_fields = ["name", "sheet_name", "title", "sheet_title"]
+
+    qs = Sheet.objects.all()
+
+    # filter is_active เฉพาะถ้ามี field นี้จริง
+    if has_field(Sheet, "is_active"):
+        qs = qs.filter(is_active=True)
+
+    # select_related subject เฉพาะถ้ามี relation นี้จริง
+    if has_field(Sheet, "subject"):
+        qs = qs.select_related("subject")
 
     if q:
-        qs = qs.filter(
-            Q(code__icontains=q) |
-            Q(name__icontains=q)
-        )
+        cond = Q()
+        added = False
 
-    qs = qs.select_related("subject").order_by("subject__name", "code")[:50]
+        for f in code_fields:
+            if has_field(Sheet, f):
+                cond |= Q(**{f"{f}__icontains": q})
+                added = True
+
+        for f in name_fields:
+            if has_field(Sheet, f):
+                cond |= Q(**{f"{f}__icontains": q})
+                added = True
+
+        if added:
+            qs = qs.filter(cond)
+
+    # order_by แบบปลอดภัย
+    if has_field(Sheet, "code"):
+        qs = qs.order_by("code")
+    elif has_field(Sheet, "sheet_code"):
+        qs = qs.order_by("sheet_code")
+    else:
+        qs = qs.order_by("id")
+
+    qs = qs[:50]
 
     results = []
     for s in qs:
-        subj = getattr(s, "subject", None)
-        subj_name = getattr(subj, "name", "") if subj else ""
+        code_val = ""
+        for f in code_fields:
+            if hasattr(s, f):
+                v = getattr(s, f) or ""
+                if v:
+                    code_val = str(v)
+                    break
+
+        name_val = ""
+        for f in name_fields:
+            if hasattr(s, f):
+                v = getattr(s, f) or ""
+                if v:
+                    name_val = str(v)
+                    break
+
+        subj_name = ""
+        if hasattr(s, "subject") and getattr(s, "subject", None) is not None:
+            subj_name = getattr(s.subject, "name", "") or ""
+
+        total_pages = 0
+        if hasattr(s, "total_pages"):
+            try:
+                total_pages = int(getattr(s, "total_pages") or 0)
+            except Exception:
+                total_pages = 0
+
+        if code_val and name_val:
+            text = f"{code_val} — {name_val}"
+        elif code_val:
+            text = code_val
+        elif name_val:
+            text = name_val
+        else:
+            text = str(s)
+
+        if subj_name:
+            text += f" ({subj_name})"
+
         results.append({
             "id": s.id,
-            "text": f"{s.code} — {s.name}" + (f" ({subj_name})" if subj_name else ""),
-            "total_pages": int(getattr(s, "total_pages", 0) or 0),
+            "text": text,
+            "total_pages": total_pages,
         })
 
     return JsonResponse({"results": results})
@@ -467,7 +544,7 @@ def sheet_update(request: HttpRequest) -> HttpResponse:
         rows: list[tuple[ClassSubject, SheetUpdateRowForm]] = []
         for cs in class_subjects:
             prefix = f"cs{cs.id}"
-            f = SheetUpdateRowForm(request.POST, prefix=prefix)  # ✅ ใช้ฟอร์มจาก forms.py
+            f = SheetUpdateRowForm(request.POST, prefix=prefix)
             rows.append((cs, f))
 
         all_valid = all(f.is_valid() for _, f in rows)
@@ -495,7 +572,6 @@ def sheet_update(request: HttpRequest) -> HttpResponse:
 
             return redirect(f"/sheet-update/?date={selected_date.isoformat()}")
 
-        # ❌ ฟอร์มไม่ผ่าน: คืนค่าเดิมให้ template
         for cs, f in rows:
             cls = cs.tutoring_class
             if cls.id not in class_bucket:
@@ -525,7 +601,7 @@ def sheet_update(request: HttpRequest) -> HttpResponse:
             }
 
             prefix = f"cs{cs.id}"
-            f = SheetUpdateRowForm(prefix=prefix, initial=initial)  # ✅ ใช้ฟอร์มจาก forms.py
+            f = SheetUpdateRowForm(prefix=prefix, initial=initial)
 
             cls = cs.tutoring_class
             if cls.id not in class_bucket:

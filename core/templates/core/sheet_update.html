@@ -33,6 +33,20 @@
     font-weight:800;
     opacity:.8;
   }
+
+  /* ✅ กัน Select2 กว้างไม่เต็มในตาราง */
+  .select2-container { min-width: 240px; }
+  .select2-container--default .select2-selection--single{
+    height: 36px;
+    display:flex;
+    align-items:center;
+  }
+  .select2-container--default .select2-selection--single .select2-selection__rendered{
+    line-height: 36px;
+  }
+  .select2-container--default .select2-selection--single .select2-selection__arrow{
+    height: 36px;
+  }
 </style>
 
 <div class="topbar">
@@ -110,7 +124,7 @@
                   {{ f.question_taught_to }}
                 </td>
 
-                <td style="min-width:150px;">
+                <td class="total-pages-cell" style="min-width:150px;">
                   {% if total and total > 0 %}
                     <b>{{ total }}</b>
                   {% else %}
@@ -141,4 +155,72 @@
     <span class="muted">บันทึกแล้ว Dashboard จะใช้ “วันที่ล่าสุดที่หยอด” เป็นข้อมูลหลัก</span>
   </div>
 </form>
+
+<!-- ✅ Select2 (ต้องมี jQuery ใน base.html อยู่แล้ว) -->
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+
+  // ✅ init select2 ให้ทุก dropdown ที่มี class sheet-select
+  function initSheetSelect2(ctx){
+    const $ctx = ctx ? $(ctx) : $(document);
+
+    $ctx.find('select.sheet-select').each(function(){
+      const $el = $(this);
+
+      // กัน init ซ้ำ
+      if ($el.data('select2')) return;
+
+      $el.select2({
+        width: '100%',
+        allowClear: true,
+        placeholder: $el.data('placeholder') || "พิมพ์รหัส / ชื่อชีท",
+        ajax: {
+          url: "{% url 'core:sheet_search_api' %}",
+          dataType: 'json',
+          delay: 250,
+          data: function(params){
+            return { q: params.term || "" };
+          },
+          processResults: function(data){
+            // data ต้องเป็น {results:[{id,text,total_pages},...]}
+            return data;
+          },
+          cache: true
+        },
+        minimumInputLength: 1
+      });
+
+      // ✅ อัปเดต "เลขหน้าทั้งหมด" ทันทีเมื่อเลือกชีท
+      $el.on('select2:select', function(e){
+        const totalPages = e.params.data && e.params.data.total_pages ? e.params.data.total_pages : 0;
+        const $cell = $el.closest('tr').find('.total-pages-cell');
+        $cell.find('b').remove(); // ลบตัวเดิมถ้ามี
+        if (totalPages > 0){
+          $cell.prepend('<b>' + totalPages + '</b>');
+        } else {
+          // ถ้าไม่มีหน้า ให้ขึ้นเป็น -
+          // (คงข้อความ hint ด้านล่างไว้)
+          $cell.prepend(document.createTextNode('-'));
+        }
+      });
+
+      // ✅ เคลียร์แล้วให้ total pages กลับเป็น -
+      $el.on('select2:clear', function(){
+        const $cell = $el.closest('tr').find('.total-pages-cell');
+        $cell.find('b').remove();
+        // ล้าง text node แรกถ้าเป็นตัวเลข/ขีด
+        const first = $cell.contents().filter(function(){ return this.nodeType === 3; }).first();
+        if (first.length) first.remove();
+        $cell.prepend(document.createTextNode('-'));
+      });
+    });
+  }
+
+  initSheetSelect2();
+});
+</script>
+
 {% endblock %}

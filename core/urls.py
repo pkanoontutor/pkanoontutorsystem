@@ -7,7 +7,7 @@ urlpatterns = [
     # ✅ หน้าแรกของ core ให้เป็น Home (Public) เช่นกัน
     path("", views.home, name="home_page"),
 
-    # ถ้าต้องการลิงก์สำหรับ redirect ไป dashboard ค่อยใช้ path แยก
+    # Redirect ไป dashboard
     path("go-dashboard/", views.home_redirect, name="home_redirect"),
 
     # Dashboard
@@ -15,6 +15,9 @@ urlpatterns = [
 
     # Sheet Update
     path("sheet-update/", views.sheet_update, name="sheet_update"),
+
+    # ✅ API: Sheet search (สำหรับ dropdown + search)
+    path("api/sheets/search/", views.sheet_search_api, name="sheet_search_api"),
 
     # Attendance
     path("attendance/submit/", views.attendance_submit, name="attendance_submit"),
@@ -44,5 +47,6 @@ urlpatterns = [
     # Generate course notice
     path("generate/course-notice/", views.generate_course_notice, name="generate_course_notice"),
 
+    # Export
     path("export/excel/", views.export_excel, name="export_excel"),
 ]

@@ -15,7 +15,7 @@ from django.db.models import Count, Q, Sum
 from django.http import JsonResponse, HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_POST, require_GET
 
 from openpyxl import Workbook
 from openpyxl.utils import get_column_letter
@@ -408,25 +408,57 @@ def export_excel(request: HttpRequest) -> HttpResponse:
 # -----------------------
 # ✅ Sheet Update (ข้อ 1)
 # -----------------------
+
+@require_GET
+@login_required
+def sheet_search_api(request: HttpRequest) -> JsonResponse:
+    """
+    API สำหรับค้นหา Sheet (ใช้กับ dropdown แบบ search เช่น Select2)
+    - ค้นหาได้ทั้ง code และ name
+    - ไม่จำกัด subject (เลือกข้ามวิชาได้)
+    """
+    q = (request.GET.get("q") or "").strip()
+
+    qs = Sheet.objects.filter(is_active=True)
+
+    if q:
+        qs = qs.filter(
+            Q(code__icontains=q) |
+            Q(name__icontains=q)
+        )
+
+    qs = qs.select_related("subject").order_by("subject__name", "code")[:50]
+
+    results = []
+    for s in qs:
+        subj = getattr(s, "subject", None)
+        subj_name = getattr(subj, "name", "") if subj else ""
+        results.append({
+            "id": s.id,
+            "text": f"{s.code} — {s.name}" + (f" ({subj_name})" if subj_name else ""),
+            "total_pages": int(getattr(s, "total_pages", 0) or 0),
+        })
+
+    return JsonResponse({"results": results})
+
+
 class _SheetUpdateRowForm(forms.Form):
     class_subject_id = forms.IntegerField(widget=forms.HiddenInput)
     subject_name = forms.CharField(required=False, disabled=True)
 
+    # ✅ เลือกชีทได้ทุกวิชา (ไม่ filter ตาม subject)
     sheet = forms.ModelChoiceField(
-        queryset=Sheet.objects.filter(is_active=True).order_by("subject__name", "code"),
+        queryset=Sheet.objects.filter(is_active=True).select_related("subject").order_by("subject__name", "code"),
         required=False,
-        empty_label="-- เลือกชีท --",
+        empty_label="-- เลือกชีท (พิมพ์ค้นหาได้) --",
+        widget=forms.Select(attrs={
+            "class": "sheet-select",  # ✅ สำหรับผูก Select2/JS ฝั่ง template
+            "data-placeholder": "พิมพ์รหัส / ชื่อชีท",
+        }),
     )
     page_taught_to = forms.IntegerField(required=False, min_value=0)
     question_taught_to = forms.IntegerField(required=False, min_value=0)
     last_teacher = forms.CharField(required=False)
-
-    def __init__(self, *args, subject_id: int | None = None, **kwargs):
-        super().__init__(*args, **kwargs)
-        if subject_id:
-            self.fields["sheet"].queryset = Sheet.objects.filter(
-                is_active=True, subject_id=subject_id
-            ).order_by("code")
 
 
 @login_required
@@ -461,7 +493,7 @@ def sheet_update(request: HttpRequest) -> HttpResponse:
         rows: list[tuple[ClassSubject, _SheetUpdateRowForm]] = []
         for cs in class_subjects:
             prefix = f"cs{cs.id}"
-            f = _SheetUpdateRowForm(request.POST, prefix=prefix, subject_id=cs.subject_id)
+            f = _SheetUpdateRowForm(request.POST, prefix=prefix)  # ✅ remove subject_id filter
             rows.append((cs, f))
 
         all_valid = all(f.is_valid() for _, f in rows)
@@ -518,7 +550,7 @@ def sheet_update(request: HttpRequest) -> HttpResponse:
             }
 
             prefix = f"cs{cs.id}"
-            f = _SheetUpdateRowForm(prefix=prefix, initial=initial, subject_id=cs.subject_id)
+            f = _SheetUpdateRowForm(prefix=prefix, initial=initial)  # ✅ remove subject_id filter
 
             cls = cs.tutoring_class
             if cls.id not in class_bucket:

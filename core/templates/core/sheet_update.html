@@ -172,6 +172,79 @@
     /* ลด min-width บางคอลัมน์บนจอเล็ก */
     .select2-container{ min-width: 200px; }
   }
+
+  /* =====================================================
+     ✅ NEW: Modal "สร้างชีท"
+     ===================================================== */
+  .btn-create{
+    background:#0f766e !important;
+    border-color:#0f766e !important;
+    color:#fff !important;
+    font-weight:900 !important;
+  }
+  .modal-backdrop{
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.45);
+    display:none;
+    z-index: 9999;
+    padding: 18px;
+  }
+  .modal{
+    max-width: 620px;
+    margin: 40px auto 0;
+    background: var(--card-bg, #fff);
+    border-radius: 16px;
+    border: 1px solid rgba(0,0,0,.08);
+    box-shadow: 0 20px 60px rgba(0,0,0,.25);
+    overflow:hidden;
+  }
+  .modal-head{
+    padding: 14px 16px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:10px;
+    border-bottom: 1px solid rgba(0,0,0,.08);
+  }
+  .modal-title{
+    font-weight: 900;
+    font-size: 16px;
+  }
+  .modal-body{
+    padding: 14px 16px;
+  }
+  .modal-grid{
+    display:grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  @media (max-width: 640px){
+    .modal-grid{ grid-template-columns: 1fr; }
+  }
+  .modal-field .label{
+    font-size:12px;
+    font-weight:900;
+    opacity:.75;
+    margin-bottom:4px;
+  }
+  .modal-actions{
+    padding: 14px 16px;
+    border-top: 1px solid rgba(0,0,0,.08);
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+  }
+  .btn-outline{
+    background: transparent !important;
+    border: 1px solid rgba(0,0,0,.15) !important;
+    font-weight:900 !important;
+  }
+  .modal-hint{
+    font-size:12px;
+    opacity:.8;
+    margin-top:8px;
+  }
 </style>
 
 <div class="topbar">
@@ -185,6 +258,10 @@
       <label class="muted">วันที่:</label>
       <input type="date" name="date" value="{{ selected_date|date:'Y-m-d' }}" />
       <button class="btn" type="submit">ไป</button>
+
+      <!-- ✅ NEW: สร้างชีท -->
+      <button class="btn btn-create" type="button" id="btn-open-create-sheet">สร้างชีท</button>
+
       <a class="btn" href="/">กลับ Dashboard</a>
     </form>
 
@@ -287,7 +364,6 @@
                 {{ f.sheet }}
               </div>
 
-              <!-- ✅ ตอนนี้บนมือถือจะเป็น 2 บรรทัดอัตโนมัติจาก CSS -->
               <div class="grid">
                 <div>
                   <div class="label">หน้าที่สอนถึง</div>
@@ -341,6 +417,66 @@
   </div>
 </form>
 
+<!-- =====================================================
+     ✅ NEW: Modal "สร้างชีท" (ทางเลือก B)
+     ต้องกรอก: code / title / subject / total_pages
+     ===================================================== -->
+<datalist id="subjectNameList">
+  {% for g in grouped %}
+    {% for row in g.forms %}
+      {% with f=row.form %}
+        {% if f.subject_name.value %}
+          <option value="{{ f.subject_name.value }}"></option>
+        {% endif %}
+      {% endwith %}
+    {% endfor %}
+  {% endfor %}
+</datalist>
+
+<div class="modal-backdrop" id="create-sheet-modal">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="createSheetTitle">
+    <div class="modal-head">
+      <div class="modal-title" id="createSheetTitle">สร้างชีทใหม่</div>
+      <button class="btn btn-outline" type="button" id="btn-close-create-sheet">ปิด</button>
+    </div>
+
+    <div class="modal-body">
+      <div class="modal-grid">
+        <div class="modal-field">
+          <div class="label">Code (รหัสชีท) *</div>
+          <input type="text" id="cs_code" placeholder="เช่น A01, MATH-01" />
+        </div>
+
+        <div class="modal-field">
+          <div class="label">Total Pages *</div>
+          <input type="number" id="cs_total_pages" min="1" placeholder="เช่น 20" />
+        </div>
+
+        <div class="modal-field" style="grid-column: 1 / -1;">
+          <div class="label">Title (ชื่อชีท) *</div>
+          <input type="text" id="cs_title" placeholder="เช่น เศษส่วนชุด 1" />
+        </div>
+
+        <div class="modal-field" style="grid-column: 1 / -1;">
+          <div class="label">Subject *</div>
+          <!-- ✅ ใช้ datalist จากชื่อวิชาที่มีอยู่บนหน้านี้ (เลือก/พิมพ์ได้) -->
+          <input type="text" id="cs_subject" list="subjectNameList" placeholder="เช่น คณิต, วิทย์, อังกฤษ" />
+          <div class="modal-hint">
+            ถ้าวิชาที่พิมพ์ไม่ตรงกับระบบ หลังบ้านจะเป็นคน “จับคู่/สร้าง” ให้ตามที่คุณทำไว้ใน API ครับ
+          </div>
+        </div>
+      </div>
+
+      <div class="save-warn" id="cs_err" style="display:none; margin-top:10px;"></div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn btn-create" type="button" id="btn-create-sheet-submit">บันทึกชีท</button>
+      <button class="btn btn-outline" type="button" id="btn-create-sheet-cancel">ยกเลิก</button>
+    </div>
+  </div>
+</div>
+
 <!-- ✅ jQuery + Select2 -->
 <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
 <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
@@ -348,6 +484,21 @@
 
 <script>
 (function() {
+  function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+      const cookies = document.cookie.split(';');
+      for (let i = 0; i < cookies.length; i++) {
+        const cookie = cookies[i].trim();
+        if (cookie.substring(0, name.length + 1) === (name + '=')) {
+          cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+          break;
+        }
+      }
+    }
+    return cookieValue;
+  }
+
   function markInvalid($el, on) {
     if (on) $el.addClass("is-invalid");
     else $el.removeClass("is-invalid");
@@ -488,6 +639,105 @@
     return ok;
   }
 
+  // ==========================
+  // ✅ NEW: Create Sheet Modal
+  // ==========================
+  const modal = document.getElementById("create-sheet-modal");
+  const btnOpen = document.getElementById("btn-open-create-sheet");
+  const btnClose = document.getElementById("btn-close-create-sheet");
+  const btnCancel = document.getElementById("btn-create-sheet-cancel");
+  const btnSubmit = document.getElementById("btn-create-sheet-submit");
+  const errBox = document.getElementById("cs_err");
+
+  function openModal(){
+    if(!modal) return;
+    modal.style.display = "block";
+    errBox.style.display = "none";
+    errBox.textContent = "";
+    // clear fields (optional)
+    document.getElementById("cs_code").value = "";
+    document.getElementById("cs_title").value = "";
+    document.getElementById("cs_subject").value = "";
+    document.getElementById("cs_total_pages").value = "";
+  }
+
+  function closeModal(){
+    if(!modal) return;
+    modal.style.display = "none";
+  }
+
+  function showErr(msg){
+    errBox.textContent = msg || "เกิดข้อผิดพลาด";
+    errBox.style.display = "block";
+  }
+
+  async function createSheet(){
+    const code = (document.getElementById("cs_code").value || "").trim();
+    const title = (document.getElementById("cs_title").value || "").trim();
+    const subject = (document.getElementById("cs_subject").value || "").trim();
+    const total_pages = (document.getElementById("cs_total_pages").value || "").trim();
+
+    if(!code || !title || !subject || !total_pages){
+      showErr("กรอกให้ครบ: code, title, subject, total page");
+      return;
+    }
+
+    const tp = Number(total_pages);
+    if(!Number.isFinite(tp) || tp <= 0){
+      showErr("Total Pages ต้องเป็นตัวเลขมากกว่า 0");
+      return;
+    }
+
+    try{
+      const res = await fetch("{% url 'core:sheet_create_api' %}", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRFToken": getCookie("csrftoken"),
+        },
+        body: JSON.stringify({
+          code: code,
+          title: title,
+          subject: subject,
+          total_pages: tp
+        })
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if(!res.ok || !data.ok){
+        showErr((data && data.error) ? data.error : "สร้างชีทไม่สำเร็จ");
+        return;
+      }
+
+      alert("สร้างชีทสำเร็จ ✅");
+      closeModal();
+
+      // รีโหลดหน้า เพื่อให้ค้นหาเจอใน Select2 ทันที
+      const url = new URL(window.location.href);
+      window.location.href = url.toString();
+    }catch(e){
+      showErr("สร้างชีทไม่สำเร็จ (network/server error)");
+    }
+  }
+
+  document.addEventListener("keydown", (e) => {
+    if(e.key === "Escape") closeModal();
+  });
+
+  if(btnOpen) btnOpen.addEventListener("click", openModal);
+  if(btnClose) btnClose.addEventListener("click", closeModal);
+  if(btnCancel) btnCancel.addEventListener("click", closeModal);
+
+  if(modal){
+    modal.addEventListener("click", (e) => {
+      if(e.target === modal) closeModal();
+    });
+  }
+  if(btnSubmit) btnSubmit.addEventListener("click", createSheet);
+
+  // ==========================
+  // init
+  // ==========================
   $(document).ready(function() {
     initSheetSelect2();
     wireLiveValidation();

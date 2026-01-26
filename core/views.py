@@ -10,7 +10,7 @@ from datetime import datetime
 
 from django import forms
 from django.contrib.auth.decorators import login_required
-from django.db import transaction
+from django.db import transaction, IntegrityError
 from django.db.models import Count, Q, Sum
 from django.http import JsonResponse, HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -28,6 +28,7 @@ from .models import (
     Enrollment,
     TutoringClass,
     ClassSubject,
+    Subject,          # ✅ NEW (สำหรับ dropdown ใน modal สร้างชีท)
     Sheet,
     SheetUpdateEntry,  # ✅ เก็บ Sheet Update แบบรายวัน
     SheetInventory,
@@ -282,7 +283,7 @@ def dashboard(request: HttpRequest) -> HttpResponse:
 
 
 # =========================================================
-# ✅ NEW: Export ข้อมูลออก Excel (สำคัญ: remaining_sessions)
+# ✅ Export ข้อมูลออก Excel (สำคัญ: remaining_sessions)
 # =========================================================
 def _autosize(ws):
     for col in range(1, ws.max_column + 1):
@@ -398,22 +399,17 @@ def export_excel(request: HttpRequest) -> HttpResponse:
     return resp
 
 
-# -----------------------
-# ✅ Sheet Update (ข้อ 1)
-# -----------------------
-
+# =========================================================
+# ✅ API: Sheet search (Select2)
+# =========================================================
 @require_GET
 @login_required
 def sheet_search_api(request: HttpRequest) -> JsonResponse:
     """
-    ✅ FIX เวอร์ชันชัวร์: search แล้วไม่ว่าง
-    - รองรับชื่อฟิลด์หลายแบบ (กันโมเดลไม่ใช้ code/name)
-    - ถ้ามี is_active จะ filter True, ถ้าไม่มีจะไม่ filter
-    - คืนรูปแบบ {results:[{id,text,total_pages},...]} ตามที่ Select2 ต้องการ
+    search แล้วคืน {results:[{id,text,total_pages},...]} ให้ Select2
     """
     q = (request.GET.get("q") or "").strip()
 
-    # helper: เช็ก field จริงในโมเดล
     def has_field(model, field_name: str) -> bool:
         try:
             model._meta.get_field(field_name)
@@ -421,17 +417,14 @@ def sheet_search_api(request: HttpRequest) -> JsonResponse:
         except Exception:
             return False
 
-    # ชื่อฟิลด์ที่พบบ่อย
     code_fields = ["code", "sheet_code", "sheet_id", "sheet_code_text"]
     name_fields = ["name", "sheet_name", "title", "sheet_title"]
 
     qs = Sheet.objects.all()
 
-    # filter is_active เฉพาะถ้ามี field นี้จริง
     if has_field(Sheet, "is_active"):
         qs = qs.filter(is_active=True)
 
-    # select_related subject เฉพาะถ้ามี relation นี้จริง
     if has_field(Sheet, "subject"):
         qs = qs.select_related("subject")
 
@@ -452,7 +445,6 @@ def sheet_search_api(request: HttpRequest) -> JsonResponse:
         if added:
             qs = qs.filter(cond)
 
-    # order_by แบบปลอดภัย
     if has_field(Sheet, "code"):
         qs = qs.order_by("code")
     elif has_field(Sheet, "sheet_code"):
@@ -512,6 +504,58 @@ def sheet_search_api(request: HttpRequest) -> JsonResponse:
     return JsonResponse({"results": results})
 
 
+# =========================================================
+# ✅ API: Sheet create (ทางเลือก B: modal สร้างชีท)
+# - ต้องกรอก: code, title, subject_id, total_pages
+# =========================================================
+@require_POST
+@login_required
+def sheet_create_api(request: HttpRequest) -> JsonResponse:
+    code = (request.POST.get("code") or "").strip()
+    title = (request.POST.get("title") or "").strip()
+    subject_id = (request.POST.get("subject_id") or "").strip()
+    total_pages_raw = (request.POST.get("total_pages") or "").strip()
+
+    if not code or not title or not subject_id:
+        return JsonResponse({"ok": False, "error": "กรุณากรอก Code, Title และ Subject ให้ครบ"}, status=400)
+
+    try:
+        total_pages = int(total_pages_raw) if total_pages_raw != "" else 0
+        if total_pages < 0:
+            total_pages = 0
+    except Exception:
+        return JsonResponse({"ok": False, "error": "Total pages ต้องเป็นตัวเลข"}, status=400)
+
+    subject = get_object_or_404(Subject, id=subject_id, is_active=True)
+
+    try:
+        with transaction.atomic():
+            sheet = Sheet.objects.create(
+                code=code,
+                title=title,
+                subject=subject,
+                total_pages=total_pages,
+                total_questions=0,
+                is_active=True,
+            )
+            SheetInventory.objects.get_or_create(
+                sheet=sheet,
+                defaults={"quantity": 0, "is_finished": False},
+            )
+    except IntegrityError:
+        return JsonResponse({"ok": False, "error": f"รหัสชีท '{code}' ซ้ำแล้วครับ"}, status=400)
+
+    return JsonResponse({
+        "ok": True,
+        "id": sheet.id,
+        "text": f"{sheet.code} — {sheet.title}",
+        "total_pages": int(sheet.total_pages or 0),
+    })
+
+
+# =========================================================
+# ✅ Sheet Update (หน้า)
+# =========================================================
 @login_required
 def sheet_update(request: HttpRequest) -> HttpResponse:
     latest_date = SheetUpdateEntry.objects.order_by("-date").values_list("date", flat=True).first()
@@ -620,6 +664,7 @@ def sheet_update(request: HttpRequest) -> HttpResponse:
         "grouped": grouped,
         "selected_date": selected_date,
         "default_date": default_date,
+        "subjects": Subject.objects.filter(is_active=True).order_by("name"),  # ✅ สำหรับ modal สร้างชีท
     })
 
 
@@ -727,7 +772,7 @@ def attendance_submit(request: HttpRequest) -> JsonResponse:
         student__is_active=True,
     ).aggregate(
         present=Count("id", filter=Q(status=Attendance.Status.PRESENT)),
-        excused=Count("id", filter=Q(status=Attendance.Status.EXCUSED)),
+        excused=Count("id", filter=Q(status=Attendance.Status.EXCUUSED)),
         no_show=Count("id", filter=Q(status=Attendance.Status.NO_SHOW)),
         total=Count("id"),
     )
@@ -1074,7 +1119,7 @@ def sheet_inventory(request: HttpRequest) -> HttpResponse:
 
 
 # =========================================================
-# ✅ NEW: Generate ใบแจ้งครบคอร์ส (เอกสาร 1)
+# ✅ Generate ใบแจ้งครบคอร์ส (เอกสาร 1)
 # =========================================================
 @login_required
 def generate_course_notice(request: HttpRequest) -> HttpResponse:
@@ -1093,7 +1138,9 @@ def generate_course_notice(request: HttpRequest) -> HttpResponse:
     student = enrollment.student
     tutoring_class = enrollment.tutoring_class
 
-    base_price = enrollment.course_price if enrollment.course_price is not None else (tutoring_class.course_price if tutoring_class else 0)
+    base_price = enrollment.course_price if enrollment.course_price is not None else (
+        tutoring_class.course_price if tutoring_class else 0
+    )
 
     def to_decimal(x, default: Decimal) -> Decimal:
         try:
@@ -1111,15 +1158,27 @@ def generate_course_notice(request: HttpRequest) -> HttpResponse:
 
     next_course_start_date = course_end_date + timedelta(days=7)
 
-    amount_10 = to_decimal(request.POST.get("amount_10") if request.method == "POST" else None, Decimal(str(base_price or 0)))
-    discount_10 = to_decimal(request.POST.get("discount_10") if request.method == "POST" else None, Decimal("0"))
+    amount_10 = to_decimal(
+        request.POST.get("amount_10") if request.method == "POST" else None,
+        Decimal(str(base_price or 0))
+    )
+    discount_10 = to_decimal(
+        request.POST.get("discount_10") if request.method == "POST" else None,
+        Decimal("0")
+    )
     net_10 = amount_10 - discount_10
     if net_10 < 0:
         net_10 = Decimal("0")
 
     amount_20_default = Decimal(str(base_price or 0)) * 2
-    amount_20 = to_decimal(request.POST.get("amount_20") if request.method == "POST" else None, amount_20_default)
-    discount_20 = to_decimal(request.POST.get("discount_20") if request.method == "POST" else None, Decimal("0"))
+    amount_20 = to_decimal(
+        request.POST.get("amount_20") if request.method == "POST" else None,
+        amount_20_default
+    )
+    discount_20 = to_decimal(
+        request.POST.get("discount_20") if request.method == "POST" else None,
+        Decimal("0")
+    )
     net_20 = amount_20 - discount_20
     if net_20 < 0:
         net_20 = Decimal("0")

@@ -129,7 +129,7 @@
     box-shadow: 0 0 0 3px rgba(220, 38, 38, .12);
   }
 
-  /* ✅ sticky save bar */
+  /* ✅ sticky save bar (เดิม) */
   .sticky-save{
     position: sticky;
     bottom: 0;
@@ -168,8 +168,6 @@
   @media (max-width: 768px){
     .table-desktop{ display:none; }
     .cards-mobile{ display:block; }
-
-    /* ลด min-width บางคอลัมน์บนจอเล็ก */
     .select2-container{ min-width: 200px; }
   }
 
@@ -245,6 +243,76 @@
     opacity:.8;
     margin-top:8px;
   }
+
+  /* =====================================================
+     ✅ NEW: Mobile Floating Action Bar (กดได้ตลอด)
+     ===================================================== */
+  .mobile-fab-bar{
+    display:none; /* default hidden */
+  }
+
+  @media (max-width: 768px){
+    /* กันเนื้อหาถูกบังด้วยแถบล่าง */
+    body { padding-bottom: 92px; }
+
+    /* ซ่อน sticky-save เดิมบนมือถือ (กันซ้อน) */
+    .sticky-save{ display:none; }
+
+    .mobile-fab-bar{
+      display:flex;
+      position: fixed;
+      left: 12px;
+      right: 12px;
+      bottom: 10px;
+      z-index: 9998;
+      gap: 10px;
+      padding: 10px;
+      border-radius: 16px;
+      background: rgba(255,255,255,.92);
+      border: 1px solid rgba(0,0,0,.10);
+      box-shadow: 0 10px 30px rgba(0,0,0,.22);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      align-items: stretch;
+    }
+
+    .fab-btn{
+      flex: 1;
+      min-height: 52px;
+      border-radius: 14px;
+      font-weight: 1000;
+      font-size: 16px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      gap:8px;
+      border: none;
+      cursor: pointer;
+    }
+
+    .fab-create{
+      background:#0f766e;
+      color:#fff;
+    }
+    .fab-save{
+      background:#2563eb;
+      color:#fff;
+    }
+
+    .fab-sub{
+      display:block;
+      font-size:11px;
+      font-weight:900;
+      opacity:.9;
+      margin-top:2px;
+    }
+    .fab-stack{
+      display:flex;
+      flex-direction:column;
+      line-height:1.05;
+      align-items:center;
+    }
+  }
 </style>
 
 <div class="topbar">
@@ -259,7 +327,7 @@
       <input type="date" name="date" value="{{ selected_date|date:'Y-m-d' }}" />
       <button class="btn" type="submit">ไป</button>
 
-      <!-- ✅ NEW: สร้างชีท -->
+      <!-- ✅ NEW: สร้างชีท (ยังมีไว้บน desktop) -->
       <button class="btn btn-create" type="button" id="btn-open-create-sheet">สร้างชีท</button>
 
       <a class="btn" href="/">กลับ Dashboard</a>
@@ -406,7 +474,7 @@
     </div>
   {% endfor %}
 
-  <!-- ✅ Sticky save bar (mobile-friendly) -->
+  <!-- ✅ Sticky save bar (desktop-friendly) -->
   <div class="sticky-save">
     <div class="row">
       <button class="btn" type="submit" id="btn-save">Save</button>
@@ -417,9 +485,25 @@
   </div>
 </form>
 
+<!-- ✅ Mobile Floating Bar (กดได้ตลอดเวลา) -->
+<div class="mobile-fab-bar">
+  <button class="fab-btn fab-create" type="button" id="fab-open-create-sheet">
+    <span class="fab-stack">
+      <span>+ สร้างชีท</span>
+      <span class="fab-sub">เพิ่มชีทใหม่</span>
+    </span>
+  </button>
+
+  <button class="fab-btn fab-save" type="button" id="fab-save">
+    <span class="fab-stack">
+      <span>💾 Save</span>
+      <span class="fab-sub">บันทึกทั้งหมด</span>
+    </span>
+  </button>
+</div>
+
 <!-- =====================================================
-     ✅ NEW: Modal "สร้างชีท" (ทางเลือก B)
-     ต้องกรอก: code / title / subject / total_pages
+     ✅ Modal "สร้างชีท" (ทางเลือก B)
      ===================================================== -->
 <datalist id="subjectNameList">
   {% for g in grouped %}
@@ -459,7 +543,6 @@
 
         <div class="modal-field" style="grid-column: 1 / -1;">
           <div class="label">Subject *</div>
-          <!-- ✅ ใช้ datalist จากชื่อวิชาที่มีอยู่บนหน้านี้ (เลือก/พิมพ์ได้) -->
           <input type="text" id="cs_subject" list="subjectNameList" placeholder="เช่น คณิต, วิทย์, อังกฤษ" />
           <div class="modal-hint">
             ถ้าวิชาที่พิมพ์ไม่ตรงกับระบบ หลังบ้านจะเป็นคน “จับคู่/สร้าง” ให้ตามที่คุณทำไว้ใน API ครับ
@@ -640,7 +723,7 @@
   }
 
   // ==========================
-  // ✅ NEW: Create Sheet Modal
+  // ✅ Create Sheet Modal
   // ==========================
   const modal = document.getElementById("create-sheet-modal");
   const btnOpen = document.getElementById("btn-open-create-sheet");
@@ -649,12 +732,15 @@
   const btnSubmit = document.getElementById("btn-create-sheet-submit");
   const errBox = document.getElementById("cs_err");
 
+  // ✅ Mobile FAB buttons
+  const fabOpen = document.getElementById("fab-open-create-sheet");
+  const fabSave = document.getElementById("fab-save");
+
   function openModal(){
     if(!modal) return;
     modal.style.display = "block";
     errBox.style.display = "none";
     errBox.textContent = "";
-    // clear fields (optional)
     document.getElementById("cs_code").value = "";
     document.getElementById("cs_title").value = "";
     document.getElementById("cs_subject").value = "";
@@ -695,12 +781,7 @@
           "Content-Type": "application/json",
           "X-CSRFToken": getCookie("csrftoken"),
         },
-        body: JSON.stringify({
-          code: code,
-          title: title,
-          subject: subject,
-          total_pages: tp
-        })
+        body: JSON.stringify({ code, title, subject, total_pages: tp })
       });
 
       const data = await res.json().catch(() => ({}));
@@ -712,7 +793,6 @@
       alert("สร้างชีทสำเร็จ ✅");
       closeModal();
 
-      // รีโหลดหน้า เพื่อให้ค้นหาเจอใน Select2 ทันที
       const url = new URL(window.location.href);
       window.location.href = url.toString();
     }catch(e){
@@ -727,6 +807,7 @@
   if(btnOpen) btnOpen.addEventListener("click", openModal);
   if(btnClose) btnClose.addEventListener("click", closeModal);
   if(btnCancel) btnCancel.addEventListener("click", closeModal);
+  if(fabOpen) fabOpen.addEventListener("click", openModal);
 
   if(modal){
     modal.addEventListener("click", (e) => {
@@ -734,6 +815,14 @@
     });
   }
   if(btnSubmit) btnSubmit.addEventListener("click", createSheet);
+
+  // ✅ Mobile Save = trigger submit (ยังผ่าน validateBeforeSubmit เหมือนเดิม)
+  if(fabSave){
+    fabSave.addEventListener("click", () => {
+      const form = document.getElementById("sheet-update-form");
+      if(form) form.requestSubmit();
+    });
+  }
 
   // ==========================
   // init

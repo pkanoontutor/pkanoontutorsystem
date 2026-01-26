@@ -172,6 +172,69 @@
   }
 
   /* =====================================================
+     ✅ NEW: Mobile subject tabs (ภายในแต่ละห้อง)
+     ===================================================== */
+  .subtabs{
+    display:none;
+    margin-top:10px;
+    padding:10px;
+    border:1px solid rgba(0,0,0,.08);
+    border-radius:14px;
+    background: var(--card-bg, #fff);
+  }
+  .subtabs .title{
+    font-weight:900;
+    font-size:13px;
+    opacity:.85;
+    margin-bottom:8px;
+  }
+  .subtab-list{
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+  }
+  .subtab-btn{
+    border:none;
+    cursor:pointer;
+    border-radius:999px;
+    padding:10px 12px;
+    font-weight:1000;
+    font-size:14px;
+    line-height:1;
+    display:flex;
+    align-items:center;
+    gap:8px;
+    box-shadow: 0 6px 18px rgba(0,0,0,.08);
+  }
+  .subtab-btn small{
+    font-weight:900;
+    opacity:.85;
+  }
+  .subtab-btn.is-active{
+    outline: 3px solid rgba(0,0,0,.30);
+    outline-offset: 2px;
+    transform: translateY(-1px);
+  }
+
+  /* สีตามวิชา (ทำแบบ class-based ใน JS) */
+  .subtab-c1{ background:#e0f2fe; color:#0c4a6e; } /* ฟ้า */
+  .subtab-c2{ background:#dcfce7; color:#14532d; } /* เขียว */
+  .subtab-c3{ background:#fae8ff; color:#581c87; } /* ม่วง */
+  .subtab-c4{ background:#ffedd5; color:#7c2d12; } /* ส้ม */
+  .subtab-c5{ background:#fee2e2; color:#7f1d1d; } /* แดง */
+  .subtab-c6{ background:#fef9c3; color:#713f12; } /* เหลือง */
+  .subtab-c7{ background:#e5e7eb; color:#111827; } /* เทา */
+
+  /* เปิดใช้เฉพาะ mobile */
+  @media (max-width: 768px){
+    .subtabs{ display:block; }
+
+    /* ✅ ซ่อน row-card ทั้งหมดก่อน แล้วค่อยโชว์เฉพาะที่เลือก */
+    .row-card{ display:none; }
+    .row-card.is-open{ display:block; }
+  }
+
+  /* =====================================================
      ✅ NEW: Modal "สร้างชีท"
      ===================================================== */
   .btn-create{
@@ -359,6 +422,12 @@
         </span>
       </summary>
 
+      <!-- ✅ NEW: บนมือถือ ทำเป็นปุ่มวิชา -->
+      <div class="subtabs" data-subtabs>
+        <div class="title">เลือกวิชา (กดซ้ำเพื่อซ่อน)</div>
+        <div class="subtab-list" data-subtab-list></div>
+      </div>
+
       <!-- =======================
            DESKTOP TABLE VIEW
            ======================= -->
@@ -421,7 +490,7 @@
       <div class="cards-mobile" style="margin-top:10px;">
         {% for row in g.forms %}
           {% with cs=row.class_subject f=row.form total=row.total_pages %}
-            <div class="row-card" data-row="1">
+            <div class="row-card" data-row-card data-subject="{{ f.subject_name.value|default:'' }}">
               <div class="title">
                 <span>{{ f.subject_name.value }}</span>
                 <span class="muted" style="font-size:12px;">{{ g.class.name }}</span>
@@ -723,6 +792,87 @@
   }
 
   // ==========================
+  // ✅ Mobile subject tabs per class
+  // ==========================
+  function normalizeSubject(x){
+    return (x || "").toString().trim();
+  }
+
+  function colorClassByIndex(i){
+    const n = (i % 7) + 1;
+    return "subtab-c" + n;
+  }
+
+  function buildSubjectTabsForDetails(detailsEl){
+    if(!detailsEl) return;
+
+    const subtabs = detailsEl.querySelector("[data-subtabs]");
+    const list = detailsEl.querySelector("[data-subtab-list]");
+    const cardsWrap = detailsEl.querySelector(".cards-mobile");
+    if(!subtabs || !list || !cardsWrap) return;
+
+    // only for mobile view - harmless on desktop
+    const cards = Array.from(cardsWrap.querySelectorAll("[data-row-card]"));
+    if(!cards.length) {
+      list.innerHTML = "";
+      return;
+    }
+
+    // map subject -> cards
+    const map = new Map();
+    cards.forEach((card) => {
+      const subj = normalizeSubject(card.getAttribute("data-subject") || card.querySelector(".title span")?.textContent);
+      if(!map.has(subj)) map.set(subj, []);
+      map.get(subj).push(card);
+      // hide all by default (mobile css)
+      card.classList.remove("is-open");
+    });
+
+    // build buttons
+    list.innerHTML = "";
+    let idx = 0;
+    for (const [subj, subCards] of map.entries()){
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "subtab-btn " + colorClassByIndex(idx);
+      btn.setAttribute("data-subject-btn", subj);
+
+      btn.innerHTML = `<span>${subj || "ไม่ระบุวิชา"}</span> <small>(${subCards.length})</small>`;
+
+      btn.addEventListener("click", () => {
+        // toggle: ถ้ากดซ้ำวิชาเดิม -> hide ทั้งหมด
+        const isActive = btn.classList.contains("is-active");
+
+        // clear all
+        detailsEl.querySelectorAll(".subtab-btn.is-active").forEach(b => b.classList.remove("is-active"));
+        cards.forEach(c => c.classList.remove("is-open"));
+
+        if(isActive){
+          // hide all (already cleared)
+          return;
+        }
+
+        // show selected subject
+        btn.classList.add("is-active");
+        subCards.forEach(c => c.classList.add("is-open"));
+
+        // init select2 for visible cards (เผื่อเปิดแล้ว select ยังไม่ init)
+        initSheetSelect2(detailsEl);
+      });
+
+      list.appendChild(btn);
+      idx += 1;
+    }
+  }
+
+  function initAllSubjectTabs(){
+    document.querySelectorAll("details.cls-acc").forEach((d) => {
+      // build once now, but the cards exist already so ok
+      buildSubjectTabsForDetails(d);
+    });
+  }
+
+  // ==========================
   // ✅ Create Sheet Modal
   // ==========================
   const modal = document.getElementById("create-sheet-modal");
@@ -830,9 +980,14 @@
   $(document).ready(function() {
     initSheetSelect2();
     wireLiveValidation();
+    initAllSubjectTabs();
 
+    // เมื่อ expand ห้อง -> rebuild tab + init select2 เฉพาะในห้องนั้น
     $(document).on("toggle", "details", function() {
-      if (this.open) initSheetSelect2(this);
+      if (this.open) {
+        buildSubjectTabsForDetails(this);
+        initSheetSelect2(this);
+      }
     });
 
     $("#sheet-update-form").on("submit", function(e) {

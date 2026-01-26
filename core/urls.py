@@ -4,7 +4,7 @@ from . import views
 app_name = "core"
 
 urlpatterns = [
-    # ✅ หน้าแรกของ core ให้เป็น Home (Public) เช่นกัน
+    # ✅ หน้าแรกของ core ให้เป็น Home (Public)
     path("", views.home, name="home_page"),
 
     # Redirect ไป dashboard
@@ -18,6 +18,9 @@ urlpatterns = [
 
     # ✅ API: Sheet search (สำหรับ dropdown + search)
     path("api/sheets/search/", views.sheet_search_api, name="sheet_search_api"),
+
+    # ✅ NEW: API: Create Sheet (ทางเลือก B)
+    path("api/sheets/create/", views.sheet_create_api, name="sheet_create_api"),
 
     # Attendance
     path("attendance/submit/", views.attendance_submit, name="attendance_submit"),

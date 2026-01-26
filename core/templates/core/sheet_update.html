@@ -81,7 +81,8 @@
     border: 1px solid rgba(0,0,0,.08);
     border-radius: 14px;
     background: var(--card-bg, #fff);
-    margin: 10px 0;
+    margin: 8px 0;                 /* ✅ ใกล้ขึ้น */
+    scroll-margin-top: 12px;       /* ✅ เวลาสครอลให้ชิดขึ้น */
   }
   .row-card .title{
     font-weight: 900;
@@ -167,7 +168,7 @@
   /* ✅ responsive: mobile => ใช้ card */
   @media (max-width: 768px){
     .table-desktop{ display:none; }
-    .cards-mobile{ display:block; }
+    .cards-mobile{ display:block; margin-top:6px; }  /* ✅ ชิดกับปุ่มมากขึ้น */
     .select2-container{ min-width: 200px; }
   }
 
@@ -210,35 +211,17 @@
     line-height: 1.15;
     display:flex;
     align-items:center;
-    justify-content:space-between;
+    justify-content:flex-start;     /* ✅ ไม่มีเลขท้ายแล้ว */
     gap:10px;
     box-shadow: 0 6px 18px rgba(0,0,0,.08);
-    min-height: 52px;              /* ✅ สูงเท่ากัน */
-  }
-  .subtab-btn .txt{
-    display:flex;
-    flex-direction:column;
-    gap:4px;
-    text-align:left;
-    min-width: 0;
+    min-height: 52px;
   }
   .subtab-btn .name{
     font-weight:1000;
     white-space:nowrap;
     overflow:hidden;
     text-overflow:ellipsis;
-  }
-  .subtab-btn .meta{
-    font-size:11px;
-    font-weight:900;
-    opacity:.85;
-  }
-  .subtab-btn .pill{
-    font-size:11px;
-    font-weight:1000;
-    padding:6px 10px;
-    border-radius:999px;
-    background: rgba(255,255,255,.55);
+    min-width:0;
   }
   .subtab-btn.is-active{
     outline: 3px solid rgba(0,0,0,.30);
@@ -246,7 +229,7 @@
     transform: translateY(-1px);
   }
 
-  /* ✅ สีตามสถานะ "เคยกรอก" / "ไม่เคยกรอก" */
+  /* ✅ สีตามสถานะ "เคยกรอก" / "ไม่เคยกรอก" (ยังคงสี แต่ไม่แสดงข้อความ) */
   .subtab-filled{
     background:#e0f2fe;  /* ฟ้า */
     color:#0c4a6e;
@@ -481,7 +464,7 @@
               <tr class="row-wrap">
                 <td style="min-width:160px;">
                   <b>{{ f.subject_name.value }}</b>
-                  {{ f.class_subject_id }}
+                  {# ✅ เอาเลขหลังชื่อวิชาออก (class_subject_id) #}
                 </td>
 
                 <td style="min-width:240px;">
@@ -518,7 +501,7 @@
       <!-- =======================
            MOBILE CARD VIEW
            ======================= -->
-      <div class="cards-mobile" style="margin-top:10px;">
+      <div class="cards-mobile" style="margin-top:6px;">
         {% for row in g.forms %}
           {% with cs=row.class_subject f=row.form total=row.total_pages %}
             <div class="row-card" data-row-card data-subject="{{ f.subject_name.value|default:'' }}">
@@ -560,7 +543,7 @@
                 {{ f.last_teacher }}
               </div>
 
-              {{ f.class_subject_id }}
+              {# ✅ เอาเลขที่อยู่หลังชื่อวิชาออก (class_subject_id) #}
             </div>
           {% endwith %}
         {% endfor %}
@@ -865,7 +848,7 @@
     list.innerHTML = "";
 
     for (const [subj, subCards] of map.entries()){
-      // ✅ status: เคยกรอกไหม (ถ้ามีการกรอกอย่างน้อย 1 card ในวิชานั้น)
+      // ✅ status: ใช้แค่เปลี่ยนสีปุ่ม (ไม่แสดงข้อความ)
       const filled = subCards.some(isFilledCard);
 
       const btn = document.createElement("button");
@@ -874,13 +857,8 @@
       btn.setAttribute("data-subject-btn", subj);
 
       const name = (subj || "ไม่ระบุวิชา");
-      btn.innerHTML = `
-        <span class="txt">
-          <span class="name">${name}</span>
-          <span class="meta">${filled ? "เคยกรอกแล้ว" : "ยังไม่เคยกรอก"}</span>
-        </span>
-        <span class="pill">${subCards.length}</span>
-      `;
+      // ✅ เอาข้อความ "เคยกรอกแล้ว" ออก + เอาเลขท้าย (pill) ออก
+      btn.innerHTML = `<span class="name">${name}</span>`;
 
       btn.addEventListener("click", () => {
         const isActive = btn.classList.contains("is-active");
@@ -895,6 +873,12 @@
 
         btn.classList.add("is-active");
         subCards.forEach(c => c.classList.add("is-open"));
+
+        // ✅ ให้ card โผล่ติดกับปุ่ม (สครอลอัตโนมัติมาหากยังไม่เห็น)
+        requestAnimationFrame(() => {
+          const first = subCards.find(c => c.classList.contains("is-open"));
+          if(first) first.scrollIntoView({ behavior: "smooth", block: "start" });
+        });
 
         initSheetSelect2(detailsEl);
       });
@@ -922,7 +906,7 @@
       const detailsEl = card.closest && card.closest("details.cls-acc");
       if(!detailsEl) return;
 
-      // rebuild เฉพาะห้องนั้น (เร็วพอสำหรับมือถือ)
+      // rebuild เฉพาะห้องนั้น
       buildSubjectTabsForDetails(detailsEl);
     });
 

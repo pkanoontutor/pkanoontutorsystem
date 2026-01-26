@@ -188,27 +188,57 @@
     opacity:.85;
     margin-bottom:8px;
   }
+
+  /* ✅ ให้ปุ่มทุกวิชาขนาดเท่ากัน */
   .subtab-list{
-    display:flex;
-    gap:8px;
-    flex-wrap:wrap;
+    display:grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap:10px;
   }
+  @media (max-width: 420px){
+    .subtab-list{ grid-template-columns: 1fr; } /* จอเล็กมาก -> 1 คอลัมน์ */
+  }
+
   .subtab-btn{
+    width:100%;
     border:none;
     cursor:pointer;
-    border-radius:999px;
-    padding:10px 12px;
-    font-weight:1000;
-    font-size:14px;
-    line-height:1;
+    border-radius: 14px;
+    padding: 12px 12px;
+    font-weight: 1000;
+    font-size: 14px;
+    line-height: 1.15;
     display:flex;
     align-items:center;
-    gap:8px;
+    justify-content:space-between;
+    gap:10px;
     box-shadow: 0 6px 18px rgba(0,0,0,.08);
+    min-height: 52px;              /* ✅ สูงเท่ากัน */
   }
-  .subtab-btn small{
+  .subtab-btn .txt{
+    display:flex;
+    flex-direction:column;
+    gap:4px;
+    text-align:left;
+    min-width: 0;
+  }
+  .subtab-btn .name{
+    font-weight:1000;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .subtab-btn .meta{
+    font-size:11px;
     font-weight:900;
     opacity:.85;
+  }
+  .subtab-btn .pill{
+    font-size:11px;
+    font-weight:1000;
+    padding:6px 10px;
+    border-radius:999px;
+    background: rgba(255,255,255,.55);
   }
   .subtab-btn.is-active{
     outline: 3px solid rgba(0,0,0,.30);
@@ -216,14 +246,15 @@
     transform: translateY(-1px);
   }
 
-  /* สีตามวิชา (ทำแบบ class-based ใน JS) */
-  .subtab-c1{ background:#e0f2fe; color:#0c4a6e; } /* ฟ้า */
-  .subtab-c2{ background:#dcfce7; color:#14532d; } /* เขียว */
-  .subtab-c3{ background:#fae8ff; color:#581c87; } /* ม่วง */
-  .subtab-c4{ background:#ffedd5; color:#7c2d12; } /* ส้ม */
-  .subtab-c5{ background:#fee2e2; color:#7f1d1d; } /* แดง */
-  .subtab-c6{ background:#fef9c3; color:#713f12; } /* เหลือง */
-  .subtab-c7{ background:#e5e7eb; color:#111827; } /* เทา */
+  /* ✅ สีตามสถานะ "เคยกรอก" / "ไม่เคยกรอก" */
+  .subtab-filled{
+    background:#e0f2fe;  /* ฟ้า */
+    color:#0c4a6e;
+  }
+  .subtab-empty{
+    background:#e5e7eb;  /* เทา */
+    color:#111827;
+  }
 
   /* เปิดใช้เฉพาะ mobile */
   @media (max-width: 768px){
@@ -798,9 +829,14 @@
     return (x || "").toString().trim();
   }
 
-  function colorClassByIndex(i){
-    const n = (i % 7) + 1;
-    return "subtab-c" + n;
+  function isFilledCard(card){
+    // ✅ ถือว่า "เคยกรอก" ถ้ามี sheet ถูกเลือก หรือมี page/question/teacher อย่างน้อย 1 ช่อง
+    const sheetVal = (card.querySelector("select.sheet-select")?.value || "").toString().trim();
+    const pageVal = (card.querySelector('input[name$="page_taught_to"]')?.value || "").toString().trim();
+    const qVal    = (card.querySelector('input[name$="question_taught_to"]')?.value || "").toString().trim();
+    const tVal    = (card.querySelector('input[name$="last_teacher"]')?.value || "").toString().trim();
+
+    return !!(sheetVal || pageVal || qVal || tVal);
   }
 
   function buildSubjectTabsForDetails(detailsEl){
@@ -811,7 +847,6 @@
     const cardsWrap = detailsEl.querySelector(".cards-mobile");
     if(!subtabs || !list || !cardsWrap) return;
 
-    // only for mobile view - harmless on desktop
     const cards = Array.from(cardsWrap.querySelectorAll("[data-row-card]"));
     if(!cards.length) {
       list.innerHTML = "";
@@ -824,23 +859,30 @@
       const subj = normalizeSubject(card.getAttribute("data-subject") || card.querySelector(".title span")?.textContent);
       if(!map.has(subj)) map.set(subj, []);
       map.get(subj).push(card);
-      // hide all by default (mobile css)
       card.classList.remove("is-open");
     });
 
-    // build buttons
     list.innerHTML = "";
-    let idx = 0;
+
     for (const [subj, subCards] of map.entries()){
+      // ✅ status: เคยกรอกไหม (ถ้ามีการกรอกอย่างน้อย 1 card ในวิชานั้น)
+      const filled = subCards.some(isFilledCard);
+
       const btn = document.createElement("button");
       btn.type = "button";
-      btn.className = "subtab-btn " + colorClassByIndex(idx);
+      btn.className = "subtab-btn " + (filled ? "subtab-filled" : "subtab-empty");
       btn.setAttribute("data-subject-btn", subj);
 
-      btn.innerHTML = `<span>${subj || "ไม่ระบุวิชา"}</span> <small>(${subCards.length})</small>`;
+      const name = (subj || "ไม่ระบุวิชา");
+      btn.innerHTML = `
+        <span class="txt">
+          <span class="name">${name}</span>
+          <span class="meta">${filled ? "เคยกรอกแล้ว" : "ยังไม่เคยกรอก"}</span>
+        </span>
+        <span class="pill">${subCards.length}</span>
+      `;
 
       btn.addEventListener("click", () => {
-        // toggle: ถ้ากดซ้ำวิชาเดิม -> hide ทั้งหมด
         const isActive = btn.classList.contains("is-active");
 
         // clear all
@@ -848,27 +890,55 @@
         cards.forEach(c => c.classList.remove("is-open"));
 
         if(isActive){
-          // hide all (already cleared)
-          return;
+          return; // toggle hide
         }
 
-        // show selected subject
         btn.classList.add("is-active");
         subCards.forEach(c => c.classList.add("is-open"));
 
-        // init select2 for visible cards (เผื่อเปิดแล้ว select ยังไม่ init)
         initSheetSelect2(detailsEl);
       });
 
       list.appendChild(btn);
-      idx += 1;
     }
   }
 
   function initAllSubjectTabs(){
     document.querySelectorAll("details.cls-acc").forEach((d) => {
-      // build once now, but the cards exist already so ok
       buildSubjectTabsForDetails(d);
+    });
+  }
+
+  // ✅ เมื่อผู้ใช้แก้ไขค่าใน card ให้รีเฟรชสีปุ่ม (ฟ้า/เทา) ของห้องนั้น
+  function wireTabStatusRefresh(){
+    document.addEventListener("change", (e) => {
+      const t = e.target;
+      if(!t) return;
+
+      // สนใจแค่ input/select ใน row-card
+      const card = t.closest && t.closest(".row-card");
+      if(!card) return;
+
+      const detailsEl = card.closest && card.closest("details.cls-acc");
+      if(!detailsEl) return;
+
+      // rebuild เฉพาะห้องนั้น (เร็วพอสำหรับมือถือ)
+      buildSubjectTabsForDetails(detailsEl);
+    });
+
+    document.addEventListener("input", (e) => {
+      const t = e.target;
+      if(!t) return;
+
+      const card = t.closest && t.closest(".row-card");
+      if(!card) return;
+
+      const detailsEl = card.closest && card.closest("details.cls-acc");
+      if(!detailsEl) return;
+
+      // ลดความถี่: ใช้ requestAnimationFrame
+      if(detailsEl.__tabRAF) cancelAnimationFrame(detailsEl.__tabRAF);
+      detailsEl.__tabRAF = requestAnimationFrame(() => buildSubjectTabsForDetails(detailsEl));
     });
   }
 
@@ -981,6 +1051,7 @@
     initSheetSelect2();
     wireLiveValidation();
     initAllSubjectTabs();
+    wireTabStatusRefresh();
 
     // เมื่อ expand ห้อง -> rebuild tab + init select2 เฉพาะในห้องนั้น
     $(document).on("toggle", "details", function() {

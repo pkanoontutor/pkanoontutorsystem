@@ -17,6 +17,21 @@
   }
   .cls-acc summary::-webkit-details-marker { display:none; }
 
+  /* ✅ NEW: ปุ่มซ่อน (ให้ซ่อนได้เฉพาะกดปุ่มนี้เท่านั้น) */
+  .btn-hide{
+    border:none;
+    cursor:pointer;
+    border-radius:12px;
+    padding:10px 12px;
+    font-weight:1000;
+    font-size:13px;
+    background:#111827;
+    color:#fff;
+    white-space:nowrap;
+  }
+  /* ซ่อนปุ่มตอนยังไม่เปิด */
+  details:not([open]) .btn-hide{ display:none; }
+
   /* ✅ ไอคอนสามเหลี่ยม */
   .chev{
     display:inline-block;
@@ -430,9 +445,12 @@
     <details class="card cls-acc" style="margin-top:12px;">
       <summary>
         <span>{{ g.class.name }}</span>
+
         <span style="display:flex; align-items:center; gap:10px;">
-          <span class="muted hint">กดเพื่อเปิด/ปิด</span>
+          <span class="muted hint">กดเพื่อเปิด</span>
           <span class="chev">▸</span>
+          <!-- ✅ ปิดได้เฉพาะกดปุ่มนี้ -->
+          <button class="btn-hide" type="button" data-hide-details>ซ่อน</button>
         </span>
       </summary>
 
@@ -464,7 +482,6 @@
               <tr class="row-wrap">
                 <td style="min-width:160px;">
                   <b>{{ f.subject_name.value }}</b>
-                  {# ✅ เอาเลขหลังชื่อวิชาออก (class_subject_id) #}
                 </td>
 
                 <td style="min-width:240px;">
@@ -542,8 +559,6 @@
                 <div class="label">คนที่สอนครั้งล่าสุด</div>
                 {{ f.last_teacher }}
               </div>
-
-              {# ✅ เอาเลขที่อยู่หลังชื่อวิชาออก (class_subject_id) #}
             </div>
           {% endwith %}
         {% endfor %}
@@ -813,12 +828,10 @@
   }
 
   function isFilledCard(card){
-    // ✅ ถือว่า "เคยกรอก" ถ้ามี sheet ถูกเลือก หรือมี page/question/teacher อย่างน้อย 1 ช่อง
     const sheetVal = (card.querySelector("select.sheet-select")?.value || "").toString().trim();
     const pageVal = (card.querySelector('input[name$="page_taught_to"]')?.value || "").toString().trim();
     const qVal    = (card.querySelector('input[name$="question_taught_to"]')?.value || "").toString().trim();
     const tVal    = (card.querySelector('input[name$="last_teacher"]')?.value || "").toString().trim();
-
     return !!(sheetVal || pageVal || qVal || tVal);
   }
 
@@ -836,7 +849,6 @@
       return;
     }
 
-    // map subject -> cards
     const map = new Map();
     cards.forEach((card) => {
       const subj = normalizeSubject(card.getAttribute("data-subject") || card.querySelector(".title span")?.textContent);
@@ -848,7 +860,6 @@
     list.innerHTML = "";
 
     for (const [subj, subCards] of map.entries()){
-      // ✅ status: ใช้แค่เปลี่ยนสีปุ่ม (ไม่แสดงข้อความ)
       const filled = subCards.some(isFilledCard);
 
       const btn = document.createElement("button");
@@ -857,24 +868,21 @@
       btn.setAttribute("data-subject-btn", subj);
 
       const name = (subj || "ไม่ระบุวิชา");
-      // ✅ เอาข้อความ "เคยกรอกแล้ว" ออก + เอาเลขท้าย (pill) ออก
       btn.innerHTML = `<span class="name">${name}</span>`;
 
       btn.addEventListener("click", () => {
         const isActive = btn.classList.contains("is-active");
 
-        // clear all
         detailsEl.querySelectorAll(".subtab-btn.is-active").forEach(b => b.classList.remove("is-active"));
         cards.forEach(c => c.classList.remove("is-open"));
 
         if(isActive){
-          return; // toggle hide
+          return; // toggle hide (เฉพาะซ่อนวิชา ไม่ได้ปิดห้อง)
         }
 
         btn.classList.add("is-active");
         subCards.forEach(c => c.classList.add("is-open"));
 
-        // ✅ ให้ card โผล่ติดกับปุ่ม (สครอลอัตโนมัติมาหากยังไม่เห็น)
         requestAnimationFrame(() => {
           const first = subCards.find(c => c.classList.contains("is-open"));
           if(first) first.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -893,20 +901,17 @@
     });
   }
 
-  // ✅ เมื่อผู้ใช้แก้ไขค่าใน card ให้รีเฟรชสีปุ่ม (ฟ้า/เทา) ของห้องนั้น
   function wireTabStatusRefresh(){
     document.addEventListener("change", (e) => {
       const t = e.target;
       if(!t) return;
 
-      // สนใจแค่ input/select ใน row-card
       const card = t.closest && t.closest(".row-card");
       if(!card) return;
 
       const detailsEl = card.closest && card.closest("details.cls-acc");
       if(!detailsEl) return;
 
-      // rebuild เฉพาะห้องนั้น
       buildSubjectTabsForDetails(detailsEl);
     });
 
@@ -920,10 +925,100 @@
       const detailsEl = card.closest && card.closest("details.cls-acc");
       if(!detailsEl) return;
 
-      // ลดความถี่: ใช้ requestAnimationFrame
       if(detailsEl.__tabRAF) cancelAnimationFrame(detailsEl.__tabRAF);
       detailsEl.__tabRAF = requestAnimationFrame(() => buildSubjectTabsForDetails(detailsEl));
     });
+  }
+
+  // ==========================
+  // ✅ NEW: “ล็อกไม่ให้ details ปิดเองบนมือถือ”
+  // เปิดได้ด้วยการกด summary เท่านั้น
+  // ปิดได้ด้วยการกดปุ่ม "ซ่อน" เท่านั้น
+  // ==========================
+  function initDetailsLocking(){
+    // 1) summary: เปิดได้อย่างเดียว (ห้ามกดแล้วปิด)
+    document.addEventListener("click", (e) => {
+      const summary = e.target.closest && e.target.closest("summary");
+      if(!summary) return;
+
+      const detailsEl = summary.closest && summary.closest("details.cls-acc");
+      if(!detailsEl) return;
+
+      // ถ้าคลิกปุ่มซ่อน ให้ปล่อยไป handler ของปุ่มซ่อน
+      if(e.target.closest && e.target.closest("[data-hide-details]")) return;
+
+      // กัน browser toggle เอง (ซึ่งทำให้เด้งปิดตอนพิมพ์ในบางมือถือ)
+      e.preventDefault();
+
+      // ถ้ายังไม่เปิด -> เปิด
+      if(!detailsEl.open){
+        detailsEl.open = true;
+
+        // rebuild tab + init select2 ในห้องนั้น
+        requestAnimationFrame(() => {
+          buildSubjectTabsForDetails(detailsEl);
+          initSheetSelect2(detailsEl);
+        });
+      }else{
+        // เปิดอยู่แล้ว -> ไม่ทำอะไร (ไม่ให้ปิด)
+      }
+    }, true);
+
+    // 2) ปุ่มซ่อน: ปิดจริง
+    document.addEventListener("click", (e) => {
+      const btn = e.target.closest && e.target.closest("[data-hide-details]");
+      if(!btn) return;
+
+      const detailsEl = btn.closest && btn.closest("details.cls-acc");
+      if(!detailsEl) return;
+
+      e.preventDefault();
+      e.stopPropagation();
+
+      detailsEl.open = false;
+    }, true);
+
+    // 3) กันกรณีบางเครื่องปิดเองจากเหตุอื่น: ถ้า toggle เป็น close โดยไม่ได้กดปุ่มซ่อน -> เปิดกลับทันที
+    document.addEventListener("toggle", (e) => {
+      const detailsEl = e.target;
+      if(!(detailsEl instanceof HTMLElement)) return;
+      if(!detailsEl.matches || !detailsEl.matches("details.cls-acc")) return;
+
+      // ถ้าปิดแล้ว ให้เปิดกลับทันที (เพราะเราต้องการปิดเฉพาะกดปุ่มซ่อน)
+      if(!detailsEl.open){
+        // note: ถ้าผู้ใช้กดปุ่มซ่อน เราตั้ง open=false เอง -> อันนี้จะเปิดกลับ
+        // ดังนั้นเราต้องมี flag ว่า "ปิดด้วยปุ่มซ่อน"
+        // แก้ด้วย flag:
+      }
+    }, true);
+
+    // 3.1) เพิ่ม flag สำหรับ “ปิดด้วยปุ่มซ่อน” เพื่อไม่เปิดกลับ
+    document.addEventListener("click", (e) => {
+      const btn = e.target.closest && e.target.closest("[data-hide-details]");
+      if(!btn) return;
+      const detailsEl = btn.closest && btn.closest("details.cls-acc");
+      if(!detailsEl) return;
+      detailsEl.__allowCloseOnce = true;
+    }, true);
+
+    document.addEventListener("toggle", (e) => {
+      const detailsEl = e.target;
+      if(!(detailsEl instanceof HTMLElement)) return;
+      if(!detailsEl.matches || !detailsEl.matches("details.cls-acc")) return;
+
+      if(!detailsEl.open){
+        if(detailsEl.__allowCloseOnce){
+          detailsEl.__allowCloseOnce = false; // ใช้ครั้งเดียว
+          return; // อนุญาตให้ปิด (เพราะกดปุ่มซ่อน)
+        }
+        // ถ้าปิดเองจากเหตุอื่น -> เปิดกลับ
+        detailsEl.open = true;
+        requestAnimationFrame(() => {
+          buildSubjectTabsForDetails(detailsEl);
+          initSheetSelect2(detailsEl);
+        });
+      }
+    }, true);
   }
 
   // ==========================
@@ -936,7 +1031,6 @@
   const btnSubmit = document.getElementById("btn-create-sheet-submit");
   const errBox = document.getElementById("cs_err");
 
-  // ✅ Mobile FAB buttons
   const fabOpen = document.getElementById("fab-open-create-sheet");
   const fabSave = document.getElementById("fab-save");
 
@@ -1020,7 +1114,6 @@
   }
   if(btnSubmit) btnSubmit.addEventListener("click", createSheet);
 
-  // ✅ Mobile Save = trigger submit (ยังผ่าน validateBeforeSubmit เหมือนเดิม)
   if(fabSave){
     fabSave.addEventListener("click", () => {
       const form = document.getElementById("sheet-update-form");
@@ -1037,13 +1130,8 @@
     initAllSubjectTabs();
     wireTabStatusRefresh();
 
-    // เมื่อ expand ห้อง -> rebuild tab + init select2 เฉพาะในห้องนั้น
-    $(document).on("toggle", "details", function() {
-      if (this.open) {
-        buildSubjectTabsForDetails(this);
-        initSheetSelect2(this);
-      }
-    });
+    // ✅ NEW: ล็อก details ไม่ให้ปิดเองบนมือถือ/ทุกเครื่อง
+    initDetailsLocking();
 
     $("#sheet-update-form").on("submit", function(e) {
       const ok = validateBeforeSubmit();

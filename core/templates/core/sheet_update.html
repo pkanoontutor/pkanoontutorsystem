@@ -17,21 +17,6 @@
   }
   .cls-acc summary::-webkit-details-marker { display:none; }
 
-  /* ✅ NEW: ปุ่มซ่อน (ให้ซ่อนได้เฉพาะกดปุ่มนี้เท่านั้น) */
-  .btn-hide{
-    border:none;
-    cursor:pointer;
-    border-radius:12px;
-    padding:10px 12px;
-    font-weight:1000;
-    font-size:13px;
-    background:#111827;
-    color:#fff;
-    white-space:nowrap;
-  }
-  /* ซ่อนปุ่มตอนยังไม่เปิด */
-  details:not([open]) .btn-hide{ display:none; }
-
   /* ✅ ไอคอนสามเหลี่ยม */
   .chev{
     display:inline-block;
@@ -226,7 +211,7 @@
     line-height: 1.15;
     display:flex;
     align-items:center;
-    justify-content:flex-start;     /* ✅ ไม่มีเลขท้ายแล้ว */
+    justify-content:flex-start;
     gap:10px;
     box-shadow: 0 6px 18px rgba(0,0,0,.08);
     min-height: 52px;
@@ -244,7 +229,6 @@
     transform: translateY(-1px);
   }
 
-  /* ✅ สีตามสถานะ "เคยกรอก" / "ไม่เคยกรอก" (ยังคงสี แต่ไม่แสดงข้อความ) */
   .subtab-filled{
     background:#e0f2fe;  /* ฟ้า */
     color:#0c4a6e;
@@ -254,11 +238,8 @@
     color:#111827;
   }
 
-  /* เปิดใช้เฉพาะ mobile */
   @media (max-width: 768px){
     .subtabs{ display:block; }
-
-    /* ✅ ซ่อน row-card ทั้งหมดก่อน แล้วค่อยโชว์เฉพาะที่เลือก */
     .row-card{ display:none; }
     .row-card.is-open{ display:block; }
   }
@@ -340,14 +321,11 @@
      ✅ NEW: Mobile Floating Action Bar (กดได้ตลอด)
      ===================================================== */
   .mobile-fab-bar{
-    display:none; /* default hidden */
+    display:none;
   }
 
   @media (max-width: 768px){
-    /* กันเนื้อหาถูกบังด้วยแถบล่าง */
     body { padding-bottom: 92px; }
-
-    /* ซ่อน sticky-save เดิมบนมือถือ (กันซ้อน) */
     .sticky-save{ display:none; }
 
     .mobile-fab-bar{
@@ -382,14 +360,8 @@
       cursor: pointer;
     }
 
-    .fab-create{
-      background:#0f766e;
-      color:#fff;
-    }
-    .fab-save{
-      background:#2563eb;
-      color:#fff;
-    }
+    .fab-create{ background:#0f766e; color:#fff; }
+    .fab-save{ background:#2563eb; color:#fff; }
 
     .fab-sub{
       display:block;
@@ -419,9 +391,7 @@
       <input type="date" name="date" value="{{ selected_date|date:'Y-m-d' }}" />
       <button class="btn" type="submit">ไป</button>
 
-      <!-- ✅ NEW: สร้างชีท (ยังมีไว้บน desktop) -->
       <button class="btn btn-create" type="button" id="btn-open-create-sheet">สร้างชีท</button>
-
       <a class="btn" href="/">กลับ Dashboard</a>
     </form>
 
@@ -445,24 +415,17 @@
     <details class="card cls-acc" style="margin-top:12px;">
       <summary>
         <span>{{ g.class.name }}</span>
-
         <span style="display:flex; align-items:center; gap:10px;">
-          <span class="muted hint">กดเพื่อเปิด</span>
+          <span class="muted hint">กดเพื่อเปิด/ปิด</span>
           <span class="chev">▸</span>
-          <!-- ✅ ปิดได้เฉพาะกดปุ่มนี้ -->
-          <button class="btn-hide" type="button" data-hide-details>ซ่อน</button>
         </span>
       </summary>
 
-      <!-- ✅ NEW: บนมือถือ ทำเป็นปุ่มวิชา -->
       <div class="subtabs" data-subtabs>
         <div class="title">เลือกวิชา (กดซ้ำเพื่อซ่อน)</div>
         <div class="subtab-list" data-subtab-list></div>
       </div>
 
-      <!-- =======================
-           DESKTOP TABLE VIEW
-           ======================= -->
       <div class="table-desktop table-wrap" style="margin-top:10px;">
         <table>
           <thead>
@@ -480,34 +443,15 @@
             {% for row in g.forms %}
               {% with cs=row.class_subject f=row.form total=row.total_pages %}
               <tr class="row-wrap">
-                <td style="min-width:160px;">
-                  <b>{{ f.subject_name.value }}</b>
-                </td>
-
-                <td style="min-width:240px;">
-                  {{ f.sheet }}
-                </td>
-
-                <td style="min-width:180px;">
-                  {{ f.page_taught_to }}
-                </td>
-
-                <td style="min-width:180px;">
-                  {{ f.question_taught_to }}
-                </td>
-
+                <td style="min-width:160px;"><b>{{ f.subject_name.value }}</b></td>
+                <td style="min-width:240px;">{{ f.sheet }}</td>
+                <td style="min-width:180px;">{{ f.page_taught_to }}</td>
+                <td style="min-width:180px;">{{ f.question_taught_to }}</td>
                 <td class="total-pages-cell" style="min-width:150px;">
-                  {% if total and total > 0 %}
-                    <b>{{ total }}</b>
-                  {% else %}
-                    -
-                  {% endif %}
+                  {% if total and total > 0 %}<b>{{ total }}</b>{% else %}-{% endif %}
                   <div class="muted" style="font-size:12px;">(ดึงจากชีทที่เลือก)</div>
                 </td>
-
-                <td style="min-width:220px;">
-                  {{ f.last_teacher }}
-                </td>
+                <td style="min-width:220px;">{{ f.last_teacher }}</td>
               </tr>
               {% endwith %}
             {% endfor %}
@@ -515,9 +459,6 @@
         </table>
       </div>
 
-      <!-- =======================
-           MOBILE CARD VIEW
-           ======================= -->
       <div class="cards-mobile" style="margin-top:6px;">
         {% for row in g.forms %}
           {% with cs=row.class_subject f=row.form total=row.total_pages %}
@@ -546,11 +487,7 @@
               <div class="field">
                 <div class="label">เลขหน้าทั้งหมด</div>
                 <div class="total-pages-cell">
-                  {% if total and total > 0 %}
-                    <b>{{ total }}</b>
-                  {% else %}
-                    -
-                  {% endif %}
+                  {% if total and total > 0 %}<b>{{ total }}</b>{% else %}-{% endif %}
                   <span class="muted" style="font-size:12px;"> (ดึงจากชีทที่เลือก)</span>
                 </div>
               </div>
@@ -572,7 +509,6 @@
     </div>
   {% endfor %}
 
-  <!-- ✅ Sticky save bar (desktop-friendly) -->
   <div class="sticky-save">
     <div class="row">
       <button class="btn" type="submit" id="btn-save">Save</button>
@@ -583,7 +519,6 @@
   </div>
 </form>
 
-<!-- ✅ Mobile Floating Bar (กดได้ตลอดเวลา) -->
 <div class="mobile-fab-bar">
   <button class="fab-btn fab-create" type="button" id="fab-open-create-sheet">
     <span class="fab-stack">
@@ -600,9 +535,6 @@
   </button>
 </div>
 
-<!-- =====================================================
-     ✅ Modal "สร้างชีท" (ทางเลือก B)
-     ===================================================== -->
 <datalist id="subjectNameList">
   {% for g in grouped %}
     {% for row in g.forms %}
@@ -658,7 +590,6 @@
   </div>
 </div>
 
-<!-- ✅ jQuery + Select2 -->
 <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
 <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
@@ -835,6 +766,7 @@
     return !!(sheetVal || pageVal || qVal || tVal);
   }
 
+  // ✅ FIX 핵심: rebuild แล้ว “คง active subject + คง is-open”
   function buildSubjectTabsForDetails(detailsEl){
     if(!detailsEl) return;
 
@@ -849,15 +781,28 @@
       return;
     }
 
+    // ✅ จำว่าตอนนี้เปิดวิชาไหนอยู่
+    const prevActiveBtn = detailsEl.querySelector(".subtab-btn.is-active");
+    const activeSubject = prevActiveBtn ? (prevActiveBtn.getAttribute("data-subject-btn") || "") : "";
+
+    // map subject -> cards
     const map = new Map();
     cards.forEach((card) => {
       const subj = normalizeSubject(card.getAttribute("data-subject") || card.querySelector(".title span")?.textContent);
       if(!map.has(subj)) map.set(subj, []);
       map.get(subj).push(card);
-      card.classList.remove("is-open");
     });
 
+    // ✅ rebuild ปุ่ม
     list.innerHTML = "";
+
+    // ✅ ถ้ามี activeSubject ให้ “เปิดค้าง” เฉพาะวิชานั้น (กันเด้ง)
+    if (activeSubject){
+      cards.forEach(c => c.classList.remove("is-open"));
+      const keep = map.get(activeSubject) || [];
+      keep.forEach(c => c.classList.add("is-open"));
+    }
+    // ถ้าไม่มี activeSubject ก็ไม่ไปยุ่ง is-open (ปล่อยให้ซ่อนได้ตามเดิม)
 
     for (const [subj, subCards] of map.entries()){
       const filled = subCards.some(isFilledCard);
@@ -870,14 +815,20 @@
       const name = (subj || "ไม่ระบุวิชา");
       btn.innerHTML = `<span class="name">${name}</span>`;
 
+      // ✅ restore active button state
+      if (activeSubject && subj === activeSubject){
+        btn.classList.add("is-active");
+      }
+
       btn.addEventListener("click", () => {
         const isActive = btn.classList.contains("is-active");
 
+        // clear all
         detailsEl.querySelectorAll(".subtab-btn.is-active").forEach(b => b.classList.remove("is-active"));
         cards.forEach(c => c.classList.remove("is-open"));
 
         if(isActive){
-          return; // toggle hide (เฉพาะซ่อนวิชา ไม่ได้ปิดห้อง)
+          return; // toggle hide เฉพาะวิชา
         }
 
         btn.classList.add("is-active");
@@ -901,18 +852,21 @@
     });
   }
 
+  // ✅ FIX: refresh สีปุ่มได้ แต่ต้องไม่ทำให้ is-open หาย
   function wireTabStatusRefresh(){
+    function refreshForDetails(detailsEl){
+      if(!detailsEl) return;
+      buildSubjectTabsForDetails(detailsEl);
+    }
+
     document.addEventListener("change", (e) => {
       const t = e.target;
       if(!t) return;
-
       const card = t.closest && t.closest(".row-card");
       if(!card) return;
-
       const detailsEl = card.closest && card.closest("details.cls-acc");
       if(!detailsEl) return;
-
-      buildSubjectTabsForDetails(detailsEl);
+      refreshForDetails(detailsEl);
     });
 
     document.addEventListener("input", (e) => {
@@ -925,100 +879,10 @@
       const detailsEl = card.closest && card.closest("details.cls-acc");
       if(!detailsEl) return;
 
+      // ลดความถี่ + สำคัญ: ไม่ให้เด้งปิด
       if(detailsEl.__tabRAF) cancelAnimationFrame(detailsEl.__tabRAF);
-      detailsEl.__tabRAF = requestAnimationFrame(() => buildSubjectTabsForDetails(detailsEl));
+      detailsEl.__tabRAF = requestAnimationFrame(() => refreshForDetails(detailsEl));
     });
-  }
-
-  // ==========================
-  // ✅ NEW: “ล็อกไม่ให้ details ปิดเองบนมือถือ”
-  // เปิดได้ด้วยการกด summary เท่านั้น
-  // ปิดได้ด้วยการกดปุ่ม "ซ่อน" เท่านั้น
-  // ==========================
-  function initDetailsLocking(){
-    // 1) summary: เปิดได้อย่างเดียว (ห้ามกดแล้วปิด)
-    document.addEventListener("click", (e) => {
-      const summary = e.target.closest && e.target.closest("summary");
-      if(!summary) return;
-
-      const detailsEl = summary.closest && summary.closest("details.cls-acc");
-      if(!detailsEl) return;
-
-      // ถ้าคลิกปุ่มซ่อน ให้ปล่อยไป handler ของปุ่มซ่อน
-      if(e.target.closest && e.target.closest("[data-hide-details]")) return;
-
-      // กัน browser toggle เอง (ซึ่งทำให้เด้งปิดตอนพิมพ์ในบางมือถือ)
-      e.preventDefault();
-
-      // ถ้ายังไม่เปิด -> เปิด
-      if(!detailsEl.open){
-        detailsEl.open = true;
-
-        // rebuild tab + init select2 ในห้องนั้น
-        requestAnimationFrame(() => {
-          buildSubjectTabsForDetails(detailsEl);
-          initSheetSelect2(detailsEl);
-        });
-      }else{
-        // เปิดอยู่แล้ว -> ไม่ทำอะไร (ไม่ให้ปิด)
-      }
-    }, true);
-
-    // 2) ปุ่มซ่อน: ปิดจริง
-    document.addEventListener("click", (e) => {
-      const btn = e.target.closest && e.target.closest("[data-hide-details]");
-      if(!btn) return;
-
-      const detailsEl = btn.closest && btn.closest("details.cls-acc");
-      if(!detailsEl) return;
-
-      e.preventDefault();
-      e.stopPropagation();
-
-      detailsEl.open = false;
-    }, true);
-
-    // 3) กันกรณีบางเครื่องปิดเองจากเหตุอื่น: ถ้า toggle เป็น close โดยไม่ได้กดปุ่มซ่อน -> เปิดกลับทันที
-    document.addEventListener("toggle", (e) => {
-      const detailsEl = e.target;
-      if(!(detailsEl instanceof HTMLElement)) return;
-      if(!detailsEl.matches || !detailsEl.matches("details.cls-acc")) return;
-
-      // ถ้าปิดแล้ว ให้เปิดกลับทันที (เพราะเราต้องการปิดเฉพาะกดปุ่มซ่อน)
-      if(!detailsEl.open){
-        // note: ถ้าผู้ใช้กดปุ่มซ่อน เราตั้ง open=false เอง -> อันนี้จะเปิดกลับ
-        // ดังนั้นเราต้องมี flag ว่า "ปิดด้วยปุ่มซ่อน"
-        // แก้ด้วย flag:
-      }
-    }, true);
-
-    // 3.1) เพิ่ม flag สำหรับ “ปิดด้วยปุ่มซ่อน” เพื่อไม่เปิดกลับ
-    document.addEventListener("click", (e) => {
-      const btn = e.target.closest && e.target.closest("[data-hide-details]");
-      if(!btn) return;
-      const detailsEl = btn.closest && btn.closest("details.cls-acc");
-      if(!detailsEl) return;
-      detailsEl.__allowCloseOnce = true;
-    }, true);
-
-    document.addEventListener("toggle", (e) => {
-      const detailsEl = e.target;
-      if(!(detailsEl instanceof HTMLElement)) return;
-      if(!detailsEl.matches || !detailsEl.matches("details.cls-acc")) return;
-
-      if(!detailsEl.open){
-        if(detailsEl.__allowCloseOnce){
-          detailsEl.__allowCloseOnce = false; // ใช้ครั้งเดียว
-          return; // อนุญาตให้ปิด (เพราะกดปุ่มซ่อน)
-        }
-        // ถ้าปิดเองจากเหตุอื่น -> เปิดกลับ
-        detailsEl.open = true;
-        requestAnimationFrame(() => {
-          buildSubjectTabsForDetails(detailsEl);
-          initSheetSelect2(detailsEl);
-        });
-      }
-    }, true);
   }
 
   // ==========================
@@ -1130,8 +994,13 @@
     initAllSubjectTabs();
     wireTabStatusRefresh();
 
-    // ✅ NEW: ล็อก details ไม่ให้ปิดเองบนมือถือ/ทุกเครื่อง
-    initDetailsLocking();
+    // เมื่อ expand ห้อง -> rebuild tab + init select2 เฉพาะในห้องนั้น
+    $(document).on("toggle", "details", function() {
+      if (this.open) {
+        buildSubjectTabsForDetails(this);
+        initSheetSelect2(this);
+      }
+    });
 
     $("#sheet-update-form").on("submit", function(e) {
       const ok = validateBeforeSubmit();

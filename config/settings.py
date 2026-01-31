@@ -4,6 +4,7 @@ Django settings for config project.
 
 import os
 from pathlib import Path
+
 import dj_database_url
 
 # -------------------------------------------------------------------
@@ -15,36 +16,35 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # -------------------------------------------------------------------
 # SECURITY
 # -------------------------------------------------------------------
-SECRET_KEY = os.getenv(
-    "SECRET_KEY",
-    "django-insecure-dev-only-change-this-in-production"
-)
+SECRET_KEY = os.getenv("SECRET_KEY", "django-insecure-dev-only-change-this-in-production")
 
-# ✅ ให้ DEBUG อ่านจาก env (แนะนำ prod ตั้ง DEBUG=0)
-DEBUG = os.getenv("DEBUG", "True").lower() in ("1", "true", "yes", "y")
+# ✅ DEBUG อ่านจาก env (prod แนะนำ DEBUG=0)
+DEBUG = os.getenv("DEBUG", "0").lower() in ("1", "true", "yes", "y")
 
-# ✅ Render มักส่ง hostname มาใน env (ถ้ามี)
+# ✅ Render hostname (ถ้ามี)
 RENDER_EXTERNAL_HOSTNAME = os.getenv("RENDER_EXTERNAL_HOSTNAME")
 
 _allowed_hosts_env = os.getenv("ALLOWED_HOSTS", "")
 if _allowed_hosts_env:
     ALLOWED_HOSTS = [h.strip() for h in _allowed_hosts_env.split(",") if h.strip()]
 else:
-    ALLOWED_HOSTS = ["127.0.0.1", "localhost"]
-    # เติมโดเมนโปรดักชันให้เลย (กันลืม)
-    ALLOWED_HOSTS += ["pkanoontutor.com", "www.pkanoontutor.com"]
-    # เติม Render hostname อัตโนมัติถ้ามี
+    ALLOWED_HOSTS = ["127.0.0.1", "localhost", "pkanoontutor.com", "www.pkanoontutor.com"]
     if RENDER_EXTERNAL_HOSTNAME:
         ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME)
 
-# CSRF trusted origins
+# CSRF trusted origins (แนะนำใส่ https://www.pkanoontutor.com)
 _csrf_env = os.getenv("CSRF_TRUSTED_ORIGINS", "")
 if _csrf_env:
     CSRF_TRUSTED_ORIGINS = [x.strip() for x in _csrf_env.split(",") if x.strip()]
 else:
-    CSRF_TRUSTED_ORIGINS = []
+    CSRF_TRUSTED_ORIGINS = [
+        "https://pkanoontutor.com",
+        "https://www.pkanoontutor.com",
+    ]
+    if RENDER_EXTERNAL_HOSTNAME:
+        CSRF_TRUSTED_ORIGINS.append(f"https://{RENDER_EXTERNAL_HOSTNAME}")
 
-# ตัวช่วย: ให้ config/urls.py ใช้ตัดสินใจเสิร์ฟ media ใน prod ได้
+# ✅ ให้ config/urls.py ตัดสินใจเสิร์ฟ media ใน prod ได้
 SERVE_MEDIA = os.getenv("SERVE_MEDIA", "0").lower() in ("1", "true", "yes", "y")
 
 # -------------------------------------------------------------------
@@ -77,6 +77,11 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
+
+# ✅ Security headers (ปลอดภัยขึ้นสำหรับ prod)
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+SESSION_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_SECURE = not DEBUG
 
 
 # -------------------------------------------------------------------
@@ -130,10 +135,7 @@ AUTH_PASSWORD_VALIDATORS = [
 # INTERNATIONALIZATION
 # -------------------------------------------------------------------
 LANGUAGE_CODE = "en-us"
-
-# ✅ ให้เวลาตรงกับไทย (ช่วยเรื่อง checked_at / แสดงเวลา)
 TIME_ZONE = os.getenv("TIME_ZONE", "Asia/Bangkok")
-
 USE_I18N = True
 USE_TZ = True
 
@@ -154,12 +156,10 @@ STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 # -------------------------------------------------------------------
 # MEDIA FILES
 # -------------------------------------------------------------------
-MEDIA_URL = "/media/"
+MEDIA_URL = os.getenv("MEDIA_URL", "/media/")
 
-# ✅ สำคัญสุด: ให้ตั้งจาก env ได้ (Render + persistent disk)
-# แนะนำบน Render:
-# - mount disk ที่ /var/data
-# - ตั้ง env: MEDIA_ROOT=/var/data/media
+# ✅ สำคัญสุด: ชี้ไป persistent disk ที่คุณ mount ไว้ (/var/data)
+# ให้ตั้ง Render env: MEDIA_ROOT=/var/data/media
 MEDIA_ROOT = os.getenv("MEDIA_ROOT", str(BASE_DIR / "media"))
 
 

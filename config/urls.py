@@ -16,5 +16,8 @@ urlpatterns = [
     path("", include("core.urls")),
 ]
 
-# ✅ สำคัญ: serve MEDIA เสมอ (ไม่ผูกกับ DEBUG)
-urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+# ✅ Serve MEDIA
+# - ใน dev (DEBUG=True) ให้ Django เสิร์ฟ /media/ ได้เลย
+# - ใน prod ถ้าต้องการให้ Django เสิร์ฟ /media/ ด้วย ให้ตั้ง env: SERVE_MEDIA=1
+if settings.DEBUG or getattr(settings, "SERVE_MEDIA", False):
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

@@ -5,6 +5,18 @@
 {% block head %}
 <style>
   .stickyhead { position: sticky; top: 0; background: #fff; z-index: 2; }
+  .table-wrap { overflow:auto; }
+
+  th, td { border-bottom: 1px solid #e5e7eb; }
+  thead th { border-bottom:2px solid #e5e7eb; }
+  th { font-weight:900; }
+  td { vertical-align:top; }
+
+  .col-student { min-width:340px; }
+  .col-session { min-width:140px; }
+  .cell { white-space:nowrap; font-size:13px; }
+
+  .cell-disabled{ background:#f3f4f6; color:#9ca3af; }
 
   .status-pill {
     display:inline-block;
@@ -19,31 +31,10 @@
   .s-excused { background:#fef9c3; border:1px solid #eab308; color:#854d0e; }
   .s-no_show { background:#fee2e2; border:1px solid #ef4444; color:#991b1b; }
 
-  .cell { white-space:nowrap; font-size:13px; }
-  .table-wrap { overflow:auto; }
-
-  /* ✅ fixed column widths */
-  th, td { border-bottom: 1px solid #e5e7eb; }
-  th { font-weight:900; }
-  td { vertical-align:top; }
-
-  .col-student { min-width: 320px; }
-  .col-session { min-width: 140px; }
-
-  /* ✅ grey cells for beyond sessions_total */
-  .cell-disabled{
-    background:#f3f4f6;
-    color:#9ca3af;
-  }
-  .cell-disabled .status-pill{
-    opacity:.35;
-  }
-
-  /* ✅ per enrollment summary row */
   .sumline{
     margin-top:6px;
     display:flex;
-    gap:10px;
+    gap:8px;
     flex-wrap:wrap;
     font-size:12px;
   }
@@ -58,17 +49,9 @@
     font-weight:900;
     color:#111827;
   }
-  .sumchip .k { color:#6b7280; font-weight:900; }
-  .sumchip .v { font-weight:900; }
-
+  .sumchip .k{ color:#6b7280; font-weight:900; }
   .muted2{ color:#6b7280; font-size:12px; }
 
-  /* ✅ make header row look nice */
-  thead th{
-    border-bottom:2px solid #e5e7eb;
-  }
-
-  /* ✅ zebra */
   tbody tr:nth-child(2n) td{ background: #fafafa; }
   tbody tr:nth-child(2n) td.cell-disabled{ background:#f3f4f6; }
 </style>
@@ -79,7 +62,7 @@
   <div class="card" style="flex:1; min-width:280px;">
     <div style="font-weight:900; font-size:18px;">Student Attendance (Details)</div>
     <div class="muted">
-      Row = นักเรียน | Column = ครั้งที่ 1–22 | ช่อง = วันที่ + สถานะ (มา/ลา/ขาด)
+      แสดงเฉพาะ enrollment ที่ active | Column = ครั้งที่ 1–22 | ช่องสีเทา = เกินจำนวนครั้งของคอร์ส
     </div>
   </div>
 
@@ -92,7 +75,7 @@
   <div class="card" style="margin-bottom:14px;">
     <div style="display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap;">
       <div style="font-weight:900; font-size:16px;">{{ cls.name }}</div>
-      <div class="muted">ข้อมูลการเช็คชื่อทั้งหมดของห้องนี้ (แสดงเฉพาะ enrollment active)</div>
+      <div class="muted">ข้อมูลการเช็คชื่อทั้งหมดของห้องนี้</div>
     </div>
 
     <div class="table-wrap" style="margin-top:10px;">
@@ -100,62 +83,9 @@
         <thead class="stickyhead">
           <tr>
             <th class="col-student">นักเรียน</th>
-            {% for n in "1234567890123456789012"|make_list %}
-              {# trick: 22 columns constant #}
+            {% for n in session_cols %}
+              <th class="col-session">ครั้งที่ {{ n }}</th>
             {% endfor %}
-            {% for n in 1|add:0|default:0 %}
-              {# noop #}
-            {% endfor %}
-
-            {# ✅ render 1..22 #}
-            {% for n in 1|add:0|default_if_none:0 %}
-              {# noop #}
-            {% endfor %}
-            {% for n in 1|add:0|default_if_none:0 %}
-              {# noop #}
-            {% endfor %}
-            {% for n in 1|add:0|default_if_none:0 %}
-              {# noop #}
-            {% endfor %}
-
-            {% for n in 1|add:0|default_if_none:0 %}
-              {# noop #}
-            {% endfor %}
-
-            {% for n in 1|add:0|default_if_none:0 %}
-              {# noop #}
-            {% endfor %}
-
-            {% for n in 1|add:0|default_if_none:0 %}
-              {# noop #}
-            {% endfor %}
-
-            {% comment %}
-              Django template ไม่มี range built-in
-              เลยใช้วิธี hardcode loop ด้วย string 1..22 แบบเรียบที่สุด:
-            {% endcomment %}
-            <th class="col-session">ครั้งที่ 1</th>
-            <th class="col-session">ครั้งที่ 2</th>
-            <th class="col-session">ครั้งที่ 3</th>
-            <th class="col-session">ครั้งที่ 4</th>
-            <th class="col-session">ครั้งที่ 5</th>
-            <th class="col-session">ครั้งที่ 6</th>
-            <th class="col-session">ครั้งที่ 7</th>
-            <th class="col-session">ครั้งที่ 8</th>
-            <th class="col-session">ครั้งที่ 9</th>
-            <th class="col-session">ครั้งที่ 10</th>
-            <th class="col-session">ครั้งที่ 11</th>
-            <th class="col-session">ครั้งที่ 12</th>
-            <th class="col-session">ครั้งที่ 13</th>
-            <th class="col-session">ครั้งที่ 14</th>
-            <th class="col-session">ครั้งที่ 15</th>
-            <th class="col-session">ครั้งที่ 16</th>
-            <th class="col-session">ครั้งที่ 17</th>
-            <th class="col-session">ครั้งที่ 18</th>
-            <th class="col-session">ครั้งที่ 19</th>
-            <th class="col-session">ครั้งที่ 20</th>
-            <th class="col-session">ครั้งที่ 21</th>
-            <th class="col-session">ครั้งที่ 22</th>
           </tr>
         </thead>
 
@@ -163,87 +93,48 @@
           {% with rows=grouped_rows|get_item:cls.id %}
             {% if rows %}
               {% for row in rows %}
-                {# ✅ show only active enrollment #}
-                {% if row.enrollment.is_active %}
-                  {% with total=row.enrollment.sessions_total|default:0 %}
-                    {# ✅ compute summary counts from records #}
-                    {% with present_cnt=0 excused_cnt=0 noshow_cnt=0 %}
-                      {# We'll count using a simple loop (no custom tag needed) #}
-                      {% for rec in row.records %}
-                        {% if rec|get_item:"status" == "present" %}
-                          {% with present_cnt=present_cnt|add:"1" %}{% endwith %}
-                        {% elif rec|get_item:"status" == "excused" %}
-                          {% with excused_cnt=excused_cnt|add:"1" %}{% endwith %}
-                        {% else %}
-                          {% with noshow_cnt=noshow_cnt|add:"1" %}{% endwith %}
-                        {% endif %}
-                      {% endfor %}
+                <tr>
+                  <td class="col-student">
+                    <b>{{ row.enrollment.student.display_name }}</b>
+                    <div class="muted2">{{ row.enrollment.get_enrollment_type_display }}</div>
 
-                      {% with attended_total=present_cnt|add:excused_cnt|add:noshow_cnt %}
-                      <tr>
-                        <td class="col-student">
-                          <b>{{ row.enrollment.student.display_name }}</b>
-                          <div class="muted2">{{ row.enrollment.get_enrollment_type_display }}</div>
+                    <div class="sumline">
+                      <span class="sumchip"><span class="k">Total</span> <b>{{ row.total_sessions }}</b></span>
+                      <span class="sumchip"><span class="k">มา</span> <b>{{ row.present_cnt }}</b></span>
+                      <span class="sumchip"><span class="k">ลา</span> <b>{{ row.excused_cnt }}</b></span>
+                      <span class="sumchip"><span class="k">ขาด</span> <b>{{ row.noshow_cnt }}</b></span>
+                      <span class="sumchip"><span class="k">คงเหลือ</span> <b>{{ row.remaining_sessions }}</b></span>
+                    </div>
+                  </td>
 
-                          <div class="sumline">
-                            <span class="sumchip"><span class="k">Total</span> <span class="v"><b>{{ total }}</b></span></span>
-                            <span class="sumchip"><span class="k">มา</span> <span class="v"><b>{{ present_cnt }}</b></span></span>
-                            <span class="sumchip"><span class="k">ลา</span> <span class="v"><b>{{ excused_cnt }}</b></span></span>
-                            <span class="sumchip"><span class="k">ขาด</span> <span class="v"><b>{{ noshow_cnt }}</b></span></span>
-                            <span class="sumchip"><span class="k">คงเหลือ</span>
-                              <span class="v">
-                                <b>
-                                  {% if total %}
-                                    {{ total|add:"-1"|add:"1"|add:"0"|add:"0"|add:"0"|add:"0"|add:"0"|add:"0"|add:"0"|add:"0"|add:"0"|add:"0" }}
-                                  {% endif %}
-                                </b>
-                              </span>
-                            </span>
-                          </div>
-
-                          {# ✅ remaining: prefer model property if exists #}
-                          <div class="muted2" style="margin-top:4px;">
-                            คงเหลือ (จากระบบ): <b>{{ row.enrollment.remaining_sessions }}</b>
-                          </div>
-                        </td>
-
-                        {# ✅ 22 fixed cells #}
-                        {% for n in "1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22"|cut:" "|split:"," %}
-                          {% with num=n|add:"0" %}
-                            {% with idx=num|add:"-1" %}
-                              {% with rec=row.records|index:idx %}
-                                {% if total and num|add:"0" > total %}
-                                  <td class="cell cell-disabled col-session">-</td>
-                                {% else %}
-                                  <td class="cell col-session">
-                                    {% if rec %}
-                                      {{ rec|get_item:"date"|date:"Y-m-d" }}
-                                      {% if rec|get_item:"status" == "present" %}
-                                        <span class="status-pill s-present">มา</span>
-                                      {% elif rec|get_item:"status" == "excused" %}
-                                        <span class="status-pill s-excused">ลา</span>
-                                      {% else %}
-                                        <span class="status-pill s-no_show">ขาด</span>
-                                      {% endif %}
-                                    {% else %}
-                                      -
-                                    {% endif %}
-                                  </td>
-                                {% endif %}
-                              {% endwith %}
-                            {% endwith %}
-                          {% endwith %}
-                        {% endfor %}
-                      </tr>
+                  {% for n in session_cols %}
+                    {% if n > row.total_sessions %}
+                      <td class="cell cell-disabled col-session">-</td>
+                    {% else %}
+                      {% with idx=n|add:"-1" %}
+                        {% with rec=row.records|index:idx %}
+                          <td class="cell col-session">
+                            {% if rec %}
+                              {{ rec|get_item:"date"|date:"Y-m-d" }}
+                              {% if rec|get_item:"status" == "present" %}
+                                <span class="status-pill s-present">มา</span>
+                              {% elif rec|get_item:"status" == "excused" %}
+                                <span class="status-pill s-excused">ลา</span>
+                              {% else %}
+                                <span class="status-pill s-no_show">ขาด</span>
+                              {% endif %}
+                            {% else %}
+                              -
+                            {% endif %}
+                          </td>
+                        {% endwith %}
                       {% endwith %}
-                    {% endwith %}
-                  {% endwith %}
-                {% endif %}
+                    {% endif %}
+                  {% endfor %}
+                </tr>
               {% endfor %}
             {% else %}
-              <tr>
-                <td colspan="50" class="muted">ยังไม่มีนักเรียนในห้องนี้</td>
-              </tr>
+              <tr><td colspan="50" class="muted">ยังไม่มีนักเรียนในห้องนี้</td></tr>
             {% endif %}
           {% endwith %}
         </tbody>
@@ -251,7 +142,7 @@
     </div>
 
     <div class="muted" style="margin-top:8px;">
-      🟢 มา | 🟡 ลา | 🔴 ขาด | ช่องสีเทา = เกินจำนวนครั้งของคอร์ส (ถึง max 22)
+      🟢 มา | 🟡 ลา | 🔴 ขาด
     </div>
   </div>
 {% endfor %}

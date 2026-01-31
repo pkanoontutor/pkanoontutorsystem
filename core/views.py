@@ -606,8 +606,8 @@ def attendance_details(request: HttpRequest) -> HttpResponse:
 
     all_att = (
         Attendance.objects
-        .select_related("enrollment")
         .filter(enrollment__in=enrollments)
+        .only("enrollment_id", "attendance_date", "status", "checked_at")
         .order_by("attendance_date", "checked_at")
         .all()
     )

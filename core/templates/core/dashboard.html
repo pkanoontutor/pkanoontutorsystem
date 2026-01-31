@@ -13,33 +13,24 @@
     .left, .right { min-width: unset; position: static; }
   }
 
-  /* ✅ ปรับความสวยงามของปุ่มตามที่ขอ */
-  .btn-att { color:#fff !important; font-weight:800 !important; }
+  /* ✅ ปุ่มหลัก */
+  .btn-att { color:#fff !important; font-weight:900 !important; }
   .btn-green { background:#16a34a !important; border-color:#16a34a !important; } /* มา */
   .btn-yellow { background:#eab308 !important; border-color:#eab308 !important; } /* ลา */
   .btn-red { background:#dc2626 !important; border-color:#dc2626 !important; } /* ขาด */
-  .btn-submit { background:#2563eb !important; border-color:#2563eb !important; color:#fff !important; font-weight:800 !important; }
-  .btn-go { background:#111827 !important; border-color:#111827 !important; color:#fff !important; font-weight:800 !important; }
+  .btn-submit { background:#2563eb !important; border-color:#2563eb !important; color:#fff !important; font-weight:900 !important; }
+  .btn-go { background:#111827 !important; border-color:#111827 !important; color:#fff !important; font-weight:900 !important; }
+  .btn-primary { background:#2563eb !important; border-color:#2563eb !important; color:#fff !important; font-weight:900 !important; }
+  .btn-success { background:#16a34a !important; border-color:#16a34a !important; color:#fff !important; font-weight:900 !important; }
 
-  .btn-primary { background:#2563eb !important; border-color:#2563eb !important; color:#fff !important; font-weight:800 !important; }
-  .btn-success { background:#16a34a !important; border-color:#16a34a !important; color:#fff !important; font-weight:800 !important; }
-  .btn-sheet { background:#7c3aed !important; border-color:#7c3aed !important; color:#fff !important; font-weight:800 !important; }
-
-  /* ✅ NEW: ปุ่มสร้างใบแจ้งครบคอร์ส */
+  /* ✅ ปุ่มสร้างเอกสาร */
   .btn-doc { background:#0f766e !important; border-color:#0f766e !important; color:#fff !important; font-weight:900 !important; }
 
-  /* ✅ ไอคอนจบคอร์ส */
-  .enroll-icon { text-decoration:none; font-size:13px; padding:2px 6px; border-radius:6px; background:#e5e7eb; color:#111827; font-weight:900; }
-  .enroll-icon:hover { background:#d1d5db; }
-
-  /* ✅ badge คอร์สปัจจุบัน */
-  .badge-current { display:inline-block; padding:2px 8px; border-radius:999px; font-size:12px; border:1px solid #bfdbfe; background:#eff6ff; color:#1d4ed8; margin-left:6px; font-weight:800; }
-
-  /* ✅ (ข้อ 1) กดแล้วกรอบดำ + ปุ่มอื่นจางลง */
+  /* ✅ กดแล้วกรอบดำ + ปุ่มอื่นจางลง */
   .active-btn { outline: 2px solid #000 !important; outline-offset: 1px; }
   .btn-dim { opacity: .35 !important; filter: saturate(.6); }
 
-  /* ✅ รูปโปรไฟล์ (avatar) */
+  /* ✅ Avatar */
   .avatar {
     width:51px; height:51px;
     border-radius:999px;
@@ -63,7 +54,7 @@
     user-select:none;
   }
 
-  /* ✅ Toolbar 4 ปุ่ม */
+  /* ✅ Toolbar */
   .toolbar-card { flex: 1; }
   .toolbar-grid{
     display:grid;
@@ -90,16 +81,16 @@
     line-height:1.1;
   }
   .toolbtn small{
-    font-weight:700;
-    opacity:.9;
+    font-weight:800;
+    opacity:.92;
     font-size: 50%;
   }
   .toolbtn.t1{ background:#2563eb; }
   .toolbtn.t2{ background:#16a34a; }
-  .toolbtn.t3{ background:#7c3aed; }
-  .toolbtn.t4{ background:#111827; }
+  .toolbtn.t3{ background:#111827; }
+  .toolbtn.t4{ background:#0f766e; }
 
-  /* ✅ แถบ % รวม (มา/ลา/ขาด) */
+  /* ✅ Global attendance bar */
   .att-bar-wrap{
     border:1px solid #e5e7eb;
     border-radius:999px;
@@ -124,7 +115,7 @@
     width:10px; height:10px; border-radius:999px; display:inline-block; margin-right:6px;
   }
 
-  /* ✅ Date control ต่อห้อง (บรรทัดเดียวกับชื่อคลาส) */
+  /* ✅ Date control ต่อห้อง */
   .class-toprow{
     display:flex;
     justify-content:space-between;
@@ -158,7 +149,7 @@
     border:1px solid #e5e7eb;
     padding:4px 8px;
     border-radius:999px;
-    font-weight:800;
+    font-weight:900;
   }
   .att-line{
     margin-top:6px;
@@ -176,9 +167,7 @@
   /* ✅ Summary table extra columns background */
   .bg-soft{ background:#f3f4f6; }
 
-  /* =====================================================
-     ✅ (ข้อ 1) Accordion สำหรับการเช็คชื่อ (default ย่อ)
-     ===================================================== */
+  /* ✅ Accordion */
   .acc summary{
     cursor:pointer;
     user-select:none;
@@ -205,6 +194,107 @@
     font-weight:900;
     border-top:2px solid #e5e7eb;
   }
+
+  /* =====================================================
+     ✅ NEW UI: เช็คชื่อใช้งานง่ายขึ้น
+     ===================================================== */
+  .class-tools{
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+    align-items:center;
+    justify-content:space-between;
+    margin-top:10px;
+    padding:10px;
+    border:1px solid #e5e7eb;
+    border-radius:12px;
+    background:#fafafa;
+  }
+  .searchbox{
+    display:flex; gap:8px; align-items:center; flex:1;
+    min-width: 220px;
+  }
+  .searchbox input{
+    width:100%;
+    padding:8px 10px;
+    border:1px solid #e5e7eb;
+    border-radius:10px;
+    font-weight:800;
+  }
+  .filterchips{
+    display:flex; gap:8px; flex-wrap:wrap;
+  }
+  .chip{
+    padding:6px 10px;
+    border:1px solid #e5e7eb;
+    border-radius:999px;
+    background:#fff;
+    font-weight:900;
+    font-size:12px;
+    cursor:pointer;
+    user-select:none;
+  }
+  .chip.active{
+    border-color:#111827;
+    box-shadow: 0 0 0 2px rgba(17,24,39,.08);
+  }
+
+  .status-badge{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    padding:3px 10px;
+    border-radius:999px;
+    font-size:12px;
+    font-weight:900;
+    border:1px solid #e5e7eb;
+    background:#fff;
+    white-space:nowrap;
+  }
+  .sb-present{ border-color:#bbf7d0; background:#f0fdf4; color:#166534; }
+  .sb-excused{ border-color:#fde68a; background:#fffbeb; color:#92400e; }
+  .sb-no-show{ border-color:#fecaca; background:#fef2f2; color:#991b1b; }
+  .sb-none{ color:#374151; background:#f9fafb; }
+
+  /* segmented buttons */
+  .segwrap{
+    display:inline-flex;
+    border:1px solid #e5e7eb;
+    border-radius:12px;
+    overflow:hidden;
+    background:#fff;
+  }
+  .segbtn{
+    border:0 !important;
+    border-right:1px solid #e5e7eb !important;
+    border-radius:0 !important;
+    padding:10px 12px !important;
+    min-width: 56px;
+    font-weight:900 !important;
+  }
+  .segbtn:last-child{ border-right:0 !important; }
+  .segbtn.btn-dim{ opacity:.35 !important; }
+  @media (max-width: 520px){
+    .segbtn{ padding:10px 10px !important; min-width: 52px; }
+  }
+
+  /* table readability */
+  .att-table{
+    width:100%;
+    border-collapse:separate;
+    border-spacing:0;
+  }
+  .att-table thead th{
+    position: sticky;
+    top: 0;
+    background:#fff;
+    z-index: 2;
+    border-bottom:1px solid #e5e7eb;
+  }
+  .att-table tr:hover td{
+    background:#fafafa;
+  }
+  .cell-tight{ white-space:nowrap; }
 </style>
 {% endblock %}
 
@@ -221,13 +311,12 @@
         + New Enrollment
         <small>ขายคอร์ส</small>
       </a>
-      <a class="toolbtn t3" href="/sheet-update/">
-        Sheet Update
-        <small>อัพเดทชีท</small>
-      </a>
-      <a class="toolbtn t4" href="/attendance-details/">
+
+      <!-- ✅ เอา Sheet ออกแล้ว -->
+      <a class="toolbtn t3" href="/attendance-details/">
         Student Attendance
         <small>ตารางเช็คชื่อรวม</small>
+      </a>
       <a class="toolbtn t4" href="{% url 'core:export_excel' %}">
         Export Excel
         <small>ดาวน์โหลดข้อมูลทั้งหมด</small>
@@ -246,12 +335,12 @@
       {% endif %}
     {% endwith %}
 
-    <div style="font-weight:800; margin-bottom:8px;">ภาพรวมวันนี้</div>
+    <div style="font-weight:900; margin-bottom:8px;">ภาพรวมวันนี้</div>
 
     <div class="att-bar-wrap" aria-label="attendance percent bar">
-      <div class="att-bar-seg seg-present" style="width: {{ pct_present|default:0 }}%;"></div>
-      <div class="att-bar-seg seg-excused" style="width: {{ pct_excused|default:0 }}%;"></div>
-      <div class="att-bar-seg seg-no-show" style="width: {{ pct_no_show|default:0 }}%;"></div>
+      <div id="bar_present" class="att-bar-seg seg-present" style="width: {{ pct_present|default:0 }}%;"></div>
+      <div id="bar_excused" class="att-bar-seg seg-excused" style="width: {{ pct_excused|default:0 }}%;"></div>
+      <div id="bar_no_show" class="att-bar-seg seg-no-show" style="width: {{ pct_no_show|default:0 }}%;"></div>
     </div>
 
     <div class="att-legend">
@@ -261,7 +350,6 @@
       <span>รวม: <b id="g_total">{{ global_summary.total }}</b></span>
     </div>
 
-    {# ✅ (ข้อ 2) รวมรายวัน/รวมสองวัน (ต้องมี context จาก backend) #}
     {% if two_day_summary %}
       <div style="margin-top:10px; border-top:1px solid #e5e7eb; padding-top:10px;">
         <div style="font-weight:900; margin-bottom:6px;">สรุปรวมรายวัน / รวมสองวัน</div>
@@ -311,16 +399,15 @@
 <div class="two-col">
   <div class="left">
 
-    <!-- ✅ (1) Summary per class : แยกตามรอบเวลา + subtotal ต่อรอบเวลา -->
+    <!-- ✅ (1) Summary per class -->
     <div class="card" style="margin-bottom:12px;">
-      <div style="font-weight:800; margin-bottom:8px;">
+      <div style="font-weight:900; margin-bottom:8px;">
         สรุปวันนี้ (แยกตามรอบเวลา)
       </div>
 
       {% for slot_key, slot in classes_by_time_slot.items %}
         {% if slot.classes %}
-          <!-- 🔹 หัวข้อรอบเวลา -->
-          <div style="margin-top:14px; font-weight:800; color:#111827;">
+          <div style="margin-top:14px; font-weight:900; color:#111827;">
             {{ slot.label }}
           </div>
 
@@ -363,7 +450,6 @@
               </tbody>
 
               <tfoot>
-                {# ✅ subtotal ต่อรอบเวลา (fallback: JS จะคำนวณให้ด้วย) #}
                 <tr class="subtotal-row">
                   <td><b>รวมรอบเวลา: {{ slot.label }}</b></td>
                   <td id="slot-{{ slot_key }}-present">{{ slot_totals|get_item:slot_key|get_item:"present"|default:0 }}</td>
@@ -381,7 +467,7 @@
 
     <!-- ✅ (2) ใกล้ครบคอร์ส -->
     <div class="card" style="margin-bottom:12px;">
-      <div style="font-weight:800; margin-bottom:6px;">ใกล้ครบคอร์ส (เหลือน้อยกว่า 2 ครั้ง)</div>
+      <div style="font-weight:900; margin-bottom:6px;">ใกล้ครบคอร์ส (เหลือน้อยกว่า 2 ครั้ง)</div>
       <div class="muted" style="margin-bottom:10px;">
         แสดงเฉพาะคนที่เหลือ 1 / 0 / ติดลบ และเลือกช่องทางที่แจ้งเตือนได้เลย
       </div>
@@ -490,7 +576,7 @@
       </div>
     </div>
 
-    <!-- ✅ (ข้อ 1) Class cards (เช็คชื่อ): เปลี่ยนเป็น accordion default ย่อ -->
+    <!-- ✅ Class cards (เช็คชื่อ) -->
     <div class="grid" style="gap:14px;">
       {% for cls in classes %}
         {% with s=summary_by_class_id|get_item:cls.id seat=seats_summary_by_class_id|get_item:cls.id %}
@@ -498,7 +584,7 @@
           <summary>
             <span>{{ cls.name }}</span>
             <span style="display:flex; align-items:center; gap:10px;">
-              <span class="muted" style="font-size:12px; font-weight:800;">
+              <span id="miniSummary-{{ cls.id }}" class="muted" style="font-size:12px; font-weight:900;">
                 มา {{ s.present|default:0 }} | ลา {{ s.excused|default:0 }} | ขาด {{ s.no_show|default:0 }} | รวม {{ s.total|default:0 }}
               </span>
               <span class="chev">▸</span>
@@ -506,9 +592,8 @@
           </summary>
 
           <div class="class-header" style="margin-top:10px;">
-            <!-- ✅ TOP ROW -->
             <div class="class-toprow">
-              <div class="class-title">{{ cls.name }}</div>
+              <div class="class-title" style="font-weight:900;">{{ cls.name }}</div>
 
               <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
                 <div class="class-datebox">
@@ -518,63 +603,65 @@
                           onclick="return gotoDateForClass({{ cls.id }});">ไป</button>
                 </div>
 
-                <button class="btn btn-submit"
-                        onclick="return submitClass({{ cls.id }});">
+                <button class="btn btn-submit" onclick="return submitClass({{ cls.id }});">
                   Submit ห้องนี้
                 </button>
               </div>
             </div>
 
-            <!-- ✅ ใต้ชื่อห้อง: ที่นั่ง -->
             <div class="seat-line">
-              <span class="seat-pill">
-                ที่นั่งรวม: <b>{{ seat.seats_total|default:0 }}</b>
-              </span>
-              <span class="seat-pill">
-                ระหว่างเรียน: <b>{{ seat.seats_in_progress|default:0 }}</b>
-              </span>
-              <span class="seat-pill">
-                ที่นั่งว่าง: <b>{{ seat.seats_available|default:0 }}</b>
-              </span>
-              <span class="muted">
-                ชั่วโมงต่อครั้ง: {{ cls.hours_per_session }}
-              </span>
+              <span class="seat-pill">ที่นั่งรวม: <b>{{ seat.seats_total|default:0 }}</b></span>
+              <span class="seat-pill">ระหว่างเรียน: <b>{{ seat.seats_in_progress|default:0 }}</b></span>
+              <span class="seat-pill">ที่นั่งว่าง: <b>{{ seat.seats_available|default:0 }}</b></span>
+              <span class="muted">ชั่วโมงต่อครั้ง: {{ cls.hours_per_session }}</span>
             </div>
 
-            <!-- ✅ มา / ลา / ขาด -->
             <div class="att-line" id="classSummary-{{ cls.id }}">
-              <span class="t-present">
-                มา: <b class="c_present">{{ s.present|default:0 }}</b>
-              </span>
-              <span class="t-excused">
-                ลา: <b class="c_excused">{{ s.excused|default:0 }}</b>
-              </span>
-              <span class="t-noshow">
-                ขาด: <b class="c_no_show">{{ s.no_show|default:0 }}</b>
-              </span>
-              <span class="t-total">
-                รวม: <b class="c_total">{{ s.total|default:0 }}</b>
-              </span>
+              <span class="t-present">มา: <b class="c_present">{{ s.present|default:0 }}</b></span>
+              <span class="t-excused">ลา: <b class="c_excused">{{ s.excused|default:0 }}</b></span>
+              <span class="t-noshow">ขาด: <b class="c_no_show">{{ s.no_show|default:0 }}</b></span>
+              <span class="t-total">รวม: <b class="c_total">{{ s.total|default:0 }}</b></span>
+            </div>
+
+            <!-- ✅ NEW: tools (search + filter) -->
+            <div class="class-tools">
+              <div class="searchbox">
+                <span class="muted" style="font-weight:900;">ค้นหา:</span>
+                <input type="text" id="search-{{ cls.id }}" placeholder="พิมพ์เลข run / ชื่อเล่น / ชื่อจริง / ระดับชั้น"
+                       oninput="filterRows({{ cls.id }});" />
+              </div>
+              <div class="filterchips" role="group" aria-label="filters">
+                <span class="chip active" id="chip-{{ cls.id }}-all" onclick="setFilter({{ cls.id }}, 'all')">ทั้งหมด</span>
+                <span class="chip" id="chip-{{ cls.id }}-present" onclick="setFilter({{ cls.id }}, 'present')">มา</span>
+                <span class="chip" id="chip-{{ cls.id }}-excused" onclick="setFilter({{ cls.id }}, 'excused')">ลา</span>
+                <span class="chip" id="chip-{{ cls.id }}-no_show" onclick="setFilter({{ cls.id }}, 'no_show')">ขาด</span>
+                <span class="chip" id="chip-{{ cls.id }}-none" onclick="setFilter({{ cls.id }}, 'none')">ยังไม่เช็ค</span>
+              </div>
             </div>
           </div>
 
           <div style="overflow:auto; margin-top:10px;">
-            <table>
+            <table class="att-table" data-class="{{ cls.id }}">
               <thead>
                 <tr>
                   <th>นักเรียน</th>
-                  <th>ทั้งหมด</th>
-                  <th>คงเหลือ</th>
-                  <th>บันทึกล่าสุด</th>
-                  <th>เช็คชื่อ</th>
-                  <th>เอกสาร</th> <!-- ✅ NEW -->
+                  <th class="cell-tight">ทั้งหมด</th>
+                  <th class="cell-tight">คงเหลือ</th>
+                  <th class="cell-tight">บันทึกล่าสุด</th>
+                  <th class="cell-tight">สถานะ</th>
+                  <th class="cell-tight">เช็คชื่อ</th>
+                  <th class="cell-tight">เอกสาร</th>
                 </tr>
               </thead>
               <tbody>
                 {% for e in enrollments %}
                   {% if e.tutoring_class_id == cls.id %}
                     {% with a=att_map|get_item:e.id %}
-                    <tr id="row-{{ e.id }}">
+                    <tr id="row-{{ e.id }}"
+                        data-class="{{ cls.id }}"
+                        data-status="{% if a and a.status %}{{ a.status }}{% else %}none{% endif %}"
+                        data-search="{{ e.sale_run_no|default:'' }} {{ e.student.nickname|default:'' }} {{ e.student.full_name|default:'' }} {{ e.student.grade_level|default:'' }}">
+
                       <td>
                         <div style="display:flex; align-items:center; gap:10px;">
                           <div class="avatar">
@@ -606,8 +693,7 @@
                             <div class="muted">
                               {% with seq=course_seq_by_enrollment_id|get_item:e.id %}
                                 {% with total=course_total_by_student|get_item:e.student_id %}
-                                  คอร์สที่ <b>{{ seq|default:"-" }}</b> /
-                                  <b>{{ total|default:"-" }}</b>
+                                  คอร์สที่ <b>{{ seq|default:"-" }}</b> / <b>{{ total|default:"-" }}</b>
                                   {% if seq and total and seq == total %}
                                     <span class="badge-current">คอร์สปัจจุบัน</span>
                                   {% endif %}
@@ -615,9 +701,7 @@
                               {% endwith %}
                             </div>
 
-                            <div class="muted">
-                              {{ e.get_enrollment_type_display }}
-                            </div>
+                            <div class="muted">{{ e.get_enrollment_type_display }}</div>
                           </div>
 
                           <a class="enroll-icon"
@@ -626,15 +710,14 @@
                         </div>
                       </td>
 
-                      <td><b>{{ e.sessions_total }}</b></td>
-                      <td>
-                        <b id="remaining-{{ e.id }}"
-                           class="{% if e.remaining_sessions <= 0 %}danger{% endif %}">
+                      <td class="cell-tight"><b>{{ e.sessions_total }}</b></td>
+                      <td class="cell-tight">
+                        <b id="remaining-{{ e.id }}" class="{% if e.remaining_sessions <= 0 %}danger{% endif %}">
                           {{ e.remaining_sessions }}
                         </b>
                       </td>
 
-                      <td class="muted" id="last-{{ e.id }}">
+                      <td class="muted cell-tight" id="last-{{ e.id }}">
                         {% if a and a.checked_at %}
                           {{ a.checked_at|date:"Y-m-d H:i" }}
                         {% else %}
@@ -642,22 +725,32 @@
                         {% endif %}
                       </td>
 
-                      <td>
-                        <button class="btn btn-att btn-green
-                          {% if a and a.status == 'present' %}active-btn{% endif %}"
-                          onclick="return pickStatus({{ cls.id }}, {{ e.id }}, 'present');">มา</button>
-
-                        <button class="btn btn-att btn-yellow
-                          {% if a and a.status == 'excused' %}active-btn{% endif %}"
-                          onclick="return pickStatus({{ cls.id }}, {{ e.id }}, 'excused');">ลา</button>
-
-                        <button class="btn btn-att btn-red
-                          {% if a and a.status == 'no_show' %}active-btn{% endif %}"
-                          onclick="return pickStatus({{ cls.id }}, {{ e.id }}, 'no_show');">ขาด</button>
+                      <td class="cell-tight">
+                        {% if a and a.status == 'present' %}
+                          <span class="status-badge sb-present" id="badge-{{ e.id }}">● มา</span>
+                        {% elif a and a.status == 'excused' %}
+                          <span class="status-badge sb-excused" id="badge-{{ e.id }}">● ลา</span>
+                        {% elif a and a.status == 'no_show' %}
+                          <span class="status-badge sb-no-show" id="badge-{{ e.id }}">● ขาด</span>
+                        {% else %}
+                          <span class="status-badge sb-none" id="badge-{{ e.id }}">— ยังไม่เช็ค</span>
+                        {% endif %}
                       </td>
 
-                      <!-- ✅ NEW: ปุ่มสร้างใบแจ้งครบคอร์ส (prefill ด้วย enrollment_id) -->
-                      <td>
+                      <td class="cell-tight">
+                        <div class="segwrap" role="group" aria-label="attendance pick">
+                          <button class="btn segbtn btn-att btn-green {% if a and a.status == 'present' %}active-btn{% endif %}"
+                                  onclick="return pickStatus({{ cls.id }}, {{ e.id }}, 'present');">มา</button>
+
+                          <button class="btn segbtn btn-att btn-yellow {% if a and a.status == 'excused' %}active-btn{% endif %}"
+                                  onclick="return pickStatus({{ cls.id }}, {{ e.id }}, 'excused');">ลา</button>
+
+                          <button class="btn segbtn btn-att btn-red {% if a and a.status == 'no_show' %}active-btn{% endif %}"
+                                  onclick="return pickStatus({{ cls.id }}, {{ e.id }}, 'no_show');">ขาด</button>
+                        </div>
+                      </td>
+
+                      <td class="cell-tight">
                         <a class="btn btn-doc"
                            href="{% url 'core:generate_course_notice' %}?enrollment_id={{ e.id }}"
                            target="_blank" rel="noopener">
@@ -677,58 +770,19 @@
     </div>
   </div>
 
-  <!-- RIGHT: Sheets -->
+  <!-- RIGHT: (Sheet เอาออกแล้ว) ใช้เป็น “ช่วยใช้งาน” -->
   <div class="right">
     <div class="card" style="margin-bottom:12px;">
-      <div style="font-weight:800; font-size:16px;">ชีท / ความคืบหน้า</div>
-      <div class="muted">อัปเดตได้ที่ <b>Sheet Update</b> หรือ Admin → Classes → Class Subjects</div>
-      <div style="margin-top:10px;">
-        <a class="btn btn-sheet" href="/sheet-update/">ไปหน้า Sheet Update</a>
+      <div style="font-weight:900; font-size:16px;">ใช้งานด่วน</div>
+      <div class="muted" style="margin-top:6px;">
+        - กด “ไป” ในตารางสรุปเพื่อกระโดดไปห้องนั้น<br>
+        - ใช้ค้นหา/ตัวกรองในแต่ละห้องเพื่อเช็คชื่อไวขึ้น
+      </div>
+      <div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;">
+        <a class="btn btn-primary" href="/attendance-details/">ตารางเช็คชื่อรวม</a>
+        <a class="btn btn-success" href="{% url 'core:export_excel' %}">Export Excel</a>
       </div>
     </div>
-
-    {% for cls in classes %}
-    <div class="card" style="margin-bottom:12px;">
-      <div style="font-weight:800;">{{ cls.name }}</div>
-
-      {% if grouped_subjects|get_item:cls.id %}
-        <div style="margin-top:10px; display:flex; flex-direction:column; gap:10px;">
-          {% for cs in grouped_subjects|get_item:cls.id %}
-          <div>
-            <div style="display:flex; justify-content:space-between; gap:10px;">
-              <div><b>{{ cs.subject.name }}</b></div>
-              <div><b>{{ cs.progress_percent }}%</b></div>
-            </div>
-
-            <div class="muted" style="margin-top:2px;">
-              {% if cs.current_sheet %}
-                {{ cs.current_sheet.code }} — {{ cs.current_sheet.title }}
-              {% else %}
-                -
-              {% endif %}
-            </div>
-
-            <div class="muted" style="margin-top:2px;">
-              {% if cs.current_sheet and cs.current_sheet.total_pages %}
-                หน้า {{ cs.current_page }} / {{ cs.current_sheet.total_pages }}
-              {% elif cs.current_sheet and cs.current_sheet.total_questions %}
-                ข้อ {{ cs.current_question }} / {{ cs.current_sheet.total_questions }}
-              {% else %}
-                -
-              {% endif %}
-            </div>
-
-            <div style="height:8px; background:#f3f4f6; border-radius:999px; overflow:hidden; border:1px solid #e5e7eb; margin-top:6px;">
-              <div style="height:8px; width: {{ cs.progress_percent }}%; background:#111827;"></div>
-            </div>
-          </div>
-          {% endfor %}
-        </div>
-      {% else %}
-        <div class="muted" style="margin-top:8px;">ยังไม่มีวิชาในคลาสนี้</div>
-      {% endif %}
-    </div>
-    {% endfor %}
   </div>
 </div>
 
@@ -750,9 +804,11 @@
 
   const csrftoken = getCookie('csrftoken');
   const picks = {};
+  const classFilters = {}; // classId -> { text, status }
 
   function ensureClass(classId){
     if(!picks[classId]) picks[classId] = {};
+    if(!classFilters[classId]) classFilters[classId] = { text:"", status:"all" };
   }
 
   function getSelectedDateForClass(classId){
@@ -766,6 +822,26 @@
     url.searchParams.set("date", d);
     window.location.href = url.toString() + "#classCard-" + classId;
     return false;
+  }
+
+  function setBadge(enrollmentId, status){
+    const badge = document.getElementById("badge-" + enrollmentId);
+    if(!badge) return;
+
+    badge.className = "status-badge";
+    if(status === "present"){
+      badge.classList.add("sb-present");
+      badge.textContent = "● มา";
+    } else if(status === "excused"){
+      badge.classList.add("sb-excused");
+      badge.textContent = "● ลา";
+    } else if(status === "no_show"){
+      badge.classList.add("sb-no-show");
+      badge.textContent = "● ขาด";
+    } else {
+      badge.classList.add("sb-none");
+      badge.textContent = "— ยังไม่เช็ค";
+    }
   }
 
   function markButtons(enrollmentId, status){
@@ -797,8 +873,34 @@
   function pickStatus(classId, enrollmentId, status){
     ensureClass(classId);
     picks[classId][enrollmentId] = status;
+
+    const row = document.getElementById("row-" + enrollmentId);
+    if(row){
+      row.dataset.status = status;
+    }
     markButtons(enrollmentId, status);
+    setBadge(enrollmentId, status);
+    filterRows(classId); // keep filter in effect
     return false;
+  }
+
+  function setGlobalBar(gs){
+    const total = Number(gs.total || 0);
+    const p = Number(gs.present || 0);
+    const e = Number(gs.excused || 0);
+    const n = Number(gs.no_show || 0);
+
+    const pctP = total > 0 ? (p * 100 / total) : 0;
+    const pctE = total > 0 ? (e * 100 / total) : 0;
+    const pctN = total > 0 ? (n * 100 / total) : 0;
+
+    const bp = document.getElementById("bar_present");
+    const be = document.getElementById("bar_excused");
+    const bn = document.getElementById("bar_no_show");
+
+    if(bp) bp.style.width = pctP + "%";
+    if(be) be.style.width = pctE + "%";
+    if(bn) bn.style.width = pctN + "%";
   }
 
   function setGlobalSummary(gs){
@@ -806,18 +908,25 @@
     document.getElementById("g_excused").textContent = gs.excused;
     document.getElementById("g_no_show").textContent = gs.no_show;
     document.getElementById("g_total").textContent = gs.total;
+    setGlobalBar(gs);
   }
 
   function setClassSummary(classId, cs){
     const box = document.getElementById("classSummary-" + classId);
-    if(!box) return;
-    box.querySelector(".c_present").textContent = cs.present;
-    box.querySelector(".c_excused").textContent = cs.excused;
-    box.querySelector(".c_no_show").textContent = cs.no_show;
-    box.querySelector(".c_total").textContent = cs.total;
+    if(box){
+      box.querySelector(".c_present").textContent = cs.present;
+      box.querySelector(".c_excused").textContent = cs.excused;
+      box.querySelector(".c_no_show").textContent = cs.no_show;
+      box.querySelector(".c_total").textContent = cs.total;
+    }
+
+    // ✅ update mini summary in accordion header
+    const mini = document.getElementById("miniSummary-" + classId);
+    if(mini){
+      mini.textContent = `มา ${cs.present} | ลา ${cs.excused} | ขาด ${cs.no_show} | รวม ${cs.total}`;
+    }
   }
 
-  // ✅ คำนวณ subtotal ต่อรอบเวลา (fallback / update หลัง submit)
   function recomputeSlotTotals(){
     document.querySelectorAll("table.slot-table").forEach(tbl => {
       const slotKey = tbl.dataset.slot;
@@ -840,6 +949,37 @@
       if(elE) elE.textContent = e;
       if(elN) elN.textContent = n;
       if(elT) elT.innerHTML = `<b>${t}</b>`;
+    });
+  }
+
+  function setFilter(classId, status){
+    ensureClass(classId);
+    classFilters[classId].status = status;
+
+    ["all","present","excused","no_show","none"].forEach(s => {
+      const el = document.getElementById(`chip-${classId}-${s}`);
+      if(el) el.classList.toggle("active", s === status);
+    });
+
+    filterRows(classId);
+  }
+
+  function filterRows(classId){
+    ensureClass(classId);
+    const textEl = document.getElementById("search-" + classId);
+    classFilters[classId].text = (textEl ? textEl.value : "").toLowerCase().trim();
+
+    const fText = classFilters[classId].text;
+    const fStatus = classFilters[classId].status;
+
+    document.querySelectorAll(`tr[data-class="${classId}"]`).forEach(row => {
+      const rowText = (row.dataset.search || "").toLowerCase();
+      const rowStatus = row.dataset.status || "none";
+
+      const okText = !fText || rowText.includes(fText);
+      const okStatus = (fStatus === "all") ? true : (rowStatus === fStatus);
+
+      row.style.display = (okText && okStatus) ? "" : "none";
     });
   }
 
@@ -866,10 +1006,11 @@
       return false;
     }
 
+    // ✅ update summaries (ทันที)
     setClassSummary(data.class_id, data.class_summary);
     setGlobalSummary(data.global_summary);
 
-    // ✅ update table summary row of that class (บนตารางสรุปบนสุด)
+    // ✅ update row in top summary table
     const sumRow = document.getElementById("summaryRow-" + classId);
     if(sumRow){
       const cp = sumRow.querySelector(".c_present");
@@ -882,29 +1023,46 @@
       if(ct) ct.innerHTML = "<b>" + data.class_summary.total + "</b>";
     }
 
-    // ✅ recompute subtotal ต่อรอบเวลา หลัง submit
+    // ✅ recompute subtotal per slot
     recomputeSlotTotals();
 
-    for(const [eid, remaining] of Object.entries(data.remaining_map)){
-      const remEl = document.getElementById("remaining-" + eid);
-      if(remEl){
-        remEl.textContent = remaining;
-        remEl.classList.toggle("danger", Number(remaining) <= 0);
+    // ✅ update remaining sessions
+    if(data.remaining_map){
+      for(const [eid, remaining] of Object.entries(data.remaining_map)){
+        const remEl = document.getElementById("remaining-" + eid);
+        if(remEl){
+          remEl.textContent = remaining;
+          remEl.classList.toggle("danger", Number(remaining) <= 0);
+        }
       }
     }
 
-    const nowText = new Date().toLocaleString('th-TH');
+    // ✅ update last checked immediately
+    // prefer server time if exists; fallback to client now
+    const serverNow = data.server_now_text || null;
+    const nowText = serverNow || new Date().toLocaleString('th-TH');
     for (const it of items) {
       const lastEl = document.getElementById("last-" + it.enrollment_id);
       if (lastEl) lastEl.textContent = nowText;
+
+      // keep dataset + badge in sync (เผื่อกด submit โดยไม่ได้เปลี่ยนสถานะบางคน)
+      const row = document.getElementById("row-" + it.enrollment_id);
+      if(row) row.dataset.status = it.status;
+      setBadge(it.enrollment_id, it.status);
+      markButtons(it.enrollment_id, it.status);
     }
 
+    // reset picks
     picks[classId] = {};
+
+    // keep filter in effect
+    filterRows(classId);
+
     return false;
   }
 
   document.addEventListener("DOMContentLoaded", () => {
-    // ✅ เปิด accordion อัตโนมัติเมื่อกด "ไป" (hash)
+    // ✅ open accordion when using hash
     if(window.location.hash && window.location.hash.startsWith("#classCard-")){
       const el = document.querySelector(window.location.hash);
       if(el && el.tagName.toLowerCase() === "details"){
@@ -913,7 +1071,7 @@
       }
     }
 
-    // init button styles based on active
+    // init segmented dimming based on active button
     document.querySelectorAll("tr[id^='row-']").forEach(row => {
       const eid = row.id.replace("row-", "");
       const green = row.querySelector(".btn-green");
@@ -922,16 +1080,27 @@
 
       if(green && green.classList.contains("active-btn")) {
         markButtons(eid, "present");
+        setBadge(eid, "present");
       } else if(yellow && yellow.classList.contains("active-btn")) {
         markButtons(eid, "excused");
+        setBadge(eid, "excused");
       } else if(red && red.classList.contains("active-btn")) {
         markButtons(eid, "no_show");
+        setBadge(eid, "no_show");
+      } else {
+        setBadge(eid, "none");
       }
     });
 
-    // ✅ คำนวณ subtotal ต่อรอบเวลา ตอนโหลดหน้า
+    // init slot totals
     recomputeSlotTotals();
+
+    // init default filters
+    document.querySelectorAll("details[id^='classCard-']").forEach(det => {
+      const cid = det.id.replace("classCard-","");
+      ensureClass(cid);
+      setFilter(cid, "all");
+    });
   });
 </script>
 {% endblock %}
-```

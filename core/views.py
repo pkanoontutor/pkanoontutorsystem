@@ -2,36 +2,27 @@ from __future__ import annotations
 from collections import OrderedDict
 
 import json
-from dataclasses import dataclass
-from datetime import date, timedelta
-from decimal import Decimal  # ✅ NEW
+from datetime import date, timedelta, datetime
+from decimal import Decimal
 from io import BytesIO
-from datetime import datetime
 
 from django import forms
 from django.contrib.auth.decorators import login_required
-from django.db import transaction, IntegrityError
+from django.db import transaction
 from django.db.models import Count, Q, Sum
 from django.http import JsonResponse, HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
-from django.views.decorators.http import require_POST, require_GET
+from django.views.decorators.http import require_POST
 
 from openpyxl import Workbook
 from openpyxl.utils import get_column_letter
-
-from .forms import SheetUpdateRowForm  # ✅ ใช้ฟอร์มจาก forms.py ตัวเดียวให้จบ
 
 from .models import (
     Student,
     Attendance,
     Enrollment,
     TutoringClass,
-    ClassSubject,
-    Subject,          # ✅ NEW (สำหรับ dropdown ใน modal สร้างชีท)
-    Sheet,
-    SheetUpdateEntry,  # ✅ เก็บ Sheet Update แบบรายวัน
-    SheetInventory,
 )
 
 
@@ -44,12 +35,22 @@ def _parse_date(s: str | None) -> date:
         return timezone.localdate()
 
 
+def _fmt_dt_th(dt: datetime | None) -> str:
+    if not dt:
+        return "-"
+    try:
+        # แสดงเวลา server (localtime) ให้สอดคล้องกับ timezone ของระบบ
+        dt_local = timezone.localtime(dt)
+        return dt_local.strftime("%Y-%m-%d %H:%M")
+    except Exception:
+        return "-"
+
+
 def home(request):
     return render(request, "core/home.html")
 
 
 def home_redirect(request: HttpRequest) -> HttpResponse:
-    # หน้าแรกให้ไป dashboard ใหม่
     return redirect("core:dashboard")
 
 
@@ -79,10 +80,7 @@ def student_id_list(request: HttpRequest) -> HttpResponse:
     return render(
         request,
         "core/student_id_list.html",
-        {
-            "students": students,
-            "selected_grade": grade,
-        }
+        {"students": students, "selected_grade": grade}
     )
 
 
@@ -102,8 +100,8 @@ def dashboard(request: HttpRequest) -> HttpResponse:
     """
     หน้าเดียว:
     - ซ้าย: เช็คชื่อ (ทุกห้องทุกคน เรียงตามคลาส) แต่ submit แยกทีละห้อง
-    - ขวา: ความคืบหน้าชีท (ใช้ข้อมูลจาก Sheet Update วันที่ล่าสุดที่มีการบันทึก)
-    - ✅ เพิ่ม: slot_totals (รวมต่อรอบเวลา) + รวมรายวัน/รวมสองวัน (เสาร์+อาทิตย์)
+    - ✅ slot_totals (รวมต่อรอบเวลา) + รวมรายวัน/รวมสองวัน (เสาร์+อาทิตย์)
+    - ❌ ตัดส่วน Sheet ออกทั้งหมดแล้ว
     """
     selected_date = _parse_date(request.GET.get("date"))
 
@@ -194,11 +192,12 @@ def dashboard(request: HttpRequest) -> HttpResponse:
         "total": global_total,
     }
 
+    # รวมรายวัน/รวมสองวัน (เสาร์+อาทิตย์)
     other_day_date: date | None = None
     other_day_summary: dict | None = None
     two_day_summary: dict | None = None
 
-    wd = selected_date.weekday()
+    wd = selected_date.weekday()  # 5=Sat, 6=Sun
     if wd == 5:
         other_day_date = selected_date + timedelta(days=1)
     elif wd == 6:
@@ -223,39 +222,8 @@ def dashboard(request: HttpRequest) -> HttpResponse:
             "total": (global_summary.get("total", 0) or 0) + (other_day_summary.get("total", 0) or 0),
         }
 
-    sheet_latest_date = (
-        SheetUpdateEntry.objects
-        .order_by("-date")
-        .values_list("date", flat=True)
-        .first()
-    )
-
-    grouped_subjects: dict[int, list[dict]] = {}
-
-    if sheet_latest_date:
-        latest_entries = (
-            SheetUpdateEntry.objects
-            .select_related("tutoring_class", "subject", "sheet")
-            .filter(
-                date=sheet_latest_date,
-                tutoring_class__is_active=True,
-                subject__is_active=True,
-            )
-            .order_by("tutoring_class__name", "subject__name")
-        )
-
-        for e in latest_entries:
-            grouped_subjects.setdefault(e.tutoring_class_id, []).append({
-                "subject": e.subject,
-                "current_sheet": e.sheet,
-                "current_page": e.page_taught_to,
-                "current_question": e.question_taught_to,
-                "progress_percent": e.progress_percent(),
-                "last_teacher": e.last_teacher,
-            })
-
     THRESHOLD = 2
-    near_complete = [e for e in enrollments if e.remaining_sessions < THRESHOLD]
+    near_complete = [e for e in enrollments if (e.remaining_sessions or 0) < THRESHOLD]
 
     context = {
         "selected_date": selected_date,
@@ -272,9 +240,6 @@ def dashboard(request: HttpRequest) -> HttpResponse:
         "other_day_date": other_day_date,
         "other_day_summary": other_day_summary,
         "two_day_summary": two_day_summary,
-
-        "grouped_subjects": grouped_subjects,
-        "sheet_latest_date": sheet_latest_date,
 
         "near_complete": near_complete,
         "threshold": THRESHOLD,
@@ -399,278 +364,14 @@ def export_excel(request: HttpRequest) -> HttpResponse:
     return resp
 
 
-# =========================================================
-# ✅ API: Sheet search (Select2)
-# =========================================================
-@require_GET
-@login_required
-def sheet_search_api(request: HttpRequest) -> JsonResponse:
-    """
-    search แล้วคืน {results:[{id,text,total_pages},...]} ให้ Select2
-    """
-    q = (request.GET.get("q") or "").strip()
-
-    def has_field(model, field_name: str) -> bool:
-        try:
-            model._meta.get_field(field_name)
-            return True
-        except Exception:
-            return False
-
-    code_fields = ["code", "sheet_code", "sheet_id", "sheet_code_text"]
-    name_fields = ["name", "sheet_name", "title", "sheet_title"]
-
-    qs = Sheet.objects.all()
-
-    if has_field(Sheet, "is_active"):
-        qs = qs.filter(is_active=True)
-
-    if has_field(Sheet, "subject"):
-        qs = qs.select_related("subject")
-
-    if q:
-        cond = Q()
-        added = False
-
-        for f in code_fields:
-            if has_field(Sheet, f):
-                cond |= Q(**{f"{f}__icontains": q})
-                added = True
-
-        for f in name_fields:
-            if has_field(Sheet, f):
-                cond |= Q(**{f"{f}__icontains": q})
-                added = True
-
-        if added:
-            qs = qs.filter(cond)
-
-    if has_field(Sheet, "code"):
-        qs = qs.order_by("code")
-    elif has_field(Sheet, "sheet_code"):
-        qs = qs.order_by("sheet_code")
-    else:
-        qs = qs.order_by("id")
-
-    qs = qs[:50]
-
-    results = []
-    for s in qs:
-        code_val = ""
-        for f in code_fields:
-            if hasattr(s, f):
-                v = getattr(s, f) or ""
-                if v:
-                    code_val = str(v)
-                    break
-
-        name_val = ""
-        for f in name_fields:
-            if hasattr(s, f):
-                v = getattr(s, f) or ""
-                if v:
-                    name_val = str(v)
-                    break
-
-        subj_name = ""
-        if hasattr(s, "subject") and getattr(s, "subject", None) is not None:
-            subj_name = getattr(s.subject, "name", "") or ""
-
-        total_pages = 0
-        if hasattr(s, "total_pages"):
-            try:
-                total_pages = int(getattr(s, "total_pages") or 0)
-            except Exception:
-                total_pages = 0
-
-        if code_val and name_val:
-            text = f"{code_val} — {name_val}"
-        elif code_val:
-            text = code_val
-        elif name_val:
-            text = name_val
-        else:
-            text = str(s)
-
-        if subj_name:
-            text += f" ({subj_name})"
-
-        results.append({
-            "id": s.id,
-            "text": text,
-            "total_pages": total_pages,
-        })
-
-    return JsonResponse({"results": results})
-
-
-# =========================================================
-# ✅ API: Sheet create (ทางเลือก B: modal สร้างชีท)
-# - ต้องกรอก: code, title, subject_id, total_pages
-# =========================================================
-@require_POST
-@login_required
-def sheet_create_api(request: HttpRequest) -> JsonResponse:
-    code = (request.POST.get("code") or "").strip()
-    title = (request.POST.get("title") or "").strip()
-    subject_id = (request.POST.get("subject_id") or "").strip()
-    total_pages_raw = (request.POST.get("total_pages") or "").strip()
-
-    if not code or not title or not subject_id:
-        return JsonResponse({"ok": False, "error": "กรุณากรอก Code, Title และ Subject ให้ครบ"}, status=400)
-
-    try:
-        total_pages = int(total_pages_raw) if total_pages_raw != "" else 0
-        if total_pages < 0:
-            total_pages = 0
-    except Exception:
-        return JsonResponse({"ok": False, "error": "Total pages ต้องเป็นตัวเลข"}, status=400)
-
-    subject = get_object_or_404(Subject, id=subject_id, is_active=True)
-
-    try:
-        with transaction.atomic():
-            sheet = Sheet.objects.create(
-                code=code,
-                title=title,
-                subject=subject,
-                total_pages=total_pages,
-                total_questions=0,
-                is_active=True,
-            )
-            SheetInventory.objects.get_or_create(
-                sheet=sheet,
-                defaults={"quantity": 0, "is_finished": False},
-            )
-    except IntegrityError:
-        return JsonResponse({"ok": False, "error": f"รหัสชีท '{code}' ซ้ำแล้วครับ"}, status=400)
-
-    return JsonResponse({
-        "ok": True,
-        "id": sheet.id,
-        "text": f"{sheet.code} — {sheet.title}",
-        "total_pages": int(sheet.total_pages or 0),
-    })
-
-
-# =========================================================
-# ✅ Sheet Update (หน้า)
-# =========================================================
-@login_required
-def sheet_update(request: HttpRequest) -> HttpResponse:
-    latest_date = SheetUpdateEntry.objects.order_by("-date").values_list("date", flat=True).first()
-    default_date = latest_date or timezone.localdate()
-
-    if request.method == "GET":
-        selected_date = _parse_date(request.GET.get("date")) if request.GET.get("date") else default_date
-    else:
-        selected_date = _parse_date(request.POST.get("date")) if request.POST.get("date") else default_date
-
-    class_subjects = (
-        ClassSubject.objects
-        .select_related("tutoring_class", "subject")
-        .filter(is_active=True, tutoring_class__is_active=True, subject__is_active=True)
-        .order_by("tutoring_class__name", "subject__name")
-        .all()
-    )
-
-    existing = (
-        SheetUpdateEntry.objects
-        .select_related("sheet")
-        .filter(date=selected_date)
-        .all()
-    )
-    existing_map = {(e.tutoring_class_id, e.subject_id): e for e in existing}
-
-    class_bucket: dict[int, dict] = {}
-
-    if request.method == "POST":
-        rows: list[tuple[ClassSubject, SheetUpdateRowForm]] = []
-        for cs in class_subjects:
-            prefix = f"cs{cs.id}"
-            f = SheetUpdateRowForm(request.POST, prefix=prefix)
-            rows.append((cs, f))
-
-        all_valid = all(f.is_valid() for _, f in rows)
-
-        if all_valid:
-            now = timezone.now()
-            with transaction.atomic():
-                for cs, f in rows:
-                    key = (cs.tutoring_class_id, cs.subject_id)
-                    entry = existing_map.get(key)
-                    if not entry:
-                        entry = SheetUpdateEntry(
-                            tutoring_class=cs.tutoring_class,
-                            subject=cs.subject,
-                            date=selected_date,
-                        )
-
-                    entry.sheet = f.cleaned_data.get("sheet")
-                    entry.page_taught_to = f.cleaned_data.get("page_taught_to") or 0
-                    entry.question_taught_to = f.cleaned_data.get("question_taught_to") or 0
-                    entry.last_teacher = (f.cleaned_data.get("last_teacher") or "").strip()
-                    entry.updated_at = now
-                    entry.updated_by = request.user
-                    entry.save()
-
-            return redirect(f"/sheet-update/?date={selected_date.isoformat()}")
-
-        for cs, f in rows:
-            cls = cs.tutoring_class
-            if cls.id not in class_bucket:
-                class_bucket[cls.id] = {"class": cls, "forms": []}
-
-            chosen_sheet = f.cleaned_data.get("sheet") if f.is_bound and f.is_valid() else None
-            total_pages = chosen_sheet.total_pages if chosen_sheet else 0
-
-            class_bucket[cls.id]["forms"].append({
-                "class_subject": cs,
-                "form": f,
-                "total_pages": total_pages,
-            })
-
-    else:
-        for cs in class_subjects:
-            key = (cs.tutoring_class_id, cs.subject_id)
-            entry = existing_map.get(key)
-
-            initial = {
-                "class_subject_id": cs.id,
-                "subject_name": cs.subject.name,
-                "sheet": entry.sheet_id if entry and entry.sheet_id else None,
-                "page_taught_to": entry.page_taught_to if entry else "",
-                "question_taught_to": entry.question_taught_to if entry else "",
-                "last_teacher": entry.last_teacher if entry else "",
-            }
-
-            prefix = f"cs{cs.id}"
-            f = SheetUpdateRowForm(prefix=prefix, initial=initial)
-
-            cls = cs.tutoring_class
-            if cls.id not in class_bucket:
-                class_bucket[cls.id] = {"class": cls, "forms": []}
-
-            total_pages = entry.sheet.total_pages if entry and entry.sheet else 0
-            class_bucket[cls.id]["forms"].append({
-                "class_subject": cs,
-                "form": f,
-                "total_pages": total_pages,
-            })
-
-    grouped = sorted(class_bucket.values(), key=lambda x: x["class"].name, reverse=True)
-
-    return render(request, "core/sheet_update.html", {
-        "grouped": grouped,
-        "selected_date": selected_date,
-        "default_date": default_date,
-        "subjects": Subject.objects.filter(is_active=True).order_by("name"),  # ✅ สำหรับ modal สร้างชีท
-    })
-
-
 @require_POST
 @login_required
 def attendance_submit(request: HttpRequest) -> JsonResponse:
+    """
+    ✅ Submit เช็คชื่อทีละห้อง
+    - อัปเดต checked_at เป็นเวลา server
+    - คืนค่า summary + remaining_map + checked_at_map + server_now_text
+    """
     try:
         payload = json.loads(request.body.decode("utf-8"))
     except Exception:
@@ -683,7 +384,11 @@ def attendance_submit(request: HttpRequest) -> JsonResponse:
     if not class_id:
         return JsonResponse({"ok": False, "error": "Missing class_id"}, status=400)
 
-    valid_status = {Attendance.Status.PRESENT, Attendance.Status.EXCUSED, Attendance.Status.NO_SHOW}
+    valid_status = {
+        Attendance.Status.PRESENT,
+        Attendance.Status.EXCUSED,
+        Attendance.Status.NO_SHOW
+    }
 
     normalized_items: list[dict] = []
     for it in items:
@@ -711,6 +416,7 @@ def attendance_submit(request: HttpRequest) -> JsonResponse:
     )
     enroll_map = {e.id: e for e in enrollments}
 
+    # กันกด submit แบบไม่ครบทุกคนที่ "ยังไม่เคยเช็ควันนี้"
     already_checked_ids = set(
         Attendance.objects
         .filter(
@@ -736,6 +442,8 @@ def attendance_submit(request: HttpRequest) -> JsonResponse:
             }
         }, status=400)
 
+    now = timezone.now()
+
     with transaction.atomic():
         for it in normalized_items:
             eid = it["enrollment_id"]
@@ -752,9 +460,10 @@ def attendance_submit(request: HttpRequest) -> JsonResponse:
                 defaults={"status": status},
             )
             att.status = status
-            att.checked_at = timezone.now()
+            att.checked_at = now
             att.save()
 
+    # summary ของห้อง
     cls_summary = Attendance.objects.filter(
         attendance_date=selected_date,
         enrollment__tutoring_class_id=class_id,
@@ -766,18 +475,33 @@ def attendance_submit(request: HttpRequest) -> JsonResponse:
         total=Count("id"),
     )
 
+    # summary ทั้งหมดของวัน (✅ FIX: EXCUSED สะกดถูก)
     global_summary = Attendance.objects.filter(
         attendance_date=selected_date,
         enrollment__tutoring_class__is_active=True,
         student__is_active=True,
     ).aggregate(
         present=Count("id", filter=Q(status=Attendance.Status.PRESENT)),
-        excused=Count("id", filter=Q(status=Attendance.Status.EXCUUSED)),
+        excused=Count("id", filter=Q(status=Attendance.Status.EXCUSED)),
         no_show=Count("id", filter=Q(status=Attendance.Status.NO_SHOW)),
         total=Count("id"),
     )
 
-    remaining_map = {eid: enroll_map[eid].remaining_sessions for eid in enroll_map.keys()}
+    # ✅ remaining_map: รีเฟรชจาก DB ให้ชัวร์ (เผื่อ remaining_sessions เปลี่ยนตาม attendance)
+    refreshed = (
+        Enrollment.objects
+        .filter(id__in=list(enroll_map.keys()))
+        .only("id", "remaining_sessions")
+    )
+    remaining_map = {e.id: e.remaining_sessions for e in refreshed}
+
+    # ✅ checked_at_map: เวลาบันทึกล่าสุดแบบ server ต่อ enrollment ในห้องนี้ (เฉพาะที่ส่งมา)
+    submitted_eids = [it["enrollment_id"] for it in normalized_items]
+    checked_at_qs = Attendance.objects.filter(
+        attendance_date=selected_date,
+        enrollment_id__in=submitted_eids,
+    ).only("enrollment_id", "checked_at")
+    checked_at_map = {a.enrollment_id: _fmt_dt_th(a.checked_at) for a in checked_at_qs}
 
     return JsonResponse({
         "ok": True,
@@ -786,6 +510,8 @@ def attendance_submit(request: HttpRequest) -> JsonResponse:
         "class_summary": cls_summary,
         "global_summary": global_summary,
         "remaining_map": remaining_map,
+        "checked_at_map": checked_at_map,          # ✅ NEW
+        "server_now_text": _fmt_dt_th(now),        # ✅ NEW (ให้ frontend ใช้ได้)
     })
 
 
@@ -800,10 +526,7 @@ def alerts_dashboard(request: HttpRequest) -> HttpResponse:
         .all()
     )
 
-    near = []
-    for e in enrollments:
-        if e.remaining_sessions < 2:
-            near.append(e)
+    near = [e for e in enrollments if (e.remaining_sessions or 0) < THRESHOLD]
 
     return render(request, "core/alerts_dashboard.html", {
         "near": near,
@@ -830,28 +553,6 @@ def alerts_mark(request: HttpRequest) -> HttpResponse:
 
     e.save()
     return redirect(request.META.get("HTTP_REFERER", "/dashboard/"))
-
-
-@login_required
-def sheet_dashboard(request: HttpRequest) -> HttpResponse:
-    classes = TutoringClass.objects.filter(is_active=True).order_by("name").all()
-
-    class_subjects = (
-        ClassSubject.objects
-        .select_related("tutoring_class", "subject", "current_sheet")
-        .filter(is_active=True, tutoring_class__is_active=True, subject__is_active=True)
-        .order_by("tutoring_class__name", "subject__name")
-        .all()
-    )
-
-    grouped: dict[int, list[ClassSubject]] = {}
-    for cs in class_subjects:
-        grouped.setdefault(cs.tutoring_class_id, []).append(cs)
-
-    return render(request, "core/sheet_dashboard.html", {
-        "classes": classes,
-        "grouped": grouped,
-    })
 
 
 @login_required
@@ -1049,76 +750,6 @@ def student_portal_home(request: HttpRequest) -> HttpResponse:
 
 
 # =========================================================
-# ✅ Sheet Inventory
-# =========================================================
-@require_POST
-@login_required
-def _sheet_inventory_action(request: HttpRequest) -> HttpResponse:
-    action = (request.POST.get("action") or "").strip()
-    item_id = request.POST.get("item_id")
-
-    if not item_id:
-        return redirect("core:sheet_inventory")
-
-    item = get_object_or_404(SheetInventory, id=item_id)
-
-    with transaction.atomic():
-        item = SheetInventory.objects.select_for_update().get(id=item.id)
-
-        if action == "inc":
-            item.quantity += 1
-        elif action == "dec":
-            item.quantity -= 1
-        elif action == "set":
-            try:
-                item.quantity = int(request.POST.get("quantity") or 0)
-            except Exception:
-                item.quantity = item.quantity
-        elif action == "finish":
-            item.is_finished = True
-        elif action == "unfinish":
-            item.is_finished = False
-
-        item.save()
-
-    return redirect("core:sheet_inventory")
-
-
-@login_required
-def sheet_inventory(request: HttpRequest) -> HttpResponse:
-    sheets = Sheet.objects.filter(is_active=True).select_related("subject").order_by("code").all()
-    existing_ids = set(SheetInventory.objects.values_list("sheet_id", flat=True))
-    to_create = [SheetInventory(sheet=s, quantity=0, is_finished=False) for s in sheets if s.id not in existing_ids]
-    if to_create:
-        SheetInventory.objects.bulk_create(to_create)
-
-    active_items = (
-        SheetInventory.objects
-        .select_related("sheet", "sheet__subject")
-        .filter(is_finished=False, sheet__is_active=True)
-        .order_by("sheet__code")
-        .all()
-    )
-
-    finished_items = (
-        SheetInventory.objects
-        .select_related("sheet", "sheet__subject")
-        .filter(is_finished=True)
-        .order_by("sheet__code")
-        .all()
-    )
-
-    if request.method == "POST":
-        return _sheet_inventory_action(request)
-
-    context = {
-        "active_items": active_items,
-        "finished_items": finished_items,
-    }
-    return render(request, "core/sheet_inventory.html", context)
-
-
-# =========================================================
 # ✅ Generate ใบแจ้งครบคอร์ส (เอกสาร 1)
 # =========================================================
 @login_required
@@ -1138,7 +769,7 @@ def generate_course_notice(request: HttpRequest) -> HttpResponse:
     student = enrollment.student
     tutoring_class = enrollment.tutoring_class
 
-    base_price = enrollment.course_price if enrollment.course_price is not None else (
+    base_price = enrollment.course_price if getattr(enrollment, "course_price", None) is not None else (
         tutoring_class.course_price if tutoring_class else 0
     )
 

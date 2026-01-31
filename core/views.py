@@ -39,7 +39,6 @@ def _fmt_dt_th(dt: datetime | None) -> str:
     if not dt:
         return "-"
     try:
-        # แสดงเวลา server (localtime) ให้สอดคล้องกับ timezone ของระบบ
         dt_local = timezone.localtime(dt)
         return dt_local.strftime("%Y-%m-%d %H:%M")
     except Exception:
@@ -57,12 +56,7 @@ def home_redirect(request: HttpRequest) -> HttpResponse:
 def student_id_list(request: HttpRequest) -> HttpResponse:
     """
     หน้า Public สำหรับผู้ปกครอง:
-    แสดงเฉพาะ
-    - Student ID
-    - ชื่อเล่น
-    - ชื่อจริงนามสกุล
-    - ระดับชั้น
-    ❌ ไม่แสดงเบอร์โทร / การเงิน
+    แสดงเฉพาะ Student ID / ชื่อเล่น / ชื่อจริงนามสกุล / ระดับชั้น
     """
     grade = request.GET.get("grade")
 
@@ -98,10 +92,9 @@ TIME_SLOT_ORDER = [
 @login_required
 def dashboard(request: HttpRequest) -> HttpResponse:
     """
-    หน้าเดียว:
-    - ซ้าย: เช็คชื่อ (ทุกห้องทุกคน เรียงตามคลาส) แต่ submit แยกทีละห้อง
-    - ✅ slot_totals (รวมต่อรอบเวลา) + รวมรายวัน/รวมสองวัน (เสาร์+อาทิตย์)
-    - ❌ ตัดส่วน Sheet ออกทั้งหมดแล้ว
+    - ซ้าย: เช็คชื่อ (submit แยกทีละห้อง)
+    - slot_totals (รวมต่อรอบเวลา) + รวมรายวัน/รวมสองวัน (เสาร์+อาทิตย์)
+    - ตัดส่วน Sheet ออกทั้งหมดแล้ว
     """
     selected_date = _parse_date(request.GET.get("date"))
 
@@ -192,7 +185,6 @@ def dashboard(request: HttpRequest) -> HttpResponse:
         "total": global_total,
     }
 
-    # รวมรายวัน/รวมสองวัน (เสาร์+อาทิตย์)
     other_day_date: date | None = None
     other_day_summary: dict | None = None
     two_day_summary: dict | None = None
@@ -248,7 +240,7 @@ def dashboard(request: HttpRequest) -> HttpResponse:
 
 
 # =========================================================
-# ✅ Export ข้อมูลออก Excel (สำคัญ: remaining_sessions)
+# ✅ Export ข้อมูลออก Excel
 # =========================================================
 def _autosize(ws):
     for col in range(1, ws.max_column + 1):
@@ -368,7 +360,7 @@ def export_excel(request: HttpRequest) -> HttpResponse:
 @login_required
 def attendance_submit(request: HttpRequest) -> JsonResponse:
     """
-    ✅ Submit เช็คชื่อทีละห้อง
+    Submit เช็คชื่อทีละห้อง
     - อัปเดต checked_at เป็นเวลา server
     - คืนค่า summary + remaining_map + checked_at_map + server_now_text
     """
@@ -416,7 +408,6 @@ def attendance_submit(request: HttpRequest) -> JsonResponse:
     )
     enroll_map = {e.id: e for e in enrollments}
 
-    # กันกด submit แบบไม่ครบทุกคนที่ "ยังไม่เคยเช็ควันนี้"
     already_checked_ids = set(
         Attendance.objects
         .filter(
@@ -463,7 +454,6 @@ def attendance_submit(request: HttpRequest) -> JsonResponse:
             att.checked_at = now
             att.save()
 
-    # summary ของห้อง
     cls_summary = Attendance.objects.filter(
         attendance_date=selected_date,
         enrollment__tutoring_class_id=class_id,
@@ -475,7 +465,6 @@ def attendance_submit(request: HttpRequest) -> JsonResponse:
         total=Count("id"),
     )
 
-    # summary ทั้งหมดของวัน (✅ FIX: EXCUSED สะกดถูก)
     global_summary = Attendance.objects.filter(
         attendance_date=selected_date,
         enrollment__tutoring_class__is_active=True,
@@ -487,7 +476,6 @@ def attendance_submit(request: HttpRequest) -> JsonResponse:
         total=Count("id"),
     )
 
-    # ✅ remaining_map: รีเฟรชจาก DB ให้ชัวร์ (เผื่อ remaining_sessions เปลี่ยนตาม attendance)
     refreshed = (
         Enrollment.objects
         .filter(id__in=list(enroll_map.keys()))
@@ -495,7 +483,6 @@ def attendance_submit(request: HttpRequest) -> JsonResponse:
     )
     remaining_map = {e.id: e.remaining_sessions for e in refreshed}
 
-    # ✅ checked_at_map: เวลาบันทึกล่าสุดแบบ server ต่อ enrollment ในห้องนี้ (เฉพาะที่ส่งมา)
     submitted_eids = [it["enrollment_id"] for it in normalized_items]
     checked_at_qs = Attendance.objects.filter(
         attendance_date=selected_date,
@@ -510,8 +497,8 @@ def attendance_submit(request: HttpRequest) -> JsonResponse:
         "class_summary": cls_summary,
         "global_summary": global_summary,
         "remaining_map": remaining_map,
-        "checked_at_map": checked_at_map,          # ✅ NEW
-        "server_now_text": _fmt_dt_th(now),        # ✅ NEW (ให้ frontend ใช้ได้)
+        "checked_at_map": checked_at_map,
+        "server_now_text": _fmt_dt_th(now),
     })
 
 
@@ -593,12 +580,21 @@ def admin_dashboard(request: HttpRequest) -> HttpResponse:
 
 @login_required
 def attendance_details(request: HttpRequest) -> HttpResponse:
+    """
+    ✅ แสดงเฉพาะ enrollment active
+    ✅ คอลัมน์คงที่ 1..22
+    ✅ ส่ง summary ต่อ enrollment ให้ template ใช้ (มา/ลา/ขาด/total/คงเหลือ)
+    """
     classes = TutoringClass.objects.filter(is_active=True).order_by("name").all()
 
     enrollments = (
         Enrollment.objects
         .select_related("student", "tutoring_class")
-        .filter(student__is_active=True, tutoring_class__is_active=True)
+        .filter(
+            is_active=True,
+            student__is_active=True,
+            tutoring_class__is_active=True,
+        )
         .order_by(
             "tutoring_class__name",
             "student__nickname",
@@ -624,27 +620,30 @@ def attendance_details(request: HttpRequest) -> HttpResponse:
         })
 
     grouped_rows: dict[int, list[dict]] = {}
-    max_cols_by_class: dict[int, int] = {}
 
     for e in enrollments:
         recs = att_list_map.get(e.id, [])
+
+        present_cnt = sum(1 for r in recs if r.get("status") == Attendance.Status.PRESENT)
+        excused_cnt = sum(1 for r in recs if r.get("status") == Attendance.Status.EXCUSED)
+        noshow_cnt = sum(1 for r in recs if r.get("status") == Attendance.Status.NO_SHOW)
+
         grouped_rows.setdefault(e.tutoring_class_id, []).append({
             "enrollment": e,
-            "records": recs,
+            "records": recs[:22],  # โชว์สูงสุด 22 ช่อง
+            "present_cnt": present_cnt,
+            "excused_cnt": excused_cnt,
+            "noshow_cnt": noshow_cnt,
+            "total_sessions": int(getattr(e, "sessions_total", 0) or 0),
+            "remaining_sessions": int(getattr(e, "remaining_sessions", 0) or 0),
         })
-        mx = max_cols_by_class.get(e.tutoring_class_id, 0)
-        if len(recs) > mx:
-            max_cols_by_class[e.tutoring_class_id] = len(recs)
 
-    col_numbers_by_class: dict[int, list[int]] = {}
-    for cls in classes:
-        mx = max_cols_by_class.get(cls.id, 0)
-        col_numbers_by_class[cls.id] = list(range(1, mx + 1))
+    session_cols = list(range(1, 23))
 
     return render(request, "core/attendance_details.html", {
         "classes": classes,
         "grouped_rows": grouped_rows,
-        "col_numbers_by_class": col_numbers_by_class,
+        "session_cols": session_cols,
     })
 
 
@@ -750,7 +749,7 @@ def student_portal_home(request: HttpRequest) -> HttpResponse:
 
 
 # =========================================================
-# ✅ Generate ใบแจ้งครบคอร์ส (เอกสาร 1)
+# ✅ Generate ใบแจ้งครบคอร์ส
 # =========================================================
 @login_required
 def generate_course_notice(request: HttpRequest) -> HttpResponse:

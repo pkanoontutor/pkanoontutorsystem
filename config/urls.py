@@ -6,18 +6,28 @@ from django.urls import path, include
 from core import views as core_views
 
 urlpatterns = [
-    # หน้าแรกของเว็บ
+    # หน้าแรกของเว็บ (public)
     path("", core_views.home, name="site_home"),
 
-    # Admin
+    # Admin (ซ่อน path ตามที่ตั้งไว้)
     path("adminlublub/", admin.site.urls),
 
-    # Core URLs ทั้งหมด
+    # Core app
     path("", include("core.urls")),
 ]
 
-# ✅ Serve MEDIA
-# - ใน dev (DEBUG=True) ให้ Django เสิร์ฟ /media/ ได้เลย
-# - ใน prod ถ้าต้องการให้ Django เสิร์ฟ /media/ ด้วย ให้ตั้ง env: SERVE_MEDIA=1
+# -------------------------------------------------------------------
+# ✅ Serve MEDIA files
+# -------------------------------------------------------------------
+# - DEV: DEBUG=True → Django เสิร์ฟ /media/
+# - PROD (Render): ตั้ง env SERVE_MEDIA=1 → Django เสิร์ฟ /media/ จาก persistent disk
+#
+# ต้องใช้คู่กับ:
+#   MEDIA_URL=/media/
+#   MEDIA_ROOT=/var/data/media
+# -------------------------------------------------------------------
 if settings.DEBUG or getattr(settings, "SERVE_MEDIA", False):
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+    urlpatterns += static(
+        settings.MEDIA_URL,
+        document_root=settings.MEDIA_ROOT,
+    )

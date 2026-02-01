@@ -17,7 +17,16 @@
   .cell { white-space:nowrap; font-size:13px; }
 
   /* ✅ grey cells for beyond sessions_total */
-  .cell-disabled{ background:#f3f4f6; color:#9ca3af; }
+  .cell-disabled{
+    background:#f3f4f6;
+    color:#9ca3af;
+  }
+
+  /* ✅ attendance beyond course (text red) */
+  .over-limit{
+    color:#b91c1c;          /* red-700 */
+    font-weight:900;
+  }
 
   .status-pill {
     display:inline-block;
@@ -63,7 +72,9 @@
   <div class="card" style="flex:1; min-width:280px;">
     <div style="font-weight:900; font-size:18px;">Student Attendance (Details)</div>
     <div class="muted">
-      แสดงเฉพาะ enrollment ที่ active | Column = ครั้งที่ 1–22 | ช่องสีเทา = เกินจำนวนครั้งของคอร์ส (แต่ถ้ามีการมาเรียนจริงจะยังแสดง)
+      แสดงเฉพาะ enrollment ที่ active | Column = ครั้งที่ 1–22 |
+      ช่องสีเทา = เกินจำนวนครั้งของคอร์ส (ยังแสดงถ้ามีการมาเรียนจริง) |
+      ตัวอักษรสีแดง = มาเกินคอร์ส
     </div>
   </div>
 
@@ -108,19 +119,22 @@
                     </div>
                   </td>
 
-                  {# ✅ แสดงทุกช่อง 1..22 เสมอ แต่ถ้าเกิน total_sessions ให้พื้นหลังเทา #}
+                  {# ✅ แสดงทุกช่อง 1..22 เสมอ แต่ถ้าเกิน total_sessions ให้พื้นหลังเทา และตัวอักษรเป็นสีแดงเมื่อมี record #}
                   {% for n in session_cols %}
                     {% with idx=n|add:"-1" %}
                       {% with rec=row.records|index:idx %}
                         <td class="cell col-session {% if n > row.total_sessions %}cell-disabled{% endif %}">
                           {% if rec %}
-                            {{ rec|get_item:"date"|date:"Y-m-d" }}
+                            <span class="{% if n > row.total_sessions %}over-limit{% endif %}">
+                              {{ rec|get_item:"date"|date:"Y-m-d" }}
+                            </span>
+
                             {% if rec|get_item:"status" == "present" %}
-                              <span class="status-pill s-present">มา</span>
+                              <span class="status-pill s-present {% if n > row.total_sessions %}over-limit{% endif %}">มา</span>
                             {% elif rec|get_item:"status" == "excused" %}
-                              <span class="status-pill s-excused">ลา</span>
+                              <span class="status-pill s-excused {% if n > row.total_sessions %}over-limit{% endif %}">ลา</span>
                             {% else %}
-                              <span class="status-pill s-no_show">ขาด</span>
+                              <span class="status-pill s-no_show {% if n > row.total_sessions %}over-limit{% endif %}">ขาด</span>
                             {% endif %}
                           {% else %}
                             -
@@ -140,7 +154,7 @@
     </div>
 
     <div class="muted" style="margin-top:8px;">
-      🟢 มา | 🟡 ลา | 🔴 ขาด | ช่องสีเทา = เกินจำนวนครั้งของคอร์ส (แต่ยังโชว์ถ้ามีการมาเรียนจริง)
+      🟢 มา | 🟡 ลา | 🔴 ขาด | ช่องสีเทา = เกินจำนวนครั้งของคอร์ส | ตัวอักษรแดง = มาเกินคอร์ส
     </div>
   </div>
 {% endfor %}

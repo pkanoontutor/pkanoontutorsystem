@@ -1,3 +1,4 @@
+```python
 from __future__ import annotations
 from collections import OrderedDict
 
@@ -651,14 +652,19 @@ def attendance_details(request: HttpRequest) -> HttpResponse:
 # ✅ Student Portal (ผู้ปกครอง)
 # =========================================================
 class StudentPortalLoginForm(forms.Form):
-    # ใช้ Select2 AJAX -> ส่งค่าเป็น student_id (string ของ id)
-    student_id = forms.ChoiceField(label="เลือกชื่อน้อง", choices=[])
+    # ✅ ใช้ Select2 AJAX แต่ "ห้าม" ใช้ ChoiceField เพราะจะ Validate choices แล้วพัง
+    #    เราใช้ CharField + Select widget แทน เพื่อให้ POST ค่า id ได้โดยไม่ติด "valid choice"
+    student_id = forms.CharField(
+        label="เลือกชื่อน้อง",
+        required=True,
+        widget=forms.Select(attrs={"id": "id_student_id"})
+    )
     parent_phone = forms.CharField(label="เบอร์ผู้ปกครอง", max_length=50)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # ไม่ preload รายชื่อนักเรียนทั้งหมดใน dropdown (ให้ค้นผ่าน AJAX)
-        self.fields["student_id"].choices = [
+        # ใส่ placeholder option ไว้ 1 ตัวพอ (Select2 จะเติมรายการจาก AJAX เอง)
+        self.fields["student_id"].widget.choices = [
             ("", "พิมพ์ค้นหาชื่อเล่น / ชื่อจริง / รหัสนักเรียน")
         ]
 
@@ -888,3 +894,4 @@ def generate_course_notice(request: HttpRequest) -> HttpResponse:
         "qr_line_static": "core/img/qr_line.png",
     }
     return render(request, "core/generate_course_notice.html", context)
+```

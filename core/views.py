@@ -893,4 +893,3 @@ def generate_course_notice(request: HttpRequest) -> HttpResponse:
         "qr_line_static": "core/img/qr_line.png",
     }
     return render(request, "core/generate_course_notice.html", context)
-```

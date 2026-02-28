@@ -13,7 +13,7 @@ from django.db.models import Count, Q, Sum
 from django.http import JsonResponse, HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_POST, require_GET
 
 from openpyxl import Workbook
 from openpyxl.utils import get_column_letter
@@ -651,17 +651,33 @@ def attendance_details(request: HttpRequest) -> HttpResponse:
 # ✅ Student Portal (ผู้ปกครอง)
 # =========================================================
 class StudentPortalLoginForm(forms.Form):
-    student_code = forms.CharField(label="รหัสนักเรียน", max_length=20)
+    # ใช้ Select2 AJAX -> ส่งค่าเป็น student_id (string ของ id)
+    student_id = forms.ChoiceField(label="เลือกชื่อน้อง", choices=[])
     parent_phone = forms.CharField(label="เบอร์ผู้ปกครอง", max_length=50)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # ไม่ preload รายชื่อนักเรียนทั้งหมดใน dropdown (ให้ค้นผ่าน AJAX)
+        self.fields["student_id"].choices = [
+            ("", "พิมพ์ค้นหาชื่อเล่น / ชื่อจริง / รหัสนักเรียน")
+        ]
 
     def clean(self):
         cleaned = super().clean()
-        code = (cleaned.get("student_code") or "").strip()
+        sid = (cleaned.get("student_id") or "").strip()
         phone = (cleaned.get("parent_phone") or "").strip()
 
-        student = Student.objects.filter(student_code=code, is_active=True).first()
+        if not sid:
+            raise forms.ValidationError("กรุณาเลือกชื่อนักเรียน")
+
+        try:
+            sid_int = int(sid)
+        except Exception:
+            raise forms.ValidationError("รูปแบบนักเรียนไม่ถูกต้อง")
+
+        student = Student.objects.filter(id=sid_int, is_active=True).first()
         if not student:
-            raise forms.ValidationError("ไม่พบรหัสนักเรียนนี้")
+            raise forms.ValidationError("ไม่พบนักเรียนนี้ในระบบ")
 
         def digits(x: str) -> str:
             return "".join(ch for ch in x if ch.isdigit())
@@ -673,6 +689,44 @@ class StudentPortalLoginForm(forms.Form):
 
         cleaned["student"] = student
         return cleaned
+
+
+@require_GET
+def student_portal_student_search(request: HttpRequest) -> JsonResponse:
+    """
+    AJAX endpoint สำหรับ Select2:
+    - ค้นหาได้ด้วย nickname / full_name / student_code
+    - คืนค่า format: { "results": [ { "id": "...", "text": "..." }, ... ] }
+    """
+    q = (request.GET.get("q") or "").strip()
+
+    qs = Student.objects.filter(is_active=True)
+
+    if q:
+        qs = qs.filter(
+            Q(nickname__icontains=q) |
+            Q(full_name__icontains=q) |
+            Q(student_code__icontains=q)
+        )
+
+    qs = qs.only("id", "student_code", "nickname", "full_name", "grade_level").order_by(
+        "grade_level", "student_code"
+    )[:30]
+
+    results = []
+    for s in qs:
+        nickname = (getattr(s, "nickname", "") or "").strip()
+        full_name = getattr(s, "full_name", "") or ""
+        student_code = getattr(s, "student_code", "") or ""
+        grade = getattr(s, "grade_level", "") or ""
+
+        label = f"{student_code} | {nickname or '-'} | {full_name}"
+        if grade:
+            label += f" | {grade}"
+
+        results.append({"id": str(s.id), "text": label})
+
+    return JsonResponse({"results": results})
 
 
 def student_portal_login(request: HttpRequest) -> HttpResponse:

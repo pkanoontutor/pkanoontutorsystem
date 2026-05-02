@@ -466,12 +466,21 @@ def quiz_grade_select(request: HttpRequest) -> HttpResponse:
 
 
 def quiz_register(request: HttpRequest) -> HttpResponse:
-    """กรอกข้อมูลผู้สอบ → เริ่มสอบ"""
+    """กรอกข้อมูลผู้สอบ → เริ่มสอบ
+       รองรับ AJAX GET ?grade=X → ส่ง JSON กลับ (subject list)
+    """
     if request.method == "GET":
         grade = request.GET.get("grade", "")
         if not grade:
             return redirect("core:quiz_grade_select")
-        # ตรวจว่ามี quiz ในระดับนี้ไหม
+
+        # AJAX request จาก quiz_grade_select.html → ส่งรายวิชากลับเป็น JSON
+        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            quizzes = _get_ordered_quizzes(grade)
+            subjects = [q.subject.name for q in quizzes]
+            return JsonResponse({"subjects": subjects})
+
+        # ปกติ → แสดงหน้า register
         quizzes = _get_ordered_quizzes(grade)
         if not quizzes:
             return render(request, "core/quiz_grade_select.html", {

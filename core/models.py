@@ -1,6 +1,7 @@
 from django.db import models, transaction
 from django.utils import timezone
 
+
 class School(models.Model):
     name = models.CharField("ชื่อโรงเรียน", max_length=255, unique=True)
     is_active = models.BooleanField("ใช้งาน", default=True)
@@ -13,6 +14,7 @@ class School(models.Model):
 
     def __str__(self):
         return self.name
+
 
 # -----------------------
 # Student
@@ -29,9 +31,6 @@ class Student(models.Model):
         FLYER = "flyer", "ใบปลิว"
         WALKIN = "walkin", "เดินผ่าน"
 
-    # -----------------------
-    # รหัสนักเรียนอัตโนมัติ: YY + 3 หลัก เช่น 25001
-    # -----------------------
     student_code = models.CharField(
         "รหัสนักเรียน",
         max_length=5,
@@ -39,23 +38,16 @@ class Student(models.Model):
         blank=True,
         help_text="ระบบสร้างอัตโนมัติรูปแบบ YY### เช่น 25001",
     )
-
     full_name = models.CharField("ชื่อจริงนามสกุล", max_length=255)
     nickname = models.CharField("ชื่อเล่น", max_length=100, blank=True)
-
     profile_image = models.ImageField(
         "รูปประจำตัว",
         upload_to="student_profiles/",
         blank=True,
         null=True,
     )
-
     grade_level = models.CharField("ระดับชั้น", max_length=50, blank=True)
     academic_year = models.CharField("ปีการศึกษา", max_length=20, blank=True)
-
-    # -----------------------
-    # ✅ โรงเรียน (ค้นหา / เพิ่มได้)
-    # -----------------------
     school = models.ForeignKey(
         School,
         verbose_name="โรงเรียน",
@@ -64,28 +56,20 @@ class Student(models.Model):
         blank=True,
         related_name="students",
     )
-
     parent_phone = models.CharField("เบอร์ผู้ปกครอง", max_length=50)
-
     contact_channel = models.CharField(
         "ช่องทางติดต่อ",
         max_length=20,
         choices=ContactChannel.choices,
         default=ContactChannel.LINE,
     )
-
-    enroll_date = models.DateField(
-        "วันที่สมัคร",
-        default=timezone.localdate,
-    )
-
+    enroll_date = models.DateField("วันที่สมัคร", default=timezone.localdate)
     referral_source = models.CharField(
         "ช่องทางที่รู้จัก",
         max_length=20,
         choices=ReferralSource.choices,
         default=ReferralSource.REFERRAL,
     )
-
     note = models.TextField("หมายเหตุ", blank=True)
     is_active = models.BooleanField("ใช้งานอยู่", default=True)
     created_at = models.DateTimeField(default=timezone.now)
@@ -97,9 +81,6 @@ class Student(models.Model):
     def __str__(self) -> str:
         return self.display_name
 
-    # -----------------------
-    # แสดงชื่อรวม
-    # -----------------------
     @property
     def display_name(self) -> str:
         parts = filter(
@@ -114,9 +95,6 @@ class Student(models.Model):
         )
         return " | ".join(parts)
 
-    # -----------------------
-    # Auto student_code
-    # -----------------------
     @staticmethod
     def _next_student_code_for_year(two_digit_year: str) -> str:
         last = (
@@ -147,26 +125,16 @@ class TutoringClass(models.Model):
         SAT_AFTERNOON = "sat_afternoon", "เสาร์บ่าย"
         SUN_MORNING = "sun_morning", "อาทิตย์เช้า"
         SUN_AFTERNOON = "sun_afternoon", "อาทิตย์บ่าย"
-    
-    name = models.CharField("ชื่อคลาส", max_length=100, unique=True)  # เช่น "ป.6 ห้อง A"
 
-    # ✅ เพิ่ม: ราคาคอร์สเต็ม (ใช้ดึงไปใส่ใน Enrollment)
+    name = models.CharField("ชื่อคลาส", max_length=100, unique=True)
     course_price = models.DecimalField("ราคาคอร์ส (เต็ม)", max_digits=10, decimal_places=2, default=0)
-
-    # ✅ (ข้อ 1) เพิ่ม: ที่นั่งรวม (ต้องกรอกตอนสร้าง Class)
-    total_seats = models.PositiveIntegerField(
-        "ที่นั่งรวม",
-        default=0,
-        help_text="จำนวนที่นั่งทั้งหมดของห้องนี้ (ใช้คำนวณ ระหว่างเรียน/ที่นั่งว่าง บน Dashboard)",
-    )
-    
+    total_seats = models.PositiveIntegerField("ที่นั่งรวม", default=0)
     time_slot = models.CharField(
         "รอบเวลา",
         max_length=20,
         choices=TimeSlot.choices,
         default=TimeSlot.SAT_MORNING,
     )
-
     hours_per_session = models.DecimalField("ชั่วโมงต่อครั้ง", max_digits=4, decimal_places=2, default=3.00)
     is_active = models.BooleanField("เปิดใช้งาน", default=True)
 
@@ -195,16 +163,14 @@ class Subject(models.Model):
 
 
 # -----------------------
-# Sheet (ชีท) - Admin เพิ่มได้
+# Sheet (ชีท)
 # -----------------------
 class Sheet(models.Model):
     code = models.CharField("รหัสชีท", max_length=50, unique=True)
     title = models.CharField("เรื่อง", max_length=255)
     subject = models.ForeignKey(Subject, on_delete=models.PROTECT, related_name="sheets")
-
     total_pages = models.PositiveIntegerField("จำนวนหน้า", default=0)
-    total_questions = models.PositiveIntegerField("จำนวนข้อ", default=0)  # ถ้าไม่ใช้ ใส่ 0
-
+    total_questions = models.PositiveIntegerField("จำนวนข้อ", default=0)
     is_active = models.BooleanField("เปิดใช้งาน", default=True)
 
     class Meta:
@@ -217,126 +183,56 @@ class Sheet(models.Model):
 
 
 # -----------------------
-# ClassSubject (คลาส/วิชา) - Tutor อัปเดตได้
-# (ใช้เป็นฐานของหน้า "Sheet Update" แบบตาราง)
+# ClassSubject
 # -----------------------
 class ClassSubject(models.Model):
     tutoring_class = models.ForeignKey(TutoringClass, on_delete=models.CASCADE, related_name="class_subjects")
     subject = models.ForeignKey(Subject, on_delete=models.PROTECT, related_name="class_subjects")
-
     current_sheet = models.ForeignKey(
         Sheet,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name="in_classes",
-        verbose_name="ชีทที่กำลังสอน",
+        related_name="active_class_subjects",
     )
-
-    current_page = models.PositiveIntegerField("ถึงหน้า", default=0)
-    current_question = models.PositiveIntegerField("ถึงข้อ", default=0)
-
-    # ✅ เพิ่มเพื่อให้ prefill "คนที่สอนครั้งล่าสุด"
-    last_teacher = models.CharField("คนที่สอนครั้งล่าสุด", max_length=100, blank=True)
-
+    current_page = models.PositiveIntegerField("หน้าที่สอนถึง", default=0)
+    current_question = models.PositiveIntegerField("ข้อที่สอนถึง", default=0)
+    last_teacher = models.CharField("สอนโดย", max_length=100, blank=True)
+    is_active = models.BooleanField("เปิดใช้งาน", default=True)
     updated_at = models.DateTimeField(default=timezone.now)
     updated_by = models.ForeignKey("auth.User", on_delete=models.SET_NULL, null=True, blank=True)
-
-    is_active = models.BooleanField("เปิดใช้งาน", default=True)
 
     class Meta:
         verbose_name = "Class Subject"
         verbose_name_plural = "Class Subjects"
-        constraints = [
-            models.UniqueConstraint(fields=["tutoring_class", "subject"], name="uniq_subject_per_class")
-        ]
-        ordering = ("tutoring_class__name", "subject__name")
+        unique_together = ("tutoring_class", "subject")
 
     def __str__(self) -> str:
-        return f"{self.tutoring_class} - {self.subject}"
-
-    @property
-    def sheet_code(self) -> str:
-        return self.current_sheet.code if self.current_sheet_id else ""
-
-    @property
-    def sheet_total_pages(self) -> int:
-        return int(self.current_sheet.total_pages) if self.current_sheet_id else 0
-
-    def progress_percent(self) -> int:
-        """
-        ใช้โชว์ % ใน Dashboard:
-        - ถ้ามี total_pages: current_page / total_pages
-        - ถ้าไม่มี total_pages แต่มี total_questions: current_question / total_questions
-        """
-        if self.current_sheet and self.current_sheet.total_pages:
-            return int((self.current_page / self.current_sheet.total_pages) * 100)
-        if self.current_sheet and self.current_sheet.total_questions:
-            return int((self.current_question / self.current_sheet.total_questions) * 100)
-        return 0
+        return f"{self.tutoring_class} — {self.subject}"
 
 
 # -----------------------
-# Enrollment (การซื้อคอร์สแบบจำนวนครั้ง)
+# Enrollment
 # -----------------------
 class Enrollment(models.Model):
-    class EnrollmentType(models.TextChoices):
-        NORMAL_10 = "normal_10", "ต่อคอร์สปกติ (10 ครั้ง)"
-        NORMAL_20 = "normal_20", "ต่อคอร์สปกติ (20 ครั้ง)"
-        FIRST_TRIAL_11 = "first_trial_11", "สมัครครั้งแรกแบบทดลองเรียน (11 ครั้ง)"
-        FIRST_BONUS_12 = "first_bonus_12", "สมัครครั้งแรกแบบแถม (12 ครั้ง)"
-        SPECIAL = "special", "กรณีพิเศษ"
-
-    TYPE_TO_SESSIONS = {
-        EnrollmentType.NORMAL_10: 10,
-        EnrollmentType.NORMAL_20: 20,
-        EnrollmentType.FIRST_TRIAL_11: 11,
-        EnrollmentType.FIRST_BONUS_12: 12,
-        EnrollmentType.SPECIAL: 10,
-    }
+    class PaymentType(models.TextChoices):
+        FULL = "full", "ชำระเต็ม"
+        INSTALLMENT = "installment", "ผ่อนชำระ"
 
     student = models.ForeignKey(Student, on_delete=models.PROTECT, related_name="enrollments")
     tutoring_class = models.ForeignKey(TutoringClass, on_delete=models.PROTECT, related_name="enrollments")
-
-    sale_run_no = models.CharField(
-        "เลขที่รายการขายคอร์ส",
-        max_length=20,
-        unique=True,
-        null=True,
-        blank=True,
-        default=None,
-        help_text="ระบบสร้างอัตโนมัติ: {รหัสนักเรียน}-{ลำดับ} เช่น 25001-01",
-    )
-
-    enrollment_type = models.CharField(
-        "ประเภทการสมัคร",
-        max_length=30,
-        choices=EnrollmentType.choices,
-        default=EnrollmentType.NORMAL_10,
-    )
-
-    # ✅ ใช้ค่าที่ import / กรอกมา “ตรงตามจริง”
-    sessions_total = models.IntegerField("จำนวนครั้งคงเหลือ", default=0)
-
-    created_at = models.DateTimeField(default=timezone.now)
+    sale_run_no = models.CharField("เลขที่ใบขาย", max_length=20, blank=True, unique=True, null=True)
+    sessions_total = models.IntegerField("จำนวนครั้งทั้งหมด", default=0)
     remark = models.TextField("หมายเหตุ", blank=True)
-
-    # ❗ จะ inactive ก็ต่อเมื่อกดจบคอร์สเท่านั้น
-    is_active = models.BooleanField("Active", default=True)
-
-    class PaymentType(models.TextChoices):
-        FULL = "full", "ชำระเต็ม"
-        INSTALLMENT = "installment", "แบ่งชำระ"
-
+    is_active = models.BooleanField("คอร์สยังอยู่", default=True)
+    created_at = models.DateTimeField(default=timezone.now)
     payment_type = models.CharField(
-        "รูปแบบการชำระ",
+        "ประเภทชำระ",
         max_length=20,
         choices=PaymentType.choices,
         default=PaymentType.FULL,
     )
-
     installments_count = models.PositiveIntegerField("จำนวนงวด", default=1)
-
     course_price = models.DecimalField("ราคาคอร์ส", max_digits=10, decimal_places=2, default=0)
     discount_amount = models.DecimalField("ส่วนลด", max_digits=10, decimal_places=2, default=0)
     net_price = models.DecimalField("ราคาสุทธิ", max_digits=10, decimal_places=2, default=0)
@@ -348,10 +244,6 @@ class Enrollment(models.Model):
 
     def save(self, *args, **kwargs):
         is_new = self._state.adding
-
-        # -----------------------
-        # sale_run_no (เฉพาะตอนสร้างใหม่)
-        # -----------------------
         if is_new and not self.sale_run_no:
             student_code = (self.student.student_code or "").strip() if self.student_id else ""
             if student_code:
@@ -359,49 +251,29 @@ class Enrollment(models.Model):
                     last = (
                         Enrollment.objects
                         .select_for_update()
-                        .filter(
-                            student_id=self.student_id,
-                            sale_run_no__startswith=f"{student_code}-"
-                        )
+                        .filter(student_id=self.student_id, sale_run_no__startswith=f"{student_code}-")
                         .order_by("-sale_run_no")
                         .values_list("sale_run_no", flat=True)
                         .first()
                     )
                     seq = int(str(last).split("-")[-1]) + 1 if last else 1
                     self.sale_run_no = f"{student_code}-{seq:02d}"
-
-        # -----------------------
-        # ❌ ห้าม override sessions_total
-        # ใช้ค่าที่ import / กรอกมาเท่านั้น
-        # -----------------------
         if self.sessions_total is None:
             self.sessions_total = 0
-
-        # -----------------------
-        # ถ้า <= 0 → ใส่หมายเหตุว่า "ครบคอร์ส"
-        # (❗ ไม่เปลี่ยน is_active)
-        # -----------------------
         if self.sessions_total <= 0:
             auto_note = "ครบคอร์สแล้ว (นำเข้าข้อมูลย้อนหลัง)"
             note = (self.remark or "").strip()
             if auto_note not in note:
                 self.remark = f"{note}\n{auto_note}".strip()
-
-        # snapshot course_price
         if self.tutoring_class_id and not self.course_price:
             self.course_price = self.tutoring_class.course_price or 0
-
-        # normalize installments
         if self.payment_type == self.PaymentType.FULL:
             self.installments_count = 1
         elif not self.installments_count or self.installments_count < 1:
             self.installments_count = 1
-
-        # net_price
         cp = self.course_price or 0
         disc = self.discount_amount or 0
         self.net_price = max(cp - disc, 0)
-
         super().save(*args, **kwargs)
 
     def used_sessions(self):
@@ -413,18 +285,15 @@ class Enrollment(models.Model):
 
 
 # -----------------------
-# ✅ Enrollment Installment (งวดชำระ)
+# EnrollmentInstallment
 # -----------------------
 class EnrollmentInstallment(models.Model):
     enrollment = models.ForeignKey(Enrollment, on_delete=models.CASCADE, related_name="installments")
     installment_no = models.PositiveIntegerField("งวดที่", default=1)
-
     amount_due = models.DecimalField("ยอดงวดนี้", max_digits=10, decimal_places=2, default=0)
     amount_paid = models.DecimalField("จ่ายแล้ว", max_digits=10, decimal_places=2, default=0)
-
     is_paid = models.BooleanField("ชำระครบแล้ว", default=False)
     paid_at = models.DateTimeField("วันที่ชำระ", null=True, blank=True)
-
     note = models.CharField("หมายเหตุ", max_length=255, blank=True)
     created_at = models.DateTimeField(default=timezone.now)
 
@@ -453,7 +322,7 @@ class EnrollmentInstallment(models.Model):
 
 
 # -----------------------
-# Attendance (เช็คชื่อแบบ 3 ปุ่ม)
+# Attendance
 # -----------------------
 class Attendance(models.Model):
     class Status(models.TextChoices):
@@ -463,10 +332,8 @@ class Attendance(models.Model):
 
     student = models.ForeignKey(Student, on_delete=models.PROTECT, related_name="attendances")
     enrollment = models.ForeignKey(Enrollment, on_delete=models.PROTECT, related_name="attendances")
-
     attendance_date = models.DateField("วันที่เช็คชื่อ", default=timezone.localdate)
     status = models.CharField("สถานะ", max_length=20, choices=Status.choices, default=Status.PRESENT)
-
     deducted = models.BooleanField("หักครั้ง", default=True)
     checked_at = models.DateTimeField(default=timezone.now)
 
@@ -490,20 +357,13 @@ class Attendance(models.Model):
 
 
 class SheetUpdateEntry(models.Model):
-    """
-    เก็บความคืบหน้า 'รายวัน' ต่อ (คลาส, วิชา)
-    Dashboard จะใช้ record ล่าสุด (date ล่าสุด) เป็นข้อมูลหลัก
-    """
     tutoring_class = models.ForeignKey(TutoringClass, on_delete=models.CASCADE, related_name="sheet_updates")
     subject = models.ForeignKey(Subject, on_delete=models.PROTECT, related_name="sheet_updates")
-
     date = models.DateField("วันที่", default=timezone.localdate)
-
     sheet = models.ForeignKey(Sheet, on_delete=models.SET_NULL, null=True, blank=True, related_name="sheet_updates")
     page_taught_to = models.PositiveIntegerField("เลขหน้าที่สอนถึง", default=0)
     question_taught_to = models.PositiveIntegerField("เลขข้อที่สอนถึง", default=0)
     last_teacher = models.CharField("คนที่สอนครั้งล่าสุด", max_length=100, blank=True)
-
     updated_at = models.DateTimeField(default=timezone.now)
     updated_by = models.ForeignKey("auth.User", on_delete=models.SET_NULL, null=True, blank=True)
 
@@ -524,17 +384,13 @@ class SheetUpdateEntry(models.Model):
 
 
 # -----------------------
-# ✅ Sheet Inventory (นับชีทคงเหลือ)
-# - 1 Sheet : 1 Inventory record
-# - is_finished=True จะย้ายไปอยู่ส่วน "ชีทที่จบแล้ว"
+# SheetInventory
 # -----------------------
 class SheetInventory(models.Model):
     sheet = models.OneToOneField(Sheet, on_delete=models.CASCADE, related_name="inventory")
     quantity = models.IntegerField("จำนวนคงเหลือ", default=0)
-
     is_finished = models.BooleanField("จบชีทแล้ว", default=False)
     finished_at = models.DateTimeField("วันที่จบชีท", null=True, blank=True)
-
     updated_at = models.DateTimeField(default=timezone.now)
 
     class Meta:
@@ -547,14 +403,192 @@ class SheetInventory(models.Model):
 
     def save(self, *args, **kwargs):
         self.updated_at = timezone.now()
-        # กันไม่ให้ quantity ติดลบ
         if self.quantity is None:
             self.quantity = 0
         if self.quantity < 0:
             self.quantity = 0
-        # ถ้าทำ finished ให้ set finished_at
         if self.is_finished and not self.finished_at:
             self.finished_at = timezone.now()
         if not self.is_finished:
             self.finished_at = None
         super().save(*args, **kwargs)
+
+
+# =============================================================
+# QUIZ MODELS
+# =============================================================
+
+GRADE_CHOICES = [
+    ("ป.1", "ป.1"), ("ป.2", "ป.2"), ("ป.3", "ป.3"),
+    ("ป.4", "ป.4"), ("ป.5", "ป.5"), ("ป.6", "ป.6"),
+    ("ม.1", "ม.1"), ("ม.2", "ม.2"), ("ม.3", "ม.3"),
+    ("ม.4", "ม.4"), ("ม.5", "ม.5"), ("ม.6", "ม.6"),
+]
+
+SUBJECT_DISPLAY_ORDER = ["คณิตศาสตร์", "วิทยาศาสตร์", "ภาษาอังกฤษ"]
+
+
+class Quiz(models.Model):
+    title = models.CharField("ชื่อชุดข้อสอบ", max_length=255)
+    subject = models.ForeignKey(
+        Subject,
+        verbose_name="วิชา",
+        on_delete=models.PROTECT,
+        related_name="quizzes",
+    )
+    grade_level = models.CharField("ระดับชั้น", max_length=10, choices=GRADE_CHOICES, default="ป.4")
+    description = models.TextField("คำอธิบาย", blank=True)
+    time_limit_minutes = models.PositiveIntegerField("เวลาทำ (นาที, 0=ไม่จำกัด)", default=0)
+    pass_score = models.PositiveIntegerField("คะแนนผ่าน (%)", default=60)
+    is_active = models.BooleanField("เปิดให้ทำข้อสอบ", default=True)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        verbose_name = "Quiz"
+        verbose_name_plural = "Quizzes"
+        ordering = ("grade_level", "subject__name", "-created_at")
+
+    def __str__(self) -> str:
+        return f"[{self.grade_level}] {self.subject} – {self.title}"
+
+    def total_questions(self):
+        return self.questions.count()
+
+    def total_score(self):
+        from django.db.models import Sum
+        return self.questions.aggregate(total=Sum("score"))["total"] or 0
+
+
+class Question(models.Model):
+    class QuestionType(models.TextChoices):
+        SINGLE = "single", "เลือกตอบ (1 คำตอบ)"
+        MULTI = "multi", "เลือกตอบ (หลายคำตอบ)"
+
+    quiz = models.ForeignKey(Quiz, on_delete=models.CASCADE, related_name="questions")
+    order = models.PositiveIntegerField("ลำดับ", default=1)
+    question_type = models.CharField(
+        "ประเภทคำถาม",
+        max_length=20,
+        choices=QuestionType.choices,
+        default=QuestionType.SINGLE,
+    )
+    text = models.TextField("คำถาม")
+    image = models.ImageField("รูปประกอบ", upload_to="quiz_questions/", blank=True, null=True)
+    score = models.PositiveIntegerField("คะแนน", default=1)
+    explanation = models.TextField("เฉลยอธิบาย", blank=True)
+
+    class Meta:
+        verbose_name = "Question"
+        verbose_name_plural = "Questions"
+        ordering = ("quiz", "order")
+
+    def __str__(self) -> str:
+        return f"Q{self.order}: {self.text[:60]}"
+
+
+class Choice(models.Model):
+    question = models.ForeignKey(Question, on_delete=models.CASCADE, related_name="choices")
+    label = models.CharField("ตัวอักษร", max_length=10, blank=True)
+    text = models.CharField("ข้อความตัวเลือก", max_length=500)
+    image = models.ImageField("รูปตัวเลือก", upload_to="quiz_choices/", blank=True, null=True)
+    is_correct = models.BooleanField("เป็นคำตอบที่ถูก", default=False)
+    order = models.PositiveIntegerField("ลำดับ", default=1)
+
+    class Meta:
+        verbose_name = "Choice"
+        verbose_name_plural = "Choices"
+        ordering = ("question", "order")
+
+    def __str__(self) -> str:
+        return f"{self.label}: {self.text[:40]}"
+
+
+class QuizAttempt(models.Model):
+    class Status(models.TextChoices):
+        IN_PROGRESS = "in_progress", "กำลังทำ"
+        SUBMITTED = "submitted", "ส่งแล้ว"
+        TIMED_OUT = "timed_out", "หมดเวลา"
+
+    # ข้อมูลผู้ทำ (ไม่ต้อง login)
+    taker_nickname = models.CharField("ชื่อเล่น", max_length=100)
+    taker_firstname = models.CharField("ชื่อจริง", max_length=150)
+    taker_lastname = models.CharField("นามสกุล", max_length=150)
+    taker_school = models.CharField("โรงเรียน", max_length=255, blank=True)
+    taker_grade = models.CharField("ระดับชั้น", max_length=10, choices=GRADE_CHOICES)
+    taker_email = models.EmailField("อีเมล (รับผลสอบ)", blank=True)
+
+    student = models.ForeignKey(
+        Student,
+        verbose_name="นักเรียน (ถ้ามี)",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="quiz_attempts",
+    )
+    quiz = models.ForeignKey(Quiz, on_delete=models.CASCADE, related_name="attempts")
+    status = models.CharField("สถานะ", max_length=20, choices=Status.choices, default=Status.IN_PROGRESS)
+    started_at = models.DateTimeField("เริ่มทำ", default=timezone.now)
+    submitted_at = models.DateTimeField("เวลาส่ง", null=True, blank=True)
+    score = models.DecimalField("คะแนนที่ได้", max_digits=6, decimal_places=2, default=0)
+    max_score = models.DecimalField("คะแนนเต็ม", max_digits=6, decimal_places=2, default=0)
+    passed = models.BooleanField("ผ่าน", default=False)
+
+    # session key จับกลุ่ม attempt หลาย quiz ในครั้งเดียว
+    session_key = models.CharField("Session Key", max_length=64, blank=True, db_index=True)
+
+    class Meta:
+        verbose_name = "Quiz Attempt"
+        verbose_name_plural = "Quiz Attempts"
+        ordering = ("-started_at",)
+
+    def __str__(self) -> str:
+        return f"{self.taker_nickname} | {self.quiz} | {self.status}"
+
+    @property
+    def taker_full_name(self):
+        return f"{self.taker_firstname} {self.taker_lastname}".strip()
+
+    @property
+    def score_percent(self):
+        if self.max_score:
+            return round(float(self.score) / float(self.max_score) * 100, 1)
+        return 0
+
+    @property
+    def time_taken_seconds(self):
+        if self.submitted_at and self.started_at:
+            return int((self.submitted_at - self.started_at).total_seconds())
+        return None
+
+    def calculate_and_save(self):
+        total_score = 0
+        max_score = 0
+        for question in self.quiz.questions.prefetch_related("choices"):
+            correct_ids = set(question.choices.filter(is_correct=True).values_list("id", flat=True))
+            answered_ids = set(self.answers.filter(question=question).values_list("choice_id", flat=True))
+            max_score += question.score
+            if answered_ids == correct_ids:
+                total_score += question.score
+        self.score = total_score
+        self.max_score = max_score
+        self.passed = (
+            (float(total_score) / float(max_score) * 100) >= self.quiz.pass_score
+            if max_score > 0 else False
+        )
+        self.status = QuizAttempt.Status.SUBMITTED
+        self.submitted_at = timezone.now()
+        self.save()
+
+
+class QuizAnswer(models.Model):
+    attempt = models.ForeignKey(QuizAttempt, on_delete=models.CASCADE, related_name="answers")
+    question = models.ForeignKey(Question, on_delete=models.CASCADE, related_name="answers")
+    choice = models.ForeignKey(Choice, on_delete=models.CASCADE, related_name="answers")
+
+    class Meta:
+        verbose_name = "Quiz Answer"
+        verbose_name_plural = "Quiz Answers"
+        unique_together = ("attempt", "question", "choice")
+
+    def __str__(self) -> str:
+        return f"Attempt {self.attempt_id} | Q{self.question.order} | {self.choice.label}"

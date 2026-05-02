@@ -170,3 +170,17 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 LOGIN_URL = "/adminlublub/login/"
 LOGIN_REDIRECT_URL = "/dashboard/"
+
+
+# -------------------------------------------------------------------
+# EMAIL — Gmail SMTP
+# อย่าใส่ password ตรงนี้ ให้ตั้ง env variable บน Render แทน
+# Key: EMAIL_HOST_PASSWORD  Value: <Gmail App Password>
+# -------------------------------------------------------------------
+EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+EMAIL_HOST = "smtp.gmail.com"
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = "pkanoontutor@gmail.com"
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
+DEFAULT_FROM_EMAIL = "pkanoontutor@gmail.com"

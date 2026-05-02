@@ -1,0 +1,197 @@
+{% load static %}
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>เลือกระดับชั้น – PKanoon Tutor</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Poppins',system-ui,sans-serif;background:#FDCF72;min-height:100vh}
+    .wrap{max-width:640px;margin:0 auto;padding:24px 16px 48px}
+
+    /* header */
+    .logo-bar{display:flex;align-items:center;justify-content:center;margin-bottom:24px}
+    .logo-bar img{max-height:100px;width:auto}
+
+    .hero{text-align:center;margin-bottom:32px}
+    .hero h1{font-size:26px;font-weight:900;color:#0f172a;margin-bottom:6px}
+    .hero p{font-size:14px;color:#475569}
+
+    /* error */
+    .error-box{background:#fee2e2;border:1px solid #fca5a5;border-radius:12px;padding:12px 16px;color:#b91c1c;font-size:14px;font-weight:600;margin-bottom:16px;text-align:center}
+
+    /* grade grid */
+    .grade-section{margin-bottom:28px}
+    .grade-section h2{font-size:13px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px}
+    .grade-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+
+    @media(min-width:480px){.grade-grid{grid-template-columns:repeat(6,1fr)}}
+
+    .grade-btn{background:#fff;border:3px solid transparent;border-radius:14px;padding:14px 6px;text-align:center;cursor:pointer;font-size:16px;font-weight:800;color:#0f172a;box-shadow:0 4px 12px rgba(0,0,0,.08);transition:.15s;position:relative}
+    .grade-btn:hover{border-color:#a855f7;transform:translateY(-2px)}
+    .grade-btn.no-quiz{opacity:.4;cursor:not-allowed}
+    .grade-btn.no-quiz:hover{transform:none;border-color:transparent}
+    .grade-btn.selected{border-color:#7c3aed;background:#faf5ff;box-shadow:0 4px 16px rgba(124,58,237,.25)}
+    .grade-btn .dot{width:8px;height:8px;border-radius:50%;background:#22c55e;position:absolute;top:7px;right:7px}
+
+    /* info card */
+    .info-card{background:#fff;border-radius:20px;padding:24px;box-shadow:0 8px 24px rgba(0,0,0,.08);display:none}
+    .info-card.show{display:block}
+    .info-card h2{font-size:18px;font-weight:800;color:#0f172a;margin-bottom:4px}
+    .info-card .sub{font-size:13px;color:#64748b;margin-bottom:20px}
+
+    .field{margin-bottom:16px}
+    .field label{display:block;font-size:13px;font-weight:700;color:#374151;margin-bottom:5px}
+    .field label span.req{color:#ef4444;margin-left:2px}
+    .field input{width:100%;padding:12px 14px;border:2px solid #e5e7eb;border-radius:12px;font-size:15px;font-family:inherit;outline:none;transition:.15s}
+    .field input:focus{border-color:#a855f7;box-shadow:0 0 0 3px rgba(168,85,247,.15)}
+    .field input.optional{border-style:dashed}
+
+    .subject-list{background:#f8fafc;border-radius:12px;padding:12px 14px;margin-bottom:20px;font-size:14px}
+    .subject-list strong{display:block;font-size:13px;color:#64748b;margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em}
+    .subject-item{display:flex;align-items:center;gap:8px;padding:4px 0;color:#0f172a;font-weight:600}
+    .subject-item .ico{font-size:18px}
+
+    .btn-start{width:100%;padding:16px;border-radius:14px;font-size:17px;font-weight:900;color:#fff;background:linear-gradient(135deg,#a855f7,#7c3aed);border:none;cursor:pointer;box-shadow:0 8px 20px rgba(124,58,237,.35);transition:.15s;display:flex;align-items:center;justify-content:center;gap:8px}
+    .btn-start:hover{transform:translateY(-2px);box-shadow:0 12px 28px rgba(124,58,237,.45)}
+    .btn-start:disabled{background:#94a3b8;box-shadow:none;cursor:not-allowed;transform:none}
+  </style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="logo-bar">
+    <img src="{% static 'core/logo.png' %}" alt="PKanoon Tutor">
+  </div>
+
+  <div class="hero">
+    <h1>✏️ แบบทดสอบออนไลน์</h1>
+    <p>เลือกระดับชั้นของคุณเพื่อเริ่มทำข้อสอบ</p>
+  </div>
+
+  {% if error %}
+  <div class="error-box">⚠️ {{ error }}</div>
+  {% endif %}
+
+  <!-- ป.1–ป.6 -->
+  <div class="grade-section">
+    <h2>ประถมศึกษา</h2>
+    <div class="grade-grid">
+      {% for code, label in grade_choices %}
+        {% if code|slice:":1" == "ป" %}
+        <div class="grade-btn {% if code not in grades_with_quizzes %}no-quiz{% endif %}"
+             data-grade="{{ code }}"
+             onclick="selectGrade(this)">
+          {{ label }}
+          {% if code in grades_with_quizzes %}<div class="dot"></div>{% endif %}
+        </div>
+        {% endif %}
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- ม.1–ม.6 -->
+  <div class="grade-section">
+    <h2>มัธยมศึกษา</h2>
+    <div class="grade-grid">
+      {% for code, label in grade_choices %}
+        {% if code|slice:":1" == "ม" %}
+        <div class="grade-btn {% if code not in grades_with_quizzes %}no-quiz{% endif %}"
+             data-grade="{{ code }}"
+             onclick="selectGrade(this)">
+          {{ label }}
+          {% if code in grades_with_quizzes %}<div class="dot"></div>{% endif %}
+        </div>
+        {% endif %}
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Info form (ขึ้นมาหลัง select grade) -->
+  <div class="info-card" id="infoCard">
+    <h2 id="gradeTitle">กำลังโหลด...</h2>
+    <div class="sub">กรอกข้อมูลของคุณเพื่อเริ่มทำข้อสอบ</div>
+
+    <!-- วิชาที่มี -->
+    <div class="subject-list" id="subjectList"></div>
+
+    <form method="post" action="/quiz/register/" id="registerForm">
+      {% csrf_token %}
+      <input type="hidden" name="grade" id="gradeInput"/>
+
+      <div class="field">
+        <label>ชื่อเล่น <span class="req">*</span></label>
+        <input type="text" name="nickname" placeholder="เช่น เจน, แบงค์, มิ้ว" maxlength="50" required/>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="field">
+          <label>ชื่อจริง <span class="req">*</span></label>
+          <input type="text" name="firstname" placeholder="ชื่อจริง" maxlength="100" required/>
+        </div>
+        <div class="field">
+          <label>นามสกุล <span class="req">*</span></label>
+          <input type="text" name="lastname" placeholder="นามสกุล" maxlength="100" required/>
+        </div>
+      </div>
+      <div class="field">
+        <label>โรงเรียน</label>
+        <input type="text" name="school" placeholder="ชื่อโรงเรียน (ถ้ามี)" maxlength="200" class="optional"/>
+      </div>
+      <div class="field">
+        <label>อีเมล <span style="color:#64748b;font-weight:400">(รับผลสอบทาง email)</span></label>
+        <input type="email" name="email" placeholder="your@email.com" maxlength="200" class="optional"/>
+      </div>
+
+      <button type="submit" class="btn-start" id="startBtn">
+        🚀 เริ่มทำข้อสอบเลย!
+      </button>
+    </form>
+  </div>
+
+</div>
+
+<script>
+// subject icons
+const ICONS = {"คณิตศาสตร์":"🔢","วิทยาศาสตร์":"🔬","ภาษาอังกฤษ":"🌏"};
+
+// quizzes data from server (grade → subjects)
+const QUIZZES_BY_GRADE = {};
+{% for code, label in grade_choices %}
+  QUIZZES_BY_GRADE["{{ code }}"] = [];
+{% endfor %}
+
+// inject actual data (rendered by Django)
+const GRADE_QUIZ_DATA = {{ grade_quiz_json|default:"{}"|safe }};
+
+function selectGrade(el) {
+  if (el.classList.contains("no-quiz")) return;
+  document.querySelectorAll(".grade-btn").forEach(b => b.classList.remove("selected"));
+  el.classList.add("selected");
+  const grade = el.dataset.grade;
+  document.getElementById("gradeInput").value = grade;
+  document.getElementById("gradeTitle").textContent = `แบบทดสอบระดับ ${grade}`;
+
+  // load subject list via fetch
+  fetch(`/quiz/register/?grade=${encodeURIComponent(grade)}`, {
+    headers: {"X-Requested-With": "XMLHttpRequest"}
+  })
+  .then(r => r.json())
+  .then(data => {
+    const sl = document.getElementById("subjectList");
+    sl.innerHTML = "<strong>วิชาที่จะทำในชุดนี้</strong>";
+    (data.subjects || []).forEach(s => {
+      const ico = ICONS[s] || "📝";
+      sl.innerHTML += `<div class="subject-item"><span class="ico">${ico}</span>${s}</div>`;
+    });
+  })
+  .catch(() => {
+    document.getElementById("subjectList").innerHTML = "<strong>วิชาที่จะทำในชุดนี้</strong><div class='subject-item'>📝 มีข้อสอบในระดับนี้</div>";
+  });
+
+  document.getElementById("infoCard").classList.add("show");
+  document.getElementById("infoCard").scrollIntoView({behavior:"smooth", block:"start"});
+}
+</script>
+</body>
+</html>

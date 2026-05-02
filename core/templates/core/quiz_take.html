@@ -1,0 +1,286 @@
+{% load static %}
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>{{ quiz.subject.name }} – {{ quiz.title }}</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Poppins',system-ui,sans-serif;background:#f1f5f9;min-height:100vh;overflow-x:hidden}
+    .topbar{position:fixed;top:0;left:0;right:0;z-index:200;background:#0f172a;color:#fff;padding:0 16px;height:56px;display:flex;align-items:center;justify-content:space-between;gap:12px;box-shadow:0 2px 10px rgba(0,0,0,.3)}
+    .topbar-left{display:flex;flex-direction:column;min-width:0}
+    .topbar-title{font-size:15px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .topbar-sub{font-size:11px;color:#94a3b8}
+    #timer{background:#fdd35e;color:#0f172a;font-size:17px;font-weight:900;border-radius:10px;padding:5px 12px;min-width:72px;text-align:center;flex-shrink:0}
+    #timer.warn{background:#f97316;color:#fff}
+    #timer.danger{background:#ef4444;color:#fff;animation:pulse .6s infinite alternate}
+    @keyframes pulse{0%{opacity:1}100%{opacity:.55}}
+    .progress-track{position:fixed;top:56px;left:0;right:0;z-index:199;height:4px;background:#1e293b}
+    .progress-fill{height:4px;background:linear-gradient(90deg,#a855f7,#7c3aed);transition:width .4s cubic-bezier(.4,0,.2,1)}
+    .subject-steps{position:fixed;top:60px;left:0;right:0;z-index:198;background:#1e293b;display:flex}
+    .step{flex:1;text-align:center;padding:7px 4px;font-size:11px;font-weight:700;color:#64748b;border-bottom:3px solid transparent;transition:.2s;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .step.done{color:#22c55e;border-color:#22c55e}
+    .step.active{color:#a855f7;border-color:#a855f7}
+    .main{padding:114px 16px 90px;max-width:680px;margin:0 auto}
+    .q-dots{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:14px;justify-content:center}
+    .qdot{width:28px;height:28px;border-radius:8px;background:#f1f5f9;border:2px solid #e5e7eb;cursor:pointer;font-size:11px;font-weight:800;color:#94a3b8;display:flex;align-items:center;justify-content:center;transition:.15s}
+    .qdot.answered{background:#ede9fe;border-color:#a855f7;color:#7c3aed}
+    .qdot.current{background:#7c3aed;border-color:#7c3aed;color:#fff}
+    .q-card{background:#fff;border-radius:20px;padding:24px;box-shadow:0 6px 20px rgba(0,0,0,.08);display:none;animation:fadeIn .3s ease}
+    .q-card.active{display:block}
+    @keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+    .q-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;gap:8px;flex-wrap:wrap}
+    .q-num{font-size:13px;font-weight:700;color:#94a3b8}
+    .q-badges{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+    .badge-score{background:#f1f5f9;border-radius:999px;padding:3px 12px;font-size:12px;font-weight:700;color:#475569}
+    .badge-multi{background:#ede9fe;color:#7c3aed;border-radius:999px;padding:3px 10px;font-size:11px;font-weight:700}
+    .q-text{font-size:17px;font-weight:700;color:#0f172a;line-height:1.65;margin-bottom:16px;white-space:pre-line}
+    .q-img{width:100%;max-height:280px;object-fit:contain;border-radius:12px;margin-bottom:16px;border:1px solid #e5e7eb;background:#f8fafc}
+    .choices{display:flex;flex-direction:column;gap:10px}
+    .choice{display:flex;align-items:flex-start;gap:12px;border:2.5px solid #e5e7eb;border-radius:14px;padding:13px 14px;cursor:pointer;transition:.15s;user-select:none;background:#fff}
+    .choice:hover{border-color:#a855f7;background:#faf5ff}
+    .choice.selected{border-color:#7c3aed;background:#faf5ff;box-shadow:0 0 0 3px rgba(124,58,237,.1)}
+    .choice-key{min-width:34px;height:34px;border-radius:10px;background:#f1f5f9;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:14px;flex-shrink:0;border:2px solid #e5e7eb;transition:.15s;color:#475569;margin-top:1px}
+    .choice.selected .choice-key{background:#7c3aed;color:#fff;border-color:#7c3aed}
+    .choice-body{flex:1;min-width:0}
+    .choice-text{font-size:15px;color:#0f172a;font-weight:500;line-height:1.45}
+    .choice-img-thumb{max-width:100%;max-height:100px;border-radius:8px;margin-top:6px;display:block}
+    .nav-bar{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid #e5e7eb;padding:10px 16px;display:flex;gap:10px;align-items:center;justify-content:space-between;z-index:200;box-shadow:0 -4px 14px rgba(0,0,0,.07)}
+    .nav-info{font-size:13px;color:#64748b;font-weight:600;flex-shrink:0}
+    .nav-btns{display:flex;gap:8px}
+    .btn{display:inline-flex;align-items:center;gap:5px;padding:10px 16px;border-radius:12px;font-size:14px;font-weight:800;cursor:pointer;border:none;transition:.15s;white-space:nowrap}
+    .btn:hover:not(:disabled){transform:translateY(-1px)}
+    .btn-prev{background:#f1f5f9;color:#374151}
+    .btn-next{background:linear-gradient(135deg,#a855f7,#7c3aed);color:#fff;box-shadow:0 3px 10px rgba(124,58,237,.25)}
+    .btn-submit-quiz{background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;box-shadow:0 3px 10px rgba(34,197,94,.25)}
+    .btn:disabled{background:#94a3b8 !important;box-shadow:none !important;cursor:not-allowed;transform:none !important}
+    .overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:500;align-items:center;justify-content:center;padding:16px}
+    .overlay.show{display:flex}
+    .modal{background:#fff;border-radius:22px;padding:28px 22px;max-width:360px;width:100%;text-align:center;box-shadow:0 24px 60px rgba(0,0,0,.25)}
+    .modal h2{font-size:21px;font-weight:900;margin-bottom:8px;color:#0f172a}
+    .modal p{color:#475569;font-size:14px;line-height:1.65;margin-bottom:22px}
+    .modal-btns{display:flex;gap:10px;justify-content:center}
+    .btn-cancel{background:#f1f5f9;color:#374151;padding:12px 20px;border-radius:12px;font-size:15px;font-weight:800;cursor:pointer;border:none}
+    .btn-confirm{background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;padding:12px 20px;border-radius:12px;font-size:15px;font-weight:800;cursor:pointer;border:none;box-shadow:0 4px 12px rgba(34,197,94,.3)}
+    .loading{display:none;position:fixed;inset:0;background:rgba(255,255,255,.92);z-index:600;align-items:center;justify-content:center;flex-direction:column;gap:14px}
+    .loading.show{display:flex}
+    .spinner{width:44px;height:44px;border:4px solid #e5e7eb;border-top-color:#7c3aed;border-radius:50%;animation:spin .75s linear infinite}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .loading p{font-size:15px;font-weight:700;color:#0f172a}
+  </style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-left">
+    <div class="topbar-title">
+      {% if quiz.subject.name == "คณิตศาสตร์" %}🔢{% elif quiz.subject.name == "วิทยาศาสตร์" %}🔬{% elif quiz.subject.name == "ภาษาอังกฤษ" %}🌏{% else %}📝{% endif %}
+      {{ quiz.subject.name }} — {{ quiz.title }}
+    </div>
+    <div class="topbar-sub">{{ taker.nickname }} | ชั้น {{ taker.grade }}</div>
+  </div>
+  <div id="timer">{% if quiz.time_limit_minutes > 0 %}--:--{% else %}∞{% endif %}</div>
+</div>
+
+<div class="progress-track">
+  <div class="progress-fill" id="progressFill" style="width:0%"></div>
+</div>
+
+<div class="subject-steps">
+  {% for q in all_quizzes %}
+  <div class="step {% if forloop.counter0 < quiz_index %}done{% elif forloop.counter0 == quiz_index %}active{% endif %}">
+    {% if q.subject.name == "คณิตศาสตร์" %}🔢 คณิต{% elif q.subject.name == "วิทยาศาสตร์" %}🔬 วิทย์{% elif q.subject.name == "ภาษาอังกฤษ" %}🌏 อังกฤษ{% else %}📝 {{ q.subject.name }}{% endif %}
+  </div>
+  {% endfor %}
+</div>
+
+<div class="main">
+  <div class="q-dots" id="dotContainer"></div>
+  <div id="questionContainer"></div>
+</div>
+
+<div class="nav-bar">
+  <div class="nav-info" id="navInfo">ข้อ 1 / {{ total_questions }}</div>
+  <div class="nav-btns">
+    <button class="btn btn-prev" id="btnPrev" onclick="prevQ()">◀ ก่อนหน้า</button>
+    <button class="btn btn-next" id="btnNext" onclick="nextQ()">ถัดไป ▶</button>
+    <button class="btn btn-submit-quiz" id="btnSubmit" onclick="openConfirm()" style="display:none">ส่งคำตอบ ✅</button>
+  </div>
+</div>
+
+<div class="overlay" id="confirmOverlay">
+  <div class="modal">
+    <h2>ยืนยันส่งคำตอบ?</h2>
+    <p>คุณตอบแล้ว <strong id="confirmedCount">0</strong> / {{ total_questions }} ข้อ<br><span style="color:#ef4444">เมื่อส่งแล้วไม่สามารถแก้ไขได้</span></p>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeConfirm()">← ย้อนกลับ</button>
+      <button class="btn-confirm" onclick="doSubmit()">ส่งคำตอบ ✅</button>
+    </div>
+  </div>
+</div>
+
+<div class="loading" id="loadingOverlay">
+  <div class="spinner"></div>
+  <p>กำลังส่งคำตอบ...</p>
+</div>
+
+<script>
+const QUESTIONS = {{ questions_json|safe }};
+const ATTEMPT_ID = {{ attempt.id }};
+const TIME_LIMIT_SEC = {{ remaining_sec }};
+const HAS_TIMER = {{ quiz.time_limit_minutes }} > 0;
+const CSRF = "{{ csrf_token }}";
+const TOTAL = QUESTIONS.length;
+
+let currentIdx = 0;
+const answers = {};
+
+// Build dots & cards
+const container = document.getElementById("questionContainer");
+const dotContainer = document.getElementById("dotContainer");
+
+QUESTIONS.forEach((q, i) => {
+  // dot
+  const dot = document.createElement("div");
+  dot.className = "qdot" + (i === 0 ? " current" : "");
+  dot.id = `dot-${i}`;
+  dot.textContent = i + 1;
+  dot.onclick = () => goTo(i);
+  dotContainer.appendChild(dot);
+
+  // card
+  const card = document.createElement("div");
+  card.className = "q-card" + (i === 0 ? " active" : "");
+  card.id = `qcard-${i}`;
+
+  let html = `<div class="q-header">
+    <div class="q-num">ข้อที่ ${q.order} / ${TOTAL}</div>
+    <div class="q-badges">
+      ${q.type === "multi" ? '<span class="badge-multi">เลือกได้หลายข้อ</span>' : ""}
+      <span class="badge-score">${q.score} คะแนน</span>
+    </div>
+  </div>
+  <div class="q-text">${esc(q.text)}</div>`;
+
+  if (q.image) html += `<img class="q-img" src="${q.image}" alt=""/>`;
+
+  html += `<div class="choices" id="choices-${q.id}">`;
+  q.choices.forEach(c => {
+    html += `<div class="choice" id="c-${c.id}" data-qid="${q.id}" data-cid="${c.id}" data-type="${q.type}" onclick="pick(this)">
+      <div class="choice-key">${c.label}</div>
+      <div class="choice-body">
+        <div class="choice-text">${esc(c.text)}</div>
+        ${c.image ? `<img class="choice-img-thumb" src="${c.image}" alt=""/>` : ""}
+      </div>
+    </div>`;
+  });
+  html += `</div>`;
+  card.innerHTML = html;
+  container.appendChild(card);
+});
+
+function esc(s) {
+  return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/\n/g,"<br>");
+}
+
+function pick(el) {
+  const qid = Number(el.dataset.qid);
+  const cid = Number(el.dataset.cid);
+  const type = el.dataset.type;
+  if (!answers[qid]) answers[qid] = new Set();
+  if (type === "multi") {
+    if (answers[qid].has(cid)) { answers[qid].delete(cid); el.classList.remove("selected"); }
+    else { answers[qid].add(cid); el.classList.add("selected"); }
+  } else {
+    document.querySelectorAll(`#choices-${qid} .choice`).forEach(c => c.classList.remove("selected"));
+    answers[qid] = new Set([cid]);
+    el.classList.add("selected");
+  }
+  refreshDot(currentIdx);
+  refreshProgress();
+}
+
+function goTo(idx) {
+  document.getElementById(`qcard-${currentIdx}`).classList.remove("active");
+  document.getElementById(`dot-${currentIdx}`).classList.remove("current");
+  currentIdx = idx;
+  document.getElementById(`qcard-${currentIdx}`).classList.add("active");
+  const d = document.getElementById(`dot-${currentIdx}`);
+  d.classList.add("current");
+  updateNav();
+  window.scrollTo({top:0,behavior:"smooth"});
+}
+
+function nextQ() { if (currentIdx < TOTAL-1) goTo(currentIdx+1); }
+function prevQ() { if (currentIdx > 0) goTo(currentIdx-1); }
+
+function updateNav() {
+  document.getElementById("navInfo").textContent = `ข้อ ${currentIdx+1} / ${TOTAL}`;
+  document.getElementById("btnPrev").disabled = currentIdx === 0;
+  const last = currentIdx === TOTAL-1;
+  document.getElementById("btnNext").style.display = last ? "none" : "";
+  document.getElementById("btnSubmit").style.display = last ? "" : "none";
+}
+
+function refreshDot(idx) {
+  const q = QUESTIONS[idx];
+  const dot = document.getElementById(`dot-${idx}`);
+  const ok = answers[q.id] && answers[q.id].size > 0;
+  dot.className = "qdot" + (ok?" answered":"") + (idx===currentIdx?" current":"");
+}
+
+function refreshProgress() {
+  const done = QUESTIONS.filter(q => answers[q.id] && answers[q.id].size > 0).length;
+  document.getElementById("progressFill").style.width = `${(done/TOTAL)*100}%`;
+  QUESTIONS.forEach((_,i) => { if (i !== currentIdx) refreshDot(i); });
+}
+
+updateNav();
+
+// Timer
+let remaining = TIME_LIMIT_SEC;
+function pad(n){return String(n).padStart(2,"0");}
+function tick(){
+  const el = document.getElementById("timer");
+  const m = Math.floor(remaining/60), s = remaining%60;
+  el.textContent = `${pad(m)}:${pad(s)}`;
+  if (remaining <= 60) el.className = "danger";
+  else if (remaining <= 300) el.className = "warn";
+  if (remaining <= 0) { clearInterval(timerInterval); alert("⏱ หมดเวลา! ระบบส่งคำตอบให้อัตโนมัติ"); doSubmit(true); return; }
+  remaining--;
+}
+let timerInterval = null;
+if (HAS_TIMER) { tick(); timerInterval = setInterval(tick, 1000); }
+
+// Confirm & submit
+function openConfirm() {
+  const done = QUESTIONS.filter(q => answers[q.id] && answers[q.id].size > 0).length;
+  document.getElementById("confirmedCount").textContent = done;
+  document.getElementById("confirmOverlay").classList.add("show");
+}
+function closeConfirm() { document.getElementById("confirmOverlay").classList.remove("show"); }
+
+async function doSubmit() {
+  closeConfirm();
+  clearInterval(timerInterval);
+  document.getElementById("loadingOverlay").classList.add("show");
+  const payload = {};
+  for (const [qid, s] of Object.entries(answers)) { payload[qid] = [...s]; }
+  try {
+    const res = await fetch(`/quiz/submit/${ATTEMPT_ID}/`, {
+      method:"POST",
+      headers:{"Content-Type":"application/json","X-CSRFToken":CSRF},
+      body:JSON.stringify({answers:payload}),
+    });
+    const data = await res.json();
+    if (data.ok) { window.location.href = data.redirect; }
+    else { document.getElementById("loadingOverlay").classList.remove("show"); alert("เกิดข้อผิดพลาด: "+(data.error||"กรุณาลองใหม่")); }
+  } catch(e) {
+    document.getElementById("loadingOverlay").classList.remove("show");
+    alert("การเชื่อมต่อล้มเหลว กรุณาลองใหม่");
+  }
+}
+</script>
+</body>
+</html>

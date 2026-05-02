@@ -4,8 +4,10 @@ from . import views
 app_name = "core"
 
 urlpatterns = [
-    # หน้าแรก
+    # ✅ หน้าแรกของ core ให้เป็น Home (Public)
     path("", views.home, name="home_page"),
+
+    # Redirect ไป dashboard
     path("go-dashboard/", views.home_redirect, name="home_redirect"),
 
     # Dashboard

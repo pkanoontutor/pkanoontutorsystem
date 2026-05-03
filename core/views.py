@@ -838,9 +838,9 @@ def quiz_admin_list(request: HttpRequest) -> HttpResponse:
     if subject_filter:
         quizzes = quizzes.filter(subject_name__icontains=subject_filter)
     for q in quizzes:
-        q._total_q = q.total_questions()
-        q._total_s = q.total_score()
-        q._attempt_count = q.attempts.filter(status=QuizAttempt.Status.SUBMITTED).count()
+        q.total_q = q.total_questions()
+        q.total_s = q.total_score()
+        q.attempt_count = q.attempts.filter(status=QuizAttempt.Status.SUBMITTED).count()
     subject_names = list(Quiz.objects.values_list("subject_name", flat=True).distinct().order_by("subject_name"))
     return render(request, "core/quiz_admin_list.html", {
         "quizzes": quizzes, "grade_choices": GRADE_CHOICES,

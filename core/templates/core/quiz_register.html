@@ -54,8 +54,8 @@
     <div class="subject-chips">
       {% for q in quizzes %}
       <div class="subject-chip">
-        {% if q.subject.name == "คณิตศาสตร์" %}🔢{% elif q.subject.name == "วิทยาศาสตร์" %}🔬{% elif q.subject.name == "ภาษาอังกฤษ" %}🌏{% else %}📝{% endif %}
-        {{ q.subject.name }}
+        {% if q.subject_name == "คณิตศาสตร์" %}🔢{% elif q.subject_name == "วิทยาศาสตร์" %}🔬{% elif q.subject_name == "ภาษาอังกฤษ" %}🌏{% else %}📝{% endif %}
+        {{ q.subject_name }}
       </div>
       {% endfor %}
     </div>

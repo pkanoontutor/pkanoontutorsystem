@@ -88,9 +88,9 @@
       </div>
 
       <div class="field">
-        <label>โรงเรียน <span class="opt">(ไม่บังคับ)</span></label>
+        <label>โรงเรียน <span class="req">*</span></label>
         <input type="text" name="school" placeholder="ชื่อโรงเรียน"
-               maxlength="200" class="dashed" value="{{ prev.school|default:'' }}"/>
+               maxlength="200" required value="{{ prev.school|default:'' }}"/>
       </div>
 
       <hr class="divider"/>

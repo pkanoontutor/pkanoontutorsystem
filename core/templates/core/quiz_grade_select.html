@@ -74,36 +74,17 @@
   <div class="error-box">⚠️ {{ error }}</div>
   {% endif %}
 
-  <!-- ป.1–ป.6 -->
+  <!-- ป.4–ป.6 -->
   <div class="grade-section">
-    <h2>ประถมศึกษา</h2>
+    <h2>เลือกระดับชั้น</h2>
     <div class="grade-grid">
       {% for code, label in grade_choices %}
-        {% if code|slice:":1" == "ป" %}
-        <div class="grade-btn {% if code not in grades_with_quizzes %}no-quiz{% endif %}"
-             data-grade="{{ code }}"
-             onclick="selectGrade(this)">
-          {{ label }}
-          {% if code in grades_with_quizzes %}<div class="dot"></div>{% endif %}
-        </div>
-        {% endif %}
-      {% endfor %}
-    </div>
-  </div>
-
-  <!-- ม.1–ม.6 -->
-  <div class="grade-section">
-    <h2>มัธยมศึกษา</h2>
-    <div class="grade-grid">
-      {% for code, label in grade_choices %}
-        {% if code|slice:":1" == "ม" %}
-        <div class="grade-btn {% if code not in grades_with_quizzes %}no-quiz{% endif %}"
-             data-grade="{{ code }}"
-             onclick="selectGrade(this)">
-          {{ label }}
-          {% if code in grades_with_quizzes %}<div class="dot"></div>{% endif %}
-        </div>
-        {% endif %}
+      <div class="grade-btn {% if code not in grades_with_quizzes %}no-quiz{% endif %}"
+           data-grade="{{ code }}"
+           onclick="selectGrade(this)">
+        {{ label }}
+        {% if code in grades_with_quizzes %}<div class="dot"></div>{% endif %}
+      </div>
       {% endfor %}
     </div>
   </div>

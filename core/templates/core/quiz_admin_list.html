@@ -1,0 +1,184 @@
+{% load static %}
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>จัดการข้อสอบ – PKanoon Tutor</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Poppins',system-ui,sans-serif;background:#f1f5f9;min-height:100vh;padding-bottom:48px}
+    .topbar{background:#0f172a;color:#fff;padding:14px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+    .topbar h1{font-size:18px;font-weight:800;display:flex;align-items:center;gap:8px}
+    .topbar-links{display:flex;gap:10px;flex-wrap:wrap}
+    .topbar-links a{color:#fdd35e;font-size:13px;font-weight:700;text-decoration:none;padding:5px 10px;border-radius:8px;border:1px solid rgba(253,211,94,.3);transition:.15s}
+    .topbar-links a:hover{background:rgba(253,211,94,.15)}
+    .wrap{max-width:1100px;margin:0 auto;padding:24px 16px}
+
+    /* filter bar */
+    .filter-bar{background:#fff;border-radius:14px;padding:16px 18px;margin-bottom:20px;box-shadow:0 4px 12px rgba(0,0,0,.06);display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end}
+    .filter-field{display:flex;flex-direction:column;gap:4px;min-width:140px}
+    .filter-field label{font-size:12px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.04em}
+    .filter-field select{padding:9px 12px;border:2px solid #e5e7eb;border-radius:10px;font-size:14px;font-family:inherit;outline:none;transition:.15s;background:#fff;cursor:pointer}
+    .filter-field select:focus{border-color:#a855f7}
+    .btn-filter{padding:9px 18px;border-radius:10px;font-size:14px;font-weight:700;border:none;cursor:pointer;background:linear-gradient(135deg,#a855f7,#7c3aed);color:#fff;transition:.15s;align-self:flex-end}
+    .btn-filter:hover{transform:translateY(-1px)}
+    .btn-reset{padding:9px 14px;border-radius:10px;font-size:14px;font-weight:700;border:2px solid #e5e7eb;cursor:pointer;background:#fff;color:#374151;text-decoration:none;display:inline-flex;align-items:center;align-self:flex-end;transition:.15s}
+    .btn-reset:hover{border-color:#94a3b8}
+
+    /* create button */
+    .page-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px}
+    .page-title{font-size:16px;font-weight:800;color:#0f172a}
+    .page-sub{font-size:13px;color:#64748b;margin-top:2px}
+    .btn-create{background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;padding:11px 20px;border-radius:12px;font-size:14px;font-weight:800;text-decoration:none;display:inline-flex;align-items:center;gap:7px;box-shadow:0 4px 12px rgba(34,197,94,.25);transition:.15s}
+    .btn-create:hover{transform:translateY(-1px);box-shadow:0 6px 18px rgba(34,197,94,.35)}
+
+    /* grade group */
+    .grade-group{margin-bottom:28px}
+    .grade-hdr{font-size:13px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.06em;border-left:4px solid #a855f7;padding-left:10px;margin-bottom:10px}
+
+    /* quiz cards */
+    .quiz-list{display:flex;flex-direction:column;gap:10px}
+    .quiz-card{background:#fff;border-radius:14px;padding:16px 18px;box-shadow:0 4px 12px rgba(0,0,0,.06);display:flex;align-items:center;gap:14px;flex-wrap:wrap;transition:.15s;border-left:5px solid #e5e7eb}
+    .quiz-card:hover{box-shadow:0 6px 18px rgba(0,0,0,.1)}
+    .quiz-card.active{border-color:#22c55e}
+    .quiz-card.inactive{border-color:#94a3b8;opacity:.75}
+
+    .quiz-icon{font-size:28px;flex-shrink:0}
+    .quiz-info{flex:1;min-width:0}
+    .quiz-title{font-size:15px;font-weight:800;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .quiz-meta{font-size:12px;color:#64748b;margin-top:3px;display:flex;flex-wrap:wrap;gap:8px}
+    .meta-chip{background:#f1f5f9;border-radius:999px;padding:2px 10px;font-weight:600}
+
+    .quiz-stats{display:flex;gap:16px;flex-shrink:0;text-align:center}
+    .stat-box{display:flex;flex-direction:column;gap:1px}
+    .stat-val{font-size:20px;font-weight:900;color:#0f172a;line-height:1}
+    .stat-lbl{font-size:10px;color:#94a3b8;font-weight:600;text-transform:uppercase}
+
+    .quiz-actions{display:flex;gap:8px;flex-shrink:0;flex-wrap:wrap}
+    .btn-act{padding:8px 13px;border-radius:10px;font-size:13px;font-weight:700;border:none;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:5px;transition:.15s;white-space:nowrap}
+    .btn-act:hover{transform:translateY(-1px)}
+    .btn-edit{background:#ede9fe;color:#7c3aed}
+    .btn-edit:hover{background:#ddd6fe}
+    .btn-toggle-on{background:#dcfce7;color:#166534}
+    .btn-toggle-on:hover{background:#bbf7d0}
+    .btn-toggle-off{background:#fee2e2;color:#b91c1c}
+    .btn-toggle-off:hover{background:#fecaca}
+    .btn-del{background:#f1f5f9;color:#64748b}
+    .btn-del:hover{background:#fee2e2;color:#b91c1c}
+
+    .empty{text-align:center;padding:48px;color:#94a3b8;font-size:15px}
+    .empty .ico{font-size:48px;margin-bottom:10px}
+  </style>
+</head>
+<body>
+
+<div class="topbar">
+  <h1>📝 จัดการข้อสอบ</h1>
+  <div class="topbar-links">
+    <a href="/quiz-report/">📊 รายงานผลสอบ</a>
+    <a href="/quiz/">🔍 หน้าข้อสอบ</a>
+    <a href="/">🏠 หน้าหลัก</a>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <!-- FILTER -->
+  <form method="get" class="filter-bar">
+    <div class="filter-field">
+      <label>ระดับชั้น</label>
+      <select name="grade">
+        <option value="">ทุกระดับชั้น</option>
+        {% for code,label in grade_choices %}
+        <option value="{{ code }}" {% if grade_filter == code %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="filter-field">
+      <label>วิชา</label>
+      <input type="text" name="subject" placeholder="คณิตศาสตร์ / วิทยาศาสตร์..."
+             value="{{ subject_filter }}" list="subj-list" style="padding:9px 12px;border:2px solid #e5e7eb;border-radius:10px;font-size:13px;font-family:inherit;outline:none;background:#fff;width:100%"/>
+      <datalist id="subj-list">
+        {% for sn in subject_names %}<option value="{{ sn }}">{% endfor %}
+      </datalist>
+    </div>
+    <button type="submit" class="btn-filter">🔍 ค้นหา</button>
+    <a href="/quiz-admin/" class="btn-reset">✕ รีเซ็ต</a>
+  </form>
+
+  <!-- PAGE HEADER -->
+  <div class="page-header">
+    <div>
+      <div class="page-title">ชุดข้อสอบทั้งหมด</div>
+      <div class="page-sub">{{ quizzes|length }} ชุด</div>
+    </div>
+    <a class="btn-create" href="/quiz-admin/create/">➕ สร้างชุดข้อสอบใหม่</a>
+  </div>
+
+  {% if quizzes %}
+    {% regroup quizzes by grade_level as grade_groups %}
+    {% for group in grade_groups %}
+    <div class="grade-group">
+      <div class="grade-hdr">ระดับชั้น {{ group.grouper }} ({{ group.list|length }} ชุด)</div>
+      <div class="quiz-list">
+        {% for q in group.list %}
+        <div class="quiz-card {% if q.is_active %}active{% else %}inactive{% endif %}">
+          <div class="quiz-icon">
+            {% if "คณิต" in q.subject_name %}🔢
+            {% elif "วิทย" in q.subject_name %}🔬
+            {% elif "อังกฤษ" in q.subject_name %}🌏
+            {% else %}📝{% endif %}
+          </div>
+          <div class="quiz-info">
+            <div class="quiz-title">{{ q.title }}</div>
+            <div class="quiz-meta">
+              <span class="meta-chip">{{ q.subject_name }}</span>
+              <span class="meta-chip">{{ q.grade_level }}</span>
+              {% if q.time_limit_minutes > 0 %}<span class="meta-chip">⏱ {{ q.time_limit_minutes }} นาที</span>{% else %}<span class="meta-chip">∞ ไม่จำกัดเวลา</span>{% endif %}
+              <span class="meta-chip">ผ่าน {{ q.pass_score }}%</span>
+              {% if q.is_active %}<span style="background:#dcfce7;color:#166534;border-radius:999px;padding:2px 10px;font-weight:700;font-size:12px">✅ เปิด</span>{% else %}<span style="background:#f1f5f9;color:#94a3b8;border-radius:999px;padding:2px 10px;font-weight:700;font-size:12px">⏸ ปิด</span>{% endif %}
+            </div>
+          </div>
+          <div class="quiz-stats">
+            <div class="stat-box">
+              <div class="stat-val">{{ q._total_q }}</div>
+              <div class="stat-lbl">ข้อ</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-val">{{ q._total_s }}</div>
+              <div class="stat-lbl">คะแนน</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-val">{{ q._attempt_count }}</div>
+              <div class="stat-lbl">ผู้สอบ</div>
+            </div>
+          </div>
+          <div class="quiz-actions">
+            <a class="btn-act btn-edit" href="/quiz-admin/{{ q.id }}/edit/">✏️ แก้ไข</a>
+            <form method="post" action="/quiz-admin/{{ q.id }}/toggle/" style="display:inline">
+              {% csrf_token %}
+              <button type="submit" class="btn-act {% if q.is_active %}btn-toggle-on{% else %}btn-toggle-off{% endif %}">
+                {% if q.is_active %}⏸ ปิด{% else %}▶ เปิด{% endif %}
+              </button>
+            </form>
+            <form method="post" action="/quiz-admin/{{ q.id }}/delete/" onsubmit="return confirm('ลบชุดข้อสอบ {{ q.title }} ใช่ไหม? (ลบไม่ได้คืน)')">
+              {% csrf_token %}
+              <button type="submit" class="btn-act btn-del">🗑 ลบ</button>
+            </form>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+  {% else %}
+  <div class="empty">
+    <div class="ico">📭</div>
+    <div>ยังไม่มีชุดข้อสอบ<br>กด <strong>สร้างชุดข้อสอบใหม่</strong> เพื่อเริ่มต้น</div>
+  </div>
+  {% endif %}
+
+</div>
+</body>
+</html>

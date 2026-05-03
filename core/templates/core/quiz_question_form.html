@@ -64,7 +64,7 @@
 <body>
 
 <div class="topbar">
-  <h1>{% if question %}✏️ แก้ไขคำถาม{% else %}➕ เพิ่มคำถาม{% endif %} — {{ quiz.subject.name }} {{ quiz.grade_level }}</h1>
+  <h1>{% if question %}✏️ แก้ไขคำถาม{% else %}➕ เพิ่มคำถาม{% endif %} — {{ quiz.subject_name }} {{ quiz.grade_level }}</h1>
   <a href="/quiz-admin/{{ quiz.id }}/edit/">← กลับ</a>
 </div>
 

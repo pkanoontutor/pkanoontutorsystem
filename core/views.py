@@ -547,13 +547,13 @@ def quiz_register(request: HttpRequest) -> HttpResponse:
     school = request.POST.get("school", "").strip()
     email = request.POST.get("email", "").strip()
 
-    if not grade or not nickname or not firstname or not lastname:
+    if not grade or not nickname or not firstname or not lastname or not school:
         quizzes = _get_ordered_quizzes(grade)
         return render(request, "core/quiz_register.html", {
             "grade": grade,
             "grade_display": dict(GRADE_CHOICES).get(grade, grade),
             "quizzes": quizzes,
-            "error": "กรุณากรอกข้อมูลให้ครบ (ชื่อเล่น / ชื่อจริง / นามสกุล)",
+            "error": "กรุณากรอกข้อมูลให้ครบ (ชื่อเล่น / ชื่อจริง / นามสกุล / โรงเรียน)",
             "prev": request.POST,
         })
 

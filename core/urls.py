@@ -27,6 +27,10 @@ urlpatterns = [
     path("student-portal/home/", views.student_portal_home, name="student_portal_home"),
     path("student-portal/logout/", views.student_portal_logout, name="student_portal_logout"),
 
+    # ✅ Online Course P6
+    path("online-course-p6/", views.online_course_login, name="online_course_login"),
+    path("online-course-p6/home/", views.online_course_home, name="online_course_home"),
+
     # Student ID List (Public)
     path("student-id-list/", views.student_id_list, name="student_id_list"),
 

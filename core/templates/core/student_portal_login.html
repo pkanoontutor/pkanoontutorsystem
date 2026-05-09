@@ -3,16 +3,31 @@
 
 {% block content %}
   <div class="card" style="max-width:520px;margin:0 auto;">
-    <h2 style="margin:0 0 8px 0;">เข้าสู่ระบบผู้ปกครอง</h2>
-    <div style="opacity:.8;font-weight:700;margin-bottom:14px;">
-      เลือก <b>ชื่อน้อง</b> และ <b>เบอร์ผู้ปกครอง (กรณียังไม่ได้แจ้ง ให้เข้าระบบด้วยเบอร์ 0999999999)</b>
-    </div>
+
+    {% if request.path == '/online-course-p6/' %}
+      <h2 style="margin:0 0 8px 0;">เข้าสู่ระบบคอร์สติวออนไลน์ ป.6</h2>
+
+      <div style="opacity:.8;font-weight:700;margin-bottom:14px;">
+        กรุณาเลือก <b>ชื่อน้อง</b> และกรอก <b>เบอร์ผู้ปกครอง</b>
+      </div>
+    {% else %}
+      <h2 style="margin:0 0 8px 0;">เข้าสู่ระบบผู้ปกครอง</h2>
+
+      <div style="opacity:.8;font-weight:700;margin-bottom:14px;">
+        เลือก <b>ชื่อน้อง</b> และ <b>เบอร์ผู้ปกครอง (กรณียังไม่ได้แจ้ง ให้เข้าระบบด้วยเบอร์ 0999999999)</b>
+      </div>
+    {% endif %}
 
     {% if form.errors %}
       <div class="error">
-        {% for err in form.non_field_errors %}{{ err }}{% endfor %}
+        {% for err in form.non_field_errors %}
+          {{ err }}
+        {% endfor %}
+
         {% for field in form %}
-          {% for err in field.errors %}{{ err }}{% endfor %}
+          {% for err in field.errors %}
+            {{ err }}
+          {% endfor %}
         {% endfor %}
       </div>
     {% endif %}
@@ -21,63 +36,85 @@
       {% csrf_token %}
 
       <div class="field">
-        <label for="id_student_id">เลือกชื่อน้อง (ค้นหาด้วยชื่อเล่นได้)</label>
+        <label for="id_student_id">
+          เลือกชื่อน้อง (ค้นหาด้วยชื่อเล่นได้)
+        </label>
+
         {{ form.student_id }}
       </div>
 
       <div class="field">
-        <label for="id_parent_phone">เบอร์ผู้ปกครอง</label>
+        <label for="id_parent_phone">
+          เบอร์ผู้ปกครอง
+        </label>
+
         {{ form.parent_phone }}
       </div>
 
       <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:14px;">
-        <button class="btn btn-blue" type="submit">เข้าสู่ระบบ</button>
+        <button class="btn btn-blue" type="submit">
+          เข้าสู่ระบบ
+        </button>
       </div>
     </form>
   </div>
 
   <!-- ================= Select2 ================= -->
-  <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+
+  <link
+    href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css"
+    rel="stylesheet"
+  />
 
   <style>
-    /* ทำให้ select2 ดูกลืนกับฟอร์ม */
     .select2-container .select2-selection--single {
       height: 40px;
       padding: 6px 10px;
       border-radius: 6px;
       border: 1px solid #ccc;
     }
-    .select2-container--default .select2-selection--single .select2-selection__rendered {
+
+    .select2-container--default
+    .select2-selection--single
+    .select2-selection__rendered {
       line-height: 26px;
     }
   </style>
 
   <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+
   <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 
   <script>
     $(document).ready(function () {
+
       const $studentSelect = $("#id_student_id");
 
       $studentSelect.select2({
         width: "100%",
         placeholder: "พิมพ์ชื่อเล่น / ชื่อจริง / รหัสนักเรียน",
         allowClear: true,
+
         ajax: {
           url: "{% url 'core:student_portal_student_search' %}",
           dataType: "json",
           delay: 250,
+
           data: function (params) {
             return {
               q: params.term || ""
             };
           },
+
           processResults: function (data) {
-            return data;  // ต้อง return {results:[{id,text}]}
+            return data;
           },
+
           cache: true
         }
       });
+
     });
   </script>
+
 {% endblock %}

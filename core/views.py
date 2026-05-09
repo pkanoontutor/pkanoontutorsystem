@@ -737,22 +737,39 @@ def student_portal_student_search(request: HttpRequest) -> JsonResponse:
 def student_portal_login(request: HttpRequest) -> HttpResponse:
     if request.method == "POST":
         form = StudentPortalLoginForm(request.POST)
+
         if form.is_valid():
             student = form.cleaned_data["student"]
             request.session["portal_student_id"] = student.id
+
+            # ✅ ถ้า Login จากปุ่มคอร์สออนไลน์ ป.6 ให้ไปหน้า Online Course
+            if request.path == "/online-course-p6/":
+                return redirect("core:online_course_home")
+
+            # ✅ ถ้า Login จาก Student Portal ปกติ ให้ไปหน้า Student Portal Home
             return redirect("core:student_portal_home")
+
     else:
         form = StudentPortalLoginForm()
 
-    return render(request, "core/student_portal_login.html", {"form": form})
+    return render(request, "core/student_portal_login.html", {
+        "form": form
+    })
+
+
+def online_course_login(request: HttpRequest) -> HttpResponse:
+    return student_portal_login(request)
 
 
 def _get_portal_student(request: HttpRequest) -> Student | None:
     sid = request.session.get("portal_student_id")
+
     if not sid:
         return None
+
     try:
         return Student.objects.get(id=sid, is_active=True)
+
     except Student.DoesNotExist:
         return None
 
@@ -762,8 +779,20 @@ def student_portal_logout(request: HttpRequest) -> HttpResponse:
     return redirect("core:student_portal_login")
 
 
+def online_course_home(request: HttpRequest) -> HttpResponse:
+    student = _get_portal_student(request)
+
+    if not student:
+        return redirect("core:online_course_login")
+
+    return render(request, "core/online_course_home.html", {
+        "student": student,
+    })
+
+
 def student_portal_home(request: HttpRequest) -> HttpResponse:
     student = _get_portal_student(request)
+
     if not student:
         return redirect("core:student_portal_login")
 
@@ -777,12 +806,15 @@ def student_portal_home(request: HttpRequest) -> HttpResponse:
 
     selected_enrollment_id = request.GET.get("enrollment_id")
     selected_enrollment = None
+
     if selected_enrollment_id:
         selected_enrollment = enrollments.filter(id=selected_enrollment_id).first()
+
     if not selected_enrollment and enrollments:
         selected_enrollment = enrollments[0]
 
     attendance_rows = []
+
     if selected_enrollment:
         attendance_rows = (
             Attendance.objects
@@ -792,7 +824,12 @@ def student_portal_home(request: HttpRequest) -> HttpResponse:
         )
 
     remaining_sessions = selected_enrollment.remaining_sessions if selected_enrollment else 0
-    hours_per_session = float(selected_enrollment.tutoring_class.hours_per_session) if selected_enrollment else 0.0
+
+    hours_per_session = (
+        float(selected_enrollment.tutoring_class.hours_per_session)
+        if selected_enrollment else 0.0
+    )
+
     remaining_hours = remaining_sessions * hours_per_session
 
     context = {
@@ -804,6 +841,7 @@ def student_portal_home(request: HttpRequest) -> HttpResponse:
         "hours_per_session": hours_per_session,
         "remaining_hours": remaining_hours,
     }
+
     return render(request, "core/student_portal_home.html", context)
 
 

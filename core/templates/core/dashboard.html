@@ -325,6 +325,33 @@
     font-weight: 900; font-size: 21px; color: #9ca3af;
   }
 
+  /* Student / Enrollment mini action buttons */
+  .student-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    flex: 0 0 auto;
+  }
+  .student-mini-btn {
+    width: 28px;
+    height: 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 9px;
+    text-decoration: none;
+    font-size: 14px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    color: #334155;
+    transition: background .12s, transform .12s, box-shadow .12s;
+  }
+  .student-mini-btn:hover {
+    background: #e2e8f0;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 6px rgba(0,0,0,.08);
+  }
+
   /* Status badge */
   .status-badge {
     display: inline-flex;
@@ -746,7 +773,10 @@
                               {% endwith %}{% endwith %}
                             </div>
                           </div>
-                          <a href="/adminlublub/core/enrollment/{{ e.id }}/change/" title="แก้ไข Enrollment" style="font-size:16px; text-decoration:none; opacity:.5;">🏁</a>
+                          <div class="student-actions">
+                            <a class="student-mini-btn" href="/adminlublub/core/student/{{ e.student_id }}/change/" title="เปิด Student Profile">👤</a>
+                            <a class="student-mini-btn" href="/adminlublub/core/enrollment/{{ e.id }}/change/" title="เปิด Enrollment">📑</a>
+                          </div>
                         </div>
                       </td>
 

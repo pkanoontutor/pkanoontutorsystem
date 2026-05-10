@@ -311,18 +311,18 @@
 
   /* Avatar */
   .avatar {
-    width: 42px; height: 42px;
+    width: 53px; height: 53px;
     border-radius: 999px;
     overflow: hidden;
     border: 1px solid #e5e7eb;
     background: #f3f4f6;
     flex: 0 0 auto;
   }
-  .avatar img { width: 42px; height: 42px; object-fit: cover; display: block; }
+  .avatar img { width: 53px; height: 53px; object-fit: cover; display: block; }
   .avatar-fallback {
-    width: 42px; height: 42px;
+    width: 53px; height: 53px;
     display: flex; align-items: center; justify-content: center;
-    font-weight: 900; font-size: 18px; color: #9ca3af;
+    font-weight: 900; font-size: 21px; color: #9ca3af;
   }
 
   /* Status badge */
@@ -425,6 +425,43 @@
     margin-top: 14px;
   }
   .section-label:first-child { margin-top: 0; }
+
+
+  /* =====================================================
+     WEEKLY SUMMARY / SMALL DATE PICKER / CLASS STATUS
+  ===================================================== */
+  .weekly-bars { display: grid; grid-template-columns: 1.2fr 1fr 1fr; gap: 10px; margin-top: 8px; }
+  .weekbar-card { border: 1px solid #e5e7eb; border-radius: 14px; padding: 10px; background: #f8fafc; min-width: 0; }
+  .weekbar-title { display:flex; justify-content:space-between; gap:8px; font-size:12px; font-weight:900; color:#334155; margin-bottom:7px; }
+  .weekbar-title small { color:#64748b; font-weight:800; white-space:nowrap; }
+  .weekbar-card.total { background:#eff6ff; border-color:#bfdbfe; }
+  @media (max-width: 760px) { .weekly-bars { grid-template-columns: 1fr; } }
+
+  .date-mini-card { display:flex; justify-content:flex-end; margin-top:10px; }
+  .date-mini-form { display:flex; gap:6px; align-items:center; flex-wrap:nowrap; background:#f8fafc; border:1px solid #e5e7eb; border-radius:999px; padding:6px; width:max-content; max-width:100%; }
+  .date-mini-form input[type="date"] { height:32px; padding:4px 8px; border:1px solid #e5e7eb; border-radius:999px; font-size:12px; font-weight:800; background:#fff; max-width:138px; }
+  .date-mini-form button { height:32px; padding:4px 12px !important; border-radius:999px !important; font-size:12px !important; }
+
+  .summary-toggle { display:flex; justify-content:space-between; align-items:center; gap:12px; cursor:pointer; user-select:none; list-style:none; }
+  .summary-toggle::-webkit-details-marker { display:none; }
+  .summary-card-collapsible > .summary-toggle .chev { transform: rotate(-90deg); }
+  .summary-card-collapsible[open] > .summary-toggle .chev { transform: rotate(0deg); }
+  .slot-table { table-layout: fixed; min-width: 860px; }
+  .slot-table th, .slot-table td { width: 11.11%; text-align:center; }
+  .slot-table th:first-child, .slot-table td:first-child { text-align:left; }
+
+  .class-checked { background:#f0fdf4 !important; border-color:#bbf7d0 !important; }
+  .class-unchecked { background:#fffbeb !important; border-color:#fde68a !important; }
+  .class-checked summary, .class-unchecked summary { border-radius:12px; padding:8px 10px; }
+  .class-checked summary { background:#dcfce7; }
+  .class-unchecked summary { background:#fef3c7; }
+
+  .student-line-1 { font-weight:900; color:#111827; }
+  .student-line-2 { margin-top:2px; color:#475569; font-size:12px; font-weight:700; }
+
+  .qbtn-purple { background: linear-gradient(135deg,#7c3aed,#5b21b6); }
+  .qbtn-orange { background: linear-gradient(135deg,#f97316,#c2410c); }
+
 </style>
 {% endblock %}
 
@@ -451,29 +488,86 @@
         📋 เช็คชื่อรวม
         <small>ตารางทุกห้อง</small>
       </a>
+      <a class="qbtn qbtn-slate" href="/adminlublub/">
+        ⚙️ Admin
+        <small>หลังบ้าน</small>
+      </a>
+      <a class="qbtn qbtn-purple" href="#" onclick="return false;">
+        💻 ระบบเรียนออนไลน์
+        <small>เตรียมลิงก์ภายหลัง</small>
+      </a>
+      <a class="qbtn qbtn-orange" href="#" onclick="return false;">
+        📝 ระบบ E-Pretest
+        <small>เตรียมลิงก์ภายหลัง</small>
+      </a>
     </div>
   </div>
 
-  <!-- Global Summary -->
+  <!-- Weekly Summary -->
   <div class="summary-card">
-    <div class="section-label">ภาพรวมวันนี้ — {{ selected_date|date:"d M Y" }}</div>
-    {% with total=global_summary.total|default:0 %}
-      {% if total > 0 %}
-        {% widthratio global_summary.present total 100 as pct_present %}
-        {% widthratio global_summary.excused total 100 as pct_excused %}
-        {% widthratio global_summary.no_show total 100 as pct_no_show %}
+    <div class="section-label">ภาพรวมสัปดาห์นี้ — เสาร์/อาทิตย์</div>
+
+    <div class="weekly-bars" id="weeklyBars">
+      {% with total=two_day_summary.total|default:global_summary.total|default:0 %}
+        {% if total > 0 %}
+          {% widthratio two_day_summary.present|default:global_summary.present total 100 as wk_pct_present %}
+          {% widthratio two_day_summary.excused|default:global_summary.excused total 100 as wk_pct_excused %}
+          {% widthratio two_day_summary.no_show|default:global_summary.no_show total 100 as wk_pct_no_show %}
+        {% endif %}
+      {% endwith %}
+      <div class="weekbar-card total" data-week-card="total">
+        <div class="weekbar-title"><span>รวมสองวัน</span><small>เสาร์+อาทิตย์</small></div>
+        <div class="att-bar-wrap">
+          <div id="bar_total_present" class="att-bar-seg seg-present" style="width:{{ wk_pct_present|default:0 }}%"></div>
+          <div id="bar_total_excused" class="att-bar-seg seg-excused" style="width:{{ wk_pct_excused|default:0 }}%"></div>
+          <div id="bar_total_no_show" class="att-bar-seg seg-no-show" style="width:{{ wk_pct_no_show|default:0 }}%"></div>
+        </div>
+        <div class="att-legend">
+          <span>มา: <b id="wk_total_present">{{ two_day_summary.present|default:global_summary.present|default:0 }}</b></span>
+          <span>ลา: <b id="wk_total_excused">{{ two_day_summary.excused|default:global_summary.excused|default:0 }}</b></span>
+          <span>ขาด: <b id="wk_total_no_show">{{ two_day_summary.no_show|default:global_summary.no_show|default:0 }}</b></span>
+          <span>รวม: <b id="wk_total_total">{{ two_day_summary.total|default:global_summary.total|default:0 }}</b></span>
+        </div>
+      </div>
+
+      {% if selected_date|date:"w" == "6" %}
+        {% with sat_summary=global_summary sat_date=selected_date sun_summary=other_day_summary sun_date=other_day_date %}
+          <div class="weekbar-card" data-week-card="sat">
+            <div class="weekbar-title"><span>วันเสาร์</span><small>{{ sat_date|date:"d/m" }}</small></div>
+            {% with total=sat_summary.total|default:0 %}{% if total > 0 %}{% widthratio sat_summary.present total 100 as sat_pct_present %}{% widthratio sat_summary.excused total 100 as sat_pct_excused %}{% widthratio sat_summary.no_show total 100 as sat_pct_no_show %}{% endif %}{% endwith %}
+            <div class="att-bar-wrap"><div id="bar_sat_present" class="att-bar-seg seg-present" style="width:{{ sat_pct_present|default:0 }}%"></div><div id="bar_sat_excused" class="att-bar-seg seg-excused" style="width:{{ sat_pct_excused|default:0 }}%"></div><div id="bar_sat_no_show" class="att-bar-seg seg-no-show" style="width:{{ sat_pct_no_show|default:0 }}%"></div></div>
+            <div class="att-legend"><span>มา: <b id="wk_sat_present">{{ sat_summary.present|default:0 }}</b></span><span>ลา: <b id="wk_sat_excused">{{ sat_summary.excused|default:0 }}</b></span><span>ขาด: <b id="wk_sat_no_show">{{ sat_summary.no_show|default:0 }}</b></span><span>รวม: <b id="wk_sat_total">{{ sat_summary.total|default:0 }}</b></span></div>
+          </div>
+          <div class="weekbar-card" data-week-card="sun">
+            <div class="weekbar-title"><span>วันอาทิตย์</span><small>{{ sun_date|date:"d/m" }}</small></div>
+            {% with total=sun_summary.total|default:0 %}{% if total > 0 %}{% widthratio sun_summary.present total 100 as sun_pct_present %}{% widthratio sun_summary.excused total 100 as sun_pct_excused %}{% widthratio sun_summary.no_show total 100 as sun_pct_no_show %}{% endif %}{% endwith %}
+            <div class="att-bar-wrap"><div id="bar_sun_present" class="att-bar-seg seg-present" style="width:{{ sun_pct_present|default:0 }}%"></div><div id="bar_sun_excused" class="att-bar-seg seg-excused" style="width:{{ sun_pct_excused|default:0 }}%"></div><div id="bar_sun_no_show" class="att-bar-seg seg-no-show" style="width:{{ sun_pct_no_show|default:0 }}%"></div></div>
+            <div class="att-legend"><span>มา: <b id="wk_sun_present">{{ sun_summary.present|default:0 }}</b></span><span>ลา: <b id="wk_sun_excused">{{ sun_summary.excused|default:0 }}</b></span><span>ขาด: <b id="wk_sun_no_show">{{ sun_summary.no_show|default:0 }}</b></span><span>รวม: <b id="wk_sun_total">{{ sun_summary.total|default:0 }}</b></span></div>
+          </div>
+        {% endwith %}
+      {% else %}
+        {% with sat_summary=other_day_summary sat_date=other_day_date sun_summary=global_summary sun_date=selected_date %}
+          <div class="weekbar-card" data-week-card="sat">
+            <div class="weekbar-title"><span>วันเสาร์</span><small>{{ sat_date|date:"d/m" }}</small></div>
+            {% with total=sat_summary.total|default:0 %}{% if total > 0 %}{% widthratio sat_summary.present total 100 as sat_pct_present %}{% widthratio sat_summary.excused total 100 as sat_pct_excused %}{% widthratio sat_summary.no_show total 100 as sat_pct_no_show %}{% endif %}{% endwith %}
+            <div class="att-bar-wrap"><div id="bar_sat_present" class="att-bar-seg seg-present" style="width:{{ sat_pct_present|default:0 }}%"></div><div id="bar_sat_excused" class="att-bar-seg seg-excused" style="width:{{ sat_pct_excused|default:0 }}%"></div><div id="bar_sat_no_show" class="att-bar-seg seg-no-show" style="width:{{ sat_pct_no_show|default:0 }}%"></div></div>
+            <div class="att-legend"><span>มา: <b id="wk_sat_present">{{ sat_summary.present|default:0 }}</b></span><span>ลา: <b id="wk_sat_excused">{{ sat_summary.excused|default:0 }}</b></span><span>ขาด: <b id="wk_sat_no_show">{{ sat_summary.no_show|default:0 }}</b></span><span>รวม: <b id="wk_sat_total">{{ sat_summary.total|default:0 }}</b></span></div>
+          </div>
+          <div class="weekbar-card" data-week-card="sun">
+            <div class="weekbar-title"><span>วันอาทิตย์</span><small>{{ sun_date|date:"d/m" }}</small></div>
+            {% with total=sun_summary.total|default:0 %}{% if total > 0 %}{% widthratio sun_summary.present total 100 as sun_pct_present %}{% widthratio sun_summary.excused total 100 as sun_pct_excused %}{% widthratio sun_summary.no_show total 100 as sun_pct_no_show %}{% endif %}{% endwith %}
+            <div class="att-bar-wrap"><div id="bar_sun_present" class="att-bar-seg seg-present" style="width:{{ sun_pct_present|default:0 }}%"></div><div id="bar_sun_excused" class="att-bar-seg seg-excused" style="width:{{ sun_pct_excused|default:0 }}%"></div><div id="bar_sun_no_show" class="att-bar-seg seg-no-show" style="width:{{ sun_pct_no_show|default:0 }}%"></div></div>
+            <div class="att-legend"><span>มา: <b id="wk_sun_present">{{ sun_summary.present|default:0 }}</b></span><span>ลา: <b id="wk_sun_excused">{{ sun_summary.excused|default:0 }}</b></span><span>ขาด: <b id="wk_sun_no_show">{{ sun_summary.no_show|default:0 }}</b></span><span>รวม: <b id="wk_sun_total">{{ sun_summary.total|default:0 }}</b></span></div>
+          </div>
+        {% endwith %}
       {% endif %}
-    {% endwith %}
-    <div class="att-bar-wrap">
-      <div id="bar_present" class="att-bar-seg seg-present" style="width:{{ pct_present|default:0 }}%"></div>
-      <div id="bar_excused" class="att-bar-seg seg-excused" style="width:{{ pct_excused|default:0 }}%"></div>
-      <div id="bar_no_show" class="att-bar-seg seg-no-show" style="width:{{ pct_no_show|default:0 }}%"></div>
     </div>
-    <div class="att-legend">
-      <span><i class="dot seg-present"></i>มา: <b id="g_present">{{ global_summary.present }}</b></span>
-      <span><i class="dot seg-excused"></i>ลา: <b id="g_excused">{{ global_summary.excused }}</b></span>
-      <span><i class="dot seg-no-show"></i>ขาด: <b id="g_no_show">{{ global_summary.no_show }}</b></span>
-      <span>รวม: <b id="g_total">{{ global_summary.total }}</b></span>
+
+    <div class="date-mini-card">
+      <form method="get" class="date-mini-form">
+        <input type="date" name="date" value="{{ selected_date|date:'Y-m-d' }}" />
+        <button type="submit" class="btn-submit-cls">ดูวันที่</button>
+      </form>
     </div>
   </div>
 
@@ -488,8 +582,12 @@
   <div class="dash-main">
 
     <!-- Summary per slot -->
-    <div class="card" style="margin-bottom:14px;">
-      <div style="font-weight:900; font-size:15px; margin-bottom:4px;">สรุปวันนี้ แยกตามรอบ</div>
+    <details class="card summary-card-collapsible" style="margin-bottom:14px;" open>
+      <summary class="summary-toggle">
+        <span style="font-weight:900; font-size:15px;">สรุปวันนี้ แยกตามรอบ</span>
+        <span class="chev">▸</span>
+      </summary>
+      <div style="margin-top:10px;">
 
       {% for slot_key, slot in classes_by_time_slot.items %}
         {% if slot.classes %}
@@ -537,13 +635,14 @@
           </div>
         {% endif %}
       {% endfor %}
-    </div>
+      </div>
+    </details>
 
     <!-- Class accordions -->
     <div class="grid" style="gap:12px;">
       {% for cls in classes %}
         {% with s=summary_by_class_id|get_item:cls.id seat=seats_summary_by_class_id|get_item:cls.id %}
-        <details class="card acc" id="classCard-{{ cls.id }}">
+        <details class="card acc {% if s.total|default:0 > 0 %}class-checked{% else %}class-unchecked{% endif %}" id="classCard-{{ cls.id }}">
 
           <summary>
             <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
@@ -634,14 +733,13 @@
                             {% endif %}
                           </div>
                           <div style="flex:1; min-width:0;">
-                            {% if e.remaining_sessions <= 0 %}
-                              <span class="danger">
-                                <b>{{ e.sale_run_no|default:"-" }}{% if e.student.nickname %} | {{ e.student.nickname }}{% endif %}{% if e.student.full_name %} | {{ e.student.full_name }}{% endif %}{% if e.student.grade_level %} | {{ e.student.grade_level }}{% endif %}</b>
-                              </span>
-                              <span class="badge">ครบคอร์ส</span>
-                            {% else %}
-                              <b>{{ e.sale_run_no|default:"-" }}{% if e.student.nickname %} | {{ e.student.nickname }}{% endif %}{% if e.student.full_name %} | {{ e.student.full_name }}{% endif %}{% if e.student.grade_level %} | {{ e.student.grade_level }}{% endif %}</b>
-                            {% endif %}
+                            <div class="student-line-1 {% if e.remaining_sessions <= 0 %}danger{% endif %}">
+                              {{ e.sale_run_no|default:"-" }}{% if e.student.nickname %} | {{ e.student.nickname }}{% endif %}
+                              {% if e.remaining_sessions <= 0 %}<span class="badge">ครบคอร์ส</span>{% endif %}
+                            </div>
+                            <div class="student-line-2">
+                              {{ e.student.full_name|default:"-" }}{% if e.student.grade_level %} | {{ e.student.grade_level }}{% endif %}
+                            </div>
                             <div class="muted" style="margin-top:2px;">
                               {% with seq=course_seq_by_enrollment_id|get_item:e.id %}{% with total=course_total_by_student|get_item:e.student_id %}
                                 คอร์สที่ {{ seq|default:"-" }} / {{ total|default:"-" }}
@@ -700,16 +798,6 @@
 
   <!-- ASIDE -->
   <div class="dash-aside">
-
-    <!-- Date picker (global) -->
-    <div class="card" style="margin-bottom:12px;">
-      <div style="font-weight:900; font-size:14px; margin-bottom:10px;">📅 เลือกวันที่</div>
-      <form method="get" style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
-        <input type="date" name="date" value="{{ selected_date|date:'Y-m-d' }}"
-               style="padding:8px 10px; border:1px solid #e5e7eb; border-radius:10px; font-size:14px; flex:1;" />
-        <button type="submit" class="btn-submit-cls" style="padding:8px 16px; font-size:13px;">ดู</button>
-      </form>
-    </div>
 
     <!-- Two-day summary -->
     {% if two_day_summary %}
@@ -841,21 +929,46 @@
   /* ================================================
      SUMMARY UPDATE
   ================================================ */
-  function setGlobalBar(gs){
-    const total=Number(gs.total||0),p=Number(gs.present||0),e=Number(gs.excused||0),n=Number(gs.no_show||0);
+  function updateBar(prefix, summary){
+    const total=Number(summary.total||0),p=Number(summary.present||0),e=Number(summary.excused||0),n=Number(summary.no_show||0);
     const pP=total>0?p*100/total:0,pE=total>0?e*100/total:0,pN=total>0?n*100/total:0;
-    const bp=document.getElementById("bar_present"),be=document.getElementById("bar_excused"),bn=document.getElementById("bar_no_show");
+    const bp=document.getElementById(`bar_${prefix}_present`),be=document.getElementById(`bar_${prefix}_excused`),bn=document.getElementById(`bar_${prefix}_no_show`);
     if(bp)bp.style.width=pP+"%";
     if(be)be.style.width=pE+"%";
     if(bn)bn.style.width=pN+"%";
   }
 
+  function getNums(prefix){
+    return {
+      present:Number(document.getElementById(`wk_${prefix}_present`)?.textContent||0),
+      excused:Number(document.getElementById(`wk_${prefix}_excused`)?.textContent||0),
+      no_show:Number(document.getElementById(`wk_${prefix}_no_show`)?.textContent||0),
+      total:Number(document.getElementById(`wk_${prefix}_total`)?.textContent||0)
+    };
+  }
+
+  function setNums(prefix, summary){
+    for(const k of ["present","excused","no_show","total"]){
+      const el=document.getElementById(`wk_${prefix}_${k}`);
+      if(el)el.textContent=summary[k]||0;
+    }
+    updateBar(prefix, summary);
+  }
+
+  function refreshWeekTotal(){
+    const sat=getNums("sat"), sun=getNums("sun");
+    setNums("total", {
+      present:sat.present+sun.present,
+      excused:sat.excused+sun.excused,
+      no_show:sat.no_show+sun.no_show,
+      total:sat.total+sun.total
+    });
+  }
+
   function setGlobalSummary(gs){
-    document.getElementById("g_present").textContent=gs.present;
-    document.getElementById("g_excused").textContent=gs.excused;
-    document.getElementById("g_no_show").textContent=gs.no_show;
-    document.getElementById("g_total").textContent=gs.total;
-    setGlobalBar(gs);
+    const selectedIsSat = "{{ selected_date|date:'w' }}" === "6";
+    setNums(selectedIsSat ? "sat" : "sun", gs);
+    refreshWeekTotal();
   }
 
   function setClassSummary(cid,cs){
@@ -937,6 +1050,11 @@
       sumRow.querySelector(".c_total").innerHTML="<b>"+data.class_summary.total+"</b>";
     }
     recomputeSlotTotals();
+    const classCard=document.getElementById("classCard-"+cid);
+    if(classCard){
+      classCard.classList.remove("class-unchecked");
+      classCard.classList.add("class-checked");
+    }
 
     if(data.remaining_map){
       for(const[eid,rem]of Object.entries(data.remaining_map)){
@@ -963,6 +1081,15 @@
      INIT
   ================================================ */
   document.addEventListener("DOMContentLoaded",()=>{
+    // hide unused header links from base.html on dashboard only
+    document.querySelectorAll("header a, nav a, .navbar a, .topbar a").forEach(a=>{
+      const text=(a.textContent||"").trim().toLowerCase();
+      const href=(a.getAttribute("href")||"").toLowerCase();
+      if(["dashboard","sheet","inventory","admin"].includes(text) || href.includes("sheet") || href.includes("inventory")){
+        a.style.display="none";
+      }
+    });
+
     // open accordion from hash
     if(window.location.hash&&window.location.hash.startsWith("#classCard-")){
       const el=document.querySelector(window.location.hash);
@@ -981,6 +1108,11 @@
       else setBadge(eid,"none");
     });
     recomputeSlotTotals();
+    const classCard=document.getElementById("classCard-"+cid);
+    if(classCard){
+      classCard.classList.remove("class-unchecked");
+      classCard.classList.add("class-checked");
+    }
     document.querySelectorAll("details[id^='classCard-']").forEach(det=>{
       const cid=det.id.replace("classCard-","");
       ensureClass(cid);setFilter(cid,"all");

@@ -5,425 +5,505 @@
 
 {% block head %}
 <style>
-  .two-col { display:flex; gap:14px; align-items:flex-start; }
-  .left { flex: 1.6; min-width: 520px; }
-  .right { flex: 1; min-width: 360px; position: sticky; top: 12px; }
-  @media (max-width: 1100px){
-    .two-col { flex-direction: column; }
-    .left, .right { min-width: unset; position: static; }
+  /* =====================================================
+     RESET & BASE
+  ===================================================== */
+  * { box-sizing: border-box; }
+
+  /* =====================================================
+     TOOLBAR (TOP)
+  ===================================================== */
+  .dash-toolbar {
+    display: flex;
+    gap: 12px;
+    align-items: stretch;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
   }
 
-  /* ✅ ปุ่มหลัก */
-  .btn-att { color:#fff !important; font-weight:900 !important; }
-  .btn-green { background:#16a34a !important; border-color:#16a34a !important; } /* มา */
-  .btn-yellow { background:#eab308 !important; border-color:#eab308 !important; } /* ลา */
-  .btn-red { background:#dc2626 !important; border-color:#dc2626 !important; } /* ขาด */
-  .btn-submit { background:#2563eb !important; border-color:#2563eb !important; color:#fff !important; font-weight:900 !important; }
-  .btn-go { background:#111827 !important; border-color:#111827 !important; color:#fff !important; font-weight:900 !important; }
-  .btn-primary { background:#2563eb !important; border-color:#2563eb !important; color:#fff !important; font-weight:900 !important; }
-  .btn-success { background:#16a34a !important; border-color:#16a34a !important; color:#fff !important; font-weight:900 !important; }
-
-  /* ✅ ปุ่มสร้างเอกสาร */
-  .btn-doc { background:#0f766e !important; border-color:#0f766e !important; color:#fff !important; font-weight:900 !important; }
-
-  /* ✅ กดแล้วกรอบดำ + ปุ่มอื่นจางลง */
-  .active-btn { outline: 2px solid #000 !important; outline-offset: 1px; }
-  .btn-dim { opacity: .35 !important; filter: saturate(.6); }
-
-  /* ✅ Avatar */
-  .avatar {
-    width:51px; height:51px;
-    border-radius:999px;
-    overflow:hidden;
-    border:1px solid #e5e7eb;
-    background:#f3f4f6;
-    flex:0 0 auto;
-  }
-  .avatar img {
-    width:51px; height:51px;
-    object-fit:cover;
-    display:block;
-  }
-  .avatar-fallback {
-    width:51px; height:51px;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    font-weight:900;
-    color:#6b7280;
-    user-select:none;
+  /* Quick-action buttons */
+  .quickbtn-group {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: stretch;
   }
 
-  /* ✅ Toolbar */
-  .toolbar-card { flex: 1; }
-  .toolbar-grid{
-    display:grid;
-    grid-template-columns: repeat(4, minmax(160px, 1fr));
-    gap:10px;
-    align-items:stretch;
+  .qbtn {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    padding: 12px 16px;
+    border-radius: 14px;
+    text-decoration: none;
+    font-weight: 900;
+    font-size: 14px;
+    color: #fff !important;
+    line-height: 1.2;
+    border: none;
+    cursor: pointer;
+    transition: transform .12s ease, box-shadow .12s ease;
+    white-space: nowrap;
+    min-width: 130px;
   }
-  @media (max-width: 1100px){
-    .toolbar-grid{ grid-template-columns: repeat(2, minmax(160px, 1fr)); }
-  }
-  @media (max-width: 520px){
-    .toolbar-grid{ grid-template-columns: 1fr; }
-  }
-  .toolbtn{
-    display:flex;
-    flex-direction:column;
-    gap:2px;
-    padding:10px 12px;
-    border-radius:10px;
-    border:1px solid rgba(255,255,255,.15);
-    text-decoration:none;
-    color:#fff !important;
-    font-weight:900;
-    line-height:1.1;
-  }
-  .toolbtn small{
-    font-weight:800;
-    opacity:.92;
-    font-size: 50%;
-  }
-  .toolbtn.t1{ background:#2563eb; }
-  .toolbtn.t2{ background:#16a34a; }
-  .toolbtn.t3{ background:#111827; }
-  .toolbtn.t4{ background:#0f766e; }
+  .qbtn:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(0,0,0,.18); }
+  .qbtn small { font-size: 11px; font-weight: 700; opacity: .88; }
 
-  /* ✅ Global attendance bar */
-  .att-bar-wrap{
-    border:1px solid #e5e7eb;
-    border-radius:999px;
-    overflow:hidden;
-    height:14px;
-    background:#f3f4f6;
-    display:flex;
-  }
-  .att-bar-seg{ height:14px; }
-  .seg-present{ background:#16a34a; }
-  .seg-excused{ background:#eab308; }
-  .seg-no-show{ background:#dc2626; }
-  .att-legend{
-    display:flex;
-    gap:10px;
-    flex-wrap:wrap;
-    margin-top:8px;
-    font-size:12px;
-    color:#6b7280;
-  }
-  .dot{
-    width:10px; height:10px; border-radius:999px; display:inline-block; margin-right:6px;
-  }
+  .qbtn-blue   { background: linear-gradient(135deg,#2563eb,#1d4ed8); }
+  .qbtn-green  { background: linear-gradient(135deg,#16a34a,#15803d); }
+  .qbtn-slate  { background: linear-gradient(135deg,#334155,#1e293b); }
 
-  /* ✅ Date control ต่อห้อง */
-  .class-toprow{
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-    gap:10px;
-    flex-wrap:wrap;
-  }
-  .class-datebox{
-    display:flex;
-    gap:8px;
-    align-items:center;
-    flex-wrap:wrap;
-  }
-  .class-datebox input[type="date"]{
-    padding:6px 8px;
-    border:1px solid #e5e7eb;
-    border-radius:8px;
-  }
-
-  /* ✅ Summary ใต้ชื่อห้อง */
-  .seat-line{
-    margin-top:6px;
-    font-size:12px;
-    color:#374151;
-    display:flex;
-    gap:10px;
-    flex-wrap:wrap;
-  }
-  .seat-pill{
-    background:#f3f4f6;
-    border:1px solid #e5e7eb;
-    padding:4px 8px;
-    border-radius:999px;
-    font-weight:900;
-  }
-  .att-line{
-    margin-top:6px;
-    font-size:12px;
-    display:flex;
-    gap:12px;
-    flex-wrap:wrap;
-    font-weight:900;
-  }
-  .t-present{ color:#16a34a; }
-  .t-excused{ color:#ca8a04; }
-  .t-noshow{ color:#dc2626; }
-  .t-total{ color:#111827; }
-
-  /* ✅ Summary table extra columns background */
-  .bg-soft{ background:#f3f4f6; }
-
-  /* ✅ Accordion */
-  .acc summary{
-    cursor:pointer;
-    user-select:none;
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    gap:10px;
-    font-weight:900;
-    font-size:16px;
-    list-style:none;
-  }
-  .acc summary::-webkit-details-marker{ display:none; }
-  .chev{
-    display:inline-block;
-    transform: rotate(-90deg);
-    transition: transform .15s ease;
-    font-weight:900;
-  }
-  details[open] .chev{ transform: rotate(0deg); }
-
-  /* ✅ subtotal row */
-  .subtotal-row td{
-    background:#f9fafb;
-    font-weight:900;
-    border-top:2px solid #e5e7eb;
+  /* Global summary card */
+  .summary-card {
+    flex: 1;
+    min-width: 260px;
+    background: #fff;
+    border-radius: 16px;
+    padding: 14px 16px;
+    box-shadow: 0 4px 10px rgba(0,0,0,.08);
+    border: 1px solid rgba(255,255,255,.8);
   }
 
   /* =====================================================
-     ✅ NEW UI: เช็คชื่อใช้งานง่ายขึ้น
-     ===================================================== */
-  .class-tools{
-    display:flex;
-    gap:10px;
-    flex-wrap:wrap;
-    align-items:center;
-    justify-content:space-between;
-    margin-top:10px;
-    padding:10px;
-    border:1px solid #e5e7eb;
-    border-radius:12px;
-    background:#fafafa;
+     LAYOUT
+  ===================================================== */
+  .dash-body {
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
   }
-  .searchbox{
-    display:flex; gap:8px; align-items:center; flex:1;
-    min-width: 220px;
-  }
-  .searchbox input{
-    width:100%;
-    padding:8px 10px;
-    border:1px solid #e5e7eb;
-    border-radius:10px;
-    font-weight:800;
-  }
-  .filterchips{
-    display:flex; gap:8px; flex-wrap:wrap;
-  }
-  .chip{
-    padding:6px 10px;
-    border:1px solid #e5e7eb;
-    border-radius:999px;
-    background:#fff;
-    font-weight:900;
-    font-size:12px;
-    cursor:pointer;
-    user-select:none;
-  }
-  .chip.active{
-    border-color:#111827;
-    box-shadow: 0 0 0 2px rgba(17,24,39,.08);
+  .dash-main  { flex: 1; min-width: 0; }
+  .dash-aside { width: 280px; flex-shrink: 0; position: sticky; top: 12px; }
+
+  @media (max-width: 1100px) {
+    .dash-body  { flex-direction: column; }
+    .dash-aside { width: 100%; position: static; }
   }
 
-  .status-badge{
-    display:inline-flex;
-    align-items:center;
-    gap:6px;
-    padding:3px 10px;
-    border-radius:999px;
-    font-size:12px;
-    font-weight:900;
-    border:1px solid #e5e7eb;
-    background:#fff;
-    white-space:nowrap;
+  /* =====================================================
+     ATTENDANCE BAR
+  ===================================================== */
+  .att-bar-wrap {
+    border: 1px solid #e5e7eb;
+    border-radius: 999px;
+    overflow: hidden;
+    height: 12px;
+    background: #f3f4f6;
+    display: flex;
   }
-  .sb-present{ border-color:#bbf7d0; background:#f0fdf4; color:#166534; }
-  .sb-excused{ border-color:#fde68a; background:#fffbeb; color:#92400e; }
-  .sb-no-show{ border-color:#fecaca; background:#fef2f2; color:#991b1b; }
-  .sb-none{ color:#374151; background:#f9fafb; }
+  .att-bar-seg { height: 12px; }
+  .seg-present { background: #16a34a; }
+  .seg-excused { background: #eab308; }
+  .seg-no-show { background: #dc2626; }
+  .att-legend {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 7px;
+    font-size: 12px;
+    color: #6b7280;
+  }
+  .dot { width: 9px; height: 9px; border-radius: 999px; display: inline-block; margin-right: 5px; }
 
-  /* segmented buttons */
-  .segwrap{
-    display:inline-flex;
-    border:1px solid #e5e7eb;
-    border-radius:12px;
-    overflow:hidden;
-    background:#fff;
+  /* =====================================================
+     SUMMARY TABLE
+  ===================================================== */
+  .sum-table-wrap { overflow-x: auto; margin-top: 6px; }
+  .sum-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .sum-table th {
+    text-align: left;
+    font-size: 11px;
+    color: #64748b;
+    padding: 8px 10px;
+    border-bottom: 1px solid #e5e7eb;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    background: #f8fafc;
+    white-space: nowrap;
   }
-  .segbtn{
-    border:0 !important;
-    border-right:1px solid #e5e7eb !important;
-    border-radius:0 !important;
-    padding:10px 12px !important;
-    min-width: 56px;
-    font-weight:900 !important;
+  .sum-table td { padding: 9px 10px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+  .sum-table tfoot td { background: #f8fafc; font-weight: 900; border-top: 2px solid #e5e7eb; }
+  .sum-table tr:hover td { background: #fafafa; }
+  .bg-soft { background: #f8fafc !important; }
+  .subtotal-row td { background: #f9fafb; font-weight: 900; border-top: 2px solid #e5e7eb; }
+
+  /* Link in table */
+  .go-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: #f1f5f9;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 4px 10px;
+    font-size: 12px;
+    font-weight: 900;
+    color: #1e293b;
+    text-decoration: none;
+    transition: background .12s;
+    white-space: nowrap;
   }
-  .segbtn:last-child{ border-right:0 !important; }
-  .segbtn.btn-dim{ opacity:.35 !important; }
-  @media (max-width: 520px){
-    .segbtn{ padding:10px 10px !important; min-width: 52px; }
+  .go-link:hover { background: #e2e8f0; }
+
+  /* =====================================================
+     CLASS ACCORDION
+  ===================================================== */
+  .acc summary {
+    cursor: pointer;
+    user-select: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    font-weight: 900;
+    font-size: 16px;
+    list-style: none;
+    padding: 4px 0;
+  }
+  .acc summary::-webkit-details-marker { display: none; }
+  .chev {
+    display: inline-block;
+    transform: rotate(-90deg);
+    transition: transform .15s ease;
+    font-weight: 900;
+    color: #94a3b8;
+  }
+  details[open] .chev { transform: rotate(0deg); }
+
+  .class-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-top: 12px;
   }
 
-  /* table readability */
-  .att-table{
-    width:100%;
-    border-collapse:separate;
-    border-spacing:0;
+  .seat-chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+  .seat-chip {
+    background: #f1f5f9;
+    border: 1px solid #e2e8f0;
+    border-radius: 999px;
+    padding: 3px 10px;
+    font-size: 12px;
+    font-weight: 800;
+    color: #334155;
+    white-space: nowrap;
   }
-  .att-table thead th{
+
+  .att-line { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 6px; font-size: 13px; font-weight: 900; }
+  .t-present { color: #16a34a; }
+  .t-excused  { color: #ca8a04; }
+  .t-noshow   { color: #dc2626; }
+  .t-total    { color: #111827; }
+
+  /* Date row */
+  .date-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .date-row input[type="date"] {
+    padding: 7px 10px;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 700;
+  }
+  .btn-go {
+    background: #1e293b;
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    padding: 7px 14px;
+    font-weight: 900;
+    font-size: 13px;
+    cursor: pointer;
+    transition: background .12s;
+  }
+  .btn-go:hover { background: #0f172a; }
+
+  .btn-submit-cls {
+    background: linear-gradient(135deg,#2563eb,#1d4ed8);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    padding: 9px 18px;
+    font-weight: 900;
+    font-size: 14px;
+    cursor: pointer;
+    transition: transform .12s, box-shadow .12s;
+    white-space: nowrap;
+  }
+  .btn-submit-cls:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(37,99,235,.35); }
+
+  /* =====================================================
+     SEARCH & FILTER
+  ===================================================== */
+  .class-tools {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 12px;
+    padding: 10px 12px;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    background: #fafafa;
+  }
+  .searchbox { display: flex; gap: 8px; align-items: center; flex: 1; min-width: 200px; }
+  .searchbox input {
+    width: 100%;
+    padding: 7px 10px;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 700;
+  }
+  .filterchips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .chip {
+    padding: 5px 12px;
+    border: 1px solid #e5e7eb;
+    border-radius: 999px;
+    background: #fff;
+    font-weight: 900;
+    font-size: 12px;
+    cursor: pointer;
+    user-select: none;
+    transition: all .12s;
+  }
+  .chip.active {
+    border-color: #334155;
+    background: #f1f5f9;
+    box-shadow: 0 0 0 2px rgba(51,65,85,.1);
+  }
+
+  /* =====================================================
+     ATTENDANCE TABLE
+  ===================================================== */
+  .att-table-wrap { overflow-x: auto; margin-top: 10px; }
+  .att-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 13px;
+  }
+  .att-table thead th {
     position: sticky;
     top: 0;
-    background:#fff;
+    background: #fff;
     z-index: 2;
-    border-bottom:1px solid #e5e7eb;
+    border-bottom: 1px solid #e5e7eb;
+    padding: 9px 10px;
+    font-size: 11px;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    font-weight: 700;
+    white-space: nowrap;
   }
-  .att-table tr:hover td{
-    background:#fafafa;
+  .att-table td { padding: 9px 10px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+  .att-table tr:hover td { background: #fafafa; }
+  .cell-tight { white-space: nowrap; }
+
+  /* Avatar */
+  .avatar {
+    width: 42px; height: 42px;
+    border-radius: 999px;
+    overflow: hidden;
+    border: 1px solid #e5e7eb;
+    background: #f3f4f6;
+    flex: 0 0 auto;
   }
-  .cell-tight{ white-space:nowrap; }
+  .avatar img { width: 42px; height: 42px; object-fit: cover; display: block; }
+  .avatar-fallback {
+    width: 42px; height: 42px;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 900; font-size: 18px; color: #9ca3af;
+  }
+
+  /* Status badge */
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 9px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 900;
+    border: 1px solid #e5e7eb;
+    background: #fff;
+    white-space: nowrap;
+  }
+  .sb-present { border-color: #bbf7d0; background: #f0fdf4; color: #166534; }
+  .sb-excused { border-color: #fde68a; background: #fffbeb; color: #92400e; }
+  .sb-no-show { border-color: #fecaca; background: #fef2f2; color: #991b1b; }
+  .sb-none    { color: #6b7280; background: #f9fafb; }
+
+  /* Segmented attendance buttons */
+  .segwrap {
+    display: inline-flex;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    overflow: hidden;
+    background: #fff;
+  }
+  .segbtn {
+    border: 0 !important;
+    border-right: 1px solid #e5e7eb !important;
+    border-radius: 0 !important;
+    padding: 8px 13px !important;
+    min-width: 50px;
+    font-weight: 900 !important;
+    font-size: 13px !important;
+    cursor: pointer;
+    color: #fff !important;
+    transition: opacity .12s;
+  }
+  .segbtn:last-child { border-right: 0 !important; }
+  .btn-green  { background: #16a34a !important; }
+  .btn-yellow { background: #eab308 !important; }
+  .btn-red    { background: #dc2626 !important; }
+  .active-btn { outline: 2px solid #000 !important; outline-offset: 1px; }
+  .btn-dim    { opacity: .3 !important; filter: saturate(.5); }
+
+  /* Danger text */
+  .danger { color: #b91c1c; font-weight: 900; }
+  .badge {
+    display: inline-block;
+    padding: 2px 7px;
+    border-radius: 999px;
+    font-size: 11px;
+    background: #fee2e2;
+    color: #b91c1c;
+    border: 1px solid #fecaca;
+    margin-left: 5px;
+    font-weight: 800;
+  }
+  .muted { color: #6b7280; font-size: 12px; }
+
+  /* Aside quick links */
+  .aside-link {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    text-decoration: none;
+    font-weight: 800;
+    font-size: 13px;
+    color: #1e293b;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    transition: background .12s, box-shadow .12s;
+  }
+  .aside-link:hover { background: #e2e8f0; box-shadow: 0 2px 6px rgba(0,0,0,.08); }
+
+  /* Two-day summary table in aside */
+  .two-day-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 8px; }
+  .two-day-table th {
+    font-size: 10px; color: #64748b; padding: 5px 8px;
+    border-bottom: 1px solid #e5e7eb; text-transform: uppercase; background: #f8fafc;
+  }
+  .two-day-table td { padding: 6px 8px; border-bottom: 1px solid #f1f5f9; }
+
+  /* Card base (from base.html) supplement */
+  .card { background: #fff; border-radius: 16px; padding: 16px; box-shadow: 0 4px 10px rgba(0,0,0,.08), 0 1px 3px rgba(0,0,0,.05); border: 1px solid rgba(255,255,255,.8); }
+  .grid { display: grid; gap: 14px; }
+
+  /* Section label */
+  .section-label {
+    font-size: 11px;
+    font-weight: 800;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    margin-bottom: 6px;
+    margin-top: 14px;
+  }
+  .section-label:first-child { margin-top: 0; }
 </style>
 {% endblock %}
 
 {% block content %}
 
-<div class="topbar">
-  <div class="card toolbar-card" style="min-width:280px;">
-    <div class="toolbar-grid">
-      <a class="toolbtn t1" href="/adminlublub/core/student/add/">
-        + New Student
-        <small>เพิ่มนักเรียนใหม่</small>
-      </a>
-      <a class="toolbtn t2" href="/adminlublub/core/enrollment/add/">
-        + New Enrollment
-        <small>ขายคอร์ส</small>
-      </a>
+<!-- =====================================================
+     TOP TOOLBAR
+===================================================== -->
+<div class="dash-toolbar">
 
-      <!-- ✅ เอา Sheet ออกแล้ว -->
-      <a class="toolbtn t3" href="/attendance-details/">
-        Student Attendance
-        <small>ตารางเช็คชื่อรวม</small>
+  <!-- Quick Actions -->
+  <div class="card" style="padding:12px 14px;">
+    <div class="section-label">Quick Actions</div>
+    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+      <a class="qbtn qbtn-blue" href="/adminlublub/core/student/add/">
+        + นักเรียนใหม่
+        <small>เพิ่มในระบบ</small>
       </a>
-      <a class="toolbtn t4" href="{% url 'core:export_excel' %}">
-        Export Excel
-        <small>ดาวน์โหลดข้อมูลทั้งหมด</small>
+      <a class="qbtn qbtn-green" href="/adminlublub/core/enrollment/add/">
+        + ขายคอร์ส
+        <small>Enrollment ใหม่</small>
+      </a>
+      <a class="qbtn qbtn-slate" href="/attendance-details/">
+        📋 เช็คชื่อรวม
+        <small>ตารางทุกห้อง</small>
       </a>
     </div>
   </div>
 
-  <div class="card" style="min-width:280px; flex: 0.9;">
+  <!-- Global Summary -->
+  <div class="summary-card">
+    <div class="section-label">ภาพรวมวันนี้ — {{ selected_date|date:"d M Y" }}</div>
     {% with total=global_summary.total|default:0 %}
       {% if total > 0 %}
         {% widthratio global_summary.present total 100 as pct_present %}
         {% widthratio global_summary.excused total 100 as pct_excused %}
         {% widthratio global_summary.no_show total 100 as pct_no_show %}
-      {% else %}
-        {% with pct_present=0 pct_excused=0 pct_no_show=0 %}{% endwith %}
       {% endif %}
     {% endwith %}
-
-    <div style="font-weight:900; margin-bottom:8px;">ภาพรวมวันนี้</div>
-
-    <div class="att-bar-wrap" aria-label="attendance percent bar">
-      <div id="bar_present" class="att-bar-seg seg-present" style="width: {{ pct_present|default:0 }}%;"></div>
-      <div id="bar_excused" class="att-bar-seg seg-excused" style="width: {{ pct_excused|default:0 }}%;"></div>
-      <div id="bar_no_show" class="att-bar-seg seg-no-show" style="width: {{ pct_no_show|default:0 }}%;"></div>
+    <div class="att-bar-wrap">
+      <div id="bar_present" class="att-bar-seg seg-present" style="width:{{ pct_present|default:0 }}%"></div>
+      <div id="bar_excused" class="att-bar-seg seg-excused" style="width:{{ pct_excused|default:0 }}%"></div>
+      <div id="bar_no_show" class="att-bar-seg seg-no-show" style="width:{{ pct_no_show|default:0 }}%"></div>
     </div>
-
     <div class="att-legend">
       <span><i class="dot seg-present"></i>มา: <b id="g_present">{{ global_summary.present }}</b></span>
       <span><i class="dot seg-excused"></i>ลา: <b id="g_excused">{{ global_summary.excused }}</b></span>
       <span><i class="dot seg-no-show"></i>ขาด: <b id="g_no_show">{{ global_summary.no_show }}</b></span>
       <span>รวม: <b id="g_total">{{ global_summary.total }}</b></span>
     </div>
-
-    {% if two_day_summary %}
-      <div style="margin-top:10px; border-top:1px solid #e5e7eb; padding-top:10px;">
-        <div style="font-weight:900; margin-bottom:6px;">สรุปรวมรายวัน / รวมสองวัน</div>
-        <div style="overflow:auto;">
-          <table>
-            <thead>
-              <tr>
-                <th>ช่วง</th>
-                <th>มา</th>
-                <th>ลา</th>
-                <th>ขาด</th>
-                <th>รวม</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td><b>{{ selected_date|date:"Y-m-d" }}</b></td>
-                <td>{{ global_summary.present|default:0 }}</td>
-                <td>{{ global_summary.excused|default:0 }}</td>
-                <td>{{ global_summary.no_show|default:0 }}</td>
-                <td><b>{{ global_summary.total|default:0 }}</b></td>
-              </tr>
-              {% if other_day_summary %}
-              <tr>
-                <td><b>{{ other_day_date|date:"Y-m-d" }}</b></td>
-                <td>{{ other_day_summary.present|default:0 }}</td>
-                <td>{{ other_day_summary.excused|default:0 }}</td>
-                <td>{{ other_day_summary.no_show|default:0 }}</td>
-                <td><b>{{ other_day_summary.total|default:0 }}</b></td>
-              </tr>
-              {% endif %}
-              <tr class="subtotal-row">
-                <td><b>รวมสองวัน</b></td>
-                <td>{{ two_day_summary.present|default:0 }}</td>
-                <td>{{ two_day_summary.excused|default:0 }}</td>
-                <td>{{ two_day_summary.no_show|default:0 }}</td>
-                <td><b>{{ two_day_summary.total|default:0 }}</b></td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    {% endif %}
   </div>
+
 </div>
 
-<div class="two-col">
-  <div class="left">
+<!-- =====================================================
+     BODY
+===================================================== -->
+<div class="dash-body">
 
-    <!-- ✅ (1) Summary per class -->
-    <div class="card" style="margin-bottom:12px;">
-      <div style="font-weight:900; margin-bottom:8px;">
-        สรุปวันนี้ (แยกตามรอบเวลา)
-      </div>
+  <!-- MAIN -->
+  <div class="dash-main">
+
+    <!-- Summary per slot -->
+    <div class="card" style="margin-bottom:14px;">
+      <div style="font-weight:900; font-size:15px; margin-bottom:4px;">สรุปวันนี้ แยกตามรอบ</div>
 
       {% for slot_key, slot in classes_by_time_slot.items %}
         {% if slot.classes %}
-          <div style="margin-top:14px; font-weight:900; color:#111827;">
-            {{ slot.label }}
-          </div>
-
-          <div style="overflow:auto; margin-top:6px;">
-            <table class="slot-table" data-slot="{{ slot_key }}">
+          <div class="section-label" style="margin-top:12px;">{{ slot.label }}</div>
+          <div class="sum-table-wrap">
+            <table class="sum-table slot-table" data-slot="{{ slot_key }}">
               <thead>
                 <tr>
                   <th>ห้อง</th>
-                  <th>มา</th>
-                  <th>ลา</th>
-                  <th>ขาด</th>
-                  <th>รวม</th>
+                  <th>มา</th><th>ลา</th><th>ขาด</th><th>รวม</th>
                   <th class="bg-soft">ที่นั่งรวม</th>
-                  <th class="bg-soft">ระหว่างเรียน</th>
-                  <th class="bg-soft">ที่นั่งว่าง</th>
-                  <th>ไปที่ห้อง</th>
+                  <th class="bg-soft">เรียนอยู่</th>
+                  <th class="bg-soft">ว่าง</th>
+                  <th></th>
                 </tr>
               </thead>
               <tbody>
@@ -431,27 +511,21 @@
                   {% with s=summary_by_class_id|get_item:cls.id seat=seats_summary_by_class_id|get_item:cls.id %}
                   <tr id="summaryRow-{{ cls.id }}">
                     <td><b>{{ cls.name }}</b></td>
-
                     <td class="c_present">{{ s.present|default:0 }}</td>
                     <td class="c_excused">{{ s.excused|default:0 }}</td>
                     <td class="c_no_show">{{ s.no_show|default:0 }}</td>
                     <td class="c_total"><b>{{ s.total|default:0 }}</b></td>
-
-                    <td class="bg-soft"><b>{{ seat.seats_total|default:0 }}</b></td>
-                    <td class="bg-soft"><b>{{ seat.seats_in_progress|default:0 }}</b></td>
-                    <td class="bg-soft"><b>{{ seat.seats_available|default:0 }}</b></td>
-
-                    <td>
-                      <a class="btn" href="#classCard-{{ cls.id }}">ไป</a>
-                    </td>
+                    <td class="bg-soft">{{ seat.seats_total|default:0 }}</td>
+                    <td class="bg-soft">{{ seat.seats_in_progress|default:0 }}</td>
+                    <td class="bg-soft">{{ seat.seats_available|default:0 }}</td>
+                    <td><a class="go-link" href="#classCard-{{ cls.id }}">ไป ↓</a></td>
                   </tr>
                   {% endwith %}
                 {% endfor %}
               </tbody>
-
               <tfoot>
-                <tr class="subtotal-row">
-                  <td><b>รวมรอบเวลา: {{ slot.label }}</b></td>
+                <tr>
+                  <td><b>รวม {{ slot.label }}</b></td>
                   <td id="slot-{{ slot_key }}-present">{{ slot_totals|get_item:slot_key|get_item:"present"|default:0 }}</td>
                   <td id="slot-{{ slot_key }}-excused">{{ slot_totals|get_item:slot_key|get_item:"excused"|default:0 }}</td>
                   <td id="slot-{{ slot_key }}-no_show">{{ slot_totals|get_item:slot_key|get_item:"no_show"|default:0 }}</td>
@@ -465,71 +539,70 @@
       {% endfor %}
     </div>
 
-    <!-- ✅ Class cards (เช็คชื่อ) -->
-    <div class="grid" style="gap:14px;">
+    <!-- Class accordions -->
+    <div class="grid" style="gap:12px;">
       {% for cls in classes %}
         {% with s=summary_by_class_id|get_item:cls.id seat=seats_summary_by_class_id|get_item:cls.id %}
         <details class="card acc" id="classCard-{{ cls.id }}">
+
           <summary>
-            <span>{{ cls.name }}</span>
-            <span style="display:flex; align-items:center; gap:10px;">
-              <span id="miniSummary-{{ cls.id }}" class="muted" style="font-size:12px; font-weight:900;">
+            <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+              <span style="font-size:16px; font-weight:900;">{{ cls.name }}</span>
+              <span id="miniSummary-{{ cls.id }}" style="font-size:12px; font-weight:700; color:#64748b;">
                 มา {{ s.present|default:0 }} | ลา {{ s.excused|default:0 }} | ขาด {{ s.no_show|default:0 }} | รวม {{ s.total|default:0 }}
               </span>
-              <span class="chev">▸</span>
-            </span>
+            </div>
+            <span class="chev">▸</span>
           </summary>
 
-          <div class="class-header" style="margin-top:10px;">
-            <div class="class-toprow">
-              <div class="class-title" style="font-weight:900;">{{ cls.name }}</div>
-
-              <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-                <div class="class-datebox">
-                  <span class="muted">วันที่:</span>
-                  <input type="date" id="date-{{ cls.id }}" value="{{ selected_date|date:'Y-m-d' }}" />
-                  <button class="btn btn-go" type="button"
-                          onclick="return gotoDateForClass({{ cls.id }});">ไป</button>
-                </div>
-
-                <button class="btn btn-submit" onclick="return submitClass({{ cls.id }});">
-                  Submit ห้องนี้
-                </button>
+          <!-- Class detail -->
+          <div class="class-header-row">
+            <div>
+              <div class="seat-chips">
+                <span class="seat-chip">🪑 ที่นั่งรวม {{ seat.seats_total|default:0 }}</span>
+                <span class="seat-chip">📚 เรียนอยู่ {{ seat.seats_in_progress|default:0 }}</span>
+                <span class="seat-chip">✅ ว่าง {{ seat.seats_available|default:0 }}</span>
+                <span class="seat-chip" style="color:#64748b;">⏱ {{ cls.hours_per_session }} ชม./ครั้ง</span>
+              </div>
+              <div class="att-line" id="classSummary-{{ cls.id }}">
+                <span class="t-present">มา: <b class="c_present">{{ s.present|default:0 }}</b></span>
+                <span class="t-excused">ลา: <b class="c_excused">{{ s.excused|default:0 }}</b></span>
+                <span class="t-noshow">ขาด: <b class="c_no_show">{{ s.no_show|default:0 }}</b></span>
+                <span class="t-total">รวม: <b class="c_total">{{ s.total|default:0 }}</b></span>
               </div>
             </div>
 
-            <div class="seat-line">
-              <span class="seat-pill">ที่นั่งรวม: <b>{{ seat.seats_total|default:0 }}</b></span>
-              <span class="seat-pill">ระหว่างเรียน: <b>{{ seat.seats_in_progress|default:0 }}</b></span>
-              <span class="seat-pill">ที่นั่งว่าง: <b>{{ seat.seats_available|default:0 }}</b></span>
-              <span class="muted">ชั่วโมงต่อครั้ง: {{ cls.hours_per_session }}</span>
-            </div>
-
-            <div class="att-line" id="classSummary-{{ cls.id }}">
-              <span class="t-present">มา: <b class="c_present">{{ s.present|default:0 }}</b></span>
-              <span class="t-excused">ลา: <b class="c_excused">{{ s.excused|default:0 }}</b></span>
-              <span class="t-noshow">ขาด: <b class="c_no_show">{{ s.no_show|default:0 }}</b></span>
-              <span class="t-total">รวม: <b class="c_total">{{ s.total|default:0 }}</b></span>
-            </div>
-
-            <!-- ✅ NEW: tools (search + filter) -->
-            <div class="class-tools">
-              <div class="searchbox">
-                <span class="muted" style="font-weight:900;">ค้นหา:</span>
-                <input type="text" id="search-{{ cls.id }}" placeholder="พิมพ์เลข run / ชื่อเล่น / ชื่อจริง / ระดับชั้น"
-                       oninput="filterRows({{ cls.id }});" />
+            <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+              <div class="date-row">
+                <span class="muted">วันที่:</span>
+                <input type="date" id="date-{{ cls.id }}" value="{{ selected_date|date:'Y-m-d' }}" />
+                <button class="btn-go" onclick="return gotoDateForClass({{ cls.id }})">ไป</button>
               </div>
-              <div class="filterchips" role="group" aria-label="filters">
-                <span class="chip active" id="chip-{{ cls.id }}-all" onclick="setFilter({{ cls.id }}, 'all')">ทั้งหมด</span>
-                <span class="chip" id="chip-{{ cls.id }}-present" onclick="setFilter({{ cls.id }}, 'present')">มา</span>
-                <span class="chip" id="chip-{{ cls.id }}-excused" onclick="setFilter({{ cls.id }}, 'excused')">ลา</span>
-                <span class="chip" id="chip-{{ cls.id }}-no_show" onclick="setFilter({{ cls.id }}, 'no_show')">ขาด</span>
-                <span class="chip" id="chip-{{ cls.id }}-none" onclick="setFilter({{ cls.id }}, 'none')">ยังไม่เช็ค</span>
-              </div>
+              <button class="btn-submit-cls" onclick="return submitClass({{ cls.id }})">
+                ✓ บันทึกห้องนี้
+              </button>
             </div>
           </div>
 
-          <div style="overflow:auto; margin-top:10px;">
+          <!-- Search + filter -->
+          <div class="class-tools">
+            <div class="searchbox">
+              <span style="font-size:12px; font-weight:800; color:#64748b; white-space:nowrap;">🔍 ค้นหา</span>
+              <input type="text" id="search-{{ cls.id }}"
+                     placeholder="ชื่อเล่น / ชื่อจริง / รหัส / ระดับชั้น"
+                     oninput="filterRows({{ cls.id }});" />
+            </div>
+            <div class="filterchips">
+              <span class="chip active" id="chip-{{ cls.id }}-all"     onclick="setFilter({{ cls.id }},'all')">ทั้งหมด</span>
+              <span class="chip"        id="chip-{{ cls.id }}-present" onclick="setFilter({{ cls.id }},'present')">✅ มา</span>
+              <span class="chip"        id="chip-{{ cls.id }}-excused" onclick="setFilter({{ cls.id }},'excused')">🟡 ลา</span>
+              <span class="chip"        id="chip-{{ cls.id }}-no_show" onclick="setFilter({{ cls.id }},'no_show')">🔴 ขาด</span>
+              <span class="chip"        id="chip-{{ cls.id }}-none"    onclick="setFilter({{ cls.id }},'none')">— ยังไม่เช็ค</span>
+            </div>
+          </div>
+
+          <!-- Attendance table -->
+          <div class="att-table-wrap">
             <table class="att-table" data-class="{{ cls.id }}">
               <thead>
                 <tr>
@@ -539,7 +612,6 @@
                   <th class="cell-tight">บันทึกล่าสุด</th>
                   <th class="cell-tight">สถานะ</th>
                   <th class="cell-tight">เช็คชื่อ</th>
-                  <th class="cell-tight">เอกสาร</th>
                 </tr>
               </thead>
               <tbody>
@@ -551,67 +623,41 @@
                         data-status="{% if a and a.status %}{{ a.status }}{% else %}none{% endif %}"
                         data-search="{{ e.sale_run_no|default:'' }} {{ e.student.nickname|default:'' }} {{ e.student.full_name|default:'' }} {{ e.student.grade_level|default:'' }}">
 
+                      <!-- Student name -->
                       <td>
                         <div style="display:flex; align-items:center; gap:10px;">
                           <div class="avatar">
                             {% if e.student.profile_image %}
                               <img src="{{ e.student.profile_image.url }}" alt="profile">
                             {% else %}
-                              <div class="avatar-fallback">?</div>
+                              <div class="avatar-fallback">{{ e.student.nickname|first|upper|default:"?" }}</div>
                             {% endif %}
                           </div>
-
-                          <div style="flex:1;">
+                          <div style="flex:1; min-width:0;">
                             {% if e.remaining_sessions <= 0 %}
                               <span class="danger">
-                                <b>{{ e.sale_run_no|default:"-" }}</b>
-                                {% if e.student.nickname %} | {{ e.student.nickname }}{% endif %}
-                                {% if e.student.full_name %} | {{ e.student.full_name }}{% endif %}
-                                {% if e.student.grade_level %} | {{ e.student.grade_level }}{% endif %}
+                                <b>{{ e.sale_run_no|default:"-" }}{% if e.student.nickname %} | {{ e.student.nickname }}{% endif %}{% if e.student.full_name %} | {{ e.student.full_name }}{% endif %}{% if e.student.grade_level %} | {{ e.student.grade_level }}{% endif %}</b>
                               </span>
-                              <span class="badge">ครบคอร์สแล้ว</span>
+                              <span class="badge">ครบคอร์ส</span>
                             {% else %}
-                              <b>
-                                {{ e.sale_run_no|default:"-" }}
-                                {% if e.student.nickname %} | {{ e.student.nickname }}{% endif %}
-                                {% if e.student.full_name %} | {{ e.student.full_name }}{% endif %}
-                                {% if e.student.grade_level %} | {{ e.student.grade_level }}{% endif %}
-                              </b>
+                              <b>{{ e.sale_run_no|default:"-" }}{% if e.student.nickname %} | {{ e.student.nickname }}{% endif %}{% if e.student.full_name %} | {{ e.student.full_name }}{% endif %}{% if e.student.grade_level %} | {{ e.student.grade_level }}{% endif %}</b>
                             {% endif %}
-
-                            <div class="muted">
-                              {% with seq=course_seq_by_enrollment_id|get_item:e.id %}
-                                {% with total=course_total_by_student|get_item:e.student_id %}
-                                  คอร์สที่ <b>{{ seq|default:"-" }}</b> / <b>{{ total|default:"-" }}</b>
-                                  {% if seq and total and seq == total %}
-                                    <span class="badge-current">คอร์สปัจจุบัน</span>
-                                  {% endif %}
-                                {% endwith %}
-                              {% endwith %}
+                            <div class="muted" style="margin-top:2px;">
+                              {% with seq=course_seq_by_enrollment_id|get_item:e.id %}{% with total=course_total_by_student|get_item:e.student_id %}
+                                คอร์สที่ {{ seq|default:"-" }} / {{ total|default:"-" }}
+                              {% endwith %}{% endwith %}
                             </div>
-
-                            <div class="muted">{{ e.get_enrollment_type_display }}</div>
                           </div>
-
-                          <a class="enroll-icon"
-                             href="/adminlublub/core/enrollment/{{ e.id }}/change/"
-                             title="ไปหน้าจบคอร์ส">🏁</a>
+                          <a href="/adminlublub/core/enrollment/{{ e.id }}/change/" title="แก้ไข Enrollment" style="font-size:16px; text-decoration:none; opacity:.5;">🏁</a>
                         </div>
                       </td>
 
                       <td class="cell-tight"><b>{{ e.sessions_total }}</b></td>
                       <td class="cell-tight">
-                        <b id="remaining-{{ e.id }}" class="{% if e.remaining_sessions <= 0 %}danger{% endif %}">
-                          {{ e.remaining_sessions }}
-                        </b>
+                        <b id="remaining-{{ e.id }}" class="{% if e.remaining_sessions <= 0 %}danger{% endif %}">{{ e.remaining_sessions }}</b>
                       </td>
-
                       <td class="muted cell-tight" id="last-{{ e.id }}">
-                        {% if a and a.checked_at %}
-                          {{ a.checked_at|date:"Y-m-d H:i" }}
-                        {% else %}
-                          -
-                        {% endif %}
+                        {% if a and a.checked_at %}{{ a.checked_at|date:"d/m H:i" }}{% else %}—{% endif %}
                       </td>
 
                       <td class="cell-tight">
@@ -627,25 +673,16 @@
                       </td>
 
                       <td class="cell-tight">
-                        <div class="segwrap" role="group" aria-label="attendance pick">
-                          <button class="btn segbtn btn-att btn-green {% if a and a.status == 'present' %}active-btn{% endif %}"
-                                  onclick="return pickStatus({{ cls.id }}, {{ e.id }}, 'present');">มา</button>
-
-                          <button class="btn segbtn btn-att btn-yellow {% if a and a.status == 'excused' %}active-btn{% endif %}"
-                                  onclick="return pickStatus({{ cls.id }}, {{ e.id }}, 'excused');">ลา</button>
-
-                          <button class="btn segbtn btn-att btn-red {% if a and a.status == 'no_show' %}active-btn{% endif %}"
-                                  onclick="return pickStatus({{ cls.id }}, {{ e.id }}, 'no_show');">ขาด</button>
+                        <div class="segwrap">
+                          <button class="btn segbtn btn-green {% if a and a.status == 'present' %}active-btn{% endif %}"
+                                  onclick="return pickStatus({{ cls.id }},{{ e.id }},'present');">มา</button>
+                          <button class="btn segbtn btn-yellow {% if a and a.status == 'excused' %}active-btn{% endif %}"
+                                  onclick="return pickStatus({{ cls.id }},{{ e.id }},'excused');">ลา</button>
+                          <button class="btn segbtn btn-red {% if a and a.status == 'no_show' %}active-btn{% endif %}"
+                                  onclick="return pickStatus({{ cls.id }},{{ e.id }},'no_show');">ขาด</button>
                         </div>
                       </td>
 
-                      <td class="cell-tight">
-                        <a class="btn btn-doc"
-                           href="{% url 'core:generate_course_notice' %}?enrollment_id={{ e.id }}"
-                           target="_blank" rel="noopener">
-                          สร้างใบแจ้งครบคอร์ส
-                        </a>
-                      </td>
                     </tr>
                     {% endwith %}
                   {% endif %}
@@ -653,343 +690,302 @@
               </tbody>
             </table>
           </div>
+
         </details>
         {% endwith %}
       {% endfor %}
-    </div>
-  </div>
+    </div><!-- /grid -->
 
-  <!-- RIGHT: (Sheet เอาออกแล้ว) ใช้เป็น “ช่วยใช้งาน” -->
-  <div class="right">
+  </div><!-- /dash-main -->
+
+  <!-- ASIDE -->
+  <div class="dash-aside">
+
+    <!-- Date picker (global) -->
     <div class="card" style="margin-bottom:12px;">
-      <div style="font-weight:900; font-size:16px;">ใช้งานด่วน</div>
-      <div class="muted" style="margin-top:6px;">
-        - กด “ไป” ในตารางสรุปเพื่อกระโดดไปห้องนั้น<br>
-        - ใช้ค้นหา/ตัวกรองในแต่ละห้องเพื่อเช็คชื่อไวขึ้น
-      </div>
-      <div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;">
-        <a class="btn btn-primary" href="/attendance-details/">ตารางเช็คชื่อรวม</a>
-        <a class="btn btn-success" href="{% url 'core:export_excel' %}">Export Excel</a>
+      <div style="font-weight:900; font-size:14px; margin-bottom:10px;">📅 เลือกวันที่</div>
+      <form method="get" style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+        <input type="date" name="date" value="{{ selected_date|date:'Y-m-d' }}"
+               style="padding:8px 10px; border:1px solid #e5e7eb; border-radius:10px; font-size:14px; flex:1;" />
+        <button type="submit" class="btn-submit-cls" style="padding:8px 16px; font-size:13px;">ดู</button>
+      </form>
+    </div>
+
+    <!-- Two-day summary -->
+    {% if two_day_summary %}
+    <div class="card" style="margin-bottom:12px;">
+      <div style="font-weight:900; font-size:14px; margin-bottom:8px;">📊 สรุปรวม 2 วัน</div>
+      <table class="two-day-table">
+        <thead><tr><th>วัน</th><th>มา</th><th>ลา</th><th>ขาด</th><th>รวม</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><b>{{ selected_date|date:"d/m" }}</b></td>
+            <td>{{ global_summary.present|default:0 }}</td>
+            <td>{{ global_summary.excused|default:0 }}</td>
+            <td>{{ global_summary.no_show|default:0 }}</td>
+            <td><b>{{ global_summary.total|default:0 }}</b></td>
+          </tr>
+          {% if other_day_summary %}
+          <tr>
+            <td><b>{{ other_day_date|date:"d/m" }}</b></td>
+            <td>{{ other_day_summary.present|default:0 }}</td>
+            <td>{{ other_day_summary.excused|default:0 }}</td>
+            <td>{{ other_day_summary.no_show|default:0 }}</td>
+            <td><b>{{ other_day_summary.total|default:0 }}</b></td>
+          </tr>
+          {% endif %}
+          <tr style="background:#f8fafc; font-weight:900;">
+            <td><b>รวม</b></td>
+            <td>{{ two_day_summary.present|default:0 }}</td>
+            <td>{{ two_day_summary.excused|default:0 }}</td>
+            <td>{{ two_day_summary.no_show|default:0 }}</td>
+            <td><b>{{ two_day_summary.total|default:0 }}</b></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+
+    <!-- Quick links -->
+    <div class="card">
+      <div style="font-weight:900; font-size:14px; margin-bottom:10px;">🔗 ลิงก์ด่วน</div>
+      <div style="display:flex; flex-direction:column; gap:8px;">
+        <a class="aside-link" href="/attendance-details/">📋 ตารางเช็คชื่อรวม</a>
+        <a class="aside-link" href="/adminlublub/core/student/">👤 จัดการนักเรียน</a>
+        <a class="aside-link" href="/adminlublub/core/enrollment/">📑 จัดการ Enrollment</a>
+        <a class="aside-link" href="/quiz-admin/">✏️ จัดการข้อสอบ</a>
+        <a class="aside-link" href="/quiz-report/">📊 รายงานข้อสอบ</a>
       </div>
     </div>
-  </div>
-</div>
+
+  </div><!-- /dash-aside -->
+
+</div><!-- /dash-body -->
 
 <script>
-  function getCookie(name) {
-    let cookieValue = null;
-    if (document.cookie && document.cookie !== '') {
-      const cookies = document.cookie.split(';');
-      for (let i = 0; i < cookies.length; i++) {
-        const cookie = cookies[i].trim();
-        if (cookie.substring(0, name.length + 1) === (name + '=')) {
-          cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-          break;
-        }
+  /* ================================================
+     UTILITIES
+  ================================================ */
+  function getCookie(name){
+    let v=null;
+    if(document.cookie&&document.cookie!==''){
+      for(const c of document.cookie.split(';')){
+        const t=c.trim();
+        if(t.startsWith(name+'=')){v=decodeURIComponent(t.slice(name.length+1));break;}
       }
     }
-    return cookieValue;
+    return v;
   }
-
   const csrftoken = getCookie('csrftoken');
   const picks = {};
-  const classFilters = {}; // classId -> { text, status }
+  const classFilters = {};
 
-  function ensureClass(classId){
-    if(!picks[classId]) picks[classId] = {};
-    if(!classFilters[classId]) classFilters[classId] = { text:"", status:"all" };
+  function ensureClass(cid){
+    if(!picks[cid]) picks[cid]={};
+    if(!classFilters[cid]) classFilters[cid]={text:"",status:"all"};
   }
 
-  function getSelectedDateForClass(classId){
-    const el = document.getElementById("date-" + classId);
-    return el ? el.value : "{{ selected_date|date:'Y-m-d' }}";
+  function getSelectedDateForClass(cid){
+    const el=document.getElementById("date-"+cid);
+    return el?el.value:"{{ selected_date|date:'Y-m-d' }}";
   }
 
-  function gotoDateForClass(classId){
-    const d = getSelectedDateForClass(classId);
-    const url = new URL(window.location.href);
-    url.searchParams.set("date", d);
-    window.location.href = url.toString() + "#classCard-" + classId;
+  function gotoDateForClass(cid){
+    const d=getSelectedDateForClass(cid);
+    const url=new URL(window.location.href);
+    url.searchParams.set("date",d);
+    window.location.href=url.toString()+"#classCard-"+cid;
     return false;
   }
 
-  function setBadge(enrollmentId, status){
-    const badge = document.getElementById("badge-" + enrollmentId);
-    if(!badge) return;
+  /* ================================================
+     BADGE & BUTTONS
+  ================================================ */
+  function setBadge(eid,status){
+    const b=document.getElementById("badge-"+eid);
+    if(!b)return;
+    b.className="status-badge";
+    if(status==="present"){b.classList.add("sb-present");b.textContent="● มา";}
+    else if(status==="excused"){b.classList.add("sb-excused");b.textContent="● ลา";}
+    else if(status==="no_show"){b.classList.add("sb-no-show");b.textContent="● ขาด";}
+    else{b.classList.add("sb-none");b.textContent="— ยังไม่เช็ค";}
+  }
 
-    badge.className = "status-badge";
-    if(status === "present"){
-      badge.classList.add("sb-present");
-      badge.textContent = "● มา";
-    } else if(status === "excused"){
-      badge.classList.add("sb-excused");
-      badge.textContent = "● ลา";
-    } else if(status === "no_show"){
-      badge.classList.add("sb-no-show");
-      badge.textContent = "● ขาด";
-    } else {
-      badge.classList.add("sb-none");
-      badge.textContent = "— ยังไม่เช็ค";
+  function markButtons(eid,status){
+    const row=document.getElementById("row-"+eid);
+    if(!row)return;
+    const g=row.querySelector(".btn-green"),y=row.querySelector(".btn-yellow"),r=row.querySelector(".btn-red");
+    const btns=[g,y,r].filter(Boolean);
+    btns.forEach(b=>{b.classList.remove("active-btn","btn-dim");});
+    let active=null;
+    if(status==="present")active=g;
+    if(status==="excused")active=y;
+    if(status==="no_show")active=r;
+    if(active){
+      active.classList.add("active-btn");
+      btns.forEach(b=>{if(b!==active)b.classList.add("btn-dim");});
     }
   }
 
-  function markButtons(enrollmentId, status){
-    const row = document.getElementById("row-" + enrollmentId);
-    if(!row) return;
-    const green = row.querySelector(".btn-green");
-    const yellow = row.querySelector(".btn-yellow");
-    const red = row.querySelector(".btn-red");
-    const btns = [green, yellow, red].filter(Boolean);
-
-    btns.forEach(b => {
-      b.classList.remove("active-btn");
-      b.classList.remove("btn-dim");
-    });
-
-    let activeBtn = null;
-    if(status === "present") activeBtn = green;
-    if(status === "excused") activeBtn = yellow;
-    if(status === "no_show") activeBtn = red;
-
-    if(activeBtn){
-      activeBtn.classList.add("active-btn");
-      btns.forEach(b => {
-        if(b !== activeBtn) b.classList.add("btn-dim");
-      });
-    }
-  }
-
-  function pickStatus(classId, enrollmentId, status){
-    ensureClass(classId);
-    picks[classId][enrollmentId] = status;
-
-    const row = document.getElementById("row-" + enrollmentId);
-    if(row){
-      row.dataset.status = status;
-    }
-    markButtons(enrollmentId, status);
-    setBadge(enrollmentId, status);
-    filterRows(classId); // keep filter in effect
+  function pickStatus(cid,eid,status){
+    ensureClass(cid);
+    picks[cid][eid]=status;
+    const row=document.getElementById("row-"+eid);
+    if(row)row.dataset.status=status;
+    markButtons(eid,status);
+    setBadge(eid,status);
+    filterRows(cid);
     return false;
   }
 
+  /* ================================================
+     SUMMARY UPDATE
+  ================================================ */
   function setGlobalBar(gs){
-    const total = Number(gs.total || 0);
-    const p = Number(gs.present || 0);
-    const e = Number(gs.excused || 0);
-    const n = Number(gs.no_show || 0);
-
-    const pctP = total > 0 ? (p * 100 / total) : 0;
-    const pctE = total > 0 ? (e * 100 / total) : 0;
-    const pctN = total > 0 ? (n * 100 / total) : 0;
-
-    const bp = document.getElementById("bar_present");
-    const be = document.getElementById("bar_excused");
-    const bn = document.getElementById("bar_no_show");
-
-    if(bp) bp.style.width = pctP + "%";
-    if(be) be.style.width = pctE + "%";
-    if(bn) bn.style.width = pctN + "%";
+    const total=Number(gs.total||0),p=Number(gs.present||0),e=Number(gs.excused||0),n=Number(gs.no_show||0);
+    const pP=total>0?p*100/total:0,pE=total>0?e*100/total:0,pN=total>0?n*100/total:0;
+    const bp=document.getElementById("bar_present"),be=document.getElementById("bar_excused"),bn=document.getElementById("bar_no_show");
+    if(bp)bp.style.width=pP+"%";
+    if(be)be.style.width=pE+"%";
+    if(bn)bn.style.width=pN+"%";
   }
 
   function setGlobalSummary(gs){
-    document.getElementById("g_present").textContent = gs.present;
-    document.getElementById("g_excused").textContent = gs.excused;
-    document.getElementById("g_no_show").textContent = gs.no_show;
-    document.getElementById("g_total").textContent = gs.total;
+    document.getElementById("g_present").textContent=gs.present;
+    document.getElementById("g_excused").textContent=gs.excused;
+    document.getElementById("g_no_show").textContent=gs.no_show;
+    document.getElementById("g_total").textContent=gs.total;
     setGlobalBar(gs);
   }
 
-  function setClassSummary(classId, cs){
-    const box = document.getElementById("classSummary-" + classId);
+  function setClassSummary(cid,cs){
+    const box=document.getElementById("classSummary-"+cid);
     if(box){
-      box.querySelector(".c_present").textContent = cs.present;
-      box.querySelector(".c_excused").textContent = cs.excused;
-      box.querySelector(".c_no_show").textContent = cs.no_show;
-      box.querySelector(".c_total").textContent = cs.total;
+      box.querySelector(".c_present").textContent=cs.present;
+      box.querySelector(".c_excused").textContent=cs.excused;
+      box.querySelector(".c_no_show").textContent=cs.no_show;
+      box.querySelector(".c_total").textContent=cs.total;
     }
-
-    // ✅ update mini summary in accordion header
-    const mini = document.getElementById("miniSummary-" + classId);
-    if(mini){
-      mini.textContent = `มา ${cs.present} | ลา ${cs.excused} | ขาด ${cs.no_show} | รวม ${cs.total}`;
-    }
+    const mini=document.getElementById("miniSummary-"+cid);
+    if(mini)mini.textContent=`มา ${cs.present} | ลา ${cs.excused} | ขาด ${cs.no_show} | รวม ${cs.total}`;
   }
 
   function recomputeSlotTotals(){
-    document.querySelectorAll("table.slot-table").forEach(tbl => {
-      const slotKey = tbl.dataset.slot;
+    document.querySelectorAll("table.slot-table").forEach(tbl=>{
+      const sk=tbl.dataset.slot;
       let p=0,e=0,n=0,t=0;
-      tbl.querySelectorAll("tbody tr").forEach(r => {
-        const gp = r.querySelector(".c_present");
-        const ge = r.querySelector(".c_excused");
-        const gn = r.querySelector(".c_no_show");
-        const gt = r.querySelector(".c_total");
-        p += Number(gp ? gp.textContent : 0);
-        e += Number(ge ? ge.textContent : 0);
-        n += Number(gn ? gn.textContent : 0);
-        t += Number(gt ? gt.textContent : 0);
+      tbl.querySelectorAll("tbody tr").forEach(r=>{
+        p+=Number(r.querySelector(".c_present")?.textContent||0);
+        e+=Number(r.querySelector(".c_excused")?.textContent||0);
+        n+=Number(r.querySelector(".c_no_show")?.textContent||0);
+        t+=Number(r.querySelector(".c_total")?.textContent||0);
       });
-      const elP = document.getElementById(`slot-${slotKey}-present`);
-      const elE = document.getElementById(`slot-${slotKey}-excused`);
-      const elN = document.getElementById(`slot-${slotKey}-no_show`);
-      const elT = document.getElementById(`slot-${slotKey}-total`);
-      if(elP) elP.textContent = p;
-      if(elE) elE.textContent = e;
-      if(elN) elN.textContent = n;
-      if(elT) elT.innerHTML = `<b>${t}</b>`;
+      const eP=document.getElementById(`slot-${sk}-present`),eE=document.getElementById(`slot-${sk}-excused`),eN=document.getElementById(`slot-${sk}-no_show`),eT=document.getElementById(`slot-${sk}-total`);
+      if(eP)eP.textContent=p;if(eE)eE.textContent=e;if(eN)eN.textContent=n;if(eT)eT.innerHTML=`<b>${t}</b>`;
     });
   }
 
-  function setFilter(classId, status){
-    ensureClass(classId);
-    classFilters[classId].status = status;
-
-    ["all","present","excused","no_show","none"].forEach(s => {
-      const el = document.getElementById(`chip-${classId}-${s}`);
-      if(el) el.classList.toggle("active", s === status);
+  /* ================================================
+     FILTER
+  ================================================ */
+  function setFilter(cid,status){
+    ensureClass(cid);
+    classFilters[cid].status=status;
+    ["all","present","excused","no_show","none"].forEach(s=>{
+      const el=document.getElementById(`chip-${cid}-${s}`);
+      if(el)el.classList.toggle("active",s===status);
     });
-
-    filterRows(classId);
+    filterRows(cid);
   }
 
-  function filterRows(classId){
-    ensureClass(classId);
-    const textEl = document.getElementById("search-" + classId);
-    classFilters[classId].text = (textEl ? textEl.value : "").toLowerCase().trim();
-
-    const fText = classFilters[classId].text;
-    const fStatus = classFilters[classId].status;
-
-    document.querySelectorAll(`tr[data-class="${classId}"]`).forEach(row => {
-      const rowText = (row.dataset.search || "").toLowerCase();
-      const rowStatus = row.dataset.status || "none";
-
-      const okText = !fText || rowText.includes(fText);
-      const okStatus = (fStatus === "all") ? true : (rowStatus === fStatus);
-
-      row.style.display = (okText && okStatus) ? "" : "none";
+  function filterRows(cid){
+    ensureClass(cid);
+    const textEl=document.getElementById("search-"+cid);
+    classFilters[cid].text=(textEl?textEl.value:"").toLowerCase().trim();
+    const fT=classFilters[cid].text,fS=classFilters[cid].status;
+    document.querySelectorAll(`tr[data-class="${cid}"]`).forEach(row=>{
+      const okT=!fT||(row.dataset.search||"").toLowerCase().includes(fT);
+      const okS=fS==="all"||row.dataset.status===fS;
+      row.style.display=(okT&&okS)?"":"none";
     });
   }
 
-  async function submitClass(classId){
-    ensureClass(classId);
-
-    const items = Object.entries(picks[classId]).map(([eid, st]) => ({ enrollment_id: Number(eid), status: st }));
-    if(items.length === 0){
-      alert("ยังไม่ได้เลือกสถานะใครเลย");
-      return false;
-    }
-
-    const selectedDate = getSelectedDateForClass(classId);
-
-    const res = await fetch("/attendance/submit/", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-CSRFToken": csrftoken },
-      body: JSON.stringify({ date: selectedDate, class_id: classId, items })
+  /* ================================================
+     SUBMIT
+  ================================================ */
+  async function submitClass(cid){
+    ensureClass(cid);
+    const items=Object.entries(picks[cid]).map(([eid,st])=>({enrollment_id:Number(eid),status:st}));
+    if(items.length===0){alert("ยังไม่ได้เลือกสถานะใครเลย");return false;}
+    const selectedDate=getSelectedDateForClass(cid);
+    const res=await fetch("/attendance/submit/",{
+      method:"POST",
+      headers:{"Content-Type":"application/json","X-CSRFToken":csrftoken},
+      body:JSON.stringify({date:selectedDate,class_id:cid,items})
     });
+    const data=await res.json();
+    if(!data.ok){alert(data.error||"Submit failed");return false;}
 
-    const data = await res.json();
-    if(!data.ok){
-      alert(data.error || "Submit failed");
-      return false;
-    }
-
-    // ✅ update summaries (ทันที)
-    setClassSummary(data.class_id, data.class_summary);
+    setClassSummary(data.class_id,data.class_summary);
     setGlobalSummary(data.global_summary);
 
-    // ✅ update row in top summary table
-    const sumRow = document.getElementById("summaryRow-" + classId);
+    const sumRow=document.getElementById("summaryRow-"+cid);
     if(sumRow){
-      const cp = sumRow.querySelector(".c_present");
-      const ce = sumRow.querySelector(".c_excused");
-      const cn = sumRow.querySelector(".c_no_show");
-      const ct = sumRow.querySelector(".c_total");
-      if(cp) cp.textContent = data.class_summary.present;
-      if(ce) ce.textContent = data.class_summary.excused;
-      if(cn) cn.textContent = data.class_summary.no_show;
-      if(ct) ct.innerHTML = "<b>" + data.class_summary.total + "</b>";
+      sumRow.querySelector(".c_present").textContent=data.class_summary.present;
+      sumRow.querySelector(".c_excused").textContent=data.class_summary.excused;
+      sumRow.querySelector(".c_no_show").textContent=data.class_summary.no_show;
+      sumRow.querySelector(".c_total").innerHTML="<b>"+data.class_summary.total+"</b>";
     }
-
-    // ✅ recompute subtotal per slot
     recomputeSlotTotals();
 
-    // ✅ update remaining sessions
     if(data.remaining_map){
-      for(const [eid, remaining] of Object.entries(data.remaining_map)){
-        const remEl = document.getElementById("remaining-" + eid);
-        if(remEl){
-          remEl.textContent = remaining;
-          remEl.classList.toggle("danger", Number(remaining) <= 0);
-        }
+      for(const[eid,rem]of Object.entries(data.remaining_map)){
+        const el=document.getElementById("remaining-"+eid);
+        if(el){el.textContent=rem;el.classList.toggle("danger",Number(rem)<=0);}
       }
     }
 
-    // ✅ update last checked immediately
-    // prefer server time if exists; fallback to client now
-    const serverNow = data.server_now_text || null;
-    const nowText = serverNow || new Date().toLocaleString('th-TH');
-    for (const it of items) {
-      const lastEl = document.getElementById("last-" + it.enrollment_id);
-      if (lastEl) lastEl.textContent = nowText;
-
-      // keep dataset + badge in sync (เผื่อกด submit โดยไม่ได้เปลี่ยนสถานะบางคน)
-      const row = document.getElementById("row-" + it.enrollment_id);
-      if(row) row.dataset.status = it.status;
-      setBadge(it.enrollment_id, it.status);
-      markButtons(it.enrollment_id, it.status);
+    const serverNow=data.server_now_text||new Date().toLocaleString('th-TH');
+    for(const it of items){
+      const lastEl=document.getElementById("last-"+it.enrollment_id);
+      if(lastEl)lastEl.textContent=serverNow;
+      const row=document.getElementById("row-"+it.enrollment_id);
+      if(row)row.dataset.status=it.status;
+      setBadge(it.enrollment_id,it.status);
+      markButtons(it.enrollment_id,it.status);
     }
-
-    // reset picks
-    picks[classId] = {};
-
-    // keep filter in effect
-    filterRows(classId);
-
+    picks[cid]={};
+    filterRows(cid);
     return false;
   }
 
-  document.addEventListener("DOMContentLoaded", () => {
-    // ✅ open accordion when using hash
-    if(window.location.hash && window.location.hash.startsWith("#classCard-")){
-      const el = document.querySelector(window.location.hash);
-      if(el && el.tagName.toLowerCase() === "details"){
-        el.open = true;
-        setTimeout(() => el.scrollIntoView({behavior:"smooth", block:"start"}), 50);
+  /* ================================================
+     INIT
+  ================================================ */
+  document.addEventListener("DOMContentLoaded",()=>{
+    // open accordion from hash
+    if(window.location.hash&&window.location.hash.startsWith("#classCard-")){
+      const el=document.querySelector(window.location.hash);
+      if(el&&el.tagName.toLowerCase()==="details"){
+        el.open=true;
+        setTimeout(()=>el.scrollIntoView({behavior:"smooth",block:"start"}),50);
       }
     }
-
-    // init segmented dimming based on active button
-    document.querySelectorAll("tr[id^='row-']").forEach(row => {
-      const eid = row.id.replace("row-", "");
-      const green = row.querySelector(".btn-green");
-      const yellow = row.querySelector(".btn-yellow");
-      const red = row.querySelector(".btn-red");
-
-      if(green && green.classList.contains("active-btn")) {
-        markButtons(eid, "present");
-        setBadge(eid, "present");
-      } else if(yellow && yellow.classList.contains("active-btn")) {
-        markButtons(eid, "excused");
-        setBadge(eid, "excused");
-      } else if(red && red.classList.contains("active-btn")) {
-        markButtons(eid, "no_show");
-        setBadge(eid, "no_show");
-      } else {
-        setBadge(eid, "none");
-      }
+    // init button states
+    document.querySelectorAll("tr[id^='row-']").forEach(row=>{
+      const eid=row.id.replace("row-","");
+      const g=row.querySelector(".btn-green"),y=row.querySelector(".btn-yellow"),r=row.querySelector(".btn-red");
+      if(g&&g.classList.contains("active-btn")){markButtons(eid,"present");setBadge(eid,"present");}
+      else if(y&&y.classList.contains("active-btn")){markButtons(eid,"excused");setBadge(eid,"excused");}
+      else if(r&&r.classList.contains("active-btn")){markButtons(eid,"no_show");setBadge(eid,"no_show");}
+      else setBadge(eid,"none");
     });
-
-    // init slot totals
     recomputeSlotTotals();
-
-    // init default filters
-    document.querySelectorAll("details[id^='classCard-']").forEach(det => {
-      const cid = det.id.replace("classCard-","");
-      ensureClass(cid);
-      setFilter(cid, "all");
+    document.querySelectorAll("details[id^='classCard-']").forEach(det=>{
+      const cid=det.id.replace("classCard-","");
+      ensureClass(cid);setFilter(cid,"all");
     });
   });
 </script>
+
 {% endblock %}

@@ -568,10 +568,6 @@ class AdmissionInquiry(models.Model):
         ENROLL = "enroll", "สมัครเรียน"
 
     class GradeLevel(models.TextChoices):
-        KG = "kg", "อนุบาล"
-        P1 = "p1", "ป.1"
-        P2 = "p2", "ป.2"
-        P3 = "p3", "ป.3"
         P4 = "p4", "ป.4"
         P5 = "p5", "ป.5"
         P6 = "p6", "ป.6"
@@ -579,8 +575,6 @@ class AdmissionInquiry(models.Model):
         M2 = "m2", "ม.2"
         M3 = "m3", "ม.3"
         M4 = "m4", "ม.4"
-        M5 = "m5", "ม.5"
-        M6 = "m6", "ม.6"
         OTHER = "other", "อื่น ๆ"
 
     class PreferredTimeSlot(models.TextChoices):

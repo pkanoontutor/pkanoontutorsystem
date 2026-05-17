@@ -21,6 +21,13 @@ urlpatterns = [
     path("alerts/", views.alerts_dashboard, name="alerts_dashboard"),
     path("alerts/mark/", views.alerts_mark, name="alerts_mark"),
 
+
+    # Admission / Trial Booking
+    path("admission/", views.admission_inquiry, name="admission_inquiry"),
+    path("admission/thank-you/<int:pk>/", views.admission_thank_you, name="admission_thank_you"),
+    path("admission-report/", views.admission_report, name="admission_report"),
+    path("admission-report/update/", views.admission_report_update, name="admission_report_update"),
+
     # Student Portal
     path("student-portal/", views.student_portal_login, name="student_portal_login"),
     path("student-portal/student-search/", views.student_portal_student_search, name="student_portal_student_search"),

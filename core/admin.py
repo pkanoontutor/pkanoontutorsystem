@@ -13,6 +13,7 @@ from .models import (
     Attendance,
     EnrollmentInstallment,
     SheetInventory,
+    AdmissionInquiry,
 )
 
 
@@ -347,3 +348,77 @@ class SheetInventoryAdmin(admin.ModelAdmin):
     autocomplete_fields = ("sheet",)
     ordering = ("sheet__code",)
     readonly_fields = ("updated_at",)
+
+# -----------------------
+# Admission Inquiry
+# -----------------------
+@admin.register(AdmissionInquiry)
+class AdmissionInquiryAdmin(admin.ModelAdmin):
+    list_display = (
+        "created_at",
+        "request_type",
+        "nickname",
+        "full_name_display",
+        "grade_level",
+        "preferred_time_slot",
+        "first_lesson_date",
+        "contact_phone",
+        "sheet_prepared",
+        "trial_attended",
+        "trial_result",
+    )
+    list_filter = (
+        "request_type",
+        "grade_level",
+        "preferred_time_slot",
+        "first_lesson_date",
+        "sheet_prepared",
+        "trial_attended",
+        "trial_result",
+    )
+    search_fields = (
+        "nickname",
+        "first_name",
+        "last_name",
+        "school_name",
+        "contact_phone",
+    )
+    readonly_fields = ("created_at", "updated_at")
+    ordering = ("-created_at",)
+    list_per_page = 50
+
+    fieldsets = (
+        ("ข้อมูลจากผู้ปกครอง", {
+            "fields": (
+                "request_type",
+                "nickname",
+                "first_name",
+                "last_name",
+                "school_name",
+                "contact_phone",
+                "latest_gpa",
+                "grade_level",
+                "preferred_time_slot",
+                "first_lesson_date",
+            )
+        }),
+        ("ข้อมูลติดตามภายในโรงเรียน", {
+            "fields": (
+                "sheet_prepared",
+                "trial_attended",
+                "trial_result",
+                "internal_note",
+            )
+        }),
+        ("ระบบ", {
+            "fields": (
+                "created_at",
+                "updated_at",
+            )
+        }),
+    )
+
+    @admin.display(description="ชื่อ-นามสกุล")
+    def full_name_display(self, obj):
+        return obj.full_name
+

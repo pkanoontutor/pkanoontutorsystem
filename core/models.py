@@ -558,3 +558,109 @@ class SheetInventory(models.Model):
         if not self.is_finished:
             self.finished_at = None
         super().save(*args, **kwargs)
+
+# -----------------------
+# ✅ Admission Inquiry (สมัครเรียน / จองทดลองเรียน)
+# -----------------------
+class AdmissionInquiry(models.Model):
+    class RequestType(models.TextChoices):
+        TRIAL = "trial", "จองทดลองเรียน"
+        ENROLL = "enroll", "สมัครเรียน"
+
+    class GradeLevel(models.TextChoices):
+        KG = "kg", "อนุบาล"
+        P1 = "p1", "ป.1"
+        P2 = "p2", "ป.2"
+        P3 = "p3", "ป.3"
+        P4 = "p4", "ป.4"
+        P5 = "p5", "ป.5"
+        P6 = "p6", "ป.6"
+        M1 = "m1", "ม.1"
+        M2 = "m2", "ม.2"
+        M3 = "m3", "ม.3"
+        M4 = "m4", "ม.4"
+        M5 = "m5", "ม.5"
+        M6 = "m6", "ม.6"
+        OTHER = "other", "อื่น ๆ"
+
+    class PreferredTimeSlot(models.TextChoices):
+        SAT_MORNING = "sat_morning", "เสาร์เช้า (08.30-12.30)"
+        SAT_AFTERNOON = "sat_afternoon", "เสาร์บ่าย (13.30-17.30)"
+        SUN_MORNING = "sun_morning", "อาทิตย์เช้า (08.30-12.30)"
+        SUN_AFTERNOON = "sun_afternoon", "อาทิตย์บ่าย (13.30-17.30)"
+
+    class TrialAttended(models.TextChoices):
+        PENDING = "pending", "ยังไม่ระบุ"
+        YES = "yes", "มาเรียนจริง"
+        NO = "no", "ไม่ได้มาเรียน"
+
+    class TrialResult(models.TextChoices):
+        PENDING = "pending", "ยังไม่ระบุ"
+        ENROLLED = "enrolled", "ทดลองแล้วสมัครต่อ"
+        NOT_ENROLLED = "not_enrolled", "ทดลองแล้วไม่สมัคร"
+        FOLLOW_UP = "follow_up", "รอติดตามผล"
+
+    request_type = models.CharField(
+        "ประเภทการลงทะเบียน",
+        max_length=20,
+        choices=RequestType.choices,
+        default=RequestType.TRIAL,
+    )
+
+    nickname = models.CharField("ชื่อเล่น", max_length=100)
+    first_name = models.CharField("ชื่อจริง", max_length=150)
+    last_name = models.CharField("นามสกุล", max_length=150)
+    school_name = models.CharField("โรงเรียน", max_length=255, blank=True)
+    contact_phone = models.CharField("เบอร์ติดต่อ", max_length=50)
+    latest_gpa = models.DecimalField(
+        "เกรดเฉลี่ยเทอมล่าสุด",
+        max_digits=4,
+        decimal_places=2,
+        null=True,
+        blank=True,
+    )
+
+    first_lesson_date = models.DateField("วันที่ทดลองเรียน/เริ่มเรียนวันแรก")
+    grade_level = models.CharField(
+        "ระดับชั้น",
+        max_length=20,
+        choices=GradeLevel.choices,
+    )
+    preferred_time_slot = models.CharField(
+        "รอบเวลาเรียน",
+        max_length=30,
+        choices=PreferredTimeSlot.choices,
+    )
+
+    sheet_prepared = models.BooleanField("เตรียมชีทพร้อมแล้ว", default=False)
+    trial_attended = models.CharField(
+        "มาเรียนจริงหรือไม่",
+        max_length=20,
+        choices=TrialAttended.choices,
+        default=TrialAttended.PENDING,
+        help_text="ใช้สำหรับรายการจองทดลองเรียน",
+    )
+    trial_result = models.CharField(
+        "ผลหลังทดลองเรียน",
+        max_length=20,
+        choices=TrialResult.choices,
+        default=TrialResult.PENDING,
+        help_text="ใช้สำหรับรายการจองทดลองเรียน",
+    )
+    internal_note = models.TextField("หมายเหตุภายใน", blank=True)
+
+    created_at = models.DateTimeField("วันที่ลงทะเบียน", default=timezone.now)
+    updated_at = models.DateTimeField("อัปเดตล่าสุด", auto_now=True)
+
+    class Meta:
+        verbose_name = "Admission Inquiry"
+        verbose_name_plural = "Admission Inquiries"
+        ordering = ("-created_at",)
+
+    @property
+    def full_name(self) -> str:
+        return f"{self.first_name} {self.last_name}".strip()
+
+    def __str__(self) -> str:
+        return f"{self.get_request_type_display()} | {self.nickname} | {self.full_name}"
+

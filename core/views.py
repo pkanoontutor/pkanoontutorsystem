@@ -23,6 +23,7 @@ from .models import (
     Attendance,
     Enrollment,
     TutoringClass,
+    AdmissionInquiry,
 )
 
 
@@ -931,3 +932,178 @@ def generate_course_notice(request: HttpRequest) -> HttpResponse:
         "qr_line_static": "core/img/qr_line.png",
     }
     return render(request, "core/generate_course_notice.html", context)
+
+# =========================================================
+# ✅ Admission Inquiry: สมัครเรียน / จองทดลองเรียน
+# =========================================================
+class AdmissionInquiryForm(forms.ModelForm):
+    class Meta:
+        model = AdmissionInquiry
+        fields = [
+            "request_type",
+            "nickname",
+            "first_name",
+            "last_name",
+            "school_name",
+            "contact_phone",
+            "latest_gpa",
+            "first_lesson_date",
+            "grade_level",
+            "preferred_time_slot",
+        ]
+        widgets = {
+            "request_type": forms.RadioSelect,
+            "nickname": forms.TextInput(attrs={"placeholder": "เช่น น้องข้าวหอม"}),
+            "first_name": forms.TextInput(attrs={"placeholder": "ชื่อจริงของนักเรียน"}),
+            "last_name": forms.TextInput(attrs={"placeholder": "นามสกุลของนักเรียน"}),
+            "school_name": forms.TextInput(attrs={"placeholder": "ชื่อโรงเรียน"}),
+            "contact_phone": forms.TextInput(attrs={"placeholder": "เบอร์ผู้ปกครอง / เบอร์ติดต่อ"}),
+            "latest_gpa": forms.NumberInput(attrs={
+                "placeholder": "เช่น 3.50",
+                "step": "0.01",
+                "min": "0",
+                "max": "4",
+            }),
+            "first_lesson_date": forms.DateInput(attrs={"type": "date"}),
+        }
+
+    def clean_contact_phone(self):
+        phone = (self.cleaned_data.get("contact_phone") or "").strip()
+        digits = "".join(ch for ch in phone if ch.isdigit())
+        if len(digits) < 9:
+            raise forms.ValidationError("กรุณากรอกเบอร์ติดต่อให้ถูกต้อง")
+        return phone
+
+
+def admission_inquiry(request: HttpRequest) -> HttpResponse:
+    if request.method == "POST":
+        form = AdmissionInquiryForm(request.POST)
+        if form.is_valid():
+            inquiry = form.save()
+            return redirect("core:admission_thank_you", pk=inquiry.pk)
+    else:
+        form = AdmissionInquiryForm()
+
+    return render(request, "core/admission_inquiry.html", {
+        "form": form,
+    })
+
+
+def admission_thank_you(request: HttpRequest, pk: int) -> HttpResponse:
+    inquiry = get_object_or_404(AdmissionInquiry, pk=pk)
+
+    return render(request, "core/admission_thank_you.html", {
+        "inquiry": inquiry,
+        "line_url": "https://lin.ee/Vp91szz",
+    })
+
+
+@login_required
+def admission_report(request: HttpRequest) -> HttpResponse:
+    qs = AdmissionInquiry.objects.all()
+
+    q = (request.GET.get("q") or "").strip()
+    request_type = (request.GET.get("request_type") or "").strip()
+    grade_level = (request.GET.get("grade_level") or "").strip()
+    preferred_time_slot = (request.GET.get("preferred_time_slot") or "").strip()
+    sheet_prepared = (request.GET.get("sheet_prepared") or "").strip()
+    trial_attended = (request.GET.get("trial_attended") or "").strip()
+    trial_result = (request.GET.get("trial_result") or "").strip()
+    date_from = (request.GET.get("date_from") or "").strip()
+    date_to = (request.GET.get("date_to") or "").strip()
+
+    if q:
+        qs = qs.filter(
+            Q(nickname__icontains=q) |
+            Q(first_name__icontains=q) |
+            Q(last_name__icontains=q) |
+            Q(school_name__icontains=q) |
+            Q(contact_phone__icontains=q)
+        )
+
+    if request_type:
+        qs = qs.filter(request_type=request_type)
+    if grade_level:
+        qs = qs.filter(grade_level=grade_level)
+    if preferred_time_slot:
+        qs = qs.filter(preferred_time_slot=preferred_time_slot)
+    if sheet_prepared == "yes":
+        qs = qs.filter(sheet_prepared=True)
+    elif sheet_prepared == "no":
+        qs = qs.filter(sheet_prepared=False)
+    if trial_attended:
+        qs = qs.filter(trial_attended=trial_attended)
+    if trial_result:
+        qs = qs.filter(trial_result=trial_result)
+    if date_from:
+        try:
+            qs = qs.filter(first_lesson_date__gte=date.fromisoformat(date_from))
+        except ValueError:
+            pass
+    if date_to:
+        try:
+            qs = qs.filter(first_lesson_date__lte=date.fromisoformat(date_to))
+        except ValueError:
+            pass
+
+    stats_base = AdmissionInquiry.objects.all()
+    stats = {
+        "total": stats_base.count(),
+        "trial": stats_base.filter(request_type=AdmissionInquiry.RequestType.TRIAL).count(),
+        "enroll": stats_base.filter(request_type=AdmissionInquiry.RequestType.ENROLL).count(),
+        "sheet_ready": stats_base.filter(sheet_prepared=True).count(),
+        "trial_attended": stats_base.filter(trial_attended=AdmissionInquiry.TrialAttended.YES).count(),
+        "trial_enrolled": stats_base.filter(trial_result=AdmissionInquiry.TrialResult.ENROLLED).count(),
+    }
+
+    inquiries = qs.order_by("first_lesson_date", "-created_at")
+
+    return render(request, "core/admission_report.html", {
+        "inquiries": inquiries,
+        "stats": stats,
+        "filters": {
+            "q": q,
+            "request_type": request_type,
+            "grade_level": grade_level,
+            "preferred_time_slot": preferred_time_slot,
+            "sheet_prepared": sheet_prepared,
+            "trial_attended": trial_attended,
+            "trial_result": trial_result,
+            "date_from": date_from,
+            "date_to": date_to,
+        },
+        "request_type_choices": AdmissionInquiry.RequestType.choices,
+        "grade_level_choices": AdmissionInquiry.GradeLevel.choices,
+        "time_slot_choices": AdmissionInquiry.PreferredTimeSlot.choices,
+        "trial_attended_choices": AdmissionInquiry.TrialAttended.choices,
+        "trial_result_choices": AdmissionInquiry.TrialResult.choices,
+    })
+
+
+@require_POST
+@login_required
+def admission_report_update(request: HttpRequest) -> HttpResponse:
+    inquiry_id = request.POST.get("inquiry_id")
+    inquiry = get_object_or_404(AdmissionInquiry, id=inquiry_id)
+
+    sheet_prepared = request.POST.get("sheet_prepared")
+    trial_attended = request.POST.get("trial_attended")
+    trial_result = request.POST.get("trial_result")
+    internal_note = request.POST.get("internal_note")
+
+    inquiry.sheet_prepared = sheet_prepared == "yes"
+
+    valid_attended = {choice[0] for choice in AdmissionInquiry.TrialAttended.choices}
+    valid_result = {choice[0] for choice in AdmissionInquiry.TrialResult.choices}
+
+    if trial_attended in valid_attended:
+        inquiry.trial_attended = trial_attended
+    if trial_result in valid_result:
+        inquiry.trial_result = trial_result
+    if internal_note is not None:
+        inquiry.internal_note = internal_note.strip()
+
+    inquiry.save()
+
+    return redirect(request.META.get("HTTP_REFERER", "core:admission_report"))
+

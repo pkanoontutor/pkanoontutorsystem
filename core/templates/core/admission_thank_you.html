@@ -1,0 +1,158 @@
+{% load static %}
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ลงทะเบียนเรียบร้อย | PKanoon Tutor</title>
+  <style>
+    *{ box-sizing:border-box; }
+    body{
+      margin:0;
+      font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+      background:#FDCF72;
+      color:#111827;
+    }
+    .wrap{
+      max-width:760px;
+      margin:0 auto;
+      padding:18px;
+    }
+    .card{
+      background:#fff;
+      border-radius:28px;
+      padding:24px;
+      box-shadow:0 14px 34px rgba(0,0,0,.16);
+      border:1px solid rgba(255,255,255,.9);
+      margin-top:18px;
+    }
+    .logo{text-align:center;margin:8px 0 16px;}
+    .logo img{max-height:160px;width:auto;}
+    .check{
+      width:72px;height:72px;border-radius:999px;
+      background:#dcfce7;color:#15803d;
+      display:flex;align-items:center;justify-content:center;
+      margin:0 auto 14px;font-size:38px;font-weight:900;
+    }
+    h1{
+      margin:0;
+      text-align:center;
+      font-size:28px;
+      color:#111827;
+    }
+    .lead{
+      text-align:center;
+      color:#475569;
+      line-height:1.7;
+      margin:10px 0 18px;
+      font-size:15px;
+    }
+    .notice{
+      background:#fff7ed;
+      border:2px solid #fed7aa;
+      color:#9a3412;
+      border-radius:20px;
+      padding:16px;
+      font-size:16px;
+      font-weight:900;
+      line-height:1.65;
+      text-align:center;
+      margin:18px 0;
+    }
+    .info{
+      border:1px solid #e5e7eb;
+      border-radius:18px;
+      overflow:hidden;
+      margin-top:16px;
+    }
+    .row{
+      display:grid;
+      grid-template-columns:190px 1fr;
+      border-bottom:1px solid #f1f5f9;
+    }
+    .row:last-child{border-bottom:0;}
+    .label{
+      background:#f8fafc;
+      padding:11px 13px;
+      color:#475569;
+      font-size:13px;
+      font-weight:900;
+    }
+    .value{
+      padding:11px 13px;
+      font-size:14px;
+      font-weight:800;
+      color:#111827;
+    }
+    .actions{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      justify-content:center;
+      margin-top:20px;
+    }
+    .btn{
+      border:0;
+      border-radius:18px;
+      padding:14px 20px;
+      text-decoration:none;
+      font-size:15px;
+      font-weight:900;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      gap:8px;
+      transition:.12s;
+    }
+    .btn:hover{transform:translateY(-1px);box-shadow:0 8px 18px rgba(0,0,0,.14);}
+    .btn-line{background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;}
+    .btn-home{background:#f1f5f9;color:#0f172a;border:1px solid #e2e8f0;}
+    @media(max-width:620px){
+      .row{grid-template-columns:1fr;}
+      .label{padding-bottom:4px;}
+      .value{padding-top:4px;}
+      h1{font-size:23px;}
+      .card{padding:18px;border-radius:22px;}
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="logo">
+      <img src="{% static 'core/logo.png' %}" alt="PKanoon Tutor">
+    </div>
+
+    <div class="card">
+      <div class="check">✓</div>
+      <h1>ลงทะเบียนเรียบร้อยแล้ว</h1>
+      <div class="lead">
+        ระบบได้รับข้อมูลของน้องแล้ว กรุณาตรวจสอบรายละเอียดด้านล่าง
+      </div>
+
+      <div class="notice">
+        กรุณาแคปภาพหน้าจอนี้ แล้วส่งไปที่ Line Official ของทางโรงเรียน<br>
+        เพื่อยืนยันที่นั่งทดลองเรียน/เริ่มเรียน
+      </div>
+
+      <div class="info">
+        <div class="row"><div class="label">ประเภท</div><div class="value">{{ inquiry.get_request_type_display }}</div></div>
+        <div class="row"><div class="label">ชื่อเล่น</div><div class="value">{{ inquiry.nickname }}</div></div>
+        <div class="row"><div class="label">ชื่อ-นามสกุล</div><div class="value">{{ inquiry.full_name }}</div></div>
+        <div class="row"><div class="label">โรงเรียน</div><div class="value">{{ inquiry.school_name|default:"-" }}</div></div>
+        <div class="row"><div class="label">เบอร์ติดต่อ</div><div class="value">{{ inquiry.contact_phone }}</div></div>
+        <div class="row"><div class="label">ระดับชั้น</div><div class="value">{{ inquiry.get_grade_level_display }}</div></div>
+        <div class="row"><div class="label">วันที่ทดลอง/เริ่มเรียน</div><div class="value">{{ inquiry.first_lesson_date|date:"d/m/Y" }}</div></div>
+        <div class="row"><div class="label">รอบเวลา</div><div class="value">{{ inquiry.get_preferred_time_slot_display }}</div></div>
+        <div class="row"><div class="label">เวลาลงทะเบียน</div><div class="value">{{ inquiry.created_at|date:"d/m/Y H:i" }}</div></div>
+      </div>
+
+      <div class="actions">
+        <a class="btn btn-line" href="{{ line_url }}" target="_blank" rel="noopener">
+          ส่งยืนยันผ่าน Line Official
+        </a>
+        <a class="btn btn-home" href="/">กลับหน้าแรก</a>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

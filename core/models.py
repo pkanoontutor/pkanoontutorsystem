@@ -566,6 +566,7 @@ class AdmissionInquiry(models.Model):
     class RequestType(models.TextChoices):
         TRIAL = "trial", "จองทดลองเรียน"
         ENROLL = "enroll", "สมัครเรียน"
+        QUEUE = "queue", "จองที่นั่งล่วงหน้า(กรณีที่นั่งเต็ม)"
 
     class GradeLevel(models.TextChoices):
         P4 = "p4", "ป.4"

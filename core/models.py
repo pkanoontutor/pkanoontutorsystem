@@ -1,4 +1,5 @@
 from django.db import models, transaction
+from decimal import Decimal
 from django.utils import timezone
 
 class School(models.Model):
@@ -566,7 +567,7 @@ class AdmissionInquiry(models.Model):
     class RequestType(models.TextChoices):
         TRIAL = "trial", "จองทดลองเรียน"
         ENROLL = "enroll", "สมัครเรียน"
-        QUEUE = "queue", "จองที่นั่งล่วงหน้า(กรณีที่นั่งเต็ม)"
+        QUEUE = "queue", "จองที่นั่งล่วงหน้า"
 
     class GradeLevel(models.TextChoices):
         P4 = "p4", "ป.4"
@@ -576,7 +577,6 @@ class AdmissionInquiry(models.Model):
         M2 = "m2", "ม.2"
         M3 = "m3", "ม.3"
         M4 = "m4", "ม.4"
-        OTHER = "other", "อื่น ๆ"
 
     class PreferredTimeSlot(models.TextChoices):
         SAT_MORNING = "sat_morning", "เสาร์เช้า (08.30-12.30)"
@@ -659,3 +659,152 @@ class AdmissionInquiry(models.Model):
     def __str__(self) -> str:
         return f"{self.get_request_type_display()} | {self.nickname} | {self.full_name}"
 
+# =========================================================
+# ✅ School Finance / Overview Modules
+# =========================================================
+class FinanceSetting(models.Model):
+    key = models.CharField("Key", max_length=80, unique=True)
+    value = models.DecimalField("Value", max_digits=12, decimal_places=2, default=0)
+    description = models.CharField("Description", max_length=255, blank=True)
+    updated_at = models.DateTimeField("Updated at", auto_now=True)
+
+    class Meta:
+        verbose_name = "Finance Setting"
+        verbose_name_plural = "Finance Settings"
+        ordering = ("key",)
+
+    def __str__(self) -> str:
+        return f"{self.key}: {self.value}"
+
+
+class ExpenseCategory(models.Model):
+    name = models.CharField("ประเภทค่าใช้จ่าย", max_length=120, unique=True)
+    is_tutor_payroll = models.BooleanField("เป็นค่าจ้างติวเตอร์", default=False)
+    is_active = models.BooleanField("ใช้งาน", default=True)
+    sort_order = models.PositiveIntegerField("ลำดับ", default=0)
+
+    class Meta:
+        verbose_name = "Expense Category"
+        verbose_name_plural = "Expense Categories"
+        ordering = ("sort_order", "name")
+
+    def __str__(self) -> str:
+        return self.name
+
+
+class SchoolExpense(models.Model):
+    class PaymentMethod(models.TextChoices):
+        CASH = "cash", "เงินสด"
+        TRANSFER = "transfer", "โอนเงิน"
+        QR = "qr", "QR / PromptPay"
+        CARD = "card", "บัตร"
+        OTHER = "other", "อื่น ๆ"
+
+    expense_date = models.DateField("วันที่จ่าย", default=timezone.localdate)
+    category = models.ForeignKey(
+        ExpenseCategory,
+        verbose_name="ประเภทค่าใช้จ่าย",
+        on_delete=models.PROTECT,
+        related_name="expenses",
+    )
+    vendor = models.CharField("Vendor / ผู้รับเงิน", max_length=255, blank=True)
+    description = models.CharField("รายละเอียด", max_length=255, blank=True)
+    amount = models.DecimalField("จำนวนเงิน", max_digits=12, decimal_places=2)
+    payment_method = models.CharField(
+        "วิธีจ่าย",
+        max_length=20,
+        choices=PaymentMethod.choices,
+        default=PaymentMethod.TRANSFER,
+    )
+    note = models.TextField("หมายเหตุ", blank=True)
+    created_at = models.DateTimeField("วันที่บันทึก", default=timezone.now)
+    updated_at = models.DateTimeField("อัปเดตล่าสุด", auto_now=True)
+
+    class Meta:
+        verbose_name = "School Expense"
+        verbose_name_plural = "School Expenses"
+        ordering = ("-expense_date", "-created_at")
+
+    def __str__(self) -> str:
+        return f"{self.expense_date} | {self.category} | {self.amount:,.2f}"
+
+
+class Tutor(models.Model):
+    name = models.CharField("ชื่อติวเตอร์", max_length=120, unique=True)
+    phone = models.CharField("เบอร์ติดต่อ", max_length=50, blank=True)
+    note = models.TextField("หมายเหตุ", blank=True)
+    is_active = models.BooleanField("ใช้งาน", default=True)
+    created_at = models.DateTimeField("วันที่สร้าง", default=timezone.now)
+    updated_at = models.DateTimeField("อัปเดตล่าสุด", auto_now=True)
+
+    class Meta:
+        verbose_name = "Tutor"
+        verbose_name_plural = "Tutors"
+        ordering = ("name",)
+
+    def __str__(self) -> str:
+        return self.name
+
+
+class TutorPayrollEntry(models.Model):
+    work_date = models.DateField("วันที่สอน", default=timezone.localdate)
+    tutor = models.ForeignKey(
+        Tutor,
+        verbose_name="ติวเตอร์",
+        on_delete=models.PROTECT,
+        related_name="payroll_entries",
+    )
+    teaching_hours = models.DecimalField("จำนวนชั่วโมงสอน", max_digits=5, decimal_places=2, default=0)
+    hourly_rate = models.DecimalField("เรทต่อชั่วโมง", max_digits=10, decimal_places=2, default=0)
+    teaching_fee = models.DecimalField("ค่าสอน", max_digits=12, decimal_places=2, default=0)
+    travel_fee = models.DecimalField("ค่าเดินทาง", max_digits=12, decimal_places=2, default=0)
+    idle_fee = models.DecimalField("ค่านั่งว่าง / ค่าอื่น ๆ", max_digits=12, decimal_places=2, default=0)
+    total_amount = models.DecimalField("ยอดรวม", max_digits=12, decimal_places=2, default=0)
+    note = models.TextField("หมายเหตุ", blank=True)
+    created_at = models.DateTimeField("วันที่บันทึก", default=timezone.now)
+    updated_at = models.DateTimeField("อัปเดตล่าสุด", auto_now=True)
+
+    class Meta:
+        verbose_name = "Tutor Payroll Entry"
+        verbose_name_plural = "Tutor Payroll Entries"
+        ordering = ("-work_date", "tutor__name")
+        constraints = [
+            models.UniqueConstraint(fields=["work_date", "tutor"], name="uniq_tutor_payroll_per_day")
+        ]
+
+    @staticmethod
+    def calculate_hourly_rate(hours: Decimal) -> Decimal:
+        hours = Decimal(str(hours or 0))
+        if hours <= 0:
+            return Decimal("0")
+        if hours <= 1:
+            return Decimal("550")
+        if hours < 4:
+            return Decimal("350")
+        return Decimal("300")
+
+    @staticmethod
+    def calculate_travel_fee(hours: Decimal) -> Decimal:
+        hours = Decimal(str(hours or 0))
+        if hours <= 0:
+            return Decimal("0")
+        if hours <= 1:
+            return Decimal("200")
+        if hours < 4:
+            return Decimal("150")
+        return Decimal("100")
+
+    def recalculate(self):
+        hours = Decimal(str(self.teaching_hours or 0))
+        self.hourly_rate = self.calculate_hourly_rate(hours)
+        self.teaching_fee = hours * self.hourly_rate
+        self.travel_fee = self.calculate_travel_fee(hours)
+        self.idle_fee = Decimal(str(self.idle_fee or 0))
+        self.total_amount = self.teaching_fee + self.travel_fee + self.idle_fee
+
+    def save(self, *args, **kwargs):
+        self.recalculate()
+        super().save(*args, **kwargs)
+
+    def __str__(self) -> str:
+        return f"{self.work_date} | {self.tutor} | {self.total_amount:,.2f}"

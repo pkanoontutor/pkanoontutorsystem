@@ -14,6 +14,11 @@ from .models import (
     EnrollmentInstallment,
     SheetInventory,
     AdmissionInquiry,
+    FinanceSetting,
+    ExpenseCategory,
+    SchoolExpense,
+    Tutor,
+    TutorPayrollEntry,
 )
 
 
@@ -421,4 +426,50 @@ class AdmissionInquiryAdmin(admin.ModelAdmin):
     @admin.display(description="ชื่อ-นามสกุล")
     def full_name_display(self, obj):
         return obj.full_name
+
+# =========================================================
+# School Finance / Overview Modules
+# =========================================================
+@admin.register(FinanceSetting)
+class FinanceSettingAdmin(admin.ModelAdmin):
+    list_display = ("key", "value", "description", "updated_at")
+    search_fields = ("key", "description")
+    readonly_fields = ("updated_at",)
+
+
+@admin.register(ExpenseCategory)
+class ExpenseCategoryAdmin(admin.ModelAdmin):
+    list_display = ("name", "is_tutor_payroll", "is_active", "sort_order")
+    list_filter = ("is_tutor_payroll", "is_active")
+    search_fields = ("name",)
+    ordering = ("sort_order", "name")
+
+
+@admin.register(SchoolExpense)
+class SchoolExpenseAdmin(admin.ModelAdmin):
+    list_display = ("expense_date", "category", "vendor", "description", "amount", "payment_method", "created_at")
+    list_filter = ("category", "payment_method", "expense_date")
+    search_fields = ("vendor", "description", "note")
+    autocomplete_fields = ("category",)
+    date_hierarchy = "expense_date"
+    ordering = ("-expense_date", "-created_at")
+
+
+@admin.register(Tutor)
+class TutorAdmin(admin.ModelAdmin):
+    list_display = ("name", "phone", "is_active", "updated_at")
+    list_filter = ("is_active",)
+    search_fields = ("name", "phone", "note")
+    ordering = ("name",)
+
+
+@admin.register(TutorPayrollEntry)
+class TutorPayrollEntryAdmin(admin.ModelAdmin):
+    list_display = ("work_date", "tutor", "teaching_hours", "hourly_rate", "teaching_fee", "travel_fee", "idle_fee", "total_amount")
+    list_filter = ("work_date", "tutor")
+    search_fields = ("tutor__name", "note")
+    autocomplete_fields = ("tutor",)
+    readonly_fields = ("hourly_rate", "teaching_fee", "travel_fee", "total_amount", "created_at", "updated_at")
+    date_hierarchy = "work_date"
+    ordering = ("-work_date", "tutor__name")
 

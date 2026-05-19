@@ -1,0 +1,214 @@
+{% extends "core/base.html" %}
+{% block title %}ภาพรวมโรงเรียน{% endblock %}
+
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+  .page-head{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:flex-start;margin-bottom:14px;}
+  .title{font-size:24px;font-weight:900;color:#0f172a;}
+  .sub{color:#475569;font-size:13px;margin-top:4px;line-height:1.5;}
+  .cards{display:grid;grid-template-columns:repeat(4,minmax(160px,1fr));gap:12px;margin-bottom:14px;}
+  .metric{background:#fff;border-radius:16px;padding:16px;box-shadow:0 4px 10px rgba(0,0,0,.08);}
+  .metric .k{font-size:12px;color:#64748b;font-weight:900;text-transform:uppercase;letter-spacing:.04em;}
+  .metric .v{font-size:26px;font-weight:900;margin-top:6px;color:#111827;}
+  .metric.good .v{color:#15803d;}
+  .metric.bad .v{color:#b91c1c;}
+  .filter-grid{display:grid;grid-template-columns:repeat(4,minmax(160px,1fr));gap:10px;}
+  .field{display:flex;flex-direction:column;gap:5px;}
+  .field label{font-size:12px;font-weight:900;color:#334155;}
+  input,select{border:1px solid #e2e8f0;border-radius:10px;padding:9px 10px;font-weight:700;background:#fff;}
+  .btn-row{display:flex;gap:8px;flex-wrap:wrap;align-items:end;}
+  .btnx{border:0;border-radius:12px;padding:10px 14px;font-weight:900;text-decoration:none;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;}
+  .primary{background:#2563eb;color:#fff;}
+  .dark{background:#0f172a;color:#fff;}
+  .soft{background:#f1f5f9;color:#0f172a;border:1px solid #e2e8f0;}
+  .chart-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px;}
+  .chart-card{background:#fff;border-radius:16px;padding:16px;box-shadow:0 4px 10px rgba(0,0,0,.08);}
+  .table-wrap{overflow:auto;margin-top:14px;}
+  .overview-table{min-width:1100px;width:100%;border-collapse:collapse;background:#fff;}
+  .overview-table th{position:sticky;top:0;background:#f8fafc;z-index:1;}
+  .overview-table th,.overview-table td{padding:10px;border-bottom:1px solid #e5e7eb;text-align:right;white-space:nowrap;}
+  .overview-table th:first-child,.overview-table td:first-child{text-align:left;}
+  .pos{color:#15803d;font-weight:900;}
+  .neg{color:#b91c1c;font-weight:900;}
+  .settings{display:flex;gap:10px;flex-wrap:wrap;align-items:end;}
+  @media(max-width:900px){.cards,.filter-grid,.chart-grid{grid-template-columns:1fr}.title{font-size:21px;}}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <div>
+    <div class="title">📊 ภาพรวมโรงเรียน</div>
+    <div class="sub">สัปดาห์ของโรงเรียนยึดเฉพาะรอบเรียนเสาร์–อาทิตย์ | รายได้คิดจาก “มาเรียน + ขาดแบบหักครั้ง”</div>
+  </div>
+  <div class="btn-row">
+    <a class="btnx soft" href="/dashboard/">← Dashboard</a>
+    <a class="btnx dark" href="/school-finance/">ไป Module รายรับรายจ่าย</a>
+  </div>
+</div>
+
+<div class="card" style="margin-bottom:14px;">
+  <form method="get">
+    <div class="filter-grid">
+      <div class="field">
+        <label>มุมมอง Period</label>
+        <select name="period_mode">
+          <option value="week" {% if period_mode == "week" %}selected{% endif %}>รายสัปดาห์ (เสาร์-อาทิตย์)</option>
+          <option value="month" {% if period_mode == "month" %}selected{% endif %}>รายเดือน</option>
+          <option value="year" {% if period_mode == "year" %}selected{% endif %}>รายปี</option>
+          <option value="custom" {% if period_mode == "custom" %}selected{% endif %}>เลือกช่วงเอง</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>วันที่อ้างอิง</label>
+        <input type="date" name="anchor_date" value="{{ filters.anchor_date }}">
+      </div>
+      <div class="field">
+        <label>วันที่เริ่มต้น</label>
+        <input type="date" name="date_from" value="{{ filters.date_from }}">
+      </div>
+      <div class="field">
+        <label>วันที่สิ้นสุด</label>
+        <input type="date" name="date_to" value="{{ filters.date_to }}">
+      </div>
+      <div class="field">
+        <label>Group ตาราง/กราฟ</label>
+        <select name="group_by">
+          <option value="week" {% if group_by == "week" %}selected{% endif %}>รายสัปดาห์</option>
+          <option value="month" {% if group_by == "month" %}selected{% endif %}>รายเดือน</option>
+          <option value="year" {% if group_by == "year" %}selected{% endif %}>รายปี</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>รอบเวลา</label>
+        <select name="time_slot">
+          <option value="">ทั้งหมด</option>
+          {% for value,label in time_slot_choices %}
+            <option value="{{ value }}" {% if filters.time_slot == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label>ห้องเรียน</label>
+        <select name="class_id">
+          <option value="">ทั้งหมด</option>
+          {% for cls in classes %}
+            <option value="{{ cls.id }}" {% if filters.class_id == cls.id|stringformat:"s" %}selected{% endif %}>{{ cls.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="btn-row">
+        <button class="btnx primary" type="submit">Filter</button>
+        <a class="btnx soft" href="/school-overview/">Reset</a>
+      </div>
+    </div>
+  </form>
+</div>
+
+<div class="card" style="margin-bottom:14px;">
+  <form method="post" class="settings">
+    {% csrf_token %}
+    <div class="field">
+      <label>รายได้ต่อคน/ครั้งที่หักชั่วโมง</label>
+      <input type="number" name="revenue_per_student" step="0.01" value="{{ revenue_per_student }}">
+    </div>
+    <div class="field">
+      <label>ค่า tutor ประมาณการต่อ class/สัปดาห์</label>
+      <input type="number" name="estimated_tutor_cost_per_class" step="0.01" value="{{ estimated_tutor_cost_per_class }}">
+    </div>
+    <button class="btnx dark" type="submit">บันทึกตัวเลขประมาณการ</button>
+  </form>
+</div>
+
+<div class="cards">
+  <div class="metric"><div class="k">มาเรียน</div><div class="v">{{ totals.present }}</div></div>
+  <div class="metric"><div class="k">ลา</div><div class="v">{{ totals.excused }}</div></div>
+  <div class="metric"><div class="k">ขาดหักครั้ง</div><div class="v">{{ totals.no_show }}</div></div>
+  <div class="metric good"><div class="k">รายได้ประมาณการ</div><div class="v">{{ totals.estimated_revenue|floatformat:0 }}</div></div>
+  <div class="metric bad"><div class="k">ค่า tutor ประมาณการ</div><div class="v">{{ totals.estimated_tutor_cost|floatformat:0 }}</div></div>
+  <div class="metric bad"><div class="k">ค่า tutor จริงจาก Module 2</div><div class="v">{{ totals.actual_tutor_cost|floatformat:0 }}</div></div>
+  <div class="metric bad"><div class="k">ค่าใช้จ่ายทั่วไป</div><div class="v">{{ totals.general_expense|floatformat:0 }}</div></div>
+  <div class="metric {% if totals.net_actual_direct >= 0 %}good{% else %}bad{% endif %}"><div class="k">กำไร/ขาดทุนหลังค่า tutor จริง</div><div class="v">{{ totals.net_actual_direct|floatformat:0 }}</div></div>
+</div>
+
+<div class="chart-grid">
+  <div class="chart-card">
+    <b>Attendance by period</b>
+    <canvas id="attendanceChart" height="170"></canvas>
+  </div>
+  <div class="chart-card">
+    <b>Revenue vs Tutor Cost</b>
+    <canvas id="financeChart" height="170"></canvas>
+  </div>
+</div>
+
+<div class="table-wrap">
+  <table class="overview-table">
+    <thead>
+      <tr>
+        <th>Period</th>
+        <th>มา</th>
+        <th>ลา</th>
+        <th>ขาดหักครั้ง</th>
+        <th>รวมคิดรายได้</th>
+        <th>Class ที่มี movement</th>
+        <th>รายได้ประมาณการ</th>
+        <th>ค่า tutor ประมาณการ</th>
+        <th>ค่า tutor จริง</th>
+        <th>ค่าใช้จ่ายทั่วไป</th>
+        <th>Net ประมาณการ</th>
+        <th>Net หลัง tutor จริง</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in rows %}
+      <tr>
+        <td>{{ r.label }}</td>
+        <td>{{ r.present }}</td>
+        <td>{{ r.excused }}</td>
+        <td>{{ r.no_show }}</td>
+        <td>{{ r.deducted_count }}</td>
+        <td>{{ r.active_class_count }}</td>
+        <td>{{ r.estimated_revenue|floatformat:2 }}</td>
+        <td>{{ r.estimated_tutor_cost|floatformat:2 }}</td>
+        <td>{{ r.actual_tutor_cost|floatformat:2 }}</td>
+        <td>{{ r.general_expense|floatformat:2 }}</td>
+        <td class="{% if r.net_estimated >= 0 %}pos{% else %}neg{% endif %}">{{ r.net_estimated|floatformat:2 }}</td>
+        <td class="{% if r.net_actual_direct >= 0 %}pos{% else %}neg{% endif %}">{{ r.net_actual_direct|floatformat:2 }}</td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="12" style="text-align:center;color:#64748b;">ยังไม่มีข้อมูลในช่วงที่เลือก</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<script>
+const labels = {{ chart_labels_json|safe }};
+new Chart(document.getElementById('attendanceChart'), {
+  type: 'bar',
+  data: {
+    labels,
+    datasets: [
+      {label: 'มา', data: {{ chart_present_json|safe }}},
+      {label: 'ลา', data: {{ chart_excused_json|safe }}},
+      {label: 'ขาด', data: {{ chart_no_show_json|safe }}}
+    ]
+  },
+  options: {responsive: true, scales: {x: {stacked: true}, y: {stacked: true, beginAtZero: true}}}
+});
+new Chart(document.getElementById('financeChart'), {
+  type: 'line',
+  data: {
+    labels,
+    datasets: [
+      {label: 'รายได้ประมาณการ', data: {{ chart_revenue_json|safe }}, tension: .25},
+      {label: 'ค่า tutor ประมาณการ', data: {{ chart_estimated_cost_json|safe }}, tension: .25},
+      {label: 'ค่า tutor จริง', data: {{ chart_actual_tutor_json|safe }}, tension: .25}
+    ]
+  },
+  options: {responsive: true, scales: {y: {beginAtZero: true}}}
+});
+</script>
+{% endblock %}

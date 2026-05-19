@@ -28,6 +28,13 @@ urlpatterns = [
     path("admission-report/", views.admission_report, name="admission_report"),
     path("admission-report/update/", views.admission_report_update, name="admission_report_update"),
 
+
+    # School overview / finance
+    path("school-overview/", views.school_overview, name="school_overview"),
+    path("school-finance/", views.school_finance, name="school_finance"),
+    path("school-finance/delete-expense/<int:pk>/", views.school_expense_delete, name="school_expense_delete"),
+    path("school-finance/delete-payroll/<int:pk>/", views.tutor_payroll_delete, name="tutor_payroll_delete"),
+
     # Student Portal
     path("student-portal/", views.student_portal_login, name="student_portal_login"),
     path("student-portal/student-search/", views.student_portal_student_search, name="student_portal_student_search"),

@@ -1,5 +1,5 @@
 from __future__ import annotations
-from collections import OrderedDict
+from collections import OrderedDict, defaultdict
 
 import json
 from datetime import date, timedelta, datetime
@@ -24,6 +24,11 @@ from .models import (
     Enrollment,
     TutoringClass,
     AdmissionInquiry,
+    FinanceSetting,
+    ExpenseCategory,
+    SchoolExpense,
+    Tutor,
+    TutorPayrollEntry,
 )
 
 
@@ -1107,3 +1112,440 @@ def admission_report_update(request: HttpRequest) -> HttpResponse:
 
     return redirect(request.META.get("HTTP_REFERER", "core:admission_report"))
 
+# =========================================================
+# ✅ School Overview / Finance helpers
+# =========================================================
+def _finance_setting(key: str, default: Decimal, description: str = "") -> Decimal:
+    obj, _ = FinanceSetting.objects.get_or_create(
+        key=key,
+        defaults={"value": default, "description": description},
+    )
+    return Decimal(str(obj.value))
+
+
+def _school_week_range(anchor: date) -> tuple[date, date]:
+    """School week = Saturday to Sunday."""
+    days_since_sat = (anchor.weekday() - 5) % 7
+    start = anchor - timedelta(days=days_since_sat)
+    return start, start + timedelta(days=1)
+
+
+def _month_range(anchor: date) -> tuple[date, date]:
+    if anchor.month == 12:
+        next_month = date(anchor.year + 1, 1, 1)
+    else:
+        next_month = date(anchor.year, anchor.month + 1, 1)
+    start = date(anchor.year, anchor.month, 1)
+    return start, next_month - timedelta(days=1)
+
+
+def _year_range(anchor: date) -> tuple[date, date]:
+    return date(anchor.year, 1, 1), date(anchor.year, 12, 31)
+
+
+def _period_from_request(request: HttpRequest) -> tuple[str, date, date]:
+    mode = (request.GET.get("period_mode") or "week").strip()
+    anchor = _parse_date(request.GET.get("anchor_date"))
+
+    if mode == "month":
+        start, end = _month_range(anchor)
+    elif mode == "year":
+        start, end = _year_range(anchor)
+    elif mode == "custom":
+        start = _parse_date(request.GET.get("date_from"))
+        end = _parse_date(request.GET.get("date_to"))
+        if end < start:
+            start, end = end, start
+    else:
+        mode = "week"
+        start, end = _school_week_range(anchor)
+
+    return mode, start, end
+
+
+def _group_key(d: date, group_by: str) -> tuple[str, date]:
+    if group_by == "month":
+        start = date(d.year, d.month, 1)
+        return start.strftime("%Y-%m"), start
+    if group_by == "year":
+        start = date(d.year, 1, 1)
+        return str(d.year), start
+    start, _ = _school_week_range(d)
+    return f"{start.strftime('%d/%m/%Y')} - {(start + timedelta(days=1)).strftime('%d/%m/%Y')}", start
+
+
+def _money(x) -> Decimal:
+    try:
+        return Decimal(str(x or 0))
+    except Exception:
+        return Decimal("0")
+
+
+def _attendance_queryset_for_range(start: date, end: date, time_slot: str = "", class_id: str = ""):
+    qs = (
+        Attendance.objects
+        .select_related("enrollment__tutoring_class", "student")
+        .filter(
+            attendance_date__gte=start,
+            attendance_date__lte=end,
+            student__is_active=True,
+            enrollment__tutoring_class__is_active=True,
+        )
+    )
+    if time_slot:
+        qs = qs.filter(enrollment__tutoring_class__time_slot=time_slot)
+    if class_id:
+        try:
+            qs = qs.filter(enrollment__tutoring_class_id=int(class_id))
+        except Exception:
+            pass
+    return qs
+
+
+@login_required
+def school_overview(request: HttpRequest) -> HttpResponse:
+    """
+    Module 1:
+    - Attendance overview by school week / month / year / custom period.
+    - Revenue estimate = (present + no-show) x revenue per student.
+    - Estimated tutor direct cost = active classes in period x tutor cost per class.
+    - Actual tutor direct cost = Module 2 tutor payroll entries.
+    """
+    if request.method == "POST":
+        revenue = _money(request.POST.get("revenue_per_student"))
+        tutor_cost = _money(request.POST.get("estimated_tutor_cost_per_class"))
+        FinanceSetting.objects.update_or_create(
+            key="revenue_per_student_per_week",
+            defaults={
+                "value": revenue,
+                "description": "รายได้ประมาณการต่อคนต่อสัปดาห์ / ต่อครั้งที่หักชั่วโมง",
+            },
+        )
+        FinanceSetting.objects.update_or_create(
+            key="estimated_tutor_cost_per_class_per_week",
+            defaults={
+                "value": tutor_cost,
+                "description": "ค่าใช้จ่ายติวเตอร์ประมาณการต่อ class ต่อสัปดาห์",
+            },
+        )
+        return redirect("core:school_overview")
+
+    period_mode, start, end = _period_from_request(request)
+    group_by = (request.GET.get("group_by") or period_mode or "week").strip()
+    if group_by not in {"week", "month", "year"}:
+        group_by = "week"
+
+    time_slot = (request.GET.get("time_slot") or "").strip()
+    class_id = (request.GET.get("class_id") or "").strip()
+
+    revenue_per_student = _finance_setting(
+        "revenue_per_student_per_week",
+        Decimal("360"),
+        "รายได้ประมาณการต่อคนต่อสัปดาห์ / ต่อครั้งที่หักชั่วโมง",
+    )
+    estimated_tutor_cost_per_class = _finance_setting(
+        "estimated_tutor_cost_per_class_per_week",
+        Decimal("1350"),
+        "ค่าใช้จ่ายติวเตอร์ประมาณการต่อ class ต่อสัปดาห์",
+    )
+
+    att_qs = _attendance_queryset_for_range(start, end, time_slot, class_id)
+
+    groups: dict[str, dict] = {}
+    for a in att_qs:
+        label, group_start = _group_key(a.attendance_date, group_by)
+        if label not in groups:
+            groups[label] = {
+                "label": label,
+                "sort": group_start,
+                "present": 0,
+                "excused": 0,
+                "no_show": 0,
+                "deducted_count": 0,
+                "class_ids": set(),
+                "estimated_revenue": Decimal("0"),
+                "estimated_tutor_cost": Decimal("0"),
+                "actual_tutor_cost": Decimal("0"),
+                "general_expense": Decimal("0"),
+                "net_estimated": Decimal("0"),
+                "net_actual_direct": Decimal("0"),
+            }
+
+        if a.status == Attendance.Status.PRESENT:
+            groups[label]["present"] += 1
+            groups[label]["deducted_count"] += 1
+            groups[label]["class_ids"].add(a.enrollment.tutoring_class_id)
+        elif a.status == Attendance.Status.EXCUSED:
+            groups[label]["excused"] += 1
+        elif a.status == Attendance.Status.NO_SHOW:
+            groups[label]["no_show"] += 1
+            groups[label]["deducted_count"] += 1
+            groups[label]["class_ids"].add(a.enrollment.tutoring_class_id)
+
+    # Actual tutor payroll from Module 2
+    payroll_qs = TutorPayrollEntry.objects.filter(work_date__gte=start, work_date__lte=end)
+    for p in payroll_qs:
+        label, group_start = _group_key(p.work_date, group_by)
+        if label not in groups:
+            groups[label] = {
+                "label": label,
+                "sort": group_start,
+                "present": 0,
+                "excused": 0,
+                "no_show": 0,
+                "deducted_count": 0,
+                "class_ids": set(),
+                "estimated_revenue": Decimal("0"),
+                "estimated_tutor_cost": Decimal("0"),
+                "actual_tutor_cost": Decimal("0"),
+                "general_expense": Decimal("0"),
+                "net_estimated": Decimal("0"),
+                "net_actual_direct": Decimal("0"),
+            }
+        groups[label]["actual_tutor_cost"] += _money(p.total_amount)
+
+    expense_qs = SchoolExpense.objects.filter(expense_date__gte=start, expense_date__lte=end)
+    for e in expense_qs:
+        label, group_start = _group_key(e.expense_date, group_by)
+        if label not in groups:
+            groups[label] = {
+                "label": label,
+                "sort": group_start,
+                "present": 0,
+                "excused": 0,
+                "no_show": 0,
+                "deducted_count": 0,
+                "class_ids": set(),
+                "estimated_revenue": Decimal("0"),
+                "estimated_tutor_cost": Decimal("0"),
+                "actual_tutor_cost": Decimal("0"),
+                "general_expense": Decimal("0"),
+                "net_estimated": Decimal("0"),
+                "net_actual_direct": Decimal("0"),
+            }
+        groups[label]["general_expense"] += _money(e.amount)
+
+    rows = []
+    for item in groups.values():
+        active_class_count = len(item["class_ids"])
+        item["active_class_count"] = active_class_count
+        item["estimated_revenue"] = Decimal(item["deducted_count"]) * revenue_per_student
+        item["estimated_tutor_cost"] = Decimal(active_class_count) * estimated_tutor_cost_per_class
+        item["net_estimated"] = item["estimated_revenue"] - item["estimated_tutor_cost"]
+        item["net_actual_direct"] = item["estimated_revenue"] - item["actual_tutor_cost"]
+        rows.append(item)
+
+    rows.sort(key=lambda x: x["sort"])
+
+    totals = {
+        "present": sum(r["present"] for r in rows),
+        "excused": sum(r["excused"] for r in rows),
+        "no_show": sum(r["no_show"] for r in rows),
+        "deducted_count": sum(r["deducted_count"] for r in rows),
+        "estimated_revenue": sum((r["estimated_revenue"] for r in rows), Decimal("0")),
+        "estimated_tutor_cost": sum((r["estimated_tutor_cost"] for r in rows), Decimal("0")),
+        "actual_tutor_cost": sum((r["actual_tutor_cost"] for r in rows), Decimal("0")),
+        "general_expense": sum((r["general_expense"] for r in rows), Decimal("0")),
+    }
+    totals["net_estimated"] = totals["estimated_revenue"] - totals["estimated_tutor_cost"]
+    totals["net_actual_direct"] = totals["estimated_revenue"] - totals["actual_tutor_cost"]
+
+    chart_labels = [r["label"] for r in rows]
+    chart_present = [r["present"] for r in rows]
+    chart_excused = [r["excused"] for r in rows]
+    chart_no_show = [r["no_show"] for r in rows]
+    chart_revenue = [float(r["estimated_revenue"]) for r in rows]
+    chart_estimated_cost = [float(r["estimated_tutor_cost"]) for r in rows]
+    chart_actual_tutor = [float(r["actual_tutor_cost"]) for r in rows]
+
+    classes = TutoringClass.objects.filter(is_active=True).order_by("time_slot", "name")
+
+    return render(request, "core/school_overview.html", {
+        "rows": rows,
+        "totals": totals,
+        "period_mode": period_mode,
+        "group_by": group_by,
+        "start": start,
+        "end": end,
+        "filters": {
+            "anchor_date": request.GET.get("anchor_date") or timezone.localdate().isoformat(),
+            "date_from": request.GET.get("date_from") or start.isoformat(),
+            "date_to": request.GET.get("date_to") or end.isoformat(),
+            "time_slot": time_slot,
+            "class_id": class_id,
+        },
+        "classes": classes,
+        "time_slot_choices": TutoringClass.TimeSlot.choices,
+        "revenue_per_student": revenue_per_student,
+        "estimated_tutor_cost_per_class": estimated_tutor_cost_per_class,
+        "chart_labels_json": json.dumps(chart_labels, ensure_ascii=False),
+        "chart_present_json": json.dumps(chart_present),
+        "chart_excused_json": json.dumps(chart_excused),
+        "chart_no_show_json": json.dumps(chart_no_show),
+        "chart_revenue_json": json.dumps(chart_revenue),
+        "chart_estimated_cost_json": json.dumps(chart_estimated_cost),
+        "chart_actual_tutor_json": json.dumps(chart_actual_tutor),
+    })
+
+
+@login_required
+def school_finance(request: HttpRequest) -> HttpResponse:
+    """
+    Module 2:
+    - Revenue estimate from attendance.
+    - General expenses.
+    - Tutor payroll batch input.
+    """
+    selected_date = _parse_date(request.GET.get("work_date") or request.POST.get("work_date"))
+    date_from = _parse_date(request.GET.get("date_from"))
+    date_to = _parse_date(request.GET.get("date_to"))
+    if date_to < date_from:
+        date_from, date_to = date_to, date_from
+
+    if request.method == "POST":
+        action = (request.POST.get("action") or "").strip()
+
+        if action == "add_category":
+            name = (request.POST.get("category_name") or "").strip()
+            if name:
+                ExpenseCategory.objects.get_or_create(name=name, defaults={"is_active": True, "sort_order": 99})
+            return redirect(request.META.get("HTTP_REFERER", "core:school_finance"))
+
+        if action == "add_tutor":
+            name = (request.POST.get("tutor_name") or "").strip()
+            phone = (request.POST.get("tutor_phone") or "").strip()
+            if name:
+                Tutor.objects.update_or_create(name=name, defaults={"phone": phone, "is_active": True})
+            return redirect(request.META.get("HTTP_REFERER", "core:school_finance"))
+
+        if action == "add_expense":
+            category_id = request.POST.get("category")
+            try:
+                category = ExpenseCategory.objects.get(id=category_id, is_active=True)
+                SchoolExpense.objects.create(
+                    expense_date=_parse_date(request.POST.get("expense_date")),
+                    category=category,
+                    vendor=(request.POST.get("vendor") or "").strip(),
+                    description=(request.POST.get("description") or "").strip(),
+                    amount=_money(request.POST.get("amount")),
+                    payment_method=(request.POST.get("payment_method") or SchoolExpense.PaymentMethod.TRANSFER),
+                    note=(request.POST.get("note") or "").strip(),
+                )
+            except Exception:
+                pass
+            return redirect(request.META.get("HTTP_REFERER", "core:school_finance"))
+
+        if action == "save_payroll":
+            work_date = _parse_date(request.POST.get("work_date"))
+            single_tutor_id = (request.POST.get("single_tutor_id") or "").strip()
+            tutor_ids = request.POST.getlist("tutor_ids")
+            if single_tutor_id:
+                tutor_ids = [single_tutor_id]
+
+            for tid in tutor_ids:
+                hours_raw = (request.POST.get(f"hours_{tid}") or "").strip()
+                idle_raw = (request.POST.get(f"idle_{tid}") or "").strip()
+                note_raw = (request.POST.get(f"note_{tid}") or "").strip()
+
+                # Skip blank rows when saving all.
+                if not single_tutor_id and hours_raw == "" and idle_raw == "" and note_raw == "":
+                    continue
+
+                hours = _money(hours_raw)
+                idle_fee = _money(idle_raw)
+
+                if hours <= 0 and idle_fee <= 0 and not note_raw:
+                    continue
+
+                try:
+                    tutor = Tutor.objects.get(id=tid, is_active=True)
+                except Tutor.DoesNotExist:
+                    continue
+
+                entry, _ = TutorPayrollEntry.objects.get_or_create(
+                    work_date=work_date,
+                    tutor=tutor,
+                    defaults={"teaching_hours": hours, "idle_fee": idle_fee, "note": note_raw},
+                )
+                entry.teaching_hours = hours
+                entry.idle_fee = idle_fee
+                entry.note = note_raw
+                entry.save()
+
+            return redirect(f"{request.path}?work_date={work_date.isoformat()}&date_from={date_from.isoformat()}&date_to={date_to.isoformat()}")
+
+    revenue_per_student = _finance_setting(
+        "revenue_per_student_per_week",
+        Decimal("360"),
+        "รายได้ประมาณการต่อคนต่อสัปดาห์ / ต่อครั้งที่หักชั่วโมง",
+    )
+
+    att_qs = Attendance.objects.filter(
+        attendance_date__gte=date_from,
+        attendance_date__lte=date_to,
+        student__is_active=True,
+        enrollment__tutoring_class__is_active=True,
+        status__in=[Attendance.Status.PRESENT, Attendance.Status.NO_SHOW],
+    )
+    deducted_count = att_qs.count()
+    estimated_revenue = Decimal(deducted_count) * revenue_per_student
+
+    categories = ExpenseCategory.objects.filter(is_active=True).order_by("sort_order", "name")
+    tutors = Tutor.objects.filter(is_active=True).order_by("name")
+    existing_entries = TutorPayrollEntry.objects.filter(work_date=selected_date).select_related("tutor")
+    payroll_map = {e.tutor_id: e for e in existing_entries}
+
+    expense_rows = (
+        SchoolExpense.objects
+        .select_related("category")
+        .filter(expense_date__gte=date_from, expense_date__lte=date_to)
+        .order_by("-expense_date", "-created_at")
+    )
+    payroll_rows = (
+        TutorPayrollEntry.objects
+        .select_related("tutor")
+        .filter(work_date__gte=date_from, work_date__lte=date_to)
+        .order_by("-work_date", "tutor__name")
+    )
+
+    general_expense_total = expense_rows.aggregate(total=Sum("amount")).get("total") or Decimal("0")
+    tutor_payroll_total = payroll_rows.aggregate(total=Sum("total_amount")).get("total") or Decimal("0")
+    total_expense = general_expense_total + tutor_payroll_total
+    net_estimated = estimated_revenue - total_expense
+
+    payment_method_choices = SchoolExpense.PaymentMethod.choices
+
+    return render(request, "core/school_finance.html", {
+        "selected_date": selected_date,
+        "date_from": date_from,
+        "date_to": date_to,
+        "categories": categories,
+        "tutors": tutors,
+        "payroll_map": payroll_map,
+        "expense_rows": expense_rows[:100],
+        "payroll_rows": payroll_rows[:100],
+        "deducted_count": deducted_count,
+        "revenue_per_student": revenue_per_student,
+        "estimated_revenue": estimated_revenue,
+        "general_expense_total": general_expense_total,
+        "tutor_payroll_total": tutor_payroll_total,
+        "total_expense": total_expense,
+        "net_estimated": net_estimated,
+        "payment_method_choices": payment_method_choices,
+    })
+
+
+@require_POST
+@login_required
+def school_expense_delete(request: HttpRequest, pk: int) -> HttpResponse:
+    expense = get_object_or_404(SchoolExpense, pk=pk)
+    expense.delete()
+    return redirect(request.META.get("HTTP_REFERER", "core:school_finance"))
+
+
+@require_POST
+@login_required
+def tutor_payroll_delete(request: HttpRequest, pk: int) -> HttpResponse:
+    entry = get_object_or_404(TutorPayrollEntry, pk=pk)
+    entry.delete()
+    return redirect(request.META.get("HTTP_REFERER", "core:school_finance"))

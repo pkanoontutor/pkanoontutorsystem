@@ -1450,6 +1450,132 @@ def school_overview(request: HttpRequest) -> HttpResponse:
 
 
 @login_required
+def _school_finance_filtered_data(request: HttpRequest):
+    selected_date = _parse_date(request.GET.get("work_date") or request.POST.get("work_date"))
+    date_from = _parse_date(request.GET.get("date_from"))
+    date_to = _parse_date(request.GET.get("date_to"))
+    if date_to < date_from:
+        date_from, date_to = date_to, date_from
+
+    revenue_per_student = _finance_setting(
+        "revenue_per_student_per_week",
+        Decimal("360"),
+        "รายได้ประมาณการต่อคนต่อสัปดาห์ / ต่อครั้งที่หักชั่วโมง",
+    )
+
+    att_qs = Attendance.objects.filter(
+        attendance_date__gte=date_from,
+        attendance_date__lte=date_to,
+        student__is_active=True,
+        enrollment__tutoring_class__is_active=True,
+        status__in=[Attendance.Status.PRESENT, Attendance.Status.NO_SHOW],
+    )
+    deducted_count = att_qs.count()
+    estimated_revenue = Decimal(deducted_count) * revenue_per_student
+
+    expense_rows = (
+        SchoolExpense.objects
+        .select_related("category")
+        .filter(expense_date__gte=date_from, expense_date__lte=date_to)
+        .order_by("-expense_date", "-created_at")
+    )
+    payroll_rows = (
+        TutorPayrollEntry.objects
+        .select_related("tutor")
+        .filter(work_date__gte=date_from, work_date__lte=date_to)
+        .order_by("-work_date", "tutor__name")
+    )
+
+    general_expense_total = expense_rows.aggregate(total=Sum("amount")).get("total") or Decimal("0")
+    tutor_payroll_total = payroll_rows.aggregate(total=Sum("total_amount")).get("total") or Decimal("0")
+    total_expense = general_expense_total + tutor_payroll_total
+    net_estimated = estimated_revenue - total_expense
+
+    return {
+        "selected_date": selected_date,
+        "date_from": date_from,
+        "date_to": date_to,
+        "revenue_per_student": revenue_per_student,
+        "deducted_count": deducted_count,
+        "estimated_revenue": estimated_revenue,
+        "expense_rows": expense_rows,
+        "payroll_rows": payroll_rows,
+        "general_expense_total": general_expense_total,
+        "tutor_payroll_total": tutor_payroll_total,
+        "total_expense": total_expense,
+        "net_estimated": net_estimated,
+    }
+
+
+@login_required
+def pkanoon_admin_tool(request: HttpRequest) -> HttpResponse:
+    """Private landing page for sensitive school tools."""
+    return render(request, "core/pkanoon_admin_tool.html")
+
+
+@login_required
+def school_finance_export(request: HttpRequest) -> HttpResponse:
+    data = _school_finance_filtered_data(request)
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Summary"
+    ws.append(["Item", "Amount / Count"])
+    ws.append(["Date From", data["date_from"].isoformat()])
+    ws.append(["Date To", data["date_to"].isoformat()])
+    ws.append(["Revenue per attendance", float(data["revenue_per_student"])])
+    ws.append(["Recognized attendance count", data["deducted_count"]])
+    ws.append(["Estimated revenue", float(data["estimated_revenue"])])
+    ws.append(["General expenses", float(data["general_expense_total"])])
+    ws.append(["Tutor payroll", float(data["tutor_payroll_total"])])
+    ws.append(["Total expenses", float(data["total_expense"])])
+    ws.append(["Net estimate", float(data["net_estimated"])])
+    _autosize(ws)
+
+    ws_exp = wb.create_sheet("General Expenses")
+    ws_exp.append(["Date", "Category", "Vendor", "Description", "Payment Method", "Amount", "Note"])
+    for e in data["expense_rows"]:
+        ws_exp.append([
+            e.expense_date.isoformat(),
+            e.category.name if e.category else "",
+            e.vendor or "",
+            e.description or "",
+            e.get_payment_method_display() if hasattr(e, "get_payment_method_display") else e.payment_method,
+            float(e.amount or 0),
+            e.note or "",
+        ])
+    _autosize(ws_exp)
+
+    ws_pay = wb.create_sheet("Tutor Payroll")
+    ws_pay.append(["Date", "Tutor", "Teaching Hours", "Hourly Rate", "Teaching Fee", "Travel Fee", "Idle/Other Fee", "Total", "Note"])
+    for p in data["payroll_rows"]:
+        ws_pay.append([
+            p.work_date.isoformat(),
+            p.tutor.name if p.tutor else "",
+            float(p.teaching_hours or 0),
+            float(p.hourly_rate or 0),
+            float(p.teaching_fee or 0),
+            float(p.travel_fee or 0),
+            float(p.idle_fee or 0),
+            float(p.total_amount or 0),
+            p.note or "",
+        ])
+    _autosize(ws_pay)
+
+    buff = BytesIO()
+    wb.save(buff)
+    buff.seek(0)
+
+    filename = f"school_finance_{data['date_from'].strftime('%Y%m%d')}_{data['date_to'].strftime('%Y%m%d')}.xlsx"
+    resp = HttpResponse(
+        buff.getvalue(),
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+    resp["Content-Disposition"] = f'attachment; filename="{filename}"'
+    return resp
+
+
+@login_required
 def school_finance(request: HttpRequest) -> HttpResponse:
     """
     Module 2:
@@ -1535,64 +1661,34 @@ def school_finance(request: HttpRequest) -> HttpResponse:
 
             return redirect(f"{request.path}?work_date={work_date.isoformat()}&date_from={date_from.isoformat()}&date_to={date_to.isoformat()}")
 
-    revenue_per_student = _finance_setting(
-        "revenue_per_student_per_week",
-        Decimal("360"),
-        "รายได้ประมาณการต่อคนต่อสัปดาห์ / ต่อครั้งที่หักชั่วโมง",
-    )
-
-    att_qs = Attendance.objects.filter(
-        attendance_date__gte=date_from,
-        attendance_date__lte=date_to,
-        student__is_active=True,
-        enrollment__tutoring_class__is_active=True,
-        status__in=[Attendance.Status.PRESENT, Attendance.Status.NO_SHOW],
-    )
-    deducted_count = att_qs.count()
-    estimated_revenue = Decimal(deducted_count) * revenue_per_student
+    data = _school_finance_filtered_data(request)
 
     categories = ExpenseCategory.objects.filter(is_active=True).order_by("sort_order", "name")
     tutors = Tutor.objects.filter(is_active=True).order_by("name")
-    existing_entries = TutorPayrollEntry.objects.filter(work_date=selected_date).select_related("tutor")
+    existing_entries = TutorPayrollEntry.objects.filter(work_date=data["selected_date"]).select_related("tutor")
     payroll_map = {e.tutor_id: e for e in existing_entries}
 
-    expense_rows = (
-        SchoolExpense.objects
-        .select_related("category")
-        .filter(expense_date__gte=date_from, expense_date__lte=date_to)
-        .order_by("-expense_date", "-created_at")
-    )
-    payroll_rows = (
-        TutorPayrollEntry.objects
-        .select_related("tutor")
-        .filter(work_date__gte=date_from, work_date__lte=date_to)
-        .order_by("-work_date", "tutor__name")
-    )
-
-    general_expense_total = expense_rows.aggregate(total=Sum("amount")).get("total") or Decimal("0")
-    tutor_payroll_total = payroll_rows.aggregate(total=Sum("total_amount")).get("total") or Decimal("0")
-    total_expense = general_expense_total + tutor_payroll_total
-    net_estimated = estimated_revenue - total_expense
-
     payment_method_choices = SchoolExpense.PaymentMethod.choices
+    current_querystring = request.GET.urlencode()
 
     return render(request, "core/school_finance.html", {
-        "selected_date": selected_date,
-        "date_from": date_from,
-        "date_to": date_to,
+        "selected_date": data["selected_date"],
+        "date_from": data["date_from"],
+        "date_to": data["date_to"],
         "categories": categories,
         "tutors": tutors,
         "payroll_map": payroll_map,
-        "expense_rows": expense_rows[:100],
-        "payroll_rows": payroll_rows[:100],
-        "deducted_count": deducted_count,
-        "revenue_per_student": revenue_per_student,
-        "estimated_revenue": estimated_revenue,
-        "general_expense_total": general_expense_total,
-        "tutor_payroll_total": tutor_payroll_total,
-        "total_expense": total_expense,
-        "net_estimated": net_estimated,
+        "expense_rows": data["expense_rows"],
+        "payroll_rows": data["payroll_rows"],
+        "deducted_count": data["deducted_count"],
+        "revenue_per_student": data["revenue_per_student"],
+        "estimated_revenue": data["estimated_revenue"],
+        "general_expense_total": data["general_expense_total"],
+        "tutor_payroll_total": data["tutor_payroll_total"],
+        "total_expense": data["total_expense"],
+        "net_estimated": data["net_estimated"],
         "payment_method_choices": payment_method_choices,
+        "current_querystring": current_querystring,
     })
 
 

@@ -1143,24 +1143,84 @@ def _year_range(anchor: date) -> tuple[date, date]:
     return date(anchor.year, 1, 1), date(anchor.year, 12, 31)
 
 
+def _safe_date(s: str | None) -> date | None:
+    if not s:
+        return None
+    try:
+        return date.fromisoformat(s)
+    except ValueError:
+        return None
+
+
 def _period_from_request(request: HttpRequest) -> tuple[str, date, date]:
-    mode = (request.GET.get("period_mode") or "week").strip()
-    anchor = _parse_date(request.GET.get("anchor_date"))
+    """
+    Date range priority:
+    1) If date_from/date_to are provided, use them directly.
+    2) Otherwise use period_mode + anchor_date as a quick preset.
+
+    This fixes the old behavior where users had to rely on anchor_date even
+    after selecting a start/end range.
+    """
+    mode = (request.GET.get("period_mode") or "custom").strip()
+
+    raw_start = _safe_date(request.GET.get("date_from"))
+    raw_end = _safe_date(request.GET.get("date_to"))
+
+    if raw_start or raw_end:
+        start = raw_start or raw_end or timezone.localdate()
+        end = raw_end or raw_start or start
+        if end < start:
+            start, end = end, start
+        return "custom", start, end
+
+    anchor = _safe_date(request.GET.get("anchor_date")) or timezone.localdate()
 
     if mode == "month":
         start, end = _month_range(anchor)
     elif mode == "year":
         start, end = _year_range(anchor)
-    elif mode == "custom":
-        start = _parse_date(request.GET.get("date_from"))
-        end = _parse_date(request.GET.get("date_to"))
-        if end < start:
-            start, end = end, start
     else:
         mode = "week"
         start, end = _school_week_range(anchor)
 
     return mode, start, end
+
+
+def _blank_overview_row(label: str, sort_date: date) -> dict:
+    return {
+        "label": label,
+        "sort": sort_date,
+        "present": 0,
+        "excused": 0,
+        "no_show": 0,
+        "deducted_count": 0,
+        "class_ids": set(),
+        "estimated_revenue": Decimal("0"),
+        "estimated_tutor_cost": Decimal("0"),
+        "actual_tutor_cost": Decimal("0"),
+        "general_expense": Decimal("0"),
+        "net_estimated": Decimal("0"),
+        "net_actual_direct": Decimal("0"),
+    }
+
+
+def _ensure_overview_group(groups: dict[str, dict], label: str, sort_date: date) -> dict:
+    if label not in groups:
+        groups[label] = _blank_overview_row(label, sort_date)
+    return groups[label]
+
+
+def _school_week_labels_between(start: date, end: date) -> list[tuple[str, date, date]]:
+    """Return all Sat-Sun school weeks overlapping the selected range."""
+    first_week_start, _ = _school_week_range(start)
+    cur = first_week_start
+    out: list[tuple[str, date, date]] = []
+    while cur <= end:
+        week_end = cur + timedelta(days=1)
+        label = f"{cur.strftime('%d/%m/%Y')} - {week_end.strftime('%d/%m/%Y')}"
+        out.append((label, cur, week_end))
+        cur += timedelta(days=7)
+    return out
 
 
 def _group_key(d: date, group_by: str) -> tuple[str, date]:
@@ -1206,7 +1266,8 @@ def _attendance_queryset_for_range(start: date, end: date, time_slot: str = "", 
 def school_overview(request: HttpRequest) -> HttpResponse:
     """
     Module 1:
-    - Attendance overview by school week / month / year / custom period.
+    - Attendance overview by selected start/end date.
+    - Attendance graph is always a weekly line chart: present / excused / no-show.
     - Revenue estimate = (present + no-show) x revenue per student.
     - Estimated tutor direct cost = active classes in period x tutor cost per class.
     - Actual tutor direct cost = Module 2 tutor payroll entries.
@@ -1228,10 +1289,12 @@ def school_overview(request: HttpRequest) -> HttpResponse:
                 "description": "ค่าใช้จ่ายติวเตอร์ประมาณการต่อ class ต่อสัปดาห์",
             },
         )
-        return redirect("core:school_overview")
+        # Keep the selected filter after saving settings.
+        qs = request.GET.urlencode()
+        return redirect(f"{request.path}?{qs}" if qs else "core:school_overview")
 
     period_mode, start, end = _period_from_request(request)
-    group_by = (request.GET.get("group_by") or period_mode or "week").strip()
+    group_by = (request.GET.get("group_by") or "week").strip()
     if group_by not in {"week", "month", "year"}:
         group_by = "week"
 
@@ -1251,79 +1314,38 @@ def school_overview(request: HttpRequest) -> HttpResponse:
 
     att_qs = _attendance_queryset_for_range(start, end, time_slot, class_id)
 
+    # =====================================================
+    # Table groups: user can choose week / month / year.
+    # =====================================================
     groups: dict[str, dict] = {}
     for a in att_qs:
         label, group_start = _group_key(a.attendance_date, group_by)
-        if label not in groups:
-            groups[label] = {
-                "label": label,
-                "sort": group_start,
-                "present": 0,
-                "excused": 0,
-                "no_show": 0,
-                "deducted_count": 0,
-                "class_ids": set(),
-                "estimated_revenue": Decimal("0"),
-                "estimated_tutor_cost": Decimal("0"),
-                "actual_tutor_cost": Decimal("0"),
-                "general_expense": Decimal("0"),
-                "net_estimated": Decimal("0"),
-                "net_actual_direct": Decimal("0"),
-            }
+        item = _ensure_overview_group(groups, label, group_start)
 
         if a.status == Attendance.Status.PRESENT:
-            groups[label]["present"] += 1
-            groups[label]["deducted_count"] += 1
-            groups[label]["class_ids"].add(a.enrollment.tutoring_class_id)
+            item["present"] += 1
+            item["deducted_count"] += 1
+            item["class_ids"].add(a.enrollment.tutoring_class_id)
         elif a.status == Attendance.Status.EXCUSED:
-            groups[label]["excused"] += 1
+            item["excused"] += 1
         elif a.status == Attendance.Status.NO_SHOW:
-            groups[label]["no_show"] += 1
-            groups[label]["deducted_count"] += 1
-            groups[label]["class_ids"].add(a.enrollment.tutoring_class_id)
+            item["no_show"] += 1
+            item["deducted_count"] += 1
+            item["class_ids"].add(a.enrollment.tutoring_class_id)
 
     # Actual tutor payroll from Module 2
     payroll_qs = TutorPayrollEntry.objects.filter(work_date__gte=start, work_date__lte=end)
     for p in payroll_qs:
         label, group_start = _group_key(p.work_date, group_by)
-        if label not in groups:
-            groups[label] = {
-                "label": label,
-                "sort": group_start,
-                "present": 0,
-                "excused": 0,
-                "no_show": 0,
-                "deducted_count": 0,
-                "class_ids": set(),
-                "estimated_revenue": Decimal("0"),
-                "estimated_tutor_cost": Decimal("0"),
-                "actual_tutor_cost": Decimal("0"),
-                "general_expense": Decimal("0"),
-                "net_estimated": Decimal("0"),
-                "net_actual_direct": Decimal("0"),
-            }
-        groups[label]["actual_tutor_cost"] += _money(p.total_amount)
+        item = _ensure_overview_group(groups, label, group_start)
+        item["actual_tutor_cost"] += _money(p.total_amount)
 
+    # General expenses from Module 2
     expense_qs = SchoolExpense.objects.filter(expense_date__gte=start, expense_date__lte=end)
     for e in expense_qs:
         label, group_start = _group_key(e.expense_date, group_by)
-        if label not in groups:
-            groups[label] = {
-                "label": label,
-                "sort": group_start,
-                "present": 0,
-                "excused": 0,
-                "no_show": 0,
-                "deducted_count": 0,
-                "class_ids": set(),
-                "estimated_revenue": Decimal("0"),
-                "estimated_tutor_cost": Decimal("0"),
-                "actual_tutor_cost": Decimal("0"),
-                "general_expense": Decimal("0"),
-                "net_estimated": Decimal("0"),
-                "net_actual_direct": Decimal("0"),
-            }
-        groups[label]["general_expense"] += _money(e.amount)
+        item = _ensure_overview_group(groups, label, group_start)
+        item["general_expense"] += _money(e.amount)
 
     rows = []
     for item in groups.values():
@@ -1350,13 +1372,52 @@ def school_overview(request: HttpRequest) -> HttpResponse:
     totals["net_estimated"] = totals["estimated_revenue"] - totals["estimated_tutor_cost"]
     totals["net_actual_direct"] = totals["estimated_revenue"] - totals["actual_tutor_cost"]
 
-    chart_labels = [r["label"] for r in rows]
-    chart_present = [r["present"] for r in rows]
-    chart_excused = [r["excused"] for r in rows]
-    chart_no_show = [r["no_show"] for r in rows]
-    chart_revenue = [float(r["estimated_revenue"]) for r in rows]
-    chart_estimated_cost = [float(r["estimated_tutor_cost"]) for r in rows]
-    chart_actual_tutor = [float(r["actual_tutor_cost"]) for r in rows]
+    # =====================================================
+    # Chart groups: ALWAYS weekly line chart by school week.
+    # This keeps X-axis as Sat-Sun weeks even if the table is monthly/yearly.
+    # =====================================================
+    weekly_groups: dict[str, dict] = {}
+    for label, week_start, week_end in _school_week_labels_between(start, end):
+        weekly_groups[label] = _blank_overview_row(label, week_start)
+
+    for a in att_qs:
+        label, week_start = _group_key(a.attendance_date, "week")
+        item = _ensure_overview_group(weekly_groups, label, week_start)
+        if a.status == Attendance.Status.PRESENT:
+            item["present"] += 1
+            item["deducted_count"] += 1
+            item["class_ids"].add(a.enrollment.tutoring_class_id)
+        elif a.status == Attendance.Status.EXCUSED:
+            item["excused"] += 1
+        elif a.status == Attendance.Status.NO_SHOW:
+            item["no_show"] += 1
+            item["deducted_count"] += 1
+            item["class_ids"].add(a.enrollment.tutoring_class_id)
+
+    for p in payroll_qs:
+        label, week_start = _group_key(p.work_date, "week")
+        item = _ensure_overview_group(weekly_groups, label, week_start)
+        item["actual_tutor_cost"] += _money(p.total_amount)
+
+    for e in expense_qs:
+        label, week_start = _group_key(e.expense_date, "week")
+        item = _ensure_overview_group(weekly_groups, label, week_start)
+        item["general_expense"] += _money(e.amount)
+
+    weekly_rows = sorted(weekly_groups.values(), key=lambda x: x["sort"])
+    for item in weekly_rows:
+        active_class_count = len(item["class_ids"])
+        item["active_class_count"] = active_class_count
+        item["estimated_revenue"] = Decimal(item["deducted_count"]) * revenue_per_student
+        item["estimated_tutor_cost"] = Decimal(active_class_count) * estimated_tutor_cost_per_class
+
+    chart_labels = [r["label"] for r in weekly_rows]
+    chart_present = [r["present"] for r in weekly_rows]
+    chart_excused = [r["excused"] for r in weekly_rows]
+    chart_no_show = [r["no_show"] for r in weekly_rows]
+    chart_revenue = [float(r["estimated_revenue"]) for r in weekly_rows]
+    chart_estimated_cost = [float(r["estimated_tutor_cost"]) for r in weekly_rows]
+    chart_actual_tutor = [float(r["actual_tutor_cost"]) for r in weekly_rows]
 
     classes = TutoringClass.objects.filter(is_active=True).order_by("time_slot", "name")
 
@@ -1369,8 +1430,8 @@ def school_overview(request: HttpRequest) -> HttpResponse:
         "end": end,
         "filters": {
             "anchor_date": request.GET.get("anchor_date") or timezone.localdate().isoformat(),
-            "date_from": request.GET.get("date_from") or start.isoformat(),
-            "date_to": request.GET.get("date_to") or end.isoformat(),
+            "date_from": start.isoformat(),
+            "date_to": end.isoformat(),
             "time_slot": time_slot,
             "class_id": class_id,
         },
@@ -1549,3 +1610,4 @@ def tutor_payroll_delete(request: HttpRequest, pk: int) -> HttpResponse:
     entry = get_object_or_404(TutorPayrollEntry, pk=pk)
     entry.delete()
     return redirect(request.META.get("HTTP_REFERER", "core:school_finance"))
+

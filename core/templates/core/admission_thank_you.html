@@ -222,12 +222,8 @@
     .btn-line{
       background:linear-gradient(135deg,#22c55e,#16a34a);
       color:#fff;
-      flex:1 1 260px;
-    }
-    .btn-home{
-      background:#f1f5f9;
-      color:#0f172a;
-      border:1px solid #e2e8f0;
+      flex:1 1 320px;
+      max-width:420px;
     }
 
     @media(max-width:620px){
@@ -404,24 +400,10 @@
         เพื่อยืนยันที่นั่งทดลองเรียน/เริ่มเรียน
       </div>
 
-      <div class="detail-title">รายละเอียดทั้งหมด</div>
-      <div class="info">
-        <div class="row"><div class="label">ประเภท</div><div class="value">{{ inquiry.get_request_type_display }}</div></div>
-        <div class="row"><div class="label">ชื่อเล่น</div><div class="value">{{ inquiry.nickname }}</div></div>
-        <div class="row"><div class="label">ชื่อ-นามสกุล</div><div class="value">{{ inquiry.full_name }}</div></div>
-        <div class="row"><div class="label">โรงเรียน</div><div class="value">{{ inquiry.school_name|default:"-" }}</div></div>
-        <div class="row"><div class="label">เบอร์ติดต่อ</div><div class="value">{{ inquiry.contact_phone }}</div></div>
-        <div class="row"><div class="label">ระดับชั้น</div><div class="value">{{ inquiry.get_grade_level_display }}</div></div>
-        <div class="row"><div class="label">วันที่ทดลอง/เริ่มเรียน</div><div class="value">{{ inquiry.first_lesson_date|date:"d/m/Y" }}</div></div>
-        <div class="row"><div class="label">รอบเวลา</div><div class="value">{{ inquiry.get_preferred_time_slot_display }}</div></div>
-        <div class="row"><div class="label">เวลาลงทะเบียน</div><div class="value">{{ inquiry.created_at|date:"d/m/Y H:i" }}</div></div>
-      </div>
-
       <div class="actions">
         <a class="btn btn-line" href="{{ line_url }}" target="_blank" rel="noopener">
           ส่งยืนยันผ่าน Line Official
         </a>
-        <a class="btn btn-home" href="/">กลับหน้าแรก</a>
       </div>
     </div>
   </div>

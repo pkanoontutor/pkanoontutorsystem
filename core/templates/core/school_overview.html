@@ -22,8 +22,9 @@
   .primary{background:#2563eb;color:#fff;}
   .dark{background:#0f172a;color:#fff;}
   .soft{background:#f1f5f9;color:#0f172a;border:1px solid #e2e8f0;}
-  .chart-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px;}
+  .chart-grid{display:grid;grid-template-columns:1fr;gap:14px;margin-top:14px;}
   .chart-card{background:#fff;border-radius:16px;padding:16px;box-shadow:0 4px 10px rgba(0,0,0,.08);}
+  .chart-sub{font-size:12px;color:#64748b;margin-top:4px;line-height:1.5;}
   .table-wrap{overflow:auto;margin-top:14px;}
   .overview-table{min-width:1100px;width:100%;border-collapse:collapse;background:#fff;}
   .overview-table th{position:sticky;top:0;background:#f8fafc;z-index:1;}
@@ -32,7 +33,8 @@
   .pos{color:#15803d;font-weight:900;}
   .neg{color:#b91c1c;font-weight:900;}
   .settings{display:flex;gap:10px;flex-wrap:wrap;align-items:end;}
-  @media(max-width:900px){.cards,.filter-grid,.chart-grid{grid-template-columns:1fr}.title{font-size:21px;}}
+  .pill-note{display:inline-flex;align-items:center;border-radius:999px;background:#eff6ff;border:1px solid #bfdbfe;color:#1e3a8a;padding:7px 12px;font-size:12px;font-weight:900;margin-top:8px;}
+  @media(max-width:900px){.cards,.filter-grid{grid-template-columns:1fr}.title{font-size:21px;}}
 </style>
 {% endblock %}
 
@@ -40,9 +42,14 @@
 <div class="page-head">
   <div>
     <div class="title">📊 ภาพรวมโรงเรียน</div>
-    <div class="sub">สัปดาห์ของโรงเรียนยึดเฉพาะรอบเรียนเสาร์–อาทิตย์ | รายได้คิดจาก “มาเรียน + ขาดแบบหักครั้ง”</div>
+    <div class="sub">
+      เลือกวันที่เริ่มต้นและวันที่สิ้นสุดได้โดยตรง ระบบจะแสดงกราฟเส้นรายสัปดาห์ โดย 1 จุด = สัปดาห์เรียนเสาร์–อาทิตย์<br>
+      รายได้คิดจาก “มาเรียน + ขาดแบบหักครั้ง”
+    </div>
+    <div class="pill-note">ช่วงที่เลือก: {{ start|date:"d/m/Y" }} - {{ end|date:"d/m/Y" }}</div>
   </div>
   <div class="btn-row">
+    <a class="btnx soft" href="/dashboard/">← Dashboard</a>
     <a class="btnx soft" href="/pkanoon-admin-tool/">← Pkanoon Admin Tool</a>
     <a class="btnx dark" href="/school-finance/">ไป Module รายรับรายจ่าย</a>
   </div>
@@ -52,28 +59,15 @@
   <form method="get">
     <div class="filter-grid">
       <div class="field">
-        <label>มุมมอง Period</label>
-        <select name="period_mode">
-          <option value="week" {% if period_mode == "week" %}selected{% endif %}>รายสัปดาห์ (เสาร์-อาทิตย์)</option>
-          <option value="month" {% if period_mode == "month" %}selected{% endif %}>รายเดือน</option>
-          <option value="year" {% if period_mode == "year" %}selected{% endif %}>รายปี</option>
-          <option value="custom" {% if period_mode == "custom" %}selected{% endif %}>เลือกช่วงเอง</option>
-        </select>
-      </div>
-      <div class="field">
-        <label>วันที่อ้างอิง</label>
-        <input type="date" name="anchor_date" value="{{ filters.anchor_date }}">
-      </div>
-      <div class="field">
         <label>วันที่เริ่มต้น</label>
-        <input type="date" name="date_from" value="{{ filters.date_from }}">
+        <input type="date" name="date_from" value="{{ filters.date_from }}" required>
       </div>
       <div class="field">
         <label>วันที่สิ้นสุด</label>
-        <input type="date" name="date_to" value="{{ filters.date_to }}">
+        <input type="date" name="date_to" value="{{ filters.date_to }}" required>
       </div>
       <div class="field">
-        <label>Group ตาราง/กราฟ</label>
+        <label>ตารางสรุปแสดงเป็น</label>
         <select name="group_by">
           <option value="week" {% if group_by == "week" %}selected{% endif %}>รายสัปดาห์</option>
           <option value="month" {% if group_by == "month" %}selected{% endif %}>รายเดือน</option>
@@ -99,7 +93,7 @@
         </select>
       </div>
       <div class="btn-row">
-        <button class="btnx primary" type="submit">Filter</button>
+        <button class="btnx primary" type="submit">แสดงผล</button>
         <a class="btnx soft" href="/school-overview/">Reset</a>
       </div>
     </div>
@@ -134,12 +128,14 @@
 
 <div class="chart-grid">
   <div class="chart-card">
-    <b>Attendance by period</b>
-    <canvas id="attendanceChart" height="170"></canvas>
+    <b>Attendance Trend by School Week</b>
+    <div class="chart-sub">กราฟเส้นแสดง มา / ลา / ขาด โดยแกน X เป็นแต่ละสัปดาห์เรียนเสาร์–อาทิตย์ ตามช่วงวันที่ที่เลือก</div>
+    <canvas id="attendanceChart" height="115"></canvas>
   </div>
   <div class="chart-card">
-    <b>Revenue vs Tutor Cost</b>
-    <canvas id="financeChart" height="170"></canvas>
+    <b>Revenue vs Tutor Cost by School Week</b>
+    <div class="chart-sub">กราฟการเงินใช้แกน X รายสัปดาห์เหมือนกัน เพื่อเทียบกับ attendance ได้ง่าย</div>
+    <canvas id="financeChart" height="115"></canvas>
   </div>
 </div>
 
@@ -186,29 +182,44 @@
 
 <script>
 const labels = {{ chart_labels_json|safe }};
+
 new Chart(document.getElementById('attendanceChart'), {
-  type: 'bar',
+  type: 'line',
   data: {
     labels,
     datasets: [
-      {label: 'มา', data: {{ chart_present_json|safe }}},
-      {label: 'ลา', data: {{ chart_excused_json|safe }}},
-      {label: 'ขาด', data: {{ chart_no_show_json|safe }}}
+      { label: 'มา', data: {{ chart_present_json|safe }}, tension: 0.25, pointRadius: 4, borderWidth: 3 },
+      { label: 'ลา', data: {{ chart_excused_json|safe }}, tension: 0.25, pointRadius: 4, borderWidth: 3 },
+      { label: 'ขาด', data: {{ chart_no_show_json|safe }}, tension: 0.25, pointRadius: 4, borderWidth: 3 }
     ]
   },
-  options: {responsive: true, scales: {x: {stacked: true}, y: {stacked: true, beginAtZero: true}}}
+  options: {
+    responsive: true,
+    interaction: { mode: 'index', intersect: false },
+    plugins: { legend: { position: 'top' } },
+    scales: {
+      x: { ticks: { maxRotation: 45, minRotation: 0 } },
+      y: { beginAtZero: true, precision: 0 }
+    }
+  }
 });
+
 new Chart(document.getElementById('financeChart'), {
   type: 'line',
   data: {
     labels,
     datasets: [
-      {label: 'รายได้ประมาณการ', data: {{ chart_revenue_json|safe }}, tension: .25},
-      {label: 'ค่า tutor ประมาณการ', data: {{ chart_estimated_cost_json|safe }}, tension: .25},
-      {label: 'ค่า tutor จริง', data: {{ chart_actual_tutor_json|safe }}, tension: .25}
+      { label: 'รายได้ประมาณการ', data: {{ chart_revenue_json|safe }}, tension: 0.25, pointRadius: 4, borderWidth: 3 },
+      { label: 'ค่า tutor ประมาณการ', data: {{ chart_estimated_cost_json|safe }}, tension: 0.25, pointRadius: 4, borderWidth: 3 },
+      { label: 'ค่า tutor จริง', data: {{ chart_actual_tutor_json|safe }}, tension: 0.25, pointRadius: 4, borderWidth: 3 }
     ]
   },
-  options: {responsive: true, scales: {y: {beginAtZero: true}}}
+  options: {
+    responsive: true,
+    interaction: { mode: 'index', intersect: false },
+    plugins: { legend: { position: 'top' } },
+    scales: { y: { beginAtZero: true } }
+  }
 });
 </script>
 {% endblock %}

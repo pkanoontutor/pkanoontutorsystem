@@ -12,6 +12,7 @@ urlpatterns = [
 
     # Dashboard
     path("dashboard/", views.dashboard, name="dashboard"),
+    path("pkanoon-admin-tool/", views.pkanoon_admin_tool, name="pkanoon_admin_tool"),
 
     # Attendance
     path("attendance/submit/", views.attendance_submit, name="attendance_submit"),
@@ -32,6 +33,7 @@ urlpatterns = [
     # School overview / finance
     path("school-overview/", views.school_overview, name="school_overview"),
     path("school-finance/", views.school_finance, name="school_finance"),
+    path("school-finance/export/", views.school_finance_export, name="school_finance_export"),
     path("school-finance/delete-expense/<int:pk>/", views.school_expense_delete, name="school_expense_delete"),
     path("school-finance/delete-payroll/<int:pk>/", views.tutor_payroll_delete, name="tutor_payroll_delete"),
 

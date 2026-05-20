@@ -658,6 +658,104 @@
   }
 
 
+
+  /* =====================================================
+     WEEKLY SUMMARY LAYOUT REFINEMENT
+     - Row 1: Full-width total bar
+     - Row 2: Saturday / Sunday side-by-side
+     - Remove right-side dangling summary card
+  ===================================================== */
+  .dash-body{
+    display:block !important;
+  }
+  .dash-main{
+    width:100% !important;
+    max-width:100% !important;
+  }
+  .dash-aside{
+    display:none !important;
+  }
+
+  .weekly-bars{
+    display:grid !important;
+    grid-template-columns:repeat(2, minmax(0, 1fr)) !important;
+    gap:12px !important;
+    align-items:stretch;
+  }
+  .weekbar-card{
+    border-radius:18px !important;
+    padding:12px !important;
+    background:linear-gradient(180deg,#ffffff,#f8fafc) !important;
+    border:1px solid #e2e8f0 !important;
+    box-shadow:0 3px 10px rgba(15,23,42,.06);
+  }
+  .weekbar-card.total{
+    grid-column:1 / -1 !important;
+    background:linear-gradient(135deg,#eff6ff,#ffffff) !important;
+    border-color:#bfdbfe !important;
+    padding:14px !important;
+  }
+  .weekbar-card.total .weekbar-title{
+    font-size:14px !important;
+    margin-bottom:9px !important;
+  }
+  .weekbar-card.total .att-bar-wrap{
+    height:24px !important;
+    border-radius:999px !important;
+  }
+  .weekbar-card.total .att-bar-seg{
+    height:24px !important;
+  }
+  .weekbar-card:not(.total) .att-bar-wrap{
+    height:18px !important;
+  }
+  .weekbar-card:not(.total) .att-bar-seg{
+    height:18px !important;
+  }
+  .weekbar-title{
+    align-items:center;
+  }
+  .weekbar-title span{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+  }
+  .weekbar-card[data-week-card="sat"] .weekbar-title span::before{
+    content:"🟦";
+    font-size:11px;
+  }
+  .weekbar-card[data-week-card="sun"] .weekbar-title span::before{
+    content:"🟪";
+    font-size:11px;
+  }
+  .weekbar-card.total .weekbar-title span::before{
+    content:"📊";
+    font-size:14px;
+  }
+  .att-legend{
+    margin-top:9px !important;
+    gap:6px !important;
+  }
+  .weekbar-card.total .att-legend span{
+    font-size:12px;
+    padding:5px 10px;
+  }
+
+  @media (max-width:860px){
+    .weekly-bars{
+      grid-template-columns:1fr !important;
+    }
+    .weekbar-card.total{
+      grid-column:auto !important;
+    }
+    .weekbar-card.total .att-bar-wrap{
+      height:20px !important;
+    }
+    .weekbar-card.total .att-bar-seg{
+      height:20px !important;
+    }
+  }
+
 </style>
 {% endblock %}
 
@@ -988,48 +1086,7 @@
 
   </div><!-- /dash-main -->
 
-  <!-- ASIDE -->
-  <div class="dash-aside">
-
-    <!-- Two-day summary -->
-    {% if two_day_summary %}
-    <div class="card" style="margin-bottom:12px;">
-      <div style="font-weight:900; font-size:14px; margin-bottom:8px;">📊 สรุปรวม 2 วัน</div>
-      <table class="two-day-table">
-        <thead><tr><th>วัน</th><th>มา</th><th>ลา</th><th>ขาด</th><th>รวม</th></tr></thead>
-        <tbody>
-          <tr>
-            <td><b>{{ selected_date|date:"d/m" }}</b></td>
-            <td>{{ global_summary.present|default:0 }}</td>
-            <td>{{ global_summary.excused|default:0 }}</td>
-            <td>{{ global_summary.no_show|default:0 }}</td>
-            <td><b>{{ global_summary.total|default:0 }}</b></td>
-          </tr>
-          {% if other_day_summary %}
-          <tr>
-            <td><b>{{ other_day_date|date:"d/m" }}</b></td>
-            <td>{{ other_day_summary.present|default:0 }}</td>
-            <td>{{ other_day_summary.excused|default:0 }}</td>
-            <td>{{ other_day_summary.no_show|default:0 }}</td>
-            <td><b>{{ other_day_summary.total|default:0 }}</b></td>
-          </tr>
-          {% endif %}
-          <tr style="background:#f8fafc; font-weight:900;">
-            <td><b>รวม</b></td>
-            <td>{{ two_day_summary.present|default:0 }}</td>
-            <td>{{ two_day_summary.excused|default:0 }}</td>
-            <td>{{ two_day_summary.no_show|default:0 }}</td>
-            <td><b>{{ two_day_summary.total|default:0 }}</b></td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-    {% endif %}
-
-    <!-- Quick links removed for cleaner layout -->
-
-
-  </div><!-- /dash-aside -->
+  <!-- ASIDE REMOVED: two-day summary is now included in the weekly bar section above -->
 
 </div><!-- /dash-body -->
 
@@ -1343,11 +1400,6 @@
       else setBadge(eid,"none");
     });
     recomputeSlotTotals();
-    const classCard=document.getElementById("classCard-"+cid);
-    if(classCard){
-      classCard.classList.remove("class-unchecked");
-      classCard.classList.add("class-checked");
-    }
     document.querySelectorAll("details[id^='classCard-']").forEach(det=>{
       const cid=det.id.replace("classCard-","");
       ensureClass(cid);setFilter(cid,"all");

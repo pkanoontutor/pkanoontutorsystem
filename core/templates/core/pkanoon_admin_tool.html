@@ -1,0 +1,47 @@
+{% extends "core/base.html" %}
+{% block title %}Pkanoon Admin Tool{% endblock %}
+
+{% block head %}
+<style>
+  .tool-wrap{max-width:1100px;margin:0 auto;display:grid;gap:16px;}
+  .tool-hero{background:linear-gradient(135deg,#0f172a,#1d4ed8);color:#fff;border-radius:24px;padding:24px;box-shadow:0 14px 28px rgba(15,23,42,.22);}
+  .tool-title{font-size:28px;font-weight:1000;letter-spacing:-.03em;}
+  .tool-sub{margin-top:6px;color:#dbeafe;font-size:14px;line-height:1.6;}
+  .tool-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;}
+  .tool-card{background:#fff;border-radius:20px;padding:18px;text-decoration:none;color:#0f172a;box-shadow:0 6px 14px rgba(15,23,42,.10);border:1px solid rgba(255,255,255,.9);transition:.14s;min-height:138px;display:flex;flex-direction:column;justify-content:space-between;}
+  .tool-card:hover{transform:translateY(-3px);box-shadow:0 12px 26px rgba(15,23,42,.16);}
+  .tool-icon{width:44px;height:44px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:24px;margin-bottom:12px;}
+  .blue{background:#dbeafe}.green{background:#dcfce7}.pink{background:#fce7f3}.amber{background:#fef3c7}.slate{background:#f1f5f9}.purple{background:#ede9fe}.red{background:#fee2e2}.teal{background:#ccfbf1}.orange{background:#ffedd5}
+  .tool-name{font-size:17px;font-weight:1000;}
+  .tool-desc{font-size:12px;color:#64748b;line-height:1.5;margin-top:4px;}
+  .section-label{font-size:12px;font-weight:1000;color:#475569;text-transform:uppercase;letter-spacing:.06em;margin-top:4px;}
+  @media(max-width:900px){.tool-grid{grid-template-columns:1fr 1fr}.tool-title{font-size:24px}}
+  @media(max-width:620px){.tool-grid{grid-template-columns:1fr}.tool-hero{padding:20px}.tool-card{min-height:120px}}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="tool-wrap">
+  <div class="tool-hero">
+    <div class="tool-title">🔐 Pkanoon Admin Tool</div>
+    <div class="tool-sub">ศูนย์รวมเมนูหลังบ้านและหน้าที่มีข้อมูลสำคัญ ใช้หน้านี้แทนการวางปุ่มลับไว้บน Dashboard หลัก</div>
+  </div>
+
+  <div class="section-label">Private / Management</div>
+  <div class="tool-grid">
+    <a class="tool-card" href="/school-overview/"><div><div class="tool-icon blue">📊</div><div class="tool-name">ภาพรวมโรงเรียน</div><div class="tool-desc">Attendance, รายได้ประมาณการ, ค่าใช้จ่าย และกราฟรายสัปดาห์</div></div></a>
+    <a class="tool-card" href="/school-finance/"><div><div class="tool-icon green">💰</div><div class="tool-name">รายรับรายจ่าย</div><div class="tool-desc">บันทึกค่าใช้จ่าย ค่าติวเตอร์ และ Export Excel</div></div></a>
+    <a class="tool-card" href="/admission-report/"><div><div class="tool-icon pink">📌</div><div class="tool-name">รายงานสมัคร/ทดลองเรียน</div><div class="tool-desc">ติดตามใบสมัคร จองทดลองเรียน และสถานะภายใน</div></div></a>
+    <a class="tool-card" href="/admin-dashboard/"><div><div class="tool-icon amber">📈</div><div class="tool-name">Admin Dashboard</div><div class="tool-desc">ภาพรวมหลังบ้านเพิ่มเติม</div></div></a>
+    <a class="tool-card" href="/adminlublub/"><div><div class="tool-icon slate">⚙️</div><div class="tool-name">Django Admin</div><div class="tool-desc">จัดการข้อมูล master data และตารางระบบ</div></div></a>
+    <a class="tool-card" href="/export/excel/"><div><div class="tool-icon teal">⬇️</div><div class="tool-name">Export ข้อมูลหลัก</div><div class="tool-desc">Export enrollments และ students จากระบบหลัก</div></div></a>
+  </div>
+
+  <div class="section-label">Operation</div>
+  <div class="tool-grid">
+    <a class="tool-card" href="/dashboard/"><div><div class="tool-icon blue">🏠</div><div class="tool-name">Dashboard เช็คชื่อ</div><div class="tool-desc">กลับหน้า Dashboard หลักสำหรับเช็คชื่อ</div></div></a>
+    <a class="tool-card" href="/attendance-details/"><div><div class="tool-icon purple">📋</div><div class="tool-name">เช็คชื่อรวม</div><div class="tool-desc">ตาราง Attendance รายห้องและรายคอร์ส</div></div></a>
+    <a class="tool-card" href="/student-id-list/"><div><div class="tool-icon orange">🧒</div><div class="tool-name">Student ID List</div><div class="tool-desc">หน้ารายการรหัสนักเรียนสำหรับผู้ปกครอง</div></div></a>
+  </div>
+</div>
+{% endblock %}

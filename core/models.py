@@ -453,6 +453,159 @@ class EnrollmentInstallment(models.Model):
         super().save(*args, **kwargs)
 
 
+
+
+# -----------------------
+# Course Payment / Receipt
+# -----------------------
+class CoursePayment(models.Model):
+    class PaymentMethod(models.TextChoices):
+        CASH = "cash", "เงินสด"
+        BANK_TRANSFER = "bank_transfer", "โอนธนาคาร"
+        PROMPTPAY = "promptpay", "PromptPay"
+        CREDIT_CARD = "credit_card", "บัตรเครดิต"
+
+    class PaymentType(models.TextChoices):
+        FULL = "full", "ชำระเต็ม"
+        INSTALLMENT = "installment", "แบ่งชำระ"
+
+    class EnrollmentAction(models.TextChoices):
+        NEW = "new", "สร้าง Enrollment ใหม่"
+        ADD_EXISTING = "add_existing", "เพิ่มจำนวนครั้งเข้า Enrollment เดิม"
+
+    class ReceiptStatus(models.TextChoices):
+        ISSUED = "issued", "ออกใบเสร็จแล้ว"
+        CANCELLED = "cancelled", "ยกเลิก"
+
+    receipt_no = models.CharField(
+        "เลขที่ใบเสร็จ",
+        max_length=20,
+        unique=True,
+        blank=True,
+        help_text="ระบบสร้างอัตโนมัติรูปแบบ YYMM-001",
+    )
+    payment_date = models.DateField("วันที่รับเงิน", default=timezone.localdate)
+
+    student = models.ForeignKey(Student, on_delete=models.PROTECT, related_name="course_payments")
+    tutoring_class = models.ForeignKey(TutoringClass, on_delete=models.PROTECT, related_name="course_payments")
+    enrollment = models.ForeignKey(
+        Enrollment,
+        on_delete=models.PROTECT,
+        related_name="course_payments",
+        null=True,
+        blank=True,
+    )
+
+    enrollment_action = models.CharField(
+        "การจัดการ Enrollment",
+        max_length=20,
+        choices=EnrollmentAction.choices,
+        default=EnrollmentAction.NEW,
+    )
+    enrollment_created = models.BooleanField("สร้าง Enrollment ใหม่จากใบเสร็จนี้", default=False)
+    enrollment_sessions_before = models.IntegerField("จำนวนครั้งก่อนเพิ่ม", null=True, blank=True)
+
+    session_package = models.CharField("แพ็กเกจจำนวนครั้ง", max_length=30, default="10")
+    sessions_granted = models.PositiveIntegerField("จำนวนครั้งที่ให้เรียน", default=10)
+
+    course_price = models.DecimalField("ราคาคอร์ส", max_digits=10, decimal_places=2, default=0)
+    discount_amount = models.DecimalField("ส่วนลด", max_digits=10, decimal_places=2, default=0)
+    net_amount = models.DecimalField("ราคาสุทธิ", max_digits=10, decimal_places=2, default=0)
+    amount_paid = models.DecimalField("ยอดรับชำระ", max_digits=10, decimal_places=2, default=0)
+
+    payment_type = models.CharField(
+        "รูปแบบการชำระ",
+        max_length=20,
+        choices=PaymentType.choices,
+        default=PaymentType.FULL,
+    )
+    payment_method = models.CharField(
+        "วิธีชำระเงิน",
+        max_length=20,
+        choices=PaymentMethod.choices,
+        default=PaymentMethod.BANK_TRANSFER,
+    )
+
+    status = models.CharField(
+        "สถานะใบเสร็จ",
+        max_length=20,
+        choices=ReceiptStatus.choices,
+        default=ReceiptStatus.ISSUED,
+    )
+    note = models.TextField("หมายเหตุ", blank=True)
+
+    created_by = models.ForeignKey(
+        "auth.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="created_course_payments",
+    )
+    created_at = models.DateTimeField("วันที่บันทึก", default=timezone.now)
+    updated_at = models.DateTimeField("อัปเดตล่าสุด", auto_now=True)
+
+    cancelled_at = models.DateTimeField("วันที่ยกเลิก", null=True, blank=True)
+    cancelled_by = models.ForeignKey(
+        "auth.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="cancelled_course_payments",
+    )
+    cancel_reason = models.TextField("เหตุผลการยกเลิก", blank=True)
+
+    class Meta:
+        verbose_name = "Course Payment / Receipt"
+        verbose_name_plural = "Course Payments / Receipts"
+        ordering = ("-payment_date", "-created_at")
+
+    def __str__(self) -> str:
+        return f"{self.receipt_no or '-'} | {self.student} | {self.amount_paid}"
+
+    @staticmethod
+    def _next_receipt_no_for_month(prefix: str) -> str:
+        last = (
+            CoursePayment.objects
+            .filter(receipt_no__startswith=f"{prefix}-")
+            .order_by("-receipt_no")
+            .values_list("receipt_no", flat=True)
+            .first()
+        )
+        if last:
+            try:
+                seq = int(str(last).split("-")[-1]) + 1
+            except Exception:
+                seq = 1
+        else:
+            seq = 1
+        return f"{prefix}-{seq:03d}"
+
+    def save(self, *args, **kwargs):
+        if not self.net_amount:
+            self.net_amount = max((self.course_price or 0) - (self.discount_amount or 0), Decimal("0"))
+
+        if not self.amount_paid:
+            self.amount_paid = self.net_amount
+
+        if not self.receipt_no:
+            pay_date = self.payment_date or timezone.localdate()
+            prefix = pay_date.strftime("%y%m")
+            with transaction.atomic():
+                self.receipt_no = CoursePayment._next_receipt_no_for_month(prefix)
+                super().save(*args, **kwargs)
+            return
+
+        super().save(*args, **kwargs)
+
+    @property
+    def is_cancelled(self) -> bool:
+        return self.status == self.ReceiptStatus.CANCELLED
+
+    @property
+    def receipt_student_name(self) -> str:
+        return self.student.display_name if self.student_id else "-"
+
+
 # -----------------------
 # Attendance (เช็คชื่อแบบ 3 ปุ่ม)
 # -----------------------

@@ -465,11 +465,31 @@ class TutorAdmin(admin.ModelAdmin):
 
 @admin.register(TutorPayrollEntry)
 class TutorPayrollEntryAdmin(admin.ModelAdmin):
-    list_display = ("work_date", "tutor", "teaching_hours", "hourly_rate", "teaching_fee", "travel_fee", "idle_fee", "total_amount")
-    list_filter = ("work_date", "tutor")
+    list_display = (
+        "work_date",
+        "tutor",
+        "teaching_hours",
+        "special_rate_325",
+        "hourly_rate",
+        "teaching_fee",
+        "online_teaching_hours",
+        "online_teaching_fee",
+        "travel_fee",
+        "idle_fee",
+        "total_amount",
+    )
+    list_filter = ("work_date", "tutor", "special_rate_325")
     search_fields = ("tutor__name", "note")
     autocomplete_fields = ("tutor",)
-    readonly_fields = ("hourly_rate", "teaching_fee", "travel_fee", "total_amount", "created_at", "updated_at")
+    readonly_fields = (
+        "hourly_rate",
+        "teaching_fee",
+        "online_teaching_fee",
+        "travel_fee",
+        "total_amount",
+        "created_at",
+        "updated_at",
+    )
     date_hierarchy = "work_date"
     ordering = ("-work_date", "tutor__name")
 

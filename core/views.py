@@ -20,6 +20,7 @@ from openpyxl.utils import get_column_letter
 
 from .models import (
     Student,
+    School,
     Attendance,
     Enrollment,
     TutoringClass,
@@ -29,6 +30,7 @@ from .models import (
     SchoolExpense,
     Tutor,
     TutorPayrollEntry,
+    CoursePayment,
 )
 
 
@@ -348,6 +350,27 @@ def export_excel(request: HttpRequest) -> HttpResponse:
         ])
 
     _autosize(ws2)
+
+    ws_cash = wb.create_sheet("Course Payments")
+    ws_cash.append(["Receipt No", "Payment Date", "Student", "Class", "Enrollment", "Payment Type", "Payment Method", "Sessions", "Course Price", "Discount", "Net Amount", "Amount Paid", "Status", "Note"])
+    for p in data.get("course_payment_rows", []):
+        ws_cash.append([
+            p.receipt_no,
+            p.payment_date.isoformat() if p.payment_date else "",
+            p.student.display_name if p.student_id else "",
+            p.tutoring_class.name if p.tutoring_class_id else "",
+            p.enrollment.sale_run_no if p.enrollment_id and p.enrollment else "",
+            p.get_payment_type_display() if hasattr(p, "get_payment_type_display") else p.payment_type,
+            p.get_payment_method_display() if hasattr(p, "get_payment_method_display") else p.payment_method,
+            int(p.sessions_granted or 0),
+            float(p.course_price or 0),
+            float(p.discount_amount or 0),
+            float(p.net_amount or 0),
+            float(p.amount_paid or 0),
+            p.get_status_display() if hasattr(p, "get_status_display") else p.status,
+            p.note or "",
+        ])
+    _autosize(ws_cash)
 
     buff = BytesIO()
     wb.save(buff)
@@ -1241,6 +1264,116 @@ def _money(x) -> Decimal:
         return Decimal("0")
 
 
+
+
+COURSE_SESSION_CHOICES = [
+    ("10", "10 ครั้ง", 10),
+    ("12", "10 แถม 2 = 12 ครั้ง", 12),
+    ("20", "20 ครั้ง", 20),
+    ("30", "30 ครั้ง", 30),
+    ("custom", "กรอกเอง", 10),
+]
+
+
+def _active_students_for_payment():
+    return Student.objects.filter(is_active=True).select_related("school").order_by("grade_level", "nickname", "full_name")
+
+
+def _active_enrollments_for_payment(student_id: str | None = None):
+    qs = (
+        Enrollment.objects
+        .select_related("student", "tutoring_class")
+        .filter(is_active=True, student__is_active=True, tutoring_class__is_active=True)
+        .order_by("student__nickname", "student__full_name", "tutoring_class__name", "-created_at")
+    )
+    if student_id:
+        try:
+            qs = qs.filter(student_id=int(student_id))
+        except Exception:
+            pass
+    return qs
+
+
+def _default_payment_form_context(request: HttpRequest, errors: list[str] | None = None, posted: dict | None = None):
+    students = _active_students_for_payment()
+    classes = TutoringClass.objects.filter(is_active=True).order_by("time_slot", "name")
+    selected_student_id = (request.GET.get("student_id") or (posted or {}).get("student_id") or "").strip()
+    enrollments = _active_enrollments_for_payment(selected_student_id or None)
+    return {
+        "students": students,
+        "classes": classes,
+        "enrollments": enrollments,
+        "payment_method_choices": CoursePayment.PaymentMethod.choices,
+        "payment_type_choices": CoursePayment.PaymentType.choices,
+        "enrollment_action_choices": CoursePayment.EnrollmentAction.choices,
+        "session_choices": COURSE_SESSION_CHOICES,
+        "today": timezone.localdate(),
+        "errors": errors or [],
+        "posted": posted or {},
+    }
+
+
+def _sessions_from_package(package: str, custom_value: str | None) -> int:
+    mapping = {code: value for code, _label, value in COURSE_SESSION_CHOICES}
+    if package == "custom":
+        try:
+            return max(int(custom_value or 0), 1)
+        except Exception:
+            return 10
+    return mapping.get(package, 10)
+
+
+def _apply_payment_to_enrollment(payment: CoursePayment, action: str, existing_enrollment: Enrollment | None = None) -> Enrollment:
+    """Create a new enrollment or add sessions to an existing enrollment for a course payment."""
+    sessions = int(payment.sessions_granted or 0)
+    if action == CoursePayment.EnrollmentAction.ADD_EXISTING and existing_enrollment:
+        payment.enrollment_sessions_before = int(existing_enrollment.sessions_total or 0)
+        existing_enrollment.sessions_total = int(existing_enrollment.sessions_total or 0) + sessions
+        existing_enrollment.remark = ((existing_enrollment.remark or "").strip() + f"\nเพิ่ม {sessions} ครั้ง จากใบเสร็จ {payment.receipt_no}").strip()
+        existing_enrollment.save()
+        payment.enrollment = existing_enrollment
+        payment.tutoring_class = existing_enrollment.tutoring_class
+        payment.enrollment_action = CoursePayment.EnrollmentAction.ADD_EXISTING
+        payment.enrollment_created = False
+        payment.save()
+        return existing_enrollment
+
+    enrollment = Enrollment.objects.create(
+        student=payment.student,
+        tutoring_class=payment.tutoring_class,
+        enrollment_type=Enrollment.EnrollmentType.SPECIAL,
+        sessions_total=sessions,
+        payment_type=Enrollment.PaymentType.INSTALLMENT if payment.payment_type == CoursePayment.PaymentType.INSTALLMENT else Enrollment.PaymentType.FULL,
+        installments_count=1,
+        course_price=payment.course_price,
+        discount_amount=payment.discount_amount,
+        remark=f"สร้างจากใบเสร็จ {payment.receipt_no}",
+        is_active=True,
+    )
+    payment.enrollment = enrollment
+    payment.enrollment_action = CoursePayment.EnrollmentAction.NEW
+    payment.enrollment_created = True
+    payment.enrollment_sessions_before = None
+    payment.save()
+    return enrollment
+
+
+def _reverse_payment_enrollment_effect(payment: CoursePayment) -> None:
+    """Reverse enrollment effect when a receipt is cancelled."""
+    enrollment = payment.enrollment
+    if not enrollment:
+        return
+    if payment.enrollment_created:
+        enrollment.is_active = False
+        enrollment.remark = ((enrollment.remark or "").strip() + f"\nยกเลิกจากใบเสร็จ {payment.receipt_no}").strip()
+        enrollment.save()
+        return
+    if payment.enrollment_sessions_before is not None:
+        enrollment.sessions_total = int(payment.enrollment_sessions_before)
+        enrollment.remark = ((enrollment.remark or "").strip() + f"\nยกเลิกการเพิ่มครั้งจากใบเสร็จ {payment.receipt_no}").strip()
+        enrollment.save()
+
+
 def _attendance_queryset_for_range(start: date, end: date, time_slot: str = "", class_id: str = ""):
     qs = (
         Attendance.objects
@@ -1485,11 +1618,23 @@ def _school_finance_filtered_data(request: HttpRequest):
         .filter(work_date__gte=date_from, work_date__lte=date_to)
         .order_by("-work_date", "tutor__name")
     )
+    course_payment_rows = (
+        CoursePayment.objects
+        .select_related("student", "tutoring_class", "enrollment")
+        .filter(
+            payment_date__gte=date_from,
+            payment_date__lte=date_to,
+            status=CoursePayment.ReceiptStatus.ISSUED,
+        )
+        .order_by("-payment_date", "-created_at")
+    )
 
     general_expense_total = expense_rows.aggregate(total=Sum("amount")).get("total") or Decimal("0")
     tutor_payroll_total = payroll_rows.aggregate(total=Sum("total_amount")).get("total") or Decimal("0")
+    cash_revenue_total = course_payment_rows.aggregate(total=Sum("amount_paid")).get("total") or Decimal("0")
     total_expense = general_expense_total + tutor_payroll_total
     net_estimated = estimated_revenue - total_expense
+    net_cash_basis = cash_revenue_total - total_expense
 
     return {
         "selected_date": selected_date,
@@ -1498,12 +1643,15 @@ def _school_finance_filtered_data(request: HttpRequest):
         "revenue_per_student": revenue_per_student,
         "deducted_count": deducted_count,
         "estimated_revenue": estimated_revenue,
+        "cash_revenue_total": cash_revenue_total,
         "expense_rows": expense_rows,
         "payroll_rows": payroll_rows,
+        "course_payment_rows": course_payment_rows,
         "general_expense_total": general_expense_total,
         "tutor_payroll_total": tutor_payroll_total,
         "total_expense": total_expense,
         "net_estimated": net_estimated,
+        "net_cash_basis": net_cash_basis,
     }
 
 
@@ -1623,11 +1771,13 @@ def school_finance_export(request: HttpRequest) -> HttpResponse:
     ws.append(["Date To", data["date_to"].isoformat()])
     ws.append(["Revenue per attendance", float(data["revenue_per_student"])])
     ws.append(["Recognized attendance count", data["deducted_count"]])
-    ws.append(["Estimated revenue", float(data["estimated_revenue"])])
+    ws.append(["Estimated revenue from attendance", float(data["estimated_revenue"])])
+    ws.append(["Cash basis course revenue", float(data["cash_revenue_total"])])
     ws.append(["General expenses", float(data["general_expense_total"])])
     ws.append(["Tutor payroll", float(data["tutor_payroll_total"])])
     ws.append(["Total expenses", float(data["total_expense"])])
-    ws.append(["Net estimate", float(data["net_estimated"])])
+    ws.append(["Net attendance estimate", float(data["net_estimated"])])
+    ws.append(["Net cash basis", float(data["net_cash_basis"])])
     _autosize(ws)
 
     ws_exp = wb.create_sheet("General Expenses")
@@ -1700,6 +1850,27 @@ def school_finance_export(request: HttpRequest) -> HttpResponse:
             "Yes" if r["has_special_rate"] else "No",
         ])
     _autosize(ws_weekend)
+
+    ws_cash = wb.create_sheet("Course Payments")
+    ws_cash.append(["Receipt No", "Payment Date", "Student", "Class", "Enrollment", "Payment Type", "Payment Method", "Sessions", "Course Price", "Discount", "Net Amount", "Amount Paid", "Status", "Note"])
+    for p in data.get("course_payment_rows", []):
+        ws_cash.append([
+            p.receipt_no,
+            p.payment_date.isoformat() if p.payment_date else "",
+            p.student.display_name if p.student_id else "",
+            p.tutoring_class.name if p.tutoring_class_id else "",
+            p.enrollment.sale_run_no if p.enrollment_id and p.enrollment else "",
+            p.get_payment_type_display() if hasattr(p, "get_payment_type_display") else p.payment_type,
+            p.get_payment_method_display() if hasattr(p, "get_payment_method_display") else p.payment_method,
+            int(p.sessions_granted or 0),
+            float(p.course_price or 0),
+            float(p.discount_amount or 0),
+            float(p.net_amount or 0),
+            float(p.amount_paid or 0),
+            p.get_status_display() if hasattr(p, "get_status_display") else p.status,
+            p.note or "",
+        ])
+    _autosize(ws_cash)
 
     buff = BytesIO()
     wb.save(buff)
@@ -1842,13 +2013,179 @@ def school_finance(request: HttpRequest) -> HttpResponse:
         "deducted_count": data["deducted_count"],
         "revenue_per_student": data["revenue_per_student"],
         "estimated_revenue": data["estimated_revenue"],
+        "cash_revenue_total": data["cash_revenue_total"],
         "general_expense_total": data["general_expense_total"],
         "tutor_payroll_total": data["tutor_payroll_total"],
         "total_expense": data["total_expense"],
         "net_estimated": data["net_estimated"],
+        "net_cash_basis": data["net_cash_basis"],
         "payment_method_choices": payment_method_choices,
         "current_querystring": current_querystring,
     })
+
+
+@login_required
+def course_payment_list(request: HttpRequest) -> HttpResponse:
+    qs = CoursePayment.objects.select_related("student", "tutoring_class", "enrollment").order_by("-payment_date", "-created_at")
+    q = (request.GET.get("q") or "").strip()
+    status = (request.GET.get("status") or "").strip()
+    date_from = _safe_date(request.GET.get("date_from"))
+    date_to = _safe_date(request.GET.get("date_to"))
+
+    if q:
+        qs = qs.filter(
+            Q(receipt_no__icontains=q) |
+            Q(student__nickname__icontains=q) |
+            Q(student__full_name__icontains=q) |
+            Q(student__student_code__icontains=q) |
+            Q(tutoring_class__name__icontains=q)
+        )
+    if status:
+        qs = qs.filter(status=status)
+    if date_from:
+        qs = qs.filter(payment_date__gte=date_from)
+    if date_to:
+        qs = qs.filter(payment_date__lte=date_to)
+
+    totals = qs.aggregate(total=Sum("amount_paid"))
+    issued_total = qs.filter(status=CoursePayment.ReceiptStatus.ISSUED).aggregate(total=Sum("amount_paid")).get("total") or Decimal("0")
+
+    return render(request, "core/course_payment_list.html", {
+        "payments": qs[:300],
+        "filters": {"q": q, "status": status, "date_from": request.GET.get("date_from", ""), "date_to": request.GET.get("date_to", "")},
+        "status_choices": CoursePayment.ReceiptStatus.choices,
+        "issued_total": issued_total,
+        "all_total": totals.get("total") or Decimal("0"),
+    })
+
+
+@login_required
+def course_payment_create(request: HttpRequest) -> HttpResponse:
+    errors: list[str] = []
+    if request.method == "POST":
+        post = request.POST
+        try:
+            student_mode = (post.get("student_mode") or "existing").strip()
+            enrollment_action = (post.get("enrollment_action") or CoursePayment.EnrollmentAction.NEW).strip()
+            payment_date = _parse_date(post.get("payment_date"))
+            payment_type = (post.get("payment_type") or CoursePayment.PaymentType.FULL).strip()
+            payment_method = (post.get("payment_method") or CoursePayment.PaymentMethod.BANK_TRANSFER).strip()
+            package = (post.get("session_package") or "10").strip()
+            sessions_granted = _sessions_from_package(package, post.get("custom_sessions"))
+            course_price = _money(post.get("course_price"))
+            discount_amount = _money(post.get("discount_amount"))
+            net_amount = max(course_price - discount_amount, Decimal("0"))
+            amount_paid = _money(post.get("amount_paid")) or net_amount
+            note = (post.get("note") or "").strip()
+
+            if student_mode == "new":
+                nickname = (post.get("new_nickname") or "").strip()
+                full_name = (post.get("new_full_name") or "").strip()
+                grade_level = (post.get("new_grade_level") or "").strip()
+                school_name = (post.get("new_school_name") or "").strip()
+                parent_phone = (post.get("new_parent_phone") or "").strip()
+                if not full_name:
+                    errors.append("กรุณากรอกชื่อจริงนามสกุลของนักเรียนใหม่")
+                if not parent_phone:
+                    errors.append("กรุณากรอกเบอร์ผู้ปกครองของนักเรียนใหม่")
+                school = None
+                if school_name:
+                    school, _ = School.objects.get_or_create(name=school_name, defaults={"is_active": True})
+                student = None
+                if not errors:
+                    student = Student.objects.create(
+                        nickname=nickname,
+                        full_name=full_name,
+                        grade_level=grade_level,
+                        school=school,
+                        parent_phone=parent_phone,
+                    )
+            else:
+                student_id = post.get("student_id")
+                student = Student.objects.filter(id=student_id, is_active=True).first()
+                if not student:
+                    errors.append("กรุณาเลือกนักเรียนเดิม")
+
+            selected_class = None
+            existing_enrollment = None
+            if enrollment_action == CoursePayment.EnrollmentAction.ADD_EXISTING:
+                existing_enrollment = Enrollment.objects.select_related("student", "tutoring_class").filter(id=post.get("existing_enrollment_id"), is_active=True).first()
+                if not existing_enrollment:
+                    errors.append("กรุณาเลือก Enrollment เดิมที่จะเพิ่มจำนวนครั้ง")
+                elif student and existing_enrollment.student_id != student.id:
+                    errors.append("Enrollment เดิมไม่ตรงกับนักเรียนที่เลือก")
+                else:
+                    selected_class = existing_enrollment.tutoring_class
+            else:
+                selected_class = TutoringClass.objects.filter(id=post.get("tutoring_class_id"), is_active=True).first()
+                if not selected_class:
+                    errors.append("กรุณาเลือก Class")
+
+            if sessions_granted <= 0:
+                errors.append("จำนวนครั้งที่ให้เรียนต้องมากกว่า 0")
+            if amount_paid < 0:
+                errors.append("ยอดรับชำระไม่ถูกต้อง")
+
+            if not errors and student and selected_class:
+                with transaction.atomic():
+                    payment = CoursePayment.objects.create(
+                        payment_date=payment_date,
+                        student=student,
+                        tutoring_class=selected_class,
+                        enrollment_action=enrollment_action,
+                        session_package=package,
+                        sessions_granted=sessions_granted,
+                        course_price=course_price,
+                        discount_amount=discount_amount,
+                        net_amount=net_amount,
+                        amount_paid=amount_paid,
+                        payment_type=payment_type,
+                        payment_method=payment_method,
+                        note=note,
+                        created_by=request.user if request.user.is_authenticated else None,
+                    )
+                    _apply_payment_to_enrollment(payment, enrollment_action, existing_enrollment)
+                return redirect("core:course_payment_detail", pk=payment.pk)
+        except Exception as exc:
+            errors.append(f"บันทึกไม่สำเร็จ: {exc}")
+
+        context = _default_payment_form_context(request, errors=errors, posted=dict(post))
+        return render(request, "core/course_payment_create.html", context)
+
+    return render(request, "core/course_payment_create.html", _default_payment_form_context(request))
+
+
+@login_required
+def course_payment_detail(request: HttpRequest, pk: int) -> HttpResponse:
+    payment = get_object_or_404(
+        CoursePayment.objects.select_related("student", "student__school", "tutoring_class", "enrollment"),
+        pk=pk,
+    )
+    return render(request, "core/course_payment_detail.html", {"payment": payment})
+
+
+@login_required
+def course_payment_receipt_image(request: HttpRequest, pk: int) -> HttpResponse:
+    payment = get_object_or_404(
+        CoursePayment.objects.select_related("student", "student__school", "tutoring_class", "enrollment"),
+        pk=pk,
+    )
+    return render(request, "core/course_payment_receipt_image.html", {"payment": payment})
+
+
+@require_POST
+@login_required
+def course_payment_cancel(request: HttpRequest, pk: int) -> HttpResponse:
+    payment = get_object_or_404(CoursePayment.objects.select_related("enrollment"), pk=pk)
+    if payment.status != CoursePayment.ReceiptStatus.CANCELLED:
+        with transaction.atomic():
+            payment.status = CoursePayment.ReceiptStatus.CANCELLED
+            payment.cancel_reason = (request.POST.get("cancel_reason") or "").strip()
+            payment.cancelled_at = timezone.now()
+            payment.cancelled_by = request.user if request.user.is_authenticated else None
+            payment.save()
+            _reverse_payment_enrollment_effect(payment)
+    return redirect("core:course_payment_detail", pk=payment.pk)
 
 
 @require_POST

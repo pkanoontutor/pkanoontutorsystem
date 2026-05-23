@@ -1547,14 +1547,17 @@ def school_finance_export(request: HttpRequest) -> HttpResponse:
     _autosize(ws_exp)
 
     ws_pay = wb.create_sheet("Tutor Payroll")
-    ws_pay.append(["Date", "Tutor", "Teaching Hours", "Hourly Rate", "Teaching Fee", "Travel Fee", "Idle/Other Fee", "Total", "Note"])
+    ws_pay.append(["Date", "Tutor", "Onsite Hours", "Special 325?", "Hourly Rate", "Onsite Teaching Fee", "Online Hours", "Online Teaching Fee", "Travel Fee", "Idle/Other Fee", "Total", "Note"])
     for p in data["payroll_rows"]:
         ws_pay.append([
             p.work_date.isoformat(),
             p.tutor.name if p.tutor else "",
             float(p.teaching_hours or 0),
+            "Yes" if getattr(p, "special_rate_325", False) else "No",
             float(p.hourly_rate or 0),
             float(p.teaching_fee or 0),
+            float(getattr(p, "online_teaching_hours", 0) or 0),
+            float(getattr(p, "online_teaching_fee", 0) or 0),
             float(p.travel_fee or 0),
             float(p.idle_fee or 0),
             float(p.total_amount or 0),
@@ -1631,17 +1634,27 @@ def school_finance(request: HttpRequest) -> HttpResponse:
 
             for tid in tutor_ids:
                 hours_raw = (request.POST.get(f"hours_{tid}") or "").strip()
+                online_hours_raw = (request.POST.get(f"online_hours_{tid}") or "").strip()
                 idle_raw = (request.POST.get(f"idle_{tid}") or "").strip()
                 note_raw = (request.POST.get(f"note_{tid}") or "").strip()
+                special_rate_325 = request.POST.get(f"special_rate_325_{tid}") == "yes"
 
                 # Skip blank rows when saving all.
-                if not single_tutor_id and hours_raw == "" and idle_raw == "" and note_raw == "":
+                if (
+                    not single_tutor_id
+                    and hours_raw == ""
+                    and online_hours_raw == ""
+                    and idle_raw == ""
+                    and note_raw == ""
+                    and not special_rate_325
+                ):
                     continue
 
                 hours = _money(hours_raw)
+                online_hours = _money(online_hours_raw)
                 idle_fee = _money(idle_raw)
 
-                if hours <= 0 and idle_fee <= 0 and not note_raw:
+                if hours <= 0 and online_hours <= 0 and idle_fee <= 0 and not note_raw:
                     continue
 
                 try:
@@ -1652,9 +1665,17 @@ def school_finance(request: HttpRequest) -> HttpResponse:
                 entry, _ = TutorPayrollEntry.objects.get_or_create(
                     work_date=work_date,
                     tutor=tutor,
-                    defaults={"teaching_hours": hours, "idle_fee": idle_fee, "note": note_raw},
+                    defaults={
+                        "teaching_hours": hours,
+                        "online_teaching_hours": online_hours,
+                        "special_rate_325": special_rate_325,
+                        "idle_fee": idle_fee,
+                        "note": note_raw,
+                    },
                 )
                 entry.teaching_hours = hours
+                entry.online_teaching_hours = online_hours
+                entry.special_rate_325 = special_rate_325
                 entry.idle_fee = idle_fee
                 entry.note = note_raw
                 entry.save()

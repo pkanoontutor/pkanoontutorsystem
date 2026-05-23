@@ -339,7 +339,7 @@
   }
   .payroll-row{
     display:grid;
-    grid-template-columns:minmax(160px,1.2fr) 105px 120px minmax(160px,1fr) 150px 118px minmax(150px,auto);
+    grid-template-columns:minmax(155px,1.1fr) 92px 92px 135px 120px minmax(150px,1fr) 170px 118px minmax(145px,auto);
     gap:9px;
     align-items:end;
     padding:12px;
@@ -361,6 +361,26 @@
   }
   .teacher-name{font-weight:1000;color:#0f172a;font-size:15px;}
   .teacher-phone{font-size:12px;color:#64748b;font-weight:800;}
+  .special-toggle{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    min-height:42px;
+    padding:8px 10px;
+    border:1px solid #fed7aa;
+    border-radius:14px;
+    background:#fff7ed;
+    color:#9a3412;
+    font-size:12px;
+    font-weight:1000;
+    line-height:1.25;
+  }
+  .special-toggle input{
+    width:18px;
+    height:18px;
+    min-width:18px;
+    accent-color:#f97316;
+  }
   .live-box{
     display:grid;
     grid-template-columns:1fr 1fr;
@@ -450,7 +470,7 @@
     max-height:520px;
   }
   .tbl{
-    min-width:920px;
+    min-width:1120px;
     width:100%;
     border-collapse:separate;
     border-spacing:0;
@@ -513,7 +533,7 @@
     .filter-actions{grid-column:1/-1;justify-content:flex-start;}
     .expense-form{grid-template-columns:repeat(2,1fr);}
     .payroll-row{
-      grid-template-columns:minmax(170px,1.2fr) 105px 120px minmax(180px,1fr) 150px 118px;
+      grid-template-columns:minmax(160px,1.1fr) 92px 92px 135px 120px minmax(160px,1fr);
     }
     .row-tools{grid-column:1/-1;justify-content:flex-start;}
   }
@@ -525,7 +545,8 @@
     .payroll-row{
       grid-template-columns:1.2fr 105px 120px;
     }
-    .payroll-row .field:nth-of-type(3){grid-column:1/-1;}
+    .payroll-row{grid-template-columns:1fr 1fr 1fr;}
+    .teacher-box{grid-column:1/-1;}
     .live-box{grid-column:1/3;}
     .total-box{grid-column:3/4;}
     .row-tools{grid-column:1/-1;}
@@ -690,9 +711,10 @@
         <div class="badge">Full width · No horizontal scroll</div>
       </div>
       <div class="rule-pills">
-        <span class="rule-pill">1 ชม. = 550/ชม. + เดินทาง 200</span>
-        <span class="rule-pill">2–3 ชม. = 350/ชม. + เดินทาง 150</span>
-        <span class="rule-pill">4 ชม.+ = 300/ชม. + เดินทาง 100</span>
+        <span class="rule-pill">Onsite 1 ชม. = 550/ชม. + เดินทาง 200</span>
+        <span class="rule-pill">Onsite 2–3 ชม. = 350/ชม. + เดินทาง 150</span>
+        <span class="rule-pill">Onsite 4 ชม.+ = 300/ชม. หรือ 325/ชม. ถ้าติ๊กพิเศษ + เดินทาง 100</span>
+        <span class="rule-pill">Online = 300/ชม. ไม่คิดค่าเดินทาง</span>
       </div>
     </div>
 
@@ -717,9 +739,19 @@
               </div>
 
               <div class="field">
-                <label>ชม.สอน</label>
+                <label>ชม.สอน onsite</label>
                 <input class="js-hours" type="number" name="hours_{{ tutor.id }}" step="0.25" min="0" value="{% if entry %}{{ entry.teaching_hours }}{% endif %}">
               </div>
+
+              <div class="field">
+                <label>ชม.สอนออนไลน์</label>
+                <input class="js-online-hours" type="number" name="online_hours_{{ tutor.id }}" step="0.25" min="0" value="{% if entry %}{{ entry.online_teaching_hours }}{% endif %}">
+              </div>
+
+              <label class="special-toggle">
+                <input class="js-special-rate" type="checkbox" name="special_rate_325_{{ tutor.id }}" value="yes" {% if entry and entry.special_rate_325 %}checked{% endif %}>
+                <span>เรทพิเศษ 325<br>เมื่อ onsite ≥ 4 ชม.</span>
+              </label>
 
               <div class="field">
                 <label>ค่านั่งว่าง</label>
@@ -733,8 +765,16 @@
 
               <div class="live-box">
                 <div class="calc-chip">
-                  <span>เรท/ชม.</span>
+                  <span>เรท onsite</span>
                   <b class="js-rate">{% if entry %}{{ entry.hourly_rate|floatformat:0 }}{% else %}-{% endif %}</b>
+                </div>
+                <div class="calc-chip">
+                  <span>ค่าสอน onsite</span>
+                  <b class="js-onsite-fee">{% if entry %}{{ entry.teaching_fee|floatformat:0 }}{% else %}-{% endif %}</b>
+                </div>
+                <div class="calc-chip">
+                  <span>ค่าสอนออนไลน์</span>
+                  <b class="js-online-fee">{% if entry %}{{ entry.online_teaching_fee|floatformat:0 }}{% else %}-{% endif %}</b>
                 </div>
                 <div class="calc-chip">
                   <span>เดินทาง</span>
@@ -845,9 +885,12 @@
             <tr>
               <th>วันที่</th>
               <th>ติวเตอร์</th>
-              <th class="num">ชม.</th>
+              <th class="num">Onsite</th>
+              <th>พิเศษ</th>
               <th class="num">เรท</th>
-              <th class="num">ค่าสอน</th>
+              <th class="num">ค่าสอน onsite</th>
+              <th class="num">Online</th>
+              <th class="num">ค่าสอน online</th>
               <th class="num">เดินทาง</th>
               <th class="num">อื่น ๆ</th>
               <th class="num">รวม</th>
@@ -860,8 +903,11 @@
               <td>{{ p.work_date|date:"d/m/Y" }}</td>
               <td><div class="teacher-name">{{ p.tutor.name }}</div>{% if p.note %}<div class="desc">{{ p.note }}</div>{% endif %}</td>
               <td class="num">{{ p.teaching_hours }}</td>
+              <td>{% if p.special_rate_325 %}<span class="badge" style="background:#fff7ed;color:#9a3412;border-color:#fed7aa;">325</span>{% else %}-{% endif %}</td>
               <td class="num">{{ p.hourly_rate|floatformat:0 }}</td>
               <td class="num">{{ p.teaching_fee|floatformat:2 }}</td>
+              <td class="num">{{ p.online_teaching_hours }}</td>
+              <td class="num">{{ p.online_teaching_fee|floatformat:2 }}</td>
               <td class="num">{{ p.travel_fee|floatformat:2 }}</td>
               <td class="num">{{ p.idle_fee|floatformat:2 }}</td>
               <td class="num"><span class="amount">{{ p.total_amount|floatformat:2 }}</span></td>
@@ -873,7 +919,7 @@
               </td>
             </tr>
             {% empty %}
-            <tr><td colspan="9" style="text-align:center;color:#64748b;">ยังไม่มีค่าจ้างติวเตอร์ในช่วงนี้</td></tr>
+            <tr><td colspan="12" style="text-align:center;color:#64748b;">ยังไม่มีค่าจ้างติวเตอร์ในช่วงนี้</td></tr>
             {% endfor %}
           </tbody>
         </table>
@@ -887,8 +933,8 @@
             <span class="amount">{{ p.total_amount|floatformat:2 }}</span>
           </div>
           <div class="mobile-meta">
-            {{ p.work_date|date:"d/m/Y" }} · {{ p.teaching_hours }} ชม. · เรท {{ p.hourly_rate|floatformat:0 }}<br>
-            ค่าสอน {{ p.teaching_fee|floatformat:2 }} / เดินทาง {{ p.travel_fee|floatformat:2 }} / อื่น ๆ {{ p.idle_fee|floatformat:2 }}
+            {{ p.work_date|date:"d/m/Y" }} · onsite {{ p.teaching_hours }} ชม. · เรท {{ p.hourly_rate|floatformat:0 }}{% if p.special_rate_325 %} · เรทพิเศษ 325{% endif %}<br>
+            online {{ p.online_teaching_hours }} ชม. = {{ p.online_teaching_fee|floatformat:2 }} / onsite {{ p.teaching_fee|floatformat:2 }} / เดินทาง {{ p.travel_fee|floatformat:2 }} / อื่น ๆ {{ p.idle_fee|floatformat:2 }}
           </div>
           <form method="post" action="{% url 'core:tutor_payroll_delete' p.id %}" onsubmit="return confirm('ลบรายการนี้ใช่ไหม?')" style="margin-top:8px;">
             {% csrf_token %}
@@ -938,12 +984,12 @@
 </div>
 
 <script>
-  function rateForHours(hours){
+  function rateForHours(hours, specialRate){
     hours = Number(hours || 0);
     if(hours <= 0) return 0;
     if(hours <= 1) return 550;
     if(hours < 4) return 350;
-    return 300;
+    return specialRate ? 325 : 300;
   }
 
   function travelForHours(hours){
@@ -956,12 +1002,18 @@
 
   function calcRow(row){
     const h = Number(row.querySelector('.js-hours')?.value || 0);
+    const onlineH = Number(row.querySelector('.js-online-hours')?.value || 0);
     const idle = Number(row.querySelector('.js-idle')?.value || 0);
-    const rate = rateForHours(h);
+    const specialRate = !!row.querySelector('.js-special-rate')?.checked;
+    const rate = rateForHours(h, specialRate);
     const travel = travelForHours(h);
-    const total = (h * rate) + travel + idle;
+    const onsiteFee = h * rate;
+    const onlineFee = onlineH * 300;
+    const total = onsiteFee + onlineFee + travel + idle;
 
     row.querySelector('.js-rate').textContent = rate ? rate.toLocaleString('en-US') : '-';
+    row.querySelector('.js-onsite-fee').textContent = onsiteFee ? onsiteFee.toLocaleString('en-US', {maximumFractionDigits:0}) : '-';
+    row.querySelector('.js-online-fee').textContent = onlineFee ? onlineFee.toLocaleString('en-US', {maximumFractionDigits:0}) : '-';
     row.querySelector('.js-travel').textContent = travel ? travel.toLocaleString('en-US') : '-';
     row.querySelector('.js-total').textContent = total ? total.toLocaleString('en-US', {maximumFractionDigits:0}) : '-';
 

@@ -19,6 +19,7 @@ from .models import (
     SchoolExpense,
     Tutor,
     TutorPayrollEntry,
+    CoursePayment,
 )
 
 
@@ -493,3 +494,78 @@ class TutorPayrollEntryAdmin(admin.ModelAdmin):
     date_hierarchy = "work_date"
     ordering = ("-work_date", "tutor__name")
 
+
+
+@admin.register(CoursePayment)
+class CoursePaymentAdmin(admin.ModelAdmin):
+    list_display = (
+        "receipt_no",
+        "payment_date",
+        "student",
+        "tutoring_class",
+        "enrollment",
+        "sessions_granted",
+        "amount_paid",
+        "payment_method",
+        "payment_type",
+        "status",
+        "created_at",
+    )
+    list_filter = ("status", "payment_method", "payment_type", "payment_date", "tutoring_class")
+    search_fields = (
+        "receipt_no",
+        "student__student_code",
+        "student__nickname",
+        "student__full_name",
+        "tutoring_class__name",
+        "note",
+    )
+    autocomplete_fields = ("student", "tutoring_class", "enrollment", "created_by", "cancelled_by")
+    readonly_fields = (
+        "receipt_no",
+        "net_amount",
+        "created_at",
+        "updated_at",
+        "cancelled_at",
+    )
+    date_hierarchy = "payment_date"
+    ordering = ("-payment_date", "-created_at")
+
+    fieldsets = (
+        ("ข้อมูลใบเสร็จ", {
+            "fields": (
+                "receipt_no",
+                "payment_date",
+                "status",
+                "student",
+                "tutoring_class",
+                "enrollment",
+                "enrollment_action",
+                "enrollment_created",
+                "enrollment_sessions_before",
+            )
+        }),
+        ("ข้อมูลคอร์สและยอดเงิน", {
+            "fields": (
+                "session_package",
+                "sessions_granted",
+                "course_price",
+                "discount_amount",
+                "net_amount",
+                "amount_paid",
+                "payment_type",
+                "payment_method",
+                "note",
+            )
+        }),
+        ("ระบบ / การยกเลิก", {
+            "fields": (
+                "created_by",
+                "created_at",
+                "updated_at",
+                "cancelled_at",
+                "cancelled_by",
+                "cancel_reason",
+            )
+        }),
+    )

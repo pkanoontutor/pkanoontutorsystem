@@ -37,6 +37,14 @@ urlpatterns = [
     path("school-finance/delete-expense/<int:pk>/", views.school_expense_delete, name="school_expense_delete"),
     path("school-finance/delete-payroll/<int:pk>/", views.tutor_payroll_delete, name="tutor_payroll_delete"),
 
+
+    # Course payments / receipts
+    path("course-payments/", views.course_payment_list, name="course_payment_list"),
+    path("course-payments/new/", views.course_payment_create, name="course_payment_create"),
+    path("course-payments/<int:pk>/", views.course_payment_detail, name="course_payment_detail"),
+    path("course-payments/<int:pk>/receipt-image/", views.course_payment_receipt_image, name="course_payment_receipt_image"),
+    path("course-payments/<int:pk>/cancel/", views.course_payment_cancel, name="course_payment_cancel"),
+
     # Student Portal
     path("student-portal/", views.student_portal_login, name="student_portal_login"),
     path("student-portal/student-search/", views.student_portal_student_search, name="student_portal_student_search"),

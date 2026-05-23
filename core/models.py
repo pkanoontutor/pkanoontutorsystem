@@ -754,9 +754,16 @@ class TutorPayrollEntry(models.Model):
         on_delete=models.PROTECT,
         related_name="payroll_entries",
     )
-    teaching_hours = models.DecimalField("จำนวนชั่วโมงสอน", max_digits=5, decimal_places=2, default=0)
-    hourly_rate = models.DecimalField("เรทต่อชั่วโมง", max_digits=10, decimal_places=2, default=0)
-    teaching_fee = models.DecimalField("ค่าสอน", max_digits=12, decimal_places=2, default=0)
+    teaching_hours = models.DecimalField("จำนวนชั่วโมงสอน onsite", max_digits=5, decimal_places=2, default=0)
+    special_rate_325 = models.BooleanField(
+        "ใช้อัตราพิเศษ 325 บาท/ชม. เมื่อสอนตั้งแต่ 4 ชม.",
+        default=False,
+        help_text="ติ๊กเฉพาะติวเตอร์ที่ได้เรทพิเศษ กรณีสอน onsite ตั้งแต่ 4 ชั่วโมงขึ้นไป",
+    )
+    hourly_rate = models.DecimalField("เรท onsite ต่อชั่วโมง", max_digits=10, decimal_places=2, default=0)
+    teaching_fee = models.DecimalField("ค่าสอน onsite", max_digits=12, decimal_places=2, default=0)
+    online_teaching_hours = models.DecimalField("จำนวนชั่วโมงสอนออนไลน์", max_digits=5, decimal_places=2, default=0)
+    online_teaching_fee = models.DecimalField("ค่าสอนออนไลน์", max_digits=12, decimal_places=2, default=0)
     travel_fee = models.DecimalField("ค่าเดินทาง", max_digits=12, decimal_places=2, default=0)
     idle_fee = models.DecimalField("ค่านั่งว่าง / ค่าอื่น ๆ", max_digits=12, decimal_places=2, default=0)
     total_amount = models.DecimalField("ยอดรวม", max_digits=12, decimal_places=2, default=0)
@@ -773,7 +780,7 @@ class TutorPayrollEntry(models.Model):
         ]
 
     @staticmethod
-    def calculate_hourly_rate(hours: Decimal) -> Decimal:
+    def calculate_hourly_rate(hours: Decimal, special_rate_325: bool = False) -> Decimal:
         hours = Decimal(str(hours or 0))
         if hours <= 0:
             return Decimal("0")
@@ -781,7 +788,7 @@ class TutorPayrollEntry(models.Model):
             return Decimal("550")
         if hours < 4:
             return Decimal("350")
-        return Decimal("300")
+        return Decimal("325") if special_rate_325 else Decimal("300")
 
     @staticmethod
     def calculate_travel_fee(hours: Decimal) -> Decimal:
@@ -794,13 +801,23 @@ class TutorPayrollEntry(models.Model):
             return Decimal("150")
         return Decimal("100")
 
+    @staticmethod
+    def calculate_online_teaching_fee(online_hours: Decimal) -> Decimal:
+        online_hours = Decimal(str(online_hours or 0))
+        if online_hours <= 0:
+            return Decimal("0")
+        return online_hours * Decimal("300")
+
     def recalculate(self):
         hours = Decimal(str(self.teaching_hours or 0))
-        self.hourly_rate = self.calculate_hourly_rate(hours)
+        online_hours = Decimal(str(self.online_teaching_hours or 0))
+        self.hourly_rate = self.calculate_hourly_rate(hours, self.special_rate_325)
         self.teaching_fee = hours * self.hourly_rate
+        self.online_teaching_hours = online_hours
+        self.online_teaching_fee = self.calculate_online_teaching_fee(online_hours)
         self.travel_fee = self.calculate_travel_fee(hours)
         self.idle_fee = Decimal(str(self.idle_fee or 0))
-        self.total_amount = self.teaching_fee + self.travel_fee + self.idle_fee
+        self.total_amount = self.teaching_fee + self.online_teaching_fee + self.travel_fee + self.idle_fee
 
     def save(self, *args, **kwargs):
         self.recalculate()

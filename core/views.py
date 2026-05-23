@@ -1513,6 +1513,104 @@ def pkanoon_admin_tool(request: HttpRequest) -> HttpResponse:
     return render(request, "core/pkanoon_admin_tool.html")
 
 
+
+def _weekend_tutor_summary(selected_date: date) -> dict:
+    """
+    Combine tutor payroll by school weekend.
+    If selected date is Sat: Sat + next Sun.
+    If selected date is Sun: previous Sat + Sun.
+    Other days: school week containing the selected date (Sat-Sun).
+    """
+    weekend_start, weekend_end = _school_week_range(selected_date)
+
+    rows_by_tutor: dict[int, dict] = {}
+    qs = (
+        TutorPayrollEntry.objects
+        .select_related("tutor")
+        .filter(work_date__gte=weekend_start, work_date__lte=weekend_end)
+        .order_by("tutor__name", "work_date")
+    )
+
+    zero = Decimal("0")
+    totals = {
+        "tutor_count": 0,
+        "onsite_hours": zero,
+        "online_hours": zero,
+        "onsite_fee": zero,
+        "online_fee": zero,
+        "travel_fee": zero,
+        "idle_fee": zero,
+        "total_amount": zero,
+    }
+
+    for p in qs:
+        if not p.tutor_id:
+            continue
+
+        row = rows_by_tutor.setdefault(p.tutor_id, {
+            "tutor": p.tutor,
+            "onsite_hours": zero,
+            "online_hours": zero,
+            "onsite_fee": zero,
+            "online_fee": zero,
+            "travel_fee": zero,
+            "idle_fee": zero,
+            "total_amount": zero,
+            "sat_amount": zero,
+            "sun_amount": zero,
+            "sat_hours": zero,
+            "sun_hours": zero,
+            "has_special_rate": False,
+            "notes": [],
+        })
+
+        teaching_hours = Decimal(str(p.teaching_hours or 0))
+        online_hours = Decimal(str(getattr(p, "online_teaching_hours", 0) or 0))
+        teaching_fee = Decimal(str(p.teaching_fee or 0))
+        online_fee = Decimal(str(getattr(p, "online_teaching_fee", 0) or 0))
+        travel_fee = Decimal(str(p.travel_fee or 0))
+        idle_fee = Decimal(str(p.idle_fee or 0))
+        total_amount = Decimal(str(p.total_amount or 0))
+
+        row["onsite_hours"] += teaching_hours
+        row["online_hours"] += online_hours
+        row["onsite_fee"] += teaching_fee
+        row["online_fee"] += online_fee
+        row["travel_fee"] += travel_fee
+        row["idle_fee"] += idle_fee
+        row["total_amount"] += total_amount
+        row["has_special_rate"] = row["has_special_rate"] or bool(getattr(p, "special_rate_325", False))
+
+        if p.work_date == weekend_start:
+            row["sat_amount"] += total_amount
+            row["sat_hours"] += teaching_hours + online_hours
+        elif p.work_date == weekend_end:
+            row["sun_amount"] += total_amount
+            row["sun_hours"] += teaching_hours + online_hours
+
+        if p.note:
+            row["notes"].append(f"{p.work_date.strftime('%d/%m')}: {p.note}")
+
+    rows = sorted(rows_by_tutor.values(), key=lambda r: (r["tutor"].name if r.get("tutor") else ""))
+
+    totals["tutor_count"] = len(rows)
+    for row in rows:
+        totals["onsite_hours"] += row["onsite_hours"]
+        totals["online_hours"] += row["online_hours"]
+        totals["onsite_fee"] += row["onsite_fee"]
+        totals["online_fee"] += row["online_fee"]
+        totals["travel_fee"] += row["travel_fee"]
+        totals["idle_fee"] += row["idle_fee"]
+        totals["total_amount"] += row["total_amount"]
+
+    return {
+        "start": weekend_start,
+        "end": weekend_end,
+        "rows": rows,
+        "totals": totals,
+    }
+
+
 @login_required
 def school_finance_export(request: HttpRequest) -> HttpResponse:
     data = _school_finance_filtered_data(request)
@@ -1564,6 +1662,44 @@ def school_finance_export(request: HttpRequest) -> HttpResponse:
             p.note or "",
         ])
     _autosize(ws_pay)
+
+    weekend_summary = _weekend_tutor_summary(data["selected_date"])
+    ws_weekend = wb.create_sheet("Weekend Tutor Summary")
+    ws_weekend.append([
+        "Weekend Start",
+        weekend_summary["start"].isoformat(),
+        "Weekend End",
+        weekend_summary["end"].isoformat(),
+    ])
+    ws_weekend.append([])
+    ws_weekend.append([
+        "Tutor",
+        "Onsite Hours",
+        "Online Hours",
+        "Onsite Teaching Fee",
+        "Online Teaching Fee",
+        "Travel Fee",
+        "Idle/Other Fee",
+        "Saturday Amount",
+        "Sunday Amount",
+        "Weekend Total",
+        "Special 325 Used?",
+    ])
+    for r in weekend_summary["rows"]:
+        ws_weekend.append([
+            r["tutor"].name if r.get("tutor") else "",
+            float(r["onsite_hours"] or 0),
+            float(r["online_hours"] or 0),
+            float(r["onsite_fee"] or 0),
+            float(r["online_fee"] or 0),
+            float(r["travel_fee"] or 0),
+            float(r["idle_fee"] or 0),
+            float(r["sat_amount"] or 0),
+            float(r["sun_amount"] or 0),
+            float(r["total_amount"] or 0),
+            "Yes" if r["has_special_rate"] else "No",
+        ])
+    _autosize(ws_weekend)
 
     buff = BytesIO()
     wb.save(buff)
@@ -1683,6 +1819,7 @@ def school_finance(request: HttpRequest) -> HttpResponse:
             return redirect(f"{request.path}?work_date={work_date.isoformat()}&date_from={date_from.isoformat()}&date_to={date_to.isoformat()}")
 
     data = _school_finance_filtered_data(request)
+    weekend_tutor_summary = _weekend_tutor_summary(data["selected_date"])
 
     categories = ExpenseCategory.objects.filter(is_active=True).order_by("sort_order", "name")
     tutors = Tutor.objects.filter(is_active=True).order_by("name")
@@ -1701,6 +1838,7 @@ def school_finance(request: HttpRequest) -> HttpResponse:
         "payroll_map": payroll_map,
         "expense_rows": data["expense_rows"],
         "payroll_rows": data["payroll_rows"],
+        "weekend_tutor_summary": weekend_tutor_summary,
         "deducted_count": data["deducted_count"],
         "revenue_per_student": data["revenue_per_student"],
         "estimated_revenue": data["estimated_revenue"],

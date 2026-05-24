@@ -1,0 +1,112 @@
+{% extends "core/base.html" %}
+{% block title %}ตั้งค่าติวเตอร์รายสัปดาห์{% endblock %}
+
+{% block head %}
+<style>
+  .teach-wrap{max-width:1180px;margin:0 auto;display:grid;gap:14px;}
+  .hero{background:linear-gradient(135deg,#0f172a,#2563eb);color:#fff;border-radius:24px;padding:22px;box-shadow:0 12px 26px rgba(15,23,42,.20);}
+  .title{font-size:26px;font-weight:1000;letter-spacing:-.03em;}
+  .sub{font-size:13px;color:#dbeafe;line-height:1.6;margin-top:6px;}
+  .panel{background:#fff;border-radius:20px;padding:16px;box-shadow:0 5px 14px rgba(15,23,42,.08);border:1px solid rgba(255,255,255,.9);}
+  .btnrow{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+  .btnx{border:0;border-radius:14px;padding:10px 14px;font-weight:1000;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:7px;cursor:pointer;white-space:nowrap;}
+  .primary{background:#2563eb;color:#fff}.dark{background:#0f172a;color:#fff}.soft{background:#f8fafc;color:#0f172a;border:1px solid #e2e8f0}.success{background:#16a34a;color:#fff}
+  .filter-grid{display:grid;grid-template-columns:220px auto 1fr;gap:10px;align-items:end;}
+  .field{display:flex;flex-direction:column;gap:5px;min-width:0;}
+  .field label{font-size:11px;font-weight:1000;color:#334155;text-transform:uppercase;letter-spacing:.04em;}
+  input,select{border:1px solid #e2e8f0;border-radius:12px;padding:10px;font-weight:800;width:100%;background:#fff;}
+  .class-block{border:1px solid #e2e8f0;border-radius:18px;overflow:hidden;background:#fff;margin-bottom:12px;}
+  .class-head{background:linear-gradient(135deg,#f8fafc,#eff6ff);padding:12px 14px;font-weight:1000;color:#0f172a;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;}
+  .assign-list{display:grid;gap:0;}
+  .assign-row{display:grid;grid-template-columns:1.2fr 1fr 1.2fr;gap:10px;align-items:center;padding:10px 14px;border-top:1px solid #edf2f7;}
+  .subject{font-weight:1000;color:#0f172a;}
+  .sheet{font-size:12px;color:#64748b;margin-top:2px;}
+  .muted{color:#64748b;font-size:12px;}
+  @media(max-width:760px){.filter-grid,.assign-row{grid-template-columns:1fr}.title{font-size:22px}.btnx{width:100%;}.btnrow .btnx{width:auto}}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="teach-wrap">
+  <div class="hero">
+    <div class="title">👩‍🏫 ตั้งค่าติวเตอร์ประจำสัปดาห์</div>
+    <div class="sub">สัปดาห์เรียน: {{ week_start|date:"d/m/Y" }} - {{ week_end|date:"d/m/Y" }} ระบบจะดึงติวเตอร์จากสัปดาห์ก่อนเป็นค่าเริ่มต้นให้โดยอัตโนมัติ</div>
+  </div>
+
+  <div class="btnrow">
+    <a class="btnx soft" href="/pkanoon-admin-tool/">← Admin Tool</a>
+    <a class="btnx dark" href="/teaching/templates/">ตั้งค่า Template</a>
+    <a class="btnx success" href="/tutor-teaching-update/?week_start={{ week_start|date:'Y-m-d' }}" target="_blank">เปิดหน้าติวเตอร์</a>
+    <a class="btnx soft" href="/teaching/report/?week_start={{ week_start|date:'Y-m-d' }}">Report</a>
+  </div>
+
+  <div class="panel">
+    <form method="get" class="filter-grid">
+      <div class="field">
+        <label>เลือกวันในสัปดาห์</label>
+        <input type="date" name="week_start" value="{{ week_start|date:'Y-m-d' }}">
+      </div>
+      <button class="btnx primary" type="submit">ดูสัปดาห์นี้</button>
+      <div class="muted">ใส่วันใดก็ได้ในสัปดาห์ ระบบจะจัดเป็นเสาร์–อาทิตย์ให้เอง</div>
+    </form>
+  </div>
+
+  <div class="panel">
+    <div class="btnrow" style="justify-content:space-between;margin-bottom:12px;">
+      <div style="font-size:17px;font-weight:1000;color:#0f172a;">📌 เลือกติวเตอร์แต่ละวิชา</div>
+      <form method="post" class="btnrow">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="add_tutor">
+        <input type="hidden" name="week_start" value="{{ week_start|date:'Y-m-d' }}">
+        <input type="text" name="tutor_name" placeholder="เพิ่มชื่อติวเตอร์" style="max-width:180px;">
+        <input type="text" name="tutor_phone" placeholder="เบอร์" style="max-width:150px;">
+        <button class="btnx soft" type="submit">เพิ่มติวเตอร์</button>
+      </form>
+    </div>
+
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="save_assignments">
+      <input type="hidden" name="week_start" value="{{ week_start|date:'Y-m-d' }}">
+
+      {% for class_id, group in grouped_assignments.items %}
+        <div class="class-block">
+          <div class="class-head">
+            <span>{{ group.class.name }}</span>
+            <span class="muted">{{ group.assignments|length }} วิชา</span>
+          </div>
+          <div class="assign-list">
+            {% for a in group.assignments %}
+              <div class="assign-row">
+                <input type="hidden" name="assignment_ids" value="{{ a.id }}">
+                <div>
+                  <div class="subject">{{ a.subject_template.subject_name }}</div>
+                  <div class="sheet">ชีทตั้งต้น: {{ a.subject_template.default_sheet_name|default:"-" }}</div>
+                </div>
+                <div class="field">
+                  <label>ติวเตอร์ประจำสัปดาห์</label>
+                  <select name="tutor_{{ a.id }}">
+                    <option value="">ยังไม่ระบุ</option>
+                    {% for t in tutors %}
+                      <option value="{{ t.id }}" {% if a.tutor_id == t.id %}selected{% endif %}>{{ t.name }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+                <div class="muted">ถ้าไม่เลือก ระบบจะแสดงในหน้าติวเตอร์แบบยังไม่ assign</div>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+      {% empty %}
+        <div class="muted">ยังไม่มี template กรุณาไปตั้งค่า template ก่อน</div>
+      {% endfor %}
+
+      {% if grouped_assignments %}
+        <div class="btnrow" style="justify-content:flex-end;">
+          <button class="btnx primary" type="submit">💾 บันทึกติวเตอร์ประจำสัปดาห์</button>
+        </div>
+      {% endif %}
+    </form>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,140 @@
+{% extends "core/base.html" %}
+{% block title %}อัปเดตการสอนติวเตอร์{% endblock %}
+
+{% block head %}
+<style>
+  body{background:#eef6ff!important;}
+  .public-wrap{max-width:980px;margin:0 auto;display:grid;gap:12px;}
+  .hero{background:linear-gradient(135deg,#0f172a,#16a34a);color:#fff;border-radius:24px;padding:18px;box-shadow:0 12px 24px rgba(15,23,42,.20);}
+  .title{font-size:24px;font-weight:1000;letter-spacing:-.03em;}
+  .sub{font-size:13px;color:#dcfce7;line-height:1.5;margin-top:5px;}
+  .filter-card,.class-card,.update-card{background:#fff;border-radius:20px;padding:14px;box-shadow:0 5px 14px rgba(15,23,42,.08);border:1px solid rgba(255,255,255,.9);}
+  .filter-grid{display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:end;}
+  .field{display:flex;flex-direction:column;gap:5px;min-width:0;}
+  .field label{font-size:11px;font-weight:1000;color:#334155;text-transform:uppercase;letter-spacing:.04em;}
+  input,select{border:1px solid #e2e8f0;border-radius:13px;padding:10px;font-weight:800;width:100%;background:#fff;}
+  input:focus,select:focus{outline:none;border-color:#16a34a;box-shadow:0 0 0 3px rgba(22,163,74,.12);}
+  .btnx{border:0;border-radius:14px;padding:10px 14px;font-weight:1000;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:7px;cursor:pointer;white-space:nowrap;}
+  .primary{background:#16a34a;color:#fff}.dark{background:#0f172a;color:#fff}.soft{background:#f8fafc;color:#0f172a;border:1px solid #e2e8f0}
+  .class-title{font-size:18px;font-weight:1000;color:#0f172a;margin-bottom:10px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;}
+  .assignment-list{display:grid;gap:10px;}
+  .update-card{border:1px solid #e2e8f0;box-shadow:none;}
+  .update-card.saved{border-color:#86efac;background:linear-gradient(180deg,#f0fdf4,#fff);}
+  .card-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;margin-bottom:10px;}
+  .subject{font-size:16px;font-weight:1000;color:#0f172a;}
+  .tutor{font-size:12px;color:#64748b;font-weight:900;margin-top:3px;}
+  .status{display:inline-flex;border-radius:999px;padding:5px 10px;font-size:12px;font-weight:1000;border:1px solid #e2e8f0;background:#f8fafc;color:#334155;}
+  .status.done{background:#dcfce7;border-color:#86efac;color:#166534;}
+  .prev-box{background:#f8fafc;border:1px solid #e2e8f0;border-radius:15px;padding:10px;margin-bottom:10px;}
+  .prev-title{font-size:11px;font-weight:1000;color:#64748b;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;}
+  .prev-text{font-size:13px;font-weight:900;color:#0f172a;line-height:1.45;}
+  .form-grid{display:grid;grid-template-columns:1.4fr .7fr .7fr .9fr auto;gap:8px;align-items:end;}
+  .muted{color:#64748b;font-size:12px;line-height:1.45;}
+  .mini{font-size:11px;color:#64748b;font-weight:800;margin-top:4px;}
+  @media(max-width:760px){
+    .filter-grid,.form-grid{grid-template-columns:1fr;}
+    .btnx{width:100%;}
+    .title{font-size:21px;}
+    .hero{padding:16px;border-radius:20px;}
+    .card-head{display:grid;}
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="public-wrap">
+  <div class="hero">
+    <div class="title">👩‍🏫 อัปเดตการสอนติวเตอร์</div>
+    <div class="sub">สัปดาห์เรียน {{ week_start|date:"d/m/Y" }} - {{ week_end|date:"d/m/Y" }} · ไม่ต้อง login · เลือกชื่อตัวเองเพื่อ filter ได้</div>
+  </div>
+
+  <div class="filter-card">
+    <form method="get" class="filter-grid">
+      <div class="field">
+        <label>เลือกสัปดาห์</label>
+        <input type="date" name="week_start" value="{{ week_start|date:'Y-m-d' }}">
+      </div>
+      <div class="field">
+        <label>Filter ชื่อติวเตอร์</label>
+        <select name="tutor_id">
+          <option value="">ดูทั้งหมด</option>
+          {% for t in tutors %}
+            <option value="{{ t.id }}" {% if selected_tutor_id == t.id|stringformat:"s" %}selected{% endif %}>{{ t.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <button class="btnx primary" type="submit">แสดงผล</button>
+    </form>
+  </div>
+
+  {% for class_id, group in grouped_assignments.items %}
+    <div class="class-card">
+      <div class="class-title">
+        <span>{{ group.class.name }}</span>
+        <span class="muted">{{ group.assignments|length }} รายการ</span>
+      </div>
+
+      <div class="assignment-list">
+        {% for item in group.assignments %}
+          {% with a=item.assignment prev=item.previous_update curr=item.current_update %}
+          <div class="update-card {% if curr %}saved{% endif %}" id="assignment-{{ a.id }}">
+            <div class="card-head">
+              <div>
+                <div class="subject">{{ a.subject_template.subject_name }}</div>
+                <div class="tutor">ผู้สอน: {% if a.tutor %}{{ a.tutor.name }}{% else %}ยังไม่ระบุ{% endif %}</div>
+              </div>
+              {% if curr %}
+                <span class="status done">✓ บันทึกแล้ว</span>
+              {% else %}
+                <span class="status">ยังไม่บันทึก</span>
+              {% endif %}
+            </div>
+
+            <div class="prev-box">
+              <div class="prev-title">บันทึกล่าสุดก่อนสัปดาห์นี้</div>
+              {% if prev %}
+                <div class="prev-text">{{ prev.progress_text }}</div>
+                <div class="mini">วันที่ {{ prev.teaching_date|date:"d/m/Y" }} · โดย {{ prev.updated_by_name|default:"-" }} · อัปเดต {{ prev.updated_at|date:"d/m/Y H:i" }}</div>
+              {% else %}
+                <div class="prev-text">ยังไม่มีประวัติก่อนหน้า</div>
+              {% endif %}
+            </div>
+
+            <form method="post" class="form-grid">
+              {% csrf_token %}
+              <input type="hidden" name="assignment_id" value="{{ a.id }}">
+              <input type="hidden" name="week_start" value="{{ week_start|date:'Y-m-d' }}">
+              <input type="hidden" name="tutor_id" value="{{ selected_tutor_id }}">
+              <div class="field">
+                <label>ชื่อชีท/เอกสาร</label>
+                <input type="text" name="sheet_name" value="{% if curr %}{{ curr.sheet_name }}{% elif prev %}{{ prev.sheet_name }}{% else %}{{ a.subject_template.default_sheet_name }}{% endif %}" placeholder="ชื่อชีท/เอกสาร">
+              </div>
+              <div class="field">
+                <label>สอนถึงหน้า</label>
+                <input type="text" name="page_to" value="{% if curr %}{{ curr.page_to }}{% elif prev %}{{ prev.page_to }}{% endif %}" placeholder="หน้า">
+              </div>
+              <div class="field">
+                <label>สอนถึงข้อ</label>
+                <input type="text" name="question_to" value="{% if curr %}{{ curr.question_to }}{% elif prev %}{{ prev.question_to }}{% endif %}" placeholder="ข้อ">
+              </div>
+              <div class="field">
+                <label>วันที่ / ผู้บันทึก</label>
+                <input type="date" name="teaching_date" value="{% if curr %}{{ curr.teaching_date|date:'Y-m-d' }}{% else %}{{ today|date:'Y-m-d' }}{% endif %}">
+                <input type="text" name="updated_by_name" value="{% if curr %}{{ curr.updated_by_name }}{% elif a.tutor %}{{ a.tutor.name }}{% endif %}" placeholder="ชื่อผู้บันทึก" style="margin-top:6px;">
+              </div>
+              <button class="btnx primary" type="submit">💾 บันทึก</button>
+            </form>
+
+            {% if curr %}
+              <div class="mini">บันทึกล่าสุด: {{ curr.teaching_date|date:"d/m/Y" }} · อัปเดต {{ curr.updated_at|date:"d/m/Y H:i" }}</div>
+            {% endif %}
+          </div>
+          {% endwith %}
+        {% endfor %}
+      </div>
+    </div>
+  {% empty %}
+    <div class="filter-card muted">ยังไม่มีรายการสำหรับสัปดาห์นี้ กรุณาให้ Admin ตั้งค่า Template ก่อน</div>
+  {% endfor %}
+</div>
+{% endblock %}

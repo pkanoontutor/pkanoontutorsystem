@@ -3,7 +3,7 @@
 
 {% block head %}
 <style>
-  .wrap2{max-width:1100px;margin:0 auto;display:grid;gap:14px;}
+  .wrap2{max-width:1120px;margin:0 auto;display:grid;gap:14px;}
   .hero{background:linear-gradient(135deg,#0f172a,#7c3aed);color:#fff;border-radius:24px;padding:22px;box-shadow:0 12px 26px rgba(15,23,42,.20);}
   .title{font-size:26px;font-weight:1000;letter-spacing:-.03em;}
   .sub{font-size:13px;color:#ede9fe;margin-top:6px;}
@@ -14,15 +14,22 @@
   .panel{background:#fff;border-radius:20px;padding:16px;box-shadow:0 5px 14px rgba(15,23,42,.08);}
   .btnrow{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
   .btnx{border:0;border-radius:14px;padding:10px 14px;font-weight:1000;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:7px;cursor:pointer;white-space:nowrap;}
-  .primary{background:#2563eb;color:#fff}.dark{background:#0f172a;color:#fff}.soft{background:#f8fafc;color:#0f172a;border:1px solid #e2e8f0}
+  .primary{background:#2563eb;color:#fff}.dark{background:#0f172a;color:#fff}.soft{background:#f8fafc;color:#0f172a;border:1px solid #e2e8f0;}
   input{border:1px solid #e2e8f0;border-radius:12px;padding:10px;font-weight:800;background:#fff;}
   table{width:100%;border-collapse:collapse;background:#fff;}
   th,td{padding:10px;border-bottom:1px solid #edf2f7;text-align:left;}
-  th{background:#f8fafc;font-size:11px;color:#334155;text-transform:uppercase;letter-spacing:.04em;}
-  .done{color:#166534;font-weight:1000}.pending{color:#991b1b;font-weight:1000}.no-class{color:#475569;font-weight:1000}
+  th{background:#f8fafc;font-size:11px;color:#334155;text-transform:uppercase;letter-spacing:.04em;position:sticky;top:0;z-index:1;}
+  .done{color:#166534;font-weight:1000}.pending{color:#991b1b;font-weight:1000}.no-class{color:#475569;font-weight:1000;}
   .muted{color:#64748b;font-size:12px;}
   .table-wrap{overflow:auto;border:1px solid #e2e8f0;border-radius:16px;}
-  @media(max-width:720px){.cards{grid-template-columns:1fr}.btnx{width:100%;}.table-wrap table{min-width:760px}.title{font-size:22px}}
+  .slot-head{border-radius:18px;padding:12px 14px;font-size:17px;font-weight:1000;color:#0f172a;display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:10px;}
+  .slot-head span:last-child{font-size:12px;border-radius:999px;background:rgba(255,255,255,.7);padding:5px 10px;}
+  .sat-morning{background:linear-gradient(135deg,#dbeafe,#bfdbfe);}
+  .sat-afternoon{background:linear-gradient(135deg,#ffedd5,#fed7aa);}
+  .sun-morning{background:linear-gradient(135deg,#dcfce7,#bbf7d0);}
+  .sun-afternoon{background:linear-gradient(135deg,#ede9fe,#ddd6fe);}
+  .default{background:linear-gradient(135deg,#f1f5f9,#e2e8f0);}
+  @media(max-width:720px){.cards{grid-template-columns:1fr 1fr}.btnx{width:100%;}.table-wrap table{min-width:760px}.title{font-size:22px}}
 </style>
 {% endblock %}
 
@@ -45,52 +52,58 @@
 
   <div class="cards">
     <div class="metric"><div class="k">ทั้งหมด</div><div class="v">{{ total }}</div></div>
-    <div class="metric"><div class="k">บันทึกการสอนแล้ว</div><div class="v" style="color:#15803d;">{{ taught }}</div></div>
-    <div class="metric"><div class="k">สัปดาห์นี้ไม่มีสอน</div><div class="v" style="color:#475569;">{{ no_teaching }}</div></div>
+    <div class="metric"><div class="k">บันทึกการสอน</div><div class="v" style="color:#15803d;">{{ taught }}</div></div>
+    <div class="metric"><div class="k">ไม่มีสอน</div><div class="v" style="color:#64748b;">{{ no_teaching }}</div></div>
     <div class="metric"><div class="k">ยังไม่บันทึก</div><div class="v" style="color:#b91c1c;">{{ pending }}</div></div>
   </div>
 
-  <div class="panel">
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>สถานะ</th>
-            <th>Class</th>
-            <th>วิชา</th>
-            <th>ติวเตอร์</th>
-            <th>ชีท/เอกสาร</th>
-            <th>หน้า</th>
-            <th>ข้อ</th>
-            <th>อัปเดตล่าสุด</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for r in rows %}
+  {% for slot_key, slot in grouped_rows.items %}
+    <div class="panel">
+      <div class="slot-head {{ slot.tone }}">
+        <span>{{ slot.label }}</span>
+        <span>{{ slot.count }} รายการ</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
             <tr>
-              <td>
-                {% if r.is_no_teaching %}
-                  <span class="no-class">พักสอนสัปดาห์นี้</span>
-                {% elif r.is_done %}
-                  <span class="done">✓ บันทึกแล้ว</span>
-                {% else %}
-                  <span class="pending">ยังไม่บันทึก</span>
-                {% endif %}
-              </td>
-              <td>{{ r.assignment.tutoring_class.name }}</td>
-              <td>{{ r.assignment.subject_template.subject_name }}</td>
-              <td>{% if r.assignment.tutor %}{{ r.assignment.tutor.name }}{% else %}-{% endif %}</td>
-              <td>{% if r.update %}{{ r.update.sheet_name|default:"-" }}{% else %}-{% endif %}</td>
-              <td>{% if r.update %}{{ r.update.page_to|default:"-" }}{% else %}-{% endif %}</td>
-              <td>{% if r.update %}{{ r.update.question_to|default:"-" }}{% else %}-{% endif %}</td>
-              <td>{% if r.update %}{{ r.update.updated_at|date:"d/m/Y H:i" }}{% else %}-{% endif %}</td>
+              <th>สถานะ</th>
+              <th>Class</th>
+              <th>วิชา</th>
+              <th>ติวเตอร์</th>
+              <th>ชีท/เอกสาร</th>
+              <th>หน้า</th>
+              <th>ข้อ</th>
+              <th>อัปเดตล่าสุด</th>
             </tr>
-          {% empty %}
-            <tr><td colspan="8" class="muted">ยังไม่มีข้อมูล</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {% for r in slot.rows %}
+              <tr>
+                <td>
+                  {% if r.is_done %}
+                    {% if r.is_no_teaching %}<span class="no-class">พักสอน</span>{% else %}<span class="done">✓ บันทึกแล้ว</span>{% endif %}
+                  {% else %}
+                    <span class="pending">ยังไม่บันทึก</span>
+                  {% endif %}
+                </td>
+                <td>{{ r.assignment.tutoring_class.name }}</td>
+                <td>{{ r.assignment.subject_template.subject_name }}</td>
+                <td>{% if r.assignment.tutor %}{{ r.assignment.tutor.name }}{% else %}-{% endif %}</td>
+                <td>{% if r.update %}{{ r.update.sheet_name|default:"-" }}{% else %}-{% endif %}</td>
+                <td>{% if r.update %}{{ r.update.page_to|default:"-" }}{% else %}-{% endif %}</td>
+                <td>{% if r.update %}{{ r.update.question_to|default:"-" }}{% else %}-{% endif %}</td>
+                <td>{% if r.update %}{{ r.update.updated_at|date:"d/m/Y H:i" }}{% else %}-{% endif %}</td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="8" class="muted">ยังไม่มีข้อมูล</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
     </div>
-  </div>
+  {% empty %}
+    <div class="panel muted">ยังไม่มีข้อมูล</div>
+  {% endfor %}
 </div>
 {% endblock %}

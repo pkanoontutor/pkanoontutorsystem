@@ -31,6 +31,10 @@ from .models import (
     Tutor,
     TutorPayrollEntry,
     CoursePayment,
+    TeachingTutor,
+    TeachingClassSubjectTemplate,
+    TeachingWeeklyAssignment,
+    TeachingProgressUpdate,
 )
 
 
@@ -353,7 +357,13 @@ def export_excel(request: HttpRequest) -> HttpResponse:
 
     ws_cash = wb.create_sheet("Course Payments")
     ws_cash.append(["Receipt No", "Payment Date", "Student", "Class", "Enrollment", "Payment Type", "Payment Method", "Sessions", "Course Price", "Discount", "Net Amount", "Amount Paid", "Status", "Note"])
-    for p in data.get("course_payment_rows", []):
+    course_payment_export_rows = (
+        CoursePayment.objects
+        .select_related("student", "tutoring_class", "enrollment")
+        .filter(status=CoursePayment.ReceiptStatus.ISSUED)
+        .order_by("-payment_date", "-created_at")
+    )
+    for p in course_payment_export_rows:
         ws_cash.append([
             p.receipt_no,
             p.payment_date.isoformat() if p.payment_date else "",
@@ -1853,7 +1863,13 @@ def school_finance_export(request: HttpRequest) -> HttpResponse:
 
     ws_cash = wb.create_sheet("Course Payments")
     ws_cash.append(["Receipt No", "Payment Date", "Student", "Class", "Enrollment", "Payment Type", "Payment Method", "Sessions", "Course Price", "Discount", "Net Amount", "Amount Paid", "Status", "Note"])
-    for p in data.get("course_payment_rows", []):
+    course_payment_export_rows = (
+        CoursePayment.objects
+        .select_related("student", "tutoring_class", "enrollment")
+        .filter(status=CoursePayment.ReceiptStatus.ISSUED)
+        .order_by("-payment_date", "-created_at")
+    )
+    for p in course_payment_export_rows:
         ws_cash.append([
             p.receipt_no,
             p.payment_date.isoformat() if p.payment_date else "",
@@ -2202,4 +2218,325 @@ def tutor_payroll_delete(request: HttpRequest, pk: int) -> HttpResponse:
     entry = get_object_or_404(TutorPayrollEntry, pk=pk)
     entry.delete()
     return redirect(request.META.get("HTTP_REFERER", "core:school_finance"))
+
+# =========================================================
+# ✅ Tutor Teaching Update Module
+# =========================================================
+def _teaching_week_range(anchor: date) -> tuple[date, date]:
+    """Teaching week = Saturday to Sunday, same as school finance week."""
+    days_since_sat = (anchor.weekday() - 5) % 7
+    start = anchor - timedelta(days=days_since_sat)
+    return start, start + timedelta(days=1)
+
+
+def _teaching_week_from_request(request: HttpRequest) -> tuple[date, date]:
+    raw = request.GET.get("week_start") or request.POST.get("week_start") or request.GET.get("date")
+    anchor = _safe_date(raw) if "_safe_date" in globals() else None
+    if not anchor:
+        anchor = _parse_date(raw)
+    return _teaching_week_range(anchor)
+
+
+def _latest_tutor_for_template(template: TeachingClassSubjectTemplate, before_week_start: date) -> TeachingTutor | None:
+    prev = (
+        TeachingWeeklyAssignment.objects
+        .filter(subject_template=template, week_start_date__lt=before_week_start, tutor__isnull=False)
+        .select_related("tutor")
+        .order_by("-week_start_date", "-updated_at")
+        .first()
+    )
+    return prev.tutor if prev and prev.tutor_id else None
+
+
+def _ensure_teaching_assignments(week_start: date, week_end: date) -> None:
+    templates = (
+        TeachingClassSubjectTemplate.objects
+        .select_related("tutoring_class")
+        .filter(is_active=True, tutoring_class__is_active=True)
+        .order_by("tutoring_class__name", "display_order", "subject_name")
+    )
+
+    with transaction.atomic():
+        for tmpl in templates:
+            assignment, created = TeachingWeeklyAssignment.objects.get_or_create(
+                week_start_date=week_start,
+                subject_template=tmpl,
+                defaults={
+                    "week_end_date": week_end,
+                    "tutoring_class": tmpl.tutoring_class,
+                    "tutor": _latest_tutor_for_template(tmpl, week_start),
+                },
+            )
+            changed = False
+            if assignment.week_end_date != week_end:
+                assignment.week_end_date = week_end
+                changed = True
+            if assignment.tutoring_class_id != tmpl.tutoring_class_id:
+                assignment.tutoring_class = tmpl.tutoring_class
+                changed = True
+            if created is False and assignment.tutor_id is None:
+                last_tutor = _latest_tutor_for_template(tmpl, week_start)
+                if last_tutor:
+                    assignment.tutor = last_tutor
+                    changed = True
+            if changed:
+                assignment.save()
+
+
+@login_required
+def teaching_template_manage(request: HttpRequest) -> HttpResponse:
+    classes = TutoringClass.objects.filter(is_active=True).order_by("name")
+    tutors = TeachingTutor.objects.filter(is_active=True).order_by("name")
+
+    selected_class_id = (request.GET.get("class_id") or request.POST.get("class_id") or "").strip()
+
+    if request.method == "POST":
+        action = (request.POST.get("action") or "").strip()
+
+        if action == "add_tutor":
+            tutor_name = (request.POST.get("tutor_name") or "").strip()
+            tutor_phone = (request.POST.get("tutor_phone") or "").strip()
+            if tutor_name:
+                TeachingTutor.objects.update_or_create(
+                    name=tutor_name,
+                    defaults={"phone": tutor_phone, "is_active": True},
+                )
+            return redirect(f"/teaching/templates/?class_id={selected_class_id}" if selected_class_id else "/teaching/templates/")
+
+        if action == "add_subject":
+            class_id = request.POST.get("class_id")
+            subject_name = (request.POST.get("subject_name") or "").strip()
+            default_sheet_name = (request.POST.get("default_sheet_name") or "").strip()
+            display_order_raw = (request.POST.get("display_order") or "").strip()
+            try:
+                display_order = int(display_order_raw or 1)
+            except ValueError:
+                display_order = 1
+
+            cls = get_object_or_404(TutoringClass, id=class_id, is_active=True)
+            if subject_name:
+                TeachingClassSubjectTemplate.objects.update_or_create(
+                    tutoring_class=cls,
+                    subject_name=subject_name,
+                    defaults={
+                        "default_sheet_name": default_sheet_name,
+                        "display_order": display_order,
+                        "is_active": True,
+                    },
+                )
+            return redirect(f"/teaching/templates/?class_id={class_id}")
+
+        if action == "save_templates":
+            for tid in request.POST.getlist("template_ids"):
+                tmpl = TeachingClassSubjectTemplate.objects.filter(id=tid).first()
+                if not tmpl:
+                    continue
+                tmpl.subject_name = (request.POST.get(f"subject_name_{tid}") or tmpl.subject_name).strip()
+                tmpl.default_sheet_name = (request.POST.get(f"default_sheet_name_{tid}") or "").strip()
+                try:
+                    tmpl.display_order = int(request.POST.get(f"display_order_{tid}") or tmpl.display_order or 1)
+                except ValueError:
+                    pass
+                tmpl.is_active = request.POST.get(f"is_active_{tid}") == "yes"
+                tmpl.save()
+            return redirect(f"/teaching/templates/?class_id={selected_class_id}" if selected_class_id else "/teaching/templates/")
+
+    templates = TeachingClassSubjectTemplate.objects.select_related("tutoring_class").order_by(
+        "tutoring_class__name", "display_order", "subject_name"
+    )
+    if selected_class_id:
+        templates = templates.filter(tutoring_class_id=selected_class_id)
+
+    return render(request, "core/teaching_template_manage.html", {
+        "classes": classes,
+        "templates": templates,
+        "tutors": tutors,
+        "selected_class_id": selected_class_id,
+    })
+
+
+@login_required
+def teaching_weekly_setup(request: HttpRequest) -> HttpResponse:
+    week_start, week_end = _teaching_week_from_request(request)
+
+    if request.method == "POST":
+        action = (request.POST.get("action") or "").strip()
+
+        if action == "add_tutor":
+            tutor_name = (request.POST.get("tutor_name") or "").strip()
+            tutor_phone = (request.POST.get("tutor_phone") or "").strip()
+            if tutor_name:
+                TeachingTutor.objects.update_or_create(
+                    name=tutor_name,
+                    defaults={"phone": tutor_phone, "is_active": True},
+                )
+            return redirect(f"/teaching/weekly-setup/?week_start={week_start.isoformat()}")
+
+        _ensure_teaching_assignments(week_start, week_end)
+
+        if action == "save_assignments":
+            for aid in request.POST.getlist("assignment_ids"):
+                assignment = TeachingWeeklyAssignment.objects.filter(id=aid).first()
+                if not assignment:
+                    continue
+                tutor_id = (request.POST.get(f"tutor_{aid}") or "").strip()
+                assignment.tutor = TeachingTutor.objects.filter(id=tutor_id, is_active=True).first() if tutor_id else None
+                assignment.save()
+            return redirect(f"/teaching/weekly-setup/?week_start={week_start.isoformat()}")
+
+    _ensure_teaching_assignments(week_start, week_end)
+
+    assignments = (
+        TeachingWeeklyAssignment.objects
+        .select_related("tutoring_class", "subject_template", "tutor")
+        .filter(week_start_date=week_start)
+        .order_by("tutoring_class__name", "subject_template__display_order", "subject_template__subject_name")
+    )
+    tutors = TeachingTutor.objects.filter(is_active=True).order_by("name")
+
+    grouped_assignments: OrderedDict[int, dict] = OrderedDict()
+    for a in assignments:
+        key = a.tutoring_class_id
+        grouped_assignments.setdefault(key, {"class": a.tutoring_class, "assignments": []})
+        grouped_assignments[key]["assignments"].append(a)
+
+    return render(request, "core/teaching_weekly_setup.html", {
+        "week_start": week_start,
+        "week_end": week_end,
+        "assignments": assignments,
+        "grouped_assignments": grouped_assignments,
+        "tutors": tutors,
+    })
+
+
+def tutor_teaching_update(request: HttpRequest) -> HttpResponse:
+    week_start, week_end = _teaching_week_from_request(request)
+    _ensure_teaching_assignments(week_start, week_end)
+
+    selected_tutor_id = (request.GET.get("tutor_id") or request.POST.get("tutor_id") or "").strip()
+
+    if request.method == "POST":
+        assignment_id = request.POST.get("assignment_id")
+        assignment = get_object_or_404(
+            TeachingWeeklyAssignment.objects.select_related("subject_template", "tutor"),
+            id=assignment_id,
+            week_start_date=week_start,
+        )
+        teaching_date = _safe_date(request.POST.get("teaching_date")) if "_safe_date" in globals() else None
+        if not teaching_date:
+            teaching_date = timezone.localdate()
+        sheet_name = (request.POST.get("sheet_name") or "").strip()
+        page_to = (request.POST.get("page_to") or "").strip()
+        question_to = (request.POST.get("question_to") or "").strip()
+        updated_by_name = (request.POST.get("updated_by_name") or "").strip()
+        if not updated_by_name and assignment.tutor_id:
+            updated_by_name = assignment.tutor.name
+
+        TeachingProgressUpdate.objects.update_or_create(
+            assignment=assignment,
+            teaching_date=teaching_date,
+            defaults={
+                "sheet_name": sheet_name,
+                "page_to": page_to,
+                "question_to": question_to,
+                "updated_by_name": updated_by_name,
+            },
+        )
+        qs = f"week_start={week_start.isoformat()}"
+        if selected_tutor_id:
+            qs += f"&tutor_id={selected_tutor_id}"
+        return redirect(f"/tutor-teaching-update/?{qs}#assignment-{assignment.id}")
+
+    assignments = (
+        TeachingWeeklyAssignment.objects
+        .select_related("tutoring_class", "subject_template", "tutor")
+        .prefetch_related("progress_updates")
+        .filter(week_start_date=week_start)
+        .order_by("tutoring_class__time_slot", "tutoring_class__name", "subject_template__display_order", "subject_template__subject_name")
+    )
+    if selected_tutor_id:
+        assignments = assignments.filter(tutor_id=selected_tutor_id)
+
+    all_assignments = list(assignments)
+    template_ids = [a.subject_template_id for a in all_assignments]
+
+    previous_updates = {}
+    if template_ids:
+        prev_qs = (
+            TeachingProgressUpdate.objects
+            .select_related("assignment", "assignment__subject_template", "assignment__tutor")
+            .filter(
+                assignment__subject_template_id__in=template_ids,
+                assignment__week_start_date__lt=week_start,
+            )
+            .order_by("assignment__subject_template_id", "-teaching_date", "-updated_at")
+        )
+        for upd in prev_qs:
+            previous_updates.setdefault(upd.assignment.subject_template_id, upd)
+
+    current_updates = {}
+    if all_assignments:
+        curr_qs = (
+            TeachingProgressUpdate.objects
+            .filter(assignment_id__in=[a.id for a in all_assignments])
+            .order_by("assignment_id", "-teaching_date", "-updated_at")
+        )
+        for upd in curr_qs:
+            current_updates.setdefault(upd.assignment_id, upd)
+
+    tutor_choices = TeachingTutor.objects.filter(is_active=True).order_by("name")
+
+    grouped_assignments: OrderedDict[int, dict] = OrderedDict()
+    for a in all_assignments:
+        key = a.tutoring_class_id
+        grouped_assignments.setdefault(key, {"class": a.tutoring_class, "assignments": []})
+        grouped_assignments[key]["assignments"].append({
+            "assignment": a,
+            "previous_update": previous_updates.get(a.subject_template_id),
+            "current_update": current_updates.get(a.id),
+        })
+
+    return render(request, "core/tutor_teaching_update.html", {
+        "week_start": week_start,
+        "week_end": week_end,
+        "today": timezone.localdate(),
+        "tutors": tutor_choices,
+        "selected_tutor_id": selected_tutor_id,
+        "grouped_assignments": grouped_assignments,
+    })
+
+
+@login_required
+def teaching_update_report(request: HttpRequest) -> HttpResponse:
+    week_start, week_end = _teaching_week_from_request(request)
+    _ensure_teaching_assignments(week_start, week_end)
+
+    assignments = (
+        TeachingWeeklyAssignment.objects
+        .select_related("tutoring_class", "subject_template", "tutor")
+        .filter(week_start_date=week_start)
+        .order_by("tutoring_class__name", "subject_template__display_order", "subject_template__subject_name")
+    )
+
+    updates = {
+        u.assignment_id: u
+        for u in TeachingProgressUpdate.objects.filter(assignment__week_start_date=week_start).order_by("assignment_id", "-teaching_date", "-updated_at")
+    }
+
+    rows = []
+    for a in assignments:
+        u = updates.get(a.id)
+        rows.append({"assignment": a, "update": u, "is_done": bool(u)})
+
+    total = len(rows)
+    done = sum(1 for r in rows if r["is_done"])
+
+    return render(request, "core/teaching_update_report.html", {
+        "week_start": week_start,
+        "week_end": week_end,
+        "rows": rows,
+        "total": total,
+        "done": done,
+        "pending": total - done,
+    })
 

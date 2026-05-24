@@ -1086,6 +1086,7 @@ class TeachingProgressUpdate(models.Model):
     sheet_name = models.CharField("ชื่อชีท/เอกสาร", max_length=255, blank=True)
     page_to = models.CharField("สอนถึงหน้า", max_length=50, blank=True)
     question_to = models.CharField("สอนถึงข้อ", max_length=50, blank=True)
+    no_teaching = models.BooleanField("สัปดาห์นี้ไม่มีสอน", default=False)
     updated_by_name = models.CharField("ผู้บันทึก", max_length=120, blank=True)
     updated_at = models.DateTimeField("อัปเดตล่าสุด", auto_now=True)
     created_at = models.DateTimeField("วันที่สร้าง", default=timezone.now)
@@ -1115,3 +1116,6 @@ class TeachingProgressUpdate(models.Model):
             parts.append(f"ข้อ {self.question_to}")
         return " / ".join(parts) if parts else "-"
 
+    @property
+    def status_text(self) -> str:
+        return "สัปดาห์นี้ไม่มีสอน" if self.no_teaching else "บันทึกแล้ว"

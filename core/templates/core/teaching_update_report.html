@@ -7,7 +7,7 @@
   .hero{background:linear-gradient(135deg,#0f172a,#7c3aed);color:#fff;border-radius:24px;padding:22px;box-shadow:0 12px 26px rgba(15,23,42,.20);}
   .title{font-size:26px;font-weight:1000;letter-spacing:-.03em;}
   .sub{font-size:13px;color:#ede9fe;margin-top:6px;}
-  .cards{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+  .cards{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;}
   .metric{background:#fff;border-radius:18px;padding:16px;box-shadow:0 5px 14px rgba(15,23,42,.08);}
   .metric .k{font-size:11px;color:#64748b;font-weight:1000;text-transform:uppercase;}
   .metric .v{font-size:26px;font-weight:1000;color:#0f172a;margin-top:4px;}
@@ -19,7 +19,7 @@
   table{width:100%;border-collapse:collapse;background:#fff;}
   th,td{padding:10px;border-bottom:1px solid #edf2f7;text-align:left;}
   th{background:#f8fafc;font-size:11px;color:#334155;text-transform:uppercase;letter-spacing:.04em;}
-  .done{color:#166534;font-weight:1000}.pending{color:#991b1b;font-weight:1000}
+  .done{color:#166534;font-weight:1000}.pending{color:#991b1b;font-weight:1000}.no-class{color:#475569;font-weight:1000}
   .muted{color:#64748b;font-size:12px;}
   .table-wrap{overflow:auto;border:1px solid #e2e8f0;border-radius:16px;}
   @media(max-width:720px){.cards{grid-template-columns:1fr}.btnx{width:100%;}.table-wrap table{min-width:760px}.title{font-size:22px}}
@@ -45,7 +45,8 @@
 
   <div class="cards">
     <div class="metric"><div class="k">ทั้งหมด</div><div class="v">{{ total }}</div></div>
-    <div class="metric"><div class="k">บันทึกแล้ว</div><div class="v" style="color:#15803d;">{{ done }}</div></div>
+    <div class="metric"><div class="k">บันทึกการสอนแล้ว</div><div class="v" style="color:#15803d;">{{ taught }}</div></div>
+    <div class="metric"><div class="k">สัปดาห์นี้ไม่มีสอน</div><div class="v" style="color:#475569;">{{ no_teaching }}</div></div>
     <div class="metric"><div class="k">ยังไม่บันทึก</div><div class="v" style="color:#b91c1c;">{{ pending }}</div></div>
   </div>
 
@@ -67,7 +68,15 @@
         <tbody>
           {% for r in rows %}
             <tr>
-              <td>{% if r.is_done %}<span class="done">✓ บันทึกแล้ว</span>{% else %}<span class="pending">ยังไม่บันทึก</span>{% endif %}</td>
+              <td>
+                {% if r.is_no_teaching %}
+                  <span class="no-class">พักสอนสัปดาห์นี้</span>
+                {% elif r.is_done %}
+                  <span class="done">✓ บันทึกแล้ว</span>
+                {% else %}
+                  <span class="pending">ยังไม่บันทึก</span>
+                {% endif %}
+              </td>
               <td>{{ r.assignment.tutoring_class.name }}</td>
               <td>{{ r.assignment.subject_template.subject_name }}</td>
               <td>{% if r.assignment.tutor %}{{ r.assignment.tutor.name }}{% else %}-{% endif %}</td>

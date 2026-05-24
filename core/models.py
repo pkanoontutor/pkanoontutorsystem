@@ -978,3 +978,140 @@ class TutorPayrollEntry(models.Model):
 
     def __str__(self) -> str:
         return f"{self.work_date} | {self.tutor} | {self.total_amount:,.2f}"
+
+# =========================================================
+# Tutor Teaching Update Module (Independent from old ClassSubject)
+# =========================================================
+class TeachingTutor(models.Model):
+    name = models.CharField("ชื่อติวเตอร์", max_length=120, unique=True)
+    phone = models.CharField("เบอร์ติดต่อ", max_length=50, blank=True)
+    note = models.TextField("หมายเหตุ", blank=True)
+    is_active = models.BooleanField("ใช้งาน", default=True)
+    created_at = models.DateTimeField("วันที่สร้าง", default=timezone.now)
+    updated_at = models.DateTimeField("อัปเดตล่าสุด", auto_now=True)
+
+    class Meta:
+        verbose_name = "Teaching Tutor"
+        verbose_name_plural = "Teaching Tutors"
+        ordering = ("name",)
+
+    def __str__(self) -> str:
+        return self.name
+
+
+class TeachingClassSubjectTemplate(models.Model):
+    tutoring_class = models.ForeignKey(
+        TutoringClass,
+        verbose_name="คลาส",
+        on_delete=models.CASCADE,
+        related_name="teaching_subject_templates",
+    )
+    subject_name = models.CharField("ชื่อวิชา", max_length=120)
+    default_sheet_name = models.CharField(
+        "ชื่อชีท/เอกสารตั้งต้น",
+        max_length=255,
+        blank=True,
+        help_text="ใช้ prefill ให้ติวเตอร์ในแต่ละสัปดาห์",
+    )
+    display_order = models.PositiveIntegerField("ลำดับแสดงผล", default=1)
+    is_active = models.BooleanField("ใช้งาน", default=True)
+    created_at = models.DateTimeField("วันที่สร้าง", default=timezone.now)
+    updated_at = models.DateTimeField("อัปเดตล่าสุด", auto_now=True)
+
+    class Meta:
+        verbose_name = "Teaching Subject Template"
+        verbose_name_plural = "Teaching Subject Templates"
+        ordering = ("tutoring_class__name", "display_order", "subject_name")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["tutoring_class", "subject_name"],
+                name="uniq_teaching_subject_per_class",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.tutoring_class} | {self.subject_name}"
+
+
+class TeachingWeeklyAssignment(models.Model):
+    week_start_date = models.DateField("วันเริ่มสัปดาห์เรียน", help_text="ระบบใช้วันเสาร์เป็นต้นสัปดาห์")
+    week_end_date = models.DateField("วันสิ้นสุดสัปดาห์เรียน", help_text="ระบบใช้วันอาทิตย์เป็นวันสิ้นสุด")
+    tutoring_class = models.ForeignKey(
+        TutoringClass,
+        verbose_name="คลาส",
+        on_delete=models.CASCADE,
+        related_name="teaching_weekly_assignments",
+    )
+    subject_template = models.ForeignKey(
+        TeachingClassSubjectTemplate,
+        verbose_name="วิชาใน template",
+        on_delete=models.CASCADE,
+        related_name="weekly_assignments",
+    )
+    tutor = models.ForeignKey(
+        TeachingTutor,
+        verbose_name="ติวเตอร์",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="weekly_assignments",
+    )
+    created_at = models.DateTimeField("วันที่สร้าง", default=timezone.now)
+    updated_at = models.DateTimeField("อัปเดตล่าสุด", auto_now=True)
+
+    class Meta:
+        verbose_name = "Teaching Weekly Assignment"
+        verbose_name_plural = "Teaching Weekly Assignments"
+        ordering = ("week_start_date", "tutoring_class__name", "subject_template__display_order")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["week_start_date", "subject_template"],
+                name="uniq_teaching_assignment_per_week_subject",
+            )
+        ]
+
+    def __str__(self) -> str:
+        tutor_name = self.tutor.name if self.tutor_id else "ยังไม่ระบุ"
+        return f"{self.week_start_date} | {self.tutoring_class} | {self.subject_template.subject_name} | {tutor_name}"
+
+
+class TeachingProgressUpdate(models.Model):
+    assignment = models.ForeignKey(
+        TeachingWeeklyAssignment,
+        verbose_name="Assignment",
+        on_delete=models.CASCADE,
+        related_name="progress_updates",
+    )
+    teaching_date = models.DateField("วันที่สอน", default=timezone.localdate)
+    sheet_name = models.CharField("ชื่อชีท/เอกสาร", max_length=255, blank=True)
+    page_to = models.CharField("สอนถึงหน้า", max_length=50, blank=True)
+    question_to = models.CharField("สอนถึงข้อ", max_length=50, blank=True)
+    updated_by_name = models.CharField("ผู้บันทึก", max_length=120, blank=True)
+    updated_at = models.DateTimeField("อัปเดตล่าสุด", auto_now=True)
+    created_at = models.DateTimeField("วันที่สร้าง", default=timezone.now)
+
+    class Meta:
+        verbose_name = "Teaching Progress Update"
+        verbose_name_plural = "Teaching Progress Updates"
+        ordering = ("-teaching_date", "-updated_at")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["assignment", "teaching_date"],
+                name="uniq_teaching_progress_per_assignment_date",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.assignment} | {self.teaching_date}"
+
+    @property
+    def progress_text(self) -> str:
+        parts = []
+        if self.sheet_name:
+            parts.append(self.sheet_name)
+        if self.page_to:
+            parts.append(f"หน้า {self.page_to}")
+        if self.question_to:
+            parts.append(f"ข้อ {self.question_to}")
+        return " / ".join(parts) if parts else "-"
+

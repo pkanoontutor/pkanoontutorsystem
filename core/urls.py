@@ -45,6 +45,13 @@ urlpatterns = [
     path("course-payments/<int:pk>/receipt-image/", views.course_payment_receipt_image, name="course_payment_receipt_image"),
     path("course-payments/<int:pk>/cancel/", views.course_payment_cancel, name="course_payment_cancel"),
 
+
+    # Tutor teaching update
+    path("teaching/templates/", views.teaching_template_manage, name="teaching_template_manage"),
+    path("teaching/weekly-setup/", views.teaching_weekly_setup, name="teaching_weekly_setup"),
+    path("teaching/report/", views.teaching_update_report, name="teaching_update_report"),
+    path("tutor-teaching-update/", views.tutor_teaching_update, name="tutor_teaching_update"),
+
     # Student Portal
     path("student-portal/", views.student_portal_login, name="student_portal_login"),
     path("student-portal/student-search/", views.student_portal_student_search, name="student_portal_student_search"),

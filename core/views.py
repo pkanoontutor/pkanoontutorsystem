@@ -2409,6 +2409,57 @@ def teaching_weekly_setup(request: HttpRequest) -> HttpResponse:
     })
 
 
+def _teaching_slot_groups_from_assignments(assignments, previous_updates=None, current_updates=None):
+    """Group assignments by the school time slot order: Sat AM, Sat PM, Sun AM, Sun PM."""
+    previous_updates = previous_updates or {}
+    current_updates = current_updates or {}
+    slot_meta = {
+        TutoringClass.TimeSlot.SAT_MORNING: {"label": "เสาร์เช้า", "tone": "sat-morning"},
+        TutoringClass.TimeSlot.SAT_AFTERNOON: {"label": "เสาร์บ่าย", "tone": "sat-afternoon"},
+        TutoringClass.TimeSlot.SUN_MORNING: {"label": "อาทิตย์เช้า", "tone": "sun-morning"},
+        TutoringClass.TimeSlot.SUN_AFTERNOON: {"label": "อาทิตย์บ่าย", "tone": "sun-afternoon"},
+    }
+
+    grouped_slots: OrderedDict[str, dict] = OrderedDict()
+    for slot in TIME_SLOT_ORDER:
+        meta = slot_meta.get(slot, {"label": str(slot), "tone": "default"})
+        grouped_slots[slot] = {
+            "label": meta["label"],
+            "tone": meta["tone"],
+            "classes": OrderedDict(),
+            "count": 0,
+        }
+
+    slot_rank = {slot: idx for idx, slot in enumerate(TIME_SLOT_ORDER)}
+    sorted_assignments = sorted(
+        assignments,
+        key=lambda a: (
+            slot_rank.get(a.tutoring_class.time_slot, 999),
+            a.tutoring_class.name,
+            a.subject_template.display_order,
+            a.subject_template.subject_name,
+        )
+    )
+
+    for a in sorted_assignments:
+        slot = a.tutoring_class.time_slot
+        if slot not in grouped_slots:
+            grouped_slots[slot] = {"label": slot, "tone": "default", "classes": OrderedDict(), "count": 0}
+        class_bucket = grouped_slots[slot]["classes"].setdefault(
+            a.tutoring_class_id,
+            {"class": a.tutoring_class, "assignments": []},
+        )
+        class_bucket["assignments"].append({
+            "assignment": a,
+            "previous_update": previous_updates.get(a.subject_template_id),
+            "current_update": current_updates.get(a.id),
+        })
+        grouped_slots[slot]["count"] += 1
+
+    # Hide empty slot headers when filtering by tutor/class leaves no assignments in that slot.
+    return OrderedDict((k, v) for k, v in grouped_slots.items() if v["count"] > 0)
+
+
 def tutor_teaching_update(request: HttpRequest) -> HttpResponse:
     week_start, week_end = _teaching_week_from_request(request)
     _ensure_teaching_assignments(week_start, week_end)
@@ -2427,12 +2478,38 @@ def tutor_teaching_update(request: HttpRequest) -> HttpResponse:
             teaching_date = timezone.localdate()
 
         no_teaching = request.POST.get("no_teaching") == "yes"
-
-        # If "no teaching this week" is selected, keep the last known progress
-        # visible by saving the prefilled values from the form.
         sheet_name = (request.POST.get("sheet_name") or "").strip()
         page_to = (request.POST.get("page_to") or "").strip()
         question_to = (request.POST.get("question_to") or "").strip()
+
+        qs = f"week_start={week_start.isoformat()}"
+        if selected_tutor_id:
+            qs += f"&tutor_id={selected_tutor_id}"
+
+        # Require both page and question for actual teaching updates.
+        # If not applicable, user can enter '-' in either field. If no teaching, allow blank.
+        if not no_teaching and (not page_to or not question_to):
+            qs += "&error=missing_progress"
+            return redirect(f"/tutor-teaching-update/?{qs}#assignment-{assignment.id}")
+
+        # If no teaching, preserve the latest real teaching progress as the visible sheet/page/question.
+        if no_teaching:
+            prev = (
+                TeachingProgressUpdate.objects
+                .filter(
+                    assignment__subject_template_id=assignment.subject_template_id,
+                    assignment__week_start_date__lt=week_start,
+                    no_teaching=False,
+                )
+                .order_by("-teaching_date", "-updated_at")
+                .first()
+            )
+            if prev:
+                sheet_name = prev.sheet_name
+                page_to = prev.page_to
+                question_to = prev.question_to
+            elif not sheet_name:
+                sheet_name = assignment.subject_template.default_sheet_name or ""
 
         updated_by_name = (request.POST.get("updated_by_name") or "").strip()
         if not updated_by_name and assignment.tutor_id:
@@ -2449,9 +2526,6 @@ def tutor_teaching_update(request: HttpRequest) -> HttpResponse:
                 "updated_by_name": updated_by_name,
             },
         )
-        qs = f"week_start={week_start.isoformat()}"
-        if selected_tutor_id:
-            qs += f"&tutor_id={selected_tutor_id}"
         return redirect(f"/tutor-teaching-update/?{qs}#assignment-{assignment.id}")
 
     assignments = (
@@ -2459,7 +2533,6 @@ def tutor_teaching_update(request: HttpRequest) -> HttpResponse:
         .select_related("tutoring_class", "subject_template", "tutor")
         .prefetch_related("progress_updates")
         .filter(week_start_date=week_start)
-        .order_by("tutoring_class__time_slot", "tutoring_class__name", "subject_template__display_order", "subject_template__subject_name")
     )
     if selected_tutor_id:
         assignments = assignments.filter(tutor_id=selected_tutor_id)
@@ -2475,6 +2548,7 @@ def tutor_teaching_update(request: HttpRequest) -> HttpResponse:
             .filter(
                 assignment__subject_template_id__in=template_ids,
                 assignment__week_start_date__lt=week_start,
+                no_teaching=False,
             )
             .order_by("assignment__subject_template_id", "-teaching_date", "-updated_at")
         )
@@ -2492,16 +2566,7 @@ def tutor_teaching_update(request: HttpRequest) -> HttpResponse:
             current_updates.setdefault(upd.assignment_id, upd)
 
     tutor_choices = TeachingTutor.objects.filter(is_active=True).order_by("name")
-
-    grouped_assignments: OrderedDict[int, dict] = OrderedDict()
-    for a in all_assignments:
-        key = a.tutoring_class_id
-        grouped_assignments.setdefault(key, {"class": a.tutoring_class, "assignments": []})
-        grouped_assignments[key]["assignments"].append({
-            "assignment": a,
-            "previous_update": previous_updates.get(a.subject_template_id),
-            "current_update": current_updates.get(a.id),
-        })
+    grouped_slots = _teaching_slot_groups_from_assignments(all_assignments, previous_updates, current_updates)
 
     return render(request, "core/tutor_teaching_update.html", {
         "week_start": week_start,
@@ -2509,19 +2574,20 @@ def tutor_teaching_update(request: HttpRequest) -> HttpResponse:
         "today": timezone.localdate(),
         "tutors": tutor_choices,
         "selected_tutor_id": selected_tutor_id,
-        "grouped_assignments": grouped_assignments,
+        "grouped_slots": grouped_slots,
+        "error_code": (request.GET.get("error") or "").strip(),
     })
+
 
 @login_required
 def teaching_update_report(request: HttpRequest) -> HttpResponse:
     week_start, week_end = _teaching_week_from_request(request)
     _ensure_teaching_assignments(week_start, week_end)
 
-    assignments = (
+    assignments = list(
         TeachingWeeklyAssignment.objects
         .select_related("tutoring_class", "subject_template", "tutor")
         .filter(week_start_date=week_start)
-        .order_by("tutoring_class__name", "subject_template__display_order", "subject_template__subject_name")
     )
 
     updates = {
@@ -2539,6 +2605,32 @@ def teaching_update_report(request: HttpRequest) -> HttpResponse:
             "is_no_teaching": bool(u and u.no_teaching),
         })
 
+    slot_rank = {slot: idx for idx, slot in enumerate(TIME_SLOT_ORDER)}
+    rows.sort(key=lambda r: (
+        slot_rank.get(r["assignment"].tutoring_class.time_slot, 999),
+        r["assignment"].tutoring_class.name,
+        r["assignment"].subject_template.display_order,
+        r["assignment"].subject_template.subject_name,
+    ))
+
+    slot_meta = {
+        TutoringClass.TimeSlot.SAT_MORNING: {"label": "เสาร์เช้า", "tone": "sat-morning"},
+        TutoringClass.TimeSlot.SAT_AFTERNOON: {"label": "เสาร์บ่าย", "tone": "sat-afternoon"},
+        TutoringClass.TimeSlot.SUN_MORNING: {"label": "อาทิตย์เช้า", "tone": "sun-morning"},
+        TutoringClass.TimeSlot.SUN_AFTERNOON: {"label": "อาทิตย์บ่าย", "tone": "sun-afternoon"},
+    }
+    grouped_rows: OrderedDict[str, dict] = OrderedDict()
+    for slot in TIME_SLOT_ORDER:
+        meta = slot_meta.get(slot, {"label": str(slot), "tone": "default"})
+        grouped_rows[slot] = {"label": meta["label"], "tone": meta["tone"], "rows": [], "count": 0}
+    for row in rows:
+        slot = row["assignment"].tutoring_class.time_slot
+        if slot not in grouped_rows:
+            grouped_rows[slot] = {"label": slot, "tone": "default", "rows": [], "count": 0}
+        grouped_rows[slot]["rows"].append(row)
+        grouped_rows[slot]["count"] += 1
+    grouped_rows = OrderedDict((k, v) for k, v in grouped_rows.items() if v["count"] > 0)
+
     total = len(rows)
     done = sum(1 for r in rows if r["is_done"])
     no_teaching = sum(1 for r in rows if r["is_no_teaching"])
@@ -2548,39 +2640,10 @@ def teaching_update_report(request: HttpRequest) -> HttpResponse:
         "week_start": week_start,
         "week_end": week_end,
         "rows": rows,
+        "grouped_rows": grouped_rows,
         "total": total,
         "done": done,
         "taught": taught,
         "no_teaching": no_teaching,
         "pending": total - done,
     })
-
-    assignments = (
-        TeachingWeeklyAssignment.objects
-        .select_related("tutoring_class", "subject_template", "tutor")
-        .filter(week_start_date=week_start)
-        .order_by("tutoring_class__name", "subject_template__display_order", "subject_template__subject_name")
-    )
-
-    updates = {
-        u.assignment_id: u
-        for u in TeachingProgressUpdate.objects.filter(assignment__week_start_date=week_start).order_by("assignment_id", "-teaching_date", "-updated_at")
-    }
-
-    rows = []
-    for a in assignments:
-        u = updates.get(a.id)
-        rows.append({"assignment": a, "update": u, "is_done": bool(u)})
-
-    total = len(rows)
-    done = sum(1 for r in rows if r["is_done"])
-
-    return render(request, "core/teaching_update_report.html", {
-        "week_start": week_start,
-        "week_end": week_end,
-        "rows": rows,
-        "total": total,
-        "done": done,
-        "pending": total - done,
-    })
-

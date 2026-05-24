@@ -1305,14 +1305,81 @@ def _active_enrollments_for_payment(student_id: str | None = None):
 
 
 def _default_payment_form_context(request: HttpRequest, errors: list[str] | None = None, posted: dict | None = None):
-    students = _active_students_for_payment()
-    classes = TutoringClass.objects.filter(is_active=True).order_by("time_slot", "name")
-    selected_student_id = (request.GET.get("student_id") or (posted or {}).get("student_id") or "").strip()
-    enrollments = _active_enrollments_for_payment(selected_student_id or None)
+    students = list(_active_students_for_payment())
+    classes = list(TutoringClass.objects.filter(is_active=True).order_by("time_slot", "name"))
+
+    # For the receipt form we use search boxes instead of long dropdowns.
+    # Keep the queryset unrestricted to active records so the browser can filter instantly.
+    enrollments = list(_active_enrollments_for_payment())
+    admission_inquiries = list(
+        AdmissionInquiry.objects
+        .order_by("-created_at")
+        .only(
+            "id",
+            "nickname",
+            "first_name",
+            "last_name",
+            "school_name",
+            "contact_phone",
+            "grade_level",
+            "preferred_time_slot",
+            "first_lesson_date",
+            "created_at",
+        )[:300]
+    )
+
+    students_lookup_json = [
+        {
+            "id": s.id,
+            "label": f"{s.nickname or '-'} | {s.full_name or '-'} | {s.student_code or '-'} | {s.grade_level or '-'}",
+            "nickname": s.nickname or "",
+            "full_name": s.full_name or "",
+            "student_code": s.student_code or "",
+            "grade_level": s.grade_level or "",
+            "school_name": s.school.name if getattr(s, "school_id", None) and s.school else "",
+            "parent_phone": s.parent_phone or "",
+        }
+        for s in students
+    ]
+
+    enrollments_lookup_json = [
+        {
+            "id": e.id,
+            "student_id": e.student_id,
+            "student_label": f"{e.student.nickname or '-'} | {e.student.full_name or '-'} | {e.student.student_code or '-'}",
+            "label": f"{e.student.nickname or '-'} | {e.student.full_name or '-'} | {e.tutoring_class.name} | {e.sale_run_no or e.id} | คงเหลือ {e.remaining_sessions}",
+            "class_name": e.tutoring_class.name,
+            "sale_run_no": e.sale_run_no or str(e.id),
+            "remaining_sessions": e.remaining_sessions,
+            "course_price": str(e.course_price or e.tutoring_class.course_price or 0),
+        }
+        for e in enrollments
+    ]
+
+    admission_inquiries_lookup_json = [
+        {
+            "id": i.id,
+            "label": f"{i.nickname} | {i.full_name} | {i.get_grade_level_display()} | {i.school_name or '-'} | {i.contact_phone}",
+            "nickname": i.nickname or "",
+            "full_name": i.full_name or "",
+            "grade_level": i.get_grade_level_display() or "",
+            "school_name": i.school_name or "",
+            "parent_phone": i.contact_phone or "",
+            "first_lesson_date": i.first_lesson_date.isoformat() if i.first_lesson_date else "",
+            "preferred_time_slot": i.get_preferred_time_slot_display() if i.preferred_time_slot else "",
+            "created_at": i.created_at.strftime("%Y-%m-%d") if i.created_at else "",
+        }
+        for i in admission_inquiries
+    ]
+
     return {
         "students": students,
         "classes": classes,
         "enrollments": enrollments,
+        "admission_inquiries": admission_inquiries,
+        "students_lookup_json": students_lookup_json,
+        "enrollments_lookup_json": enrollments_lookup_json,
+        "admission_inquiries_lookup_json": admission_inquiries_lookup_json,
         "payment_method_choices": CoursePayment.PaymentMethod.choices,
         "payment_type_choices": CoursePayment.PaymentType.choices,
         "enrollment_action_choices": CoursePayment.EnrollmentAction.choices,
@@ -2119,7 +2186,7 @@ def course_payment_create(request: HttpRequest) -> HttpResponse:
             else:
                 student_id = post.get("student_id")
                 student = Student.objects.filter(id=student_id, is_active=True).first()
-                if not student:
+                if not student and enrollment_action != CoursePayment.EnrollmentAction.ADD_EXISTING:
                     errors.append("กรุณาเลือกนักเรียนเดิม")
 
             selected_class = None
@@ -2128,9 +2195,13 @@ def course_payment_create(request: HttpRequest) -> HttpResponse:
                 existing_enrollment = Enrollment.objects.select_related("student", "tutoring_class").filter(id=post.get("existing_enrollment_id"), is_active=True).first()
                 if not existing_enrollment:
                     errors.append("กรุณาเลือก Enrollment เดิมที่จะเพิ่มจำนวนครั้ง")
-                elif student and existing_enrollment.student_id != student.id:
-                    errors.append("Enrollment เดิมไม่ตรงกับนักเรียนที่เลือก")
                 else:
+                    # In add-existing mode the active enrollment search is the source of truth.
+                    # This makes the flow faster even if the student search box was not selected first.
+                    if not student:
+                        student = existing_enrollment.student
+                    elif existing_enrollment.student_id != student.id:
+                        errors.append("Enrollment เดิมไม่ตรงกับนักเรียนที่เลือก")
                     selected_class = existing_enrollment.tutoring_class
             else:
                 selected_class = TutoringClass.objects.filter(id=post.get("tutoring_class_id"), is_active=True).first()

@@ -609,8 +609,8 @@ class TeachingWeeklyAssignmentAdmin(admin.ModelAdmin):
 
 @admin.register(TeachingProgressUpdate)
 class TeachingProgressUpdateAdmin(admin.ModelAdmin):
-    list_display = ("teaching_date", "class_display", "subject_display", "tutor_display", "status_display", "sheet_name", "page_to", "question_to", "updated_by_name", "updated_at")
-    list_filter = ("teaching_date", "no_teaching", "assignment__tutoring_class", "assignment__tutor")
+    list_display = ("teaching_date", "status_display", "class_display", "subject_display", "tutor_display", "sheet_name", "page_to", "question_to", "updated_by_name", "updated_at")
+    list_filter = ("no_teaching", "teaching_date", "assignment__tutoring_class", "assignment__tutor")
     search_fields = (
         "assignment__tutoring_class__name",
         "assignment__subject_template__subject_name",
@@ -620,6 +620,10 @@ class TeachingProgressUpdateAdmin(admin.ModelAdmin):
     )
     autocomplete_fields = ("assignment",)
     ordering = ("-teaching_date", "-updated_at")
+
+    @admin.display(description="สถานะ")
+    def status_display(self, obj):
+        return "ไม่มีสอน" if getattr(obj, "no_teaching", False) else "บันทึกการสอน"
 
     @admin.display(description="คลาส")
     def class_display(self, obj):
@@ -632,8 +636,4 @@ class TeachingProgressUpdateAdmin(admin.ModelAdmin):
     @admin.display(description="ติวเตอร์")
     def tutor_display(self, obj):
         return obj.assignment.tutor.name if obj.assignment_id and obj.assignment.tutor_id else "-"
-
-    @admin.display(description="สถานะ")
-    def status_display(self, obj):
-        return "ไม่มีสอน" if obj.no_teaching else "บันทึกแล้ว"
 

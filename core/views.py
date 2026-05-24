@@ -2425,9 +2425,15 @@ def tutor_teaching_update(request: HttpRequest) -> HttpResponse:
         teaching_date = _safe_date(request.POST.get("teaching_date")) if "_safe_date" in globals() else None
         if not teaching_date:
             teaching_date = timezone.localdate()
+
+        no_teaching = request.POST.get("no_teaching") == "yes"
+
+        # If "no teaching this week" is selected, keep the last known progress
+        # visible by saving the prefilled values from the form.
         sheet_name = (request.POST.get("sheet_name") or "").strip()
         page_to = (request.POST.get("page_to") or "").strip()
         question_to = (request.POST.get("question_to") or "").strip()
+
         updated_by_name = (request.POST.get("updated_by_name") or "").strip()
         if not updated_by_name and assignment.tutor_id:
             updated_by_name = assignment.tutor.name
@@ -2439,6 +2445,7 @@ def tutor_teaching_update(request: HttpRequest) -> HttpResponse:
                 "sheet_name": sheet_name,
                 "page_to": page_to,
                 "question_to": question_to,
+                "no_teaching": no_teaching,
                 "updated_by_name": updated_by_name,
             },
         )
@@ -2505,11 +2512,48 @@ def tutor_teaching_update(request: HttpRequest) -> HttpResponse:
         "grouped_assignments": grouped_assignments,
     })
 
-
 @login_required
 def teaching_update_report(request: HttpRequest) -> HttpResponse:
     week_start, week_end = _teaching_week_from_request(request)
     _ensure_teaching_assignments(week_start, week_end)
+
+    assignments = (
+        TeachingWeeklyAssignment.objects
+        .select_related("tutoring_class", "subject_template", "tutor")
+        .filter(week_start_date=week_start)
+        .order_by("tutoring_class__name", "subject_template__display_order", "subject_template__subject_name")
+    )
+
+    updates = {
+        u.assignment_id: u
+        for u in TeachingProgressUpdate.objects.filter(assignment__week_start_date=week_start).order_by("assignment_id", "-teaching_date", "-updated_at")
+    }
+
+    rows = []
+    for a in assignments:
+        u = updates.get(a.id)
+        rows.append({
+            "assignment": a,
+            "update": u,
+            "is_done": bool(u),
+            "is_no_teaching": bool(u and u.no_teaching),
+        })
+
+    total = len(rows)
+    done = sum(1 for r in rows if r["is_done"])
+    no_teaching = sum(1 for r in rows if r["is_no_teaching"])
+    taught = done - no_teaching
+
+    return render(request, "core/teaching_update_report.html", {
+        "week_start": week_start,
+        "week_end": week_end,
+        "rows": rows,
+        "total": total,
+        "done": done,
+        "taught": taught,
+        "no_teaching": no_teaching,
+        "pending": total - done,
+    })
 
     assignments = (
         TeachingWeeklyAssignment.objects

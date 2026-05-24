@@ -1114,8 +1114,8 @@ class TeachingProgressUpdate(models.Model):
             parts.append(f"หน้า {self.page_to}")
         if self.question_to:
             parts.append(f"ข้อ {self.question_to}")
-        return " / ".join(parts) if parts else "-"
+        text = " / ".join(parts) if parts else "-"
+        if self.no_teaching:
+            return f"สัปดาห์นี้ไม่มีสอน · ข้อมูลล่าสุด: {text}"
+        return text
 
-    @property
-    def status_text(self) -> str:
-        return "สัปดาห์นี้ไม่มีสอน" if self.no_teaching else "บันทึกแล้ว"

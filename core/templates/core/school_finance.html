@@ -729,6 +729,7 @@
       </div>
       <div class="hero-actions">
         <a class="btnx soft-hero" href="/pkanoon-admin-tool/">← Admin Tool</a>
+        <a class="btnx soft-hero" href="/course-payments/">🧾 รับชำระ/ใบเสร็จ</a>
         <a class="btnx soft-hero" href="/school-overview/">📊 ภาพรวมโรงเรียน</a>
       </div>
     </div>
@@ -760,6 +761,14 @@
     <div class="metric good">
       <div class="metric-top"><div class="k">รายได้ประมาณการ</div><div class="metric-icon">฿</div></div>
       <div class="v">{{ estimated_revenue|floatformat:0 }}</div>
+    </div>
+    <div class="metric good">
+      <div class="metric-top"><div class="k">รายได้เงินสดจากใบเสร็จ</div><div class="metric-icon">🧾</div></div>
+      <div class="v">{{ cash_revenue_total|floatformat:0 }}</div>
+    </div>
+    <div class="metric {% if net_cash_basis >= 0 %}good{% else %}bad{% endif %}">
+      <div class="metric-top"><div class="k">Net Cash Basis</div><div class="metric-icon">💵</div></div>
+      <div class="v">{{ net_cash_basis|floatformat:0 }}</div>
     </div>
     <div class="metric bad">
       <div class="metric-top"><div class="k">ค่าใช้จ่ายทั่วไป</div><div class="metric-icon">🧾</div></div>

@@ -1,2 +1,159 @@
 {% load static %}
-<!doctype html><html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Receipt {{ payment.receipt_no }}</title><script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script><style>*{box-sizing:border-box}body{margin:0;background:#e0f2fe;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#0f172a}.page{min-height:100vh;padding:18px;display:grid;place-items:start center;gap:12px}.toolbar{width:min(100%,520px);display:flex;gap:8px;flex-wrap:wrap;justify-content:center}.btn{border:0;border-radius:999px;padding:11px 15px;font-weight:1000;cursor:pointer;background:#0f172a;color:#fff}.btn.soft{background:#fff;color:#0f172a;border:1px solid #cbd5e1}.receipt{width:420px;max-width:100%;background:#fff;border-radius:28px;padding:22px;box-shadow:0 16px 40px rgba(15,23,42,.20);border:1px solid rgba(255,255,255,.9)}.top{text-align:center;border-bottom:2px dashed #e2e8f0;padding-bottom:14px}.logo{max-height:86px;max-width:210px;object-fit:contain}.company{font-size:20px;font-weight:1000;margin-top:8px}.doc{font-size:28px;font-weight:1000;margin-top:10px;color:#2563eb}.receipt-no{display:inline-flex;margin-top:8px;border-radius:999px;background:#eff6ff;border:1px solid #bfdbfe;color:#1d4ed8;padding:6px 12px;font-weight:1000}.status-cancel{background:#fee2e2;color:#991b1b;border:1px solid #fecaca}.info{margin-top:15px;display:grid;gap:8px}.row{display:flex;justify-content:space-between;gap:12px;border-bottom:1px solid #f1f5f9;padding:7px 0}.label{color:#64748b;font-size:13px;font-weight:900}.value{text-align:right;font-weight:1000}.amount-box{margin-top:16px;background:linear-gradient(135deg,#dcfce7,#f0fdf4);border:1px solid #bbf7d0;border-radius:22px;padding:16px;text-align:center}.amount-label{color:#166534;font-size:13px;font-weight:1000}.amount{font-size:36px;font-weight:1000;color:#15803d;letter-spacing:-.04em}.note{margin-top:14px;border-radius:16px;background:#f8fafc;border:1px solid #e2e8f0;padding:11px;color:#475569;font-size:12px;line-height:1.5}.foot{text-align:center;margin-top:14px;color:#64748b;font-size:12px;font-weight:800}@media(max-width:480px){.page{padding:10px}.receipt{border-radius:22px;padding:18px}.doc{font-size:24px}.amount{font-size:30px}.toolbar{position:sticky;top:6px;z-index:5}.btn{flex:1}}</style></head><body><div class="page"><div class="toolbar"><button class="btn" onclick="openImage()">Open Image in New Tab</button><button class="btn" onclick="copyImage()">Copy Image</button><button class="btn soft" onclick="downloadImage()">Download PNG</button></div><div id="receipt" class="receipt"><div class="top"><img class="logo" src="{% static 'core/logo2.png' %}" alt="logo"><div class="company">หจก.พี่ขนุนติวเตอร์</div><div class="doc">ใบเสร็จรับเงิน</div><div class="receipt-no {% if payment.status == 'cancelled' %}status-cancel{% endif %}">{{ payment.receipt_no }}{% if payment.status == 'cancelled' %} · ยกเลิก{% endif %}</div></div><div class="info"><div class="row"><div class="label">วันที่รับเงิน</div><div class="value">{{ payment.payment_date|date:"d/m/Y" }}</div></div><div class="row"><div class="label">นักเรียน</div><div class="value">{{ payment.student.display_name }}</div></div><div class="row"><div class="label">Class</div><div class="value">{{ payment.tutoring_class.name }}</div></div><div class="row"><div class="label">จำนวนครั้ง</div><div class="value">{{ payment.sessions_granted }} ครั้ง</div></div><div class="row"><div class="label">ราคาคอร์ส</div><div class="value">{{ payment.course_price|floatformat:2 }}</div></div><div class="row"><div class="label">ส่วนลด</div><div class="value">{{ payment.discount_amount|floatformat:2 }}</div></div><div class="row"><div class="label">วิธีชำระเงิน</div><div class="value">{{ payment.get_payment_method_display }}</div></div></div><div class="amount-box"><div class="amount-label">ยอดรับชำระ</div><div class="amount">฿{{ payment.amount_paid|floatformat:2 }}</div></div>{% if payment.note %}<div class="note">หมายเหตุ: {{ payment.note }}</div>{% endif %}<div class="foot">ขอบคุณที่ไว้วางใจพี่ขนุนติวเตอร์</div></div></div><script>async function makeCanvas(){const el=document.getElementById('receipt');return await html2canvas(el,{scale:3,useCORS:true,backgroundColor:null});}async function openImage(){const canvas=await makeCanvas();canvas.toBlob(blob=>{const url=URL.createObjectURL(blob);window.open(url,'_blank');});}async function copyImage(){try{const canvas=await makeCanvas();canvas.toBlob(async blob=>{await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]);alert('Copy รูปใบเสร็จแล้ว');});}catch(e){alert('Browser นี้อาจไม่รองรับ Copy Image ให้ใช้ Open Image แล้วกดค้าง/คลิกขวา copy แทน');}}async function downloadImage(){const canvas=await makeCanvas();const a=document.createElement('a');a.download='receipt-{{ payment.receipt_no }}.png';a.href=canvas.toDataURL('image/png');a.click();}</script></body></html>
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>Receipt {{ payment.receipt_no }}</title>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <style>
+    *{box-sizing:border-box;}
+    body{margin:0;background:#e5eef8;font-family:"TH Sarabun New",Tahoma,Arial,sans-serif;color:#111827;}
+    .page{min-height:100vh;padding:12px;display:grid;place-items:start center;gap:10px;}
+    .toolbar{width:min(100%,440px);display:flex;gap:8px;flex-wrap:wrap;justify-content:center;position:sticky;top:8px;z-index:10;}
+    .btn{border:0;border-radius:999px;padding:10px 13px;font-weight:1000;cursor:pointer;background:#0f172a;color:#fff;box-shadow:0 4px 10px rgba(15,23,42,.18);}
+    .btn.soft{background:#fff;color:#0f172a;border:1px solid #cbd5e1;}
+    .receipt-shell{width:min(100%,440px);}
+    .receipt{background:#fff;border-radius:18px;box-shadow:0 18px 46px rgba(15,23,42,.22);border:1px solid #d6dde8;overflow:hidden;}
+    .receipt-inner{padding:18px 18px 16px;}
+    .top-band{height:9px;background:linear-gradient(90deg,#0f172a,#1d4ed8,#0f172a);}
+    .company-head{display:grid;grid-template-columns:82px 1fr;gap:12px;align-items:center;border-bottom:2px solid #0f172a;padding-bottom:11px;}
+    .logo-box{border:1px solid #e2e8f0;border-radius:14px;padding:7px;background:#fff;display:flex;align-items:center;justify-content:center;min-height:76px;}
+    .logo{max-width:66px;max-height:62px;object-fit:contain;}
+    .company-name{font-size:20px;font-weight:1000;letter-spacing:-.02em;color:#0f172a;line-height:1.15;}
+    .company-meta{margin-top:5px;font-size:11px;color:#334155;line-height:1.42;font-weight:800;}
+    .doc-row{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-top:13px;}
+    .doc-title{font-size:28px;font-weight:1000;color:#0f172a;letter-spacing:.02em;}
+    .receipt-no{display:inline-grid;gap:2px;text-align:right;border:1px solid #cbd5e1;border-radius:12px;padding:8px 10px;background:#f8fafc;min-width:128px;}
+    .receipt-no span{font-size:10px;color:#64748b;font-weight:1000;text-transform:uppercase;letter-spacing:.06em;}
+    .receipt-no b{font-size:16px;color:#1d4ed8;font-weight:1000;}
+    .status-cancel{background:#fef2f2!important;border-color:#fecaca!important;}.status-cancel b{color:#991b1b!important;}
+    .info-grid{margin-top:12px;border:1px solid #dbe3ef;border-radius:14px;overflow:hidden;}
+    .info-row{display:grid;grid-template-columns:116px 1fr;border-bottom:1px solid #edf2f7;min-height:38px;}
+    .info-row:last-child{border-bottom:0;}
+    .label{background:#f8fafc;color:#475569;font-size:12px;font-weight:1000;padding:9px 10px;border-right:1px solid #edf2f7;}
+    .value{padding:9px 10px;font-size:13px;font-weight:900;color:#0f172a;text-align:right;line-height:1.35;}
+    .item-table{margin-top:12px;border:1px solid #dbe3ef;border-radius:14px;overflow:hidden;}
+    .item-head,.item-row,.item-total{display:grid;grid-template-columns:1fr 72px 96px;align-items:stretch;}
+    .item-head div{background:#0f172a;color:#fff;font-size:11px;font-weight:1000;padding:8px 9px;}
+    .item-row div{font-size:13px;font-weight:850;padding:10px 9px;border-bottom:1px solid #edf2f7;line-height:1.35;}
+    .item-row div:not(:last-child),.item-head div:not(:last-child),.item-total div:not(:last-child){border-right:1px solid #edf2f7;}
+    .num{text-align:right;}
+    .item-total div{font-size:13px;font-weight:1000;padding:9px;border-top:1px solid #dbe3ef;background:#f8fafc;}
+    .item-total.grand div{font-size:16px;background:#eff6ff;color:#1d4ed8;}
+    .paid-box{margin-top:12px;border:2px solid #0f172a;border-radius:16px;padding:12px;text-align:center;background:linear-gradient(180deg,#fff,#f8fafc);}
+    .paid-label{font-size:12px;font-weight:1000;color:#475569;text-transform:uppercase;letter-spacing:.06em;}
+    .paid-amount{font-size:34px;line-height:1.05;font-weight:1000;color:#0f172a;letter-spacing:-.04em;margin-top:3px;}
+    .note{margin-top:10px;border:1px dashed #cbd5e1;border-radius:14px;background:#f8fafc;padding:9px;color:#475569;font-size:12px;line-height:1.45;font-weight:800;}
+    .foot{border-top:1px solid #e2e8f0;margin-top:13px;padding-top:10px;text-align:center;color:#64748b;font-size:11px;font-weight:800;line-height:1.45;}
+    @media(max-width:480px){
+      .page{padding:8px;background:#fff;}
+      .toolbar{width:100%;top:4px;}
+      .btn{flex:1;padding:9px 8px;font-size:12px;}
+      .receipt-shell{width:100%;}
+      .receipt{border-radius:0;box-shadow:none;border:0;min-height:calc(100vh - 60px);}
+      .receipt-inner{padding:13px;}
+      .company-head{grid-template-columns:66px 1fr;gap:9px;}
+      .logo-box{min-height:62px;border-radius:12px;}.logo{max-width:54px;max-height:50px;}
+      .company-name{font-size:18px;}.company-meta{font-size:10px;}
+      .doc-title{font-size:24px;}.receipt-no{min-width:112px;padding:7px 8px;}
+      .info-row{grid-template-columns:100px 1fr;min-height:34px;}.label,.value{font-size:11px;padding:8px;}
+      .item-head,.item-row,.item-total{grid-template-columns:1fr 54px 82px;}.item-row div,.item-total div{font-size:11px;padding:8px 7px;}.item-total.grand div{font-size:14px;}
+      .paid-amount{font-size:30px;}
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="toolbar">
+      <button class="btn" onclick="openImage()">Open Image</button>
+      <button class="btn" onclick="copyImage()">Copy Image</button>
+      <button class="btn soft" onclick="downloadImage()">Download PNG</button>
+    </div>
+
+    <div class="receipt-shell">
+      <div id="receipt" class="receipt">
+        <div class="top-band"></div>
+        <div class="receipt-inner">
+          <div class="company-head">
+            <div class="logo-box"><img class="logo" src="{% static 'core/logo2.png' %}" alt="logo"></div>
+            <div>
+              <div class="company-name">หจก.พี่ขนุนติวเตอร์</div>
+              <div class="company-meta">
+                เลขทะเบียนผู้เสียภาษี 0113567002774<br>
+                ตำบลสำโรงเหนือ อำเภอเมืองสมุทรปราการ จ.สมุทรปราการ 10270
+              </div>
+            </div>
+          </div>
+
+          <div class="doc-row">
+            <div class="doc-title">ใบเสร็จรับเงิน</div>
+            <div class="receipt-no {% if payment.status == 'cancelled' %}status-cancel{% endif %}">
+              <span>Receipt No.</span>
+              <b>{{ payment.receipt_no }}{% if payment.status == 'cancelled' %} · ยกเลิก{% endif %}</b>
+            </div>
+          </div>
+
+          <div class="info-grid">
+            <div class="info-row"><div class="label">วันที่รับเงิน</div><div class="value">{{ payment.payment_date|date:"d/m/Y" }}</div></div>
+            <div class="info-row"><div class="label">ได้รับจาก</div><div class="value">{{ payment.student.full_name|default:payment.student.display_name }}</div></div>
+            <div class="info-row"><div class="label">ชื่อเล่น</div><div class="value">{{ payment.student.nickname|default:"-" }}</div></div>
+            <div class="info-row"><div class="label">ระดับชั้น</div><div class="value">{{ payment.student.grade_level|default:"-" }}</div></div>
+            <div class="info-row"><div class="label">วิธีชำระเงิน</div><div class="value">{{ payment.get_payment_method_display }}</div></div>
+          </div>
+
+          <div class="item-table">
+            <div class="item-head"><div>รายการ</div><div class="num">จำนวน</div><div class="num">ยอดเงิน</div></div>
+            <div class="item-row">
+              <div>ค่าเรียน {{ payment.tutoring_class.name }}</div>
+              <div class="num">{{ payment.sessions_granted }} ครั้ง</div>
+              <div class="num">{{ payment.course_price|floatformat:2 }}</div>
+            </div>
+            <div class="item-total"><div>ส่วนลด</div><div></div><div class="num">{{ payment.discount_amount|floatformat:2 }}</div></div>
+            <div class="item-total grand"><div>ยอดสุทธิ</div><div></div><div class="num">{{ payment.net_amount|floatformat:2 }}</div></div>
+          </div>
+
+          <div class="paid-box">
+            <div class="paid-label">ยอดรับชำระ</div>
+            <div class="paid-amount">฿{{ payment.amount_paid|floatformat:2 }}</div>
+          </div>
+
+          {% if payment.note %}<div class="note">หมายเหตุ: {{ payment.note }}</div>{% endif %}
+          <div class="foot">ขอบคุณที่ไว้วางใจพี่ขนุนติวเตอร์ · เอกสารนี้ออกโดยระบบ Lookmak System</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+async function makeCanvas(){
+  const node=document.getElementById('receipt');
+  return await html2canvas(node,{scale:3,useCORS:true,backgroundColor:'#ffffff'});
+}
+async function openImage(){
+  const canvas=await makeCanvas();
+  const url=canvas.toDataURL('image/png');
+  const w=window.open('');
+  w.document.write('<title>Receipt {{ payment.receipt_no }}</title><body style="margin:0;background:#111;display:grid;place-items:center;min-height:100vh;"><img src="'+url+'" style="max-width:100%;height:auto;"></body>');
+}
+async function downloadImage(){
+  const canvas=await makeCanvas();
+  const a=document.createElement('a');
+  a.download='receipt_{{ payment.receipt_no }}.png';
+  a.href=canvas.toDataURL('image/png');
+  a.click();
+}
+async function copyImage(){
+  try{
+    const canvas=await makeCanvas();
+    canvas.toBlob(async blob=>{
+      await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]);
+      alert('Copy รูปใบเสร็จแล้ว');
+    });
+  }catch(e){
+    alert('Browser นี้ copy รูปไม่ได้ ให้ใช้ Open Image หรือ Download PNG แทน');
+  }
+}
+</script>
+</body>
+</html>

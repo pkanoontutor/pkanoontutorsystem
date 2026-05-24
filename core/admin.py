@@ -20,6 +20,10 @@ from .models import (
     Tutor,
     TutorPayrollEntry,
     CoursePayment,
+    TeachingTutor,
+    TeachingClassSubjectTemplate,
+    TeachingWeeklyAssignment,
+    TeachingProgressUpdate,
 )
 
 
@@ -569,3 +573,63 @@ class CoursePaymentAdmin(admin.ModelAdmin):
             )
         }),
     )
+
+# =========================================================
+# Tutor Teaching Update Module
+# =========================================================
+@admin.register(TeachingTutor)
+class TeachingTutorAdmin(admin.ModelAdmin):
+    list_display = ("name", "phone", "is_active", "updated_at")
+    search_fields = ("name", "phone")
+    list_filter = ("is_active",)
+    ordering = ("name",)
+
+
+@admin.register(TeachingClassSubjectTemplate)
+class TeachingClassSubjectTemplateAdmin(admin.ModelAdmin):
+    list_display = ("tutoring_class", "subject_name", "default_sheet_name", "display_order", "is_active")
+    list_filter = ("tutoring_class", "is_active")
+    search_fields = ("tutoring_class__name", "subject_name", "default_sheet_name")
+    autocomplete_fields = ("tutoring_class",)
+    ordering = ("tutoring_class__name", "display_order", "subject_name")
+
+
+@admin.register(TeachingWeeklyAssignment)
+class TeachingWeeklyAssignmentAdmin(admin.ModelAdmin):
+    list_display = ("week_start_date", "week_end_date", "tutoring_class", "subject_display", "tutor", "updated_at")
+    list_filter = ("week_start_date", "tutoring_class", "tutor")
+    search_fields = ("tutoring_class__name", "subject_template__subject_name", "tutor__name")
+    autocomplete_fields = ("tutoring_class", "subject_template", "tutor")
+    ordering = ("-week_start_date", "tutoring_class__name", "subject_template__display_order")
+
+    @admin.display(description="วิชา")
+    def subject_display(self, obj):
+        return obj.subject_template.subject_name if obj.subject_template_id else "-"
+
+
+@admin.register(TeachingProgressUpdate)
+class TeachingProgressUpdateAdmin(admin.ModelAdmin):
+    list_display = ("teaching_date", "class_display", "subject_display", "tutor_display", "sheet_name", "page_to", "question_to", "updated_by_name", "updated_at")
+    list_filter = ("teaching_date", "assignment__tutoring_class", "assignment__tutor")
+    search_fields = (
+        "assignment__tutoring_class__name",
+        "assignment__subject_template__subject_name",
+        "assignment__tutor__name",
+        "sheet_name",
+        "updated_by_name",
+    )
+    autocomplete_fields = ("assignment",)
+    ordering = ("-teaching_date", "-updated_at")
+
+    @admin.display(description="คลาส")
+    def class_display(self, obj):
+        return obj.assignment.tutoring_class.name if obj.assignment_id else "-"
+
+    @admin.display(description="วิชา")
+    def subject_display(self, obj):
+        return obj.assignment.subject_template.subject_name if obj.assignment_id else "-"
+
+    @admin.display(description="ติวเตอร์")
+    def tutor_display(self, obj):
+        return obj.assignment.tutor.name if obj.assignment_id and obj.assignment.tutor_id else "-"
+

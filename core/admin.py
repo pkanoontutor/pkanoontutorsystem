@@ -376,6 +376,8 @@ class AdmissionInquiryAdmin(admin.ModelAdmin):
         "sheet_prepared",
         "trial_attended",
         "trial_result",
+        "is_completed",
+        "completed_at",
     )
     list_filter = (
         "request_type",
@@ -385,6 +387,7 @@ class AdmissionInquiryAdmin(admin.ModelAdmin):
         "sheet_prepared",
         "trial_attended",
         "trial_result",
+        "is_completed",
     )
     search_fields = (
         "nickname",
@@ -393,7 +396,7 @@ class AdmissionInquiryAdmin(admin.ModelAdmin):
         "school_name",
         "contact_phone",
     )
-    readonly_fields = ("created_at", "updated_at")
+    readonly_fields = ("created_at", "updated_at", "completed_at")
     ordering = ("-created_at",)
     list_per_page = 50
 
@@ -418,6 +421,8 @@ class AdmissionInquiryAdmin(admin.ModelAdmin):
                 "trial_attended",
                 "trial_result",
                 "internal_note",
+                "is_completed",
+                "completed_at",
             )
         }),
         ("ระบบ", {

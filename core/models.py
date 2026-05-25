@@ -797,6 +797,9 @@ class AdmissionInquiry(models.Model):
     )
     internal_note = models.TextField("หมายเหตุภายใน", blank=True)
 
+    is_completed = models.BooleanField("ดำเนินการเสร็จแล้ว", default=False)
+    completed_at = models.DateTimeField("วันที่ดำเนินการเสร็จ", null=True, blank=True)
+
     created_at = models.DateTimeField("วันที่ลงทะเบียน", default=timezone.now)
     updated_at = models.DateTimeField("อัปเดตล่าสุด", auto_now=True)
 

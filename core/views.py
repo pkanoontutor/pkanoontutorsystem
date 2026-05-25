@@ -1047,6 +1047,7 @@ def admission_report(request: HttpRequest) -> HttpResponse:
     sheet_prepared = (request.GET.get("sheet_prepared") or "").strip()
     trial_attended = (request.GET.get("trial_attended") or "").strip()
     trial_result = (request.GET.get("trial_result") or "").strip()
+    completed_status = (request.GET.get("completed_status") or "open").strip()
     date_from = (request.GET.get("date_from") or "").strip()
     date_to = (request.GET.get("date_to") or "").strip()
 
@@ -1073,6 +1074,13 @@ def admission_report(request: HttpRequest) -> HttpResponse:
         qs = qs.filter(trial_attended=trial_attended)
     if trial_result:
         qs = qs.filter(trial_result=trial_result)
+    if completed_status == "completed":
+        qs = qs.filter(is_completed=True)
+    elif completed_status == "all":
+        pass
+    else:
+        completed_status = "open"
+        qs = qs.filter(is_completed=False)
     if date_from:
         try:
             qs = qs.filter(first_lesson_date__gte=date.fromisoformat(date_from))
@@ -1085,19 +1093,52 @@ def admission_report(request: HttpRequest) -> HttpResponse:
             pass
 
     stats_base = AdmissionInquiry.objects.all()
+    open_base = stats_base.filter(is_completed=False)
+    completed_base = stats_base.filter(is_completed=True)
     stats = {
         "total": stats_base.count(),
-        "trial": stats_base.filter(request_type=AdmissionInquiry.RequestType.TRIAL).count(),
-        "enroll": stats_base.filter(request_type=AdmissionInquiry.RequestType.ENROLL).count(),
-        "sheet_ready": stats_base.filter(sheet_prepared=True).count(),
-        "trial_attended": stats_base.filter(trial_attended=AdmissionInquiry.TrialAttended.YES).count(),
-        "trial_enrolled": stats_base.filter(trial_result=AdmissionInquiry.TrialResult.ENROLLED).count(),
+        "open_total": open_base.count(),
+        "completed_total": completed_base.count(),
+        "trial": open_base.filter(request_type=AdmissionInquiry.RequestType.TRIAL).count(),
+        "enroll": open_base.filter(request_type=AdmissionInquiry.RequestType.ENROLL).count(),
+        "queue": open_base.filter(request_type=AdmissionInquiry.RequestType.QUEUE).count(),
+        "sheet_ready": open_base.filter(sheet_prepared=True).count(),
+        "trial_attended": open_base.filter(trial_attended=AdmissionInquiry.TrialAttended.YES).count(),
+        "trial_enrolled": open_base.filter(trial_result=AdmissionInquiry.TrialResult.ENROLLED).count(),
     }
 
-    inquiries = qs.order_by("first_lesson_date", "-created_at")
+    inquiries = qs.order_by("is_completed", "first_lesson_date", "-created_at")
+    active_qs = inquiries.filter(is_completed=False)
+    completed_qs = inquiries.filter(is_completed=True).order_by("-completed_at", "-updated_at", "-created_at")
+
+    inquiry_groups = [
+        {
+            "key": "trial",
+            "title": "จองทดลองเรียน",
+            "icon": "🧪",
+            "color": "blue",
+            "items": active_qs.filter(request_type=AdmissionInquiry.RequestType.TRIAL),
+        },
+        {
+            "key": "enroll",
+            "title": "สมัครเรียน",
+            "icon": "📚",
+            "color": "green",
+            "items": active_qs.filter(request_type=AdmissionInquiry.RequestType.ENROLL),
+        },
+        {
+            "key": "queue",
+            "title": "จองที่นั่งล่วงหน้า",
+            "icon": "📌",
+            "color": "orange",
+            "items": active_qs.filter(request_type=AdmissionInquiry.RequestType.QUEUE),
+        },
+    ]
 
     return render(request, "core/admission_report.html", {
         "inquiries": inquiries,
+        "inquiry_groups": inquiry_groups,
+        "completed_inquiries": completed_qs,
         "stats": stats,
         "filters": {
             "q": q,
@@ -1107,6 +1148,7 @@ def admission_report(request: HttpRequest) -> HttpResponse:
             "sheet_prepared": sheet_prepared,
             "trial_attended": trial_attended,
             "trial_result": trial_result,
+            "completed_status": completed_status,
             "date_from": date_from,
             "date_to": date_to,
         },
@@ -1128,6 +1170,7 @@ def admission_report_update(request: HttpRequest) -> HttpResponse:
     trial_attended = request.POST.get("trial_attended")
     trial_result = request.POST.get("trial_result")
     internal_note = request.POST.get("internal_note")
+    is_completed_raw = request.POST.get("is_completed")
 
     inquiry.sheet_prepared = sheet_prepared == "yes"
 
@@ -1141,9 +1184,17 @@ def admission_report_update(request: HttpRequest) -> HttpResponse:
     if internal_note is not None:
         inquiry.internal_note = internal_note.strip()
 
+    new_completed = is_completed_raw == "yes"
+    if new_completed and not inquiry.is_completed:
+        inquiry.completed_at = timezone.now()
+    elif not new_completed:
+        inquiry.completed_at = None
+    inquiry.is_completed = new_completed
+
     inquiry.save()
 
     return redirect(request.META.get("HTTP_REFERER", "core:admission_report"))
+
 
 # =========================================================
 # ✅ School Overview / Finance helpers

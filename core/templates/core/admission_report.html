@@ -4,428 +4,102 @@
 
 {% block head %}
 <style>
-  .report-wrap{display:grid;gap:14px;}
-  .report-head{
-    display:flex;
-    justify-content:space-between;
-    align-items:flex-start;
-    gap:12px;
-    flex-wrap:wrap;
-  }
-  .title-box h1{margin:0;font-size:26px;color:#0f172a;}
-  .title-box .muted{font-size:13px;color:#64748b;margin-top:4px;}
-  .btn-report{
-    border:0;
-    border-radius:12px;
-    padding:10px 14px;
-    font-weight:900;
-    text-decoration:none;
-    cursor:pointer;
-    display:inline-flex;
-    align-items:center;
-    justify-content:center;
-    gap:6px;
-    transition:.12s;
-  }
+  .report-wrap{display:grid;gap:14px;max-width:1500px;margin:0 auto;}
+  .report-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;}
+  .title-box h1{margin:0;font-size:26px;color:#0f172a;letter-spacing:-.03em;}
+  .title-box .muted{font-size:13px;color:#64748b;margin-top:4px;line-height:1.55;}
+  .btn-report{border:0;border-radius:12px;padding:10px 14px;font-weight:900;text-decoration:none;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;transition:.12s;}
   .btn-report:hover{transform:translateY(-1px);box-shadow:0 4px 10px rgba(0,0,0,.12);}
-  .btn-orange{background:#f97316;color:#fff;}
-  .btn-dark{background:#0f172a;color:#fff;}
-  .btn-light{background:#f8fafc;color:#0f172a;border:1px solid #e2e8f0;}
-  .stat-grid{
-    display:grid;
-    grid-template-columns:repeat(6, minmax(120px, 1fr));
-    gap:10px;
-  }
-  .stat{
-    background:#fff;
-    border-radius:16px;
-    padding:13px;
-    border:1px solid #e5e7eb;
-    box-shadow:0 3px 8px rgba(0,0,0,.06);
-  }
-  .stat .num{font-size:24px;font-weight:1000;color:#111827;line-height:1;}
-  .stat .label{font-size:12px;color:#64748b;font-weight:800;margin-top:6px;}
-  .filter-grid{
-    display:grid;
-    grid-template-columns:1.4fr repeat(4, 1fr);
-    gap:10px;
-  }
-  .filter-grid .field{display:flex;flex-direction:column;gap:5px;}
-  .filter-grid label{font-size:12px;font-weight:900;color:#475569;}
-  .filter-grid input,.filter-grid select{
-    border:1px solid #e2e8f0;
-    border-radius:11px;
-    padding:9px 10px;
-    font-weight:700;
-    background:#fff;
-    min-width:0;
-  }
+  .btn-orange{background:#f97316;color:#fff;}.btn-dark{background:#0f172a;color:#fff;}.btn-light{background:#f8fafc;color:#0f172a;border:1px solid #e2e8f0;}.btn-blue{background:#2563eb;color:#fff;}.btn-green{background:#16a34a;color:#fff;}
+  .stat-grid{display:grid;grid-template-columns:repeat(7,minmax(110px,1fr));gap:10px;}
+  .stat{background:#fff;border-radius:16px;padding:13px;border:1px solid #e5e7eb;box-shadow:0 3px 8px rgba(0,0,0,.06);}
+  .stat .num{font-size:24px;font-weight:1000;color:#111827;line-height:1;}.stat .label{font-size:12px;color:#64748b;font-weight:800;margin-top:6px;line-height:1.35;}
+  .filter-grid{display:grid;grid-template-columns:1.5fr repeat(5,1fr);gap:10px;align-items:end;}
+  .filter-grid .field{display:flex;flex-direction:column;gap:5px;}.filter-grid label{font-size:12px;font-weight:900;color:#475569;}
+  .filter-grid input,.filter-grid select{border:1px solid #e2e8f0;border-radius:11px;padding:9px 10px;font-weight:700;background:#fff;min-width:0;}
   .filter-actions{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;}
-  .table-wrap{
-    overflow-x:auto;
-    border:1px solid #e5e7eb;
-    border-radius:16px;
-    background:#fff;
-  }
-  .report-table{
-    min-width:1380px;
-    width:100%;
-    border-collapse:separate;
-    border-spacing:0;
-    font-size:13px;
-  }
-  .report-table th{
-    position:sticky;
-    top:0;
-    z-index:2;
-    background:#f8fafc;
-    color:#475569;
-    font-size:11px;
-    text-transform:uppercase;
-    letter-spacing:.04em;
-    padding:10px 9px;
-    border-bottom:1px solid #e5e7eb;
-    white-space:nowrap;
-  }
-  .report-table td{
-    padding:10px 9px;
-    border-bottom:1px solid #f1f5f9;
-    vertical-align:top;
-  }
-  .report-table tr:hover td{background:#fafafa;}
-  .badge2{
-    display:inline-flex;
-    align-items:center;
-    justify-content:center;
-    padding:4px 9px;
-    border-radius:999px;
-    font-size:12px;
-    font-weight:900;
-    white-space:nowrap;
-    border:1px solid transparent;
-  }
-  .b-trial{background:#eff6ff;color:#1d4ed8;border-color:#bfdbfe;}
-  .b-enroll{background:#f0fdf4;color:#15803d;border-color:#bbf7d0;}
-  .b-ready{background:#dcfce7;color:#166534;border-color:#86efac;}
-  .b-notready{background:#fee2e2;color:#991b1b;border-color:#fecaca;}
-  .b-pending{background:#f8fafc;color:#64748b;border-color:#e2e8f0;}
-  .b-warn{background:#fffbeb;color:#92400e;border-color:#fde68a;}
-  .mini{
-    font-size:12px;
-    color:#64748b;
-    margin-top:3px;
-    line-height:1.4;
-  }
-  .inline-form{
-    display:grid;
-    gap:7px;
-    min-width:290px;
-  }
-  .inline-form-row{
-    display:grid;
-    grid-template-columns:92px 1fr;
-    gap:6px;
-    align-items:center;
-  }
-  .inline-form label{
-    font-size:11px;
-    color:#475569;
-    font-weight:900;
-  }
-  .inline-form select,.inline-form textarea{
-    width:100%;
-    border:1px solid #e2e8f0;
-    border-radius:10px;
-    padding:7px 8px;
-    font-size:12px;
-    font-weight:700;
-    background:#fff;
-  }
-  .inline-form textarea{
-    min-height:40px;
-    resize:vertical;
-    font-family:inherit;
-  }
-  .btn-save{
-    background:#2563eb;
-    color:#fff;
-    border:0;
-    border-radius:10px;
-    padding:8px 10px;
-    font-weight:900;
-    cursor:pointer;
-  }
-  .empty{
-    padding:28px;
-    text-align:center;
-    color:#64748b;
-    font-weight:800;
-  }
-  @media(max-width:1180px){
-    .stat-grid{grid-template-columns:repeat(3,1fr);}
-    .filter-grid{grid-template-columns:1fr 1fr;}
-  }
-  @media(max-width:680px){
-    .stat-grid{grid-template-columns:1fr 1fr;}
-    .filter-grid{grid-template-columns:1fr;}
-  }
+  .board-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;align-items:start;}
+  .bucket{background:#fff;border-radius:22px;border:1px solid #e5e7eb;box-shadow:0 5px 14px rgba(15,23,42,.08);overflow:hidden;}
+  .bucket-head{padding:15px 16px;color:#0f172a;display:flex;justify-content:space-between;align-items:center;gap:10px;}
+  .bucket-title{font-size:17px;font-weight:1000;display:flex;align-items:center;gap:8px;}
+  .bucket-count{border-radius:999px;padding:4px 10px;background:rgba(255,255,255,.72);font-size:12px;font-weight:1000;}
+  .bucket.blue .bucket-head{background:linear-gradient(135deg,#dbeafe,#eff6ff);}.bucket.green .bucket-head{background:linear-gradient(135deg,#dcfce7,#f0fdf4);}.bucket.orange .bucket-head{background:linear-gradient(135deg,#ffedd5,#fff7ed);}.bucket.done .bucket-head{background:linear-gradient(135deg,#e2e8f0,#f8fafc);}
+  .bucket-body{display:grid;gap:10px;padding:12px;background:#fbfdff;}
+  .inquiry-card{border:1px solid #e2e8f0;border-radius:18px;background:#fff;padding:12px;display:grid;gap:10px;box-shadow:0 3px 8px rgba(15,23,42,.04);}
+  .person-row{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;}
+  .person-name{font-weight:1000;color:#0f172a;font-size:15px;line-height:1.35;}.person-meta{font-size:12px;color:#64748b;font-weight:800;line-height:1.45;margin-top:2px;}
+  .badge2{display:inline-flex;align-items:center;justify-content:center;padding:4px 9px;border-radius:999px;font-size:12px;font-weight:900;white-space:nowrap;border:1px solid transparent;}
+  .b-trial{background:#eff6ff;color:#1d4ed8;border-color:#bfdbfe;}.b-enroll{background:#f0fdf4;color:#15803d;border-color:#bbf7d0;}.b-queue{background:#fff7ed;color:#c2410c;border-color:#fed7aa;}.b-ready{background:#dcfce7;color:#166534;border-color:#86efac;}.b-notready{background:#fee2e2;color:#991b1b;border-color:#fecaca;}.b-pending{background:#f8fafc;color:#64748b;border-color:#e2e8f0;}.b-warn{background:#fffbeb;color:#92400e;border-color:#fde68a;}.b-done{background:#e2e8f0;color:#334155;border-color:#cbd5e1;}
+  .mini{font-size:12px;color:#64748b;margin-top:3px;line-height:1.4;}.detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:12px;color:#334155;}.detail-grid b{color:#0f172a;}
+  .inline-form{display:grid;gap:7px;border-top:1px dashed #e2e8f0;padding-top:10px;}.inline-form-row{display:grid;grid-template-columns:92px 1fr;gap:6px;align-items:center;}.inline-form label{font-size:11px;color:#475569;font-weight:900;}.inline-form select,.inline-form textarea{width:100%;border:1px solid #e2e8f0;border-radius:10px;padding:7px 8px;font-size:12px;font-weight:700;background:#fff;}.inline-form textarea{min-height:42px;resize:vertical;font-family:inherit;}.btn-save{background:#2563eb;color:#fff;border:0;border-radius:10px;padding:8px 10px;font-weight:900;cursor:pointer;}.done-save{background:#16a34a;}.empty{padding:20px;text-align:center;color:#64748b;font-weight:800;}
+  .completed-zone{background:#fff;border-radius:22px;border:1px solid #cbd5e1;box-shadow:0 5px 14px rgba(15,23,42,.08);overflow:hidden;}.completed-list{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;padding:12px;background:#f8fafc;}
+  @media(max-width:1280px){.stat-grid{grid-template-columns:repeat(4,1fr)}.filter-grid{grid-template-columns:1fr 1fr 1fr}.board-grid{grid-template-columns:1fr}.completed-list{grid-template-columns:1fr 1fr}}
+  @media(max-width:760px){.stat-grid{grid-template-columns:1fr 1fr}.filter-grid{grid-template-columns:1fr}.completed-list{grid-template-columns:1fr}.btn-report{width:100%;}.inline-form-row{grid-template-columns:1fr}.detail-grid{grid-template-columns:1fr}.title-box h1{font-size:22px;}}
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="report-wrap">
-
   <div class="card report-head">
     <div class="title-box">
       <h1>รายงานสมัครเรียน / จองทดลองเรียน</h1>
-      <div class="muted">ดูข้อมูลที่ผู้ปกครองกรอกจากหน้าเว็บ และอัปเดตสถานะภายในของโรงเรียนได้จากหน้านี้</div>
+      <div class="muted">แยกงานค้างเป็น 3 กอง และย้ายรายการที่ดำเนินการเสร็จแล้วไปเก็บด้านล่างอัตโนมัติ</div>
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <a class="btn-report btn-light" href="/pkanoon-admin-tool/">← Admin Tool</a>
       <a class="btn-report btn-light" href="/dashboard/">กลับ Dashboard</a>
       <a class="btn-report btn-orange" href="/admission/" target="_blank">เปิดหน้าสมัครเรียน</a>
     </div>
   </div>
 
   <div class="stat-grid">
-    <div class="stat"><div class="num">{{ stats.total }}</div><div class="label">รายการทั้งหมด</div></div>
-    <div class="stat"><div class="num">{{ stats.trial }}</div><div class="label">จองทดลองเรียน</div></div>
-    <div class="stat"><div class="num">{{ stats.enroll }}</div><div class="label">สมัครเรียน</div></div>
+    <div class="stat"><div class="num">{{ stats.open_total }}</div><div class="label">ยังไม่เสร็จ</div></div>
+    <div class="stat"><div class="num">{{ stats.completed_total }}</div><div class="label">ดำเนินการเสร็จแล้ว</div></div>
+    <div class="stat"><div class="num">{{ stats.trial }}</div><div class="label">จองทดลองเรียนค้าง</div></div>
+    <div class="stat"><div class="num">{{ stats.enroll }}</div><div class="label">สมัครเรียนค้าง</div></div>
+    <div class="stat"><div class="num">{{ stats.queue }}</div><div class="label">จองที่นั่งค้าง</div></div>
     <div class="stat"><div class="num">{{ stats.sheet_ready }}</div><div class="label">ชีทพร้อมแล้ว</div></div>
-    <div class="stat"><div class="num">{{ stats.trial_attended }}</div><div class="label">มาเรียนจริง</div></div>
     <div class="stat"><div class="num">{{ stats.trial_enrolled }}</div><div class="label">ทดลองแล้วสมัครต่อ</div></div>
   </div>
 
   <div class="card">
     <form method="get" class="filter-grid">
-      <div class="field">
-        <label>ค้นหา</label>
-        <input type="text" name="q" value="{{ filters.q }}" placeholder="ชื่อเล่น / ชื่อจริง / โรงเรียน / เบอร์">
-      </div>
-
-      <div class="field">
-        <label>ประเภท</label>
-        <select name="request_type">
-          <option value="">ทั้งหมด</option>
-          {% for value,label in request_type_choices %}
-            <option value="{{ value }}" {% if filters.request_type == value %}selected{% endif %}>{{ label }}</option>
-          {% endfor %}
-        </select>
-      </div>
-
-      <div class="field">
-        <label>ระดับชั้น</label>
-        <select name="grade_level">
-          <option value="">ทั้งหมด</option>
-          {% for value,label in grade_level_choices %}
-            <option value="{{ value }}" {% if filters.grade_level == value %}selected{% endif %}>{{ label }}</option>
-          {% endfor %}
-        </select>
-      </div>
-
-      <div class="field">
-        <label>รอบเวลา</label>
-        <select name="preferred_time_slot">
-          <option value="">ทั้งหมด</option>
-          {% for value,label in time_slot_choices %}
-            <option value="{{ value }}" {% if filters.preferred_time_slot == value %}selected{% endif %}>{{ label }}</option>
-          {% endfor %}
-        </select>
-      </div>
-
-      <div class="field">
-        <label>ชีทพร้อม</label>
-        <select name="sheet_prepared">
-          <option value="">ทั้งหมด</option>
-          <option value="yes" {% if filters.sheet_prepared == "yes" %}selected{% endif %}>พร้อมแล้ว</option>
-          <option value="no" {% if filters.sheet_prepared == "no" %}selected{% endif %}>ยังไม่พร้อม</option>
-        </select>
-      </div>
-
-      <div class="field">
-        <label>มาเรียนจริง</label>
-        <select name="trial_attended">
-          <option value="">ทั้งหมด</option>
-          {% for value,label in trial_attended_choices %}
-            <option value="{{ value }}" {% if filters.trial_attended == value %}selected{% endif %}>{{ label }}</option>
-          {% endfor %}
-        </select>
-      </div>
-
-      <div class="field">
-        <label>ผลหลังทดลอง</label>
-        <select name="trial_result">
-          <option value="">ทั้งหมด</option>
-          {% for value,label in trial_result_choices %}
-            <option value="{{ value }}" {% if filters.trial_result == value %}selected{% endif %}>{{ label }}</option>
-          {% endfor %}
-        </select>
-      </div>
-
-      <div class="field">
-        <label>วันที่เริ่ม ตั้งแต่</label>
-        <input type="date" name="date_from" value="{{ filters.date_from }}">
-      </div>
-
-      <div class="field">
-        <label>วันที่เริ่ม ถึง</label>
-        <input type="date" name="date_to" value="{{ filters.date_to }}">
-      </div>
-
-      <div class="filter-actions">
-        <button class="btn-report btn-dark" type="submit">Filter</button>
-        <a class="btn-report btn-light" href="/admission-report/">Clear</a>
-      </div>
+      <div class="field"><label>ค้นหา</label><input type="text" name="q" value="{{ filters.q }}" placeholder="ชื่อเล่น / ชื่อจริง / โรงเรียน / เบอร์"></div>
+      <div class="field"><label>ประเภท</label><select name="request_type"><option value="">ทั้งหมด</option>{% for value,label in request_type_choices %}<option value="{{ value }}" {% if filters.request_type == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+      <div class="field"><label>สถานะงาน</label><select name="completed_status"><option value="open" {% if filters.completed_status == 'open' %}selected{% endif %}>ยังไม่เสร็จ</option><option value="completed" {% if filters.completed_status == 'completed' %}selected{% endif %}>ดำเนินการเสร็จแล้ว</option><option value="all" {% if filters.completed_status == 'all' %}selected{% endif %}>ทั้งหมด</option></select></div>
+      <div class="field"><label>ระดับชั้น</label><select name="grade_level"><option value="">ทั้งหมด</option>{% for value,label in grade_level_choices %}<option value="{{ value }}" {% if filters.grade_level == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+      <div class="field"><label>รอบเวลา</label><select name="preferred_time_slot"><option value="">ทั้งหมด</option>{% for value,label in time_slot_choices %}<option value="{{ value }}" {% if filters.preferred_time_slot == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+      <div class="field"><label>ชีทพร้อม</label><select name="sheet_prepared"><option value="">ทั้งหมด</option><option value="yes" {% if filters.sheet_prepared == 'yes' %}selected{% endif %}>พร้อมแล้ว</option><option value="no" {% if filters.sheet_prepared == 'no' %}selected{% endif %}>ยังไม่พร้อม</option></select></div>
+      <div class="field"><label>จากวันที่เรียน</label><input type="date" name="date_from" value="{{ filters.date_from }}"></div>
+      <div class="field"><label>ถึงวันที่เรียน</label><input type="date" name="date_to" value="{{ filters.date_to }}"></div>
+      <div class="filter-actions"><button class="btn-report btn-blue" type="submit">Filter</button><a class="btn-report btn-light" href="/admission-report/">Clear</a></div>
     </form>
   </div>
 
-  <div class="table-wrap">
-    <table class="report-table">
-      <thead>
-        <tr>
-          <th>ลงทะเบียน</th>
-          <th>ประเภท</th>
-          <th>นักเรียน</th>
-          <th>ติดต่อ</th>
-          <th>ระดับ/รอบ/วันที่</th>
-          <th>เกรด</th>
-          <th>สถานะปัจจุบัน</th>
-          <th>อัปเดตข้อมูลของโรงเรียน</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for item in inquiries %}
-          <tr>
-            <td>
-              <b>{{ item.created_at|date:"d/m/Y" }}</b>
-              <div class="mini">{{ item.created_at|date:"H:i" }}</div>
-            </td>
-
-            <td>
-              {% if item.request_type == "trial" %}
-                <span class="badge2 b-trial">{{ item.get_request_type_display }}</span>
-              {% else %}
-                <span class="badge2 b-enroll">{{ item.get_request_type_display }}</span>
-              {% endif %}
-            </td>
-
-            <td>
-              <b>{{ item.nickname }}</b>
-              <div class="mini">{{ item.full_name }}</div>
-              <div class="mini">โรงเรียน: {{ item.school_name|default:"-" }}</div>
-            </td>
-
-            <td>
-              <b>{{ item.contact_phone }}</b>
-            </td>
-
-            <td>
-              <b>{{ item.get_grade_level_display }}</b>
-              <div class="mini">{{ item.get_preferred_time_slot_display }}</div>
-              <div class="mini">วันที่: {{ item.first_lesson_date|date:"d/m/Y" }}</div>
-            </td>
-
-            <td>
-              {% if item.latest_gpa %}
-                <b>{{ item.latest_gpa }}</b>
-              {% else %}
-                <span class="mini">-</span>
-              {% endif %}
-            </td>
-
-            <td>
-              {% if item.sheet_prepared %}
-                <span class="badge2 b-ready">ชีทพร้อมแล้ว</span>
-              {% else %}
-                <span class="badge2 b-notready">ยังไม่พร้อม</span>
-              {% endif %}
-
-              <div style="margin-top:7px;">
-                {% if item.request_type == "trial" %}
-                  {% if item.trial_attended == "yes" %}
-                    <span class="badge2 b-ready">{{ item.get_trial_attended_display }}</span>
-                  {% elif item.trial_attended == "no" %}
-                    <span class="badge2 b-notready">{{ item.get_trial_attended_display }}</span>
-                  {% else %}
-                    <span class="badge2 b-pending">{{ item.get_trial_attended_display }}</span>
-                  {% endif %}
-
-                  <div style="margin-top:7px;">
-                    {% if item.trial_result == "enrolled" %}
-                      <span class="badge2 b-ready">{{ item.get_trial_result_display }}</span>
-                    {% elif item.trial_result == "not_enrolled" %}
-                      <span class="badge2 b-notready">{{ item.get_trial_result_display }}</span>
-                    {% elif item.trial_result == "follow_up" %}
-                      <span class="badge2 b-warn">{{ item.get_trial_result_display }}</span>
-                    {% else %}
-                      <span class="badge2 b-pending">{{ item.get_trial_result_display }}</span>
-                    {% endif %}
-                  </div>
-                {% else %}
-                  <span class="badge2 b-pending">ไม่ใช่รายการทดลองเรียน</span>
-                {% endif %}
-              </div>
-
-              {% if item.internal_note %}
-                <div class="mini"><b>Note:</b> {{ item.internal_note }}</div>
-              {% endif %}
-            </td>
-
-            <td>
-              <form method="post" action="/admission-report/update/" class="inline-form">
-                {% csrf_token %}
-                <input type="hidden" name="inquiry_id" value="{{ item.id }}">
-
-                <div class="inline-form-row">
-                  <label>ชีท</label>
-                  <select name="sheet_prepared">
-                    <option value="no" {% if not item.sheet_prepared %}selected{% endif %}>ยังไม่พร้อม</option>
-                    <option value="yes" {% if item.sheet_prepared %}selected{% endif %}>พร้อมแล้ว</option>
-                  </select>
-                </div>
-
-                <div class="inline-form-row">
-                  <label>มาเรียนจริง</label>
-                  <select name="trial_attended" {% if item.request_type != "trial" %}disabled{% endif %}>
-                    {% for value,label in trial_attended_choices %}
-                      <option value="{{ value }}" {% if item.trial_attended == value %}selected{% endif %}>{{ label }}</option>
-                    {% endfor %}
-                  </select>
-                  {% if item.request_type != "trial" %}
-                    <input type="hidden" name="trial_attended" value="{{ item.trial_attended }}">
-                  {% endif %}
-                </div>
-
-                <div class="inline-form-row">
-                  <label>ผลทดลอง</label>
-                  <select name="trial_result" {% if item.request_type != "trial" %}disabled{% endif %}>
-                    {% for value,label in trial_result_choices %}
-                      <option value="{{ value }}" {% if item.trial_result == value %}selected{% endif %}>{{ label }}</option>
-                    {% endfor %}
-                  </select>
-                  {% if item.request_type != "trial" %}
-                    <input type="hidden" name="trial_result" value="{{ item.trial_result }}">
-                  {% endif %}
-                </div>
-
-                <div class="inline-form-row">
-                  <label>หมายเหตุ</label>
-                  <textarea name="internal_note" placeholder="Note ภายใน">{{ item.internal_note }}</textarea>
-                </div>
-
-                <button class="btn-save" type="submit">บันทึกสถานะ</button>
-              </form>
-            </td>
-          </tr>
-        {% empty %}
-          <tr>
-            <td colspan="8">
-              <div class="empty">ยังไม่มีข้อมูลตามเงื่อนไขที่เลือก</div>
-            </td>
-          </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+  {% if filters.completed_status != 'completed' %}
+  <div class="board-grid">
+    {% for group in inquiry_groups %}
+      <section class="bucket {{ group.color }}">
+        <div class="bucket-head"><div class="bucket-title"><span>{{ group.icon }}</span><span>{{ group.title }}</span></div><div class="bucket-count">{{ group.items|length }} รายการ</div></div>
+        <div class="bucket-body">
+          {% for i in group.items %}
+            {% include "core/_admission_inquiry_card.html" with i=i completed_zone=False %}
+          {% empty %}<div class="empty">ไม่มีรายการในกองนี้</div>{% endfor %}
+        </div>
+      </section>
+    {% endfor %}
   </div>
+  {% endif %}
 
+  {% if filters.completed_status != 'open' or completed_inquiries %}
+  <section class="completed-zone bucket done">
+    <div class="bucket-head"><div class="bucket-title"><span>✅</span><span>ดำเนินการเสร็จแล้ว</span></div><div class="bucket-count">{{ completed_inquiries|length }} รายการ</div></div>
+    <div class="completed-list">
+      {% for i in completed_inquiries %}
+        {% include "core/_admission_inquiry_card.html" with i=i completed_zone=True %}
+      {% empty %}<div class="empty">ยังไม่มีรายการที่ดำเนินการเสร็จแล้ว</div>{% endfor %}
+    </div>
+  </section>
+  {% endif %}
 </div>
 {% endblock %}

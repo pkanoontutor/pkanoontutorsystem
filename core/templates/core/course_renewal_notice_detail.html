@@ -14,11 +14,11 @@
     .editor{padding:16px;display:grid;gap:12px;position:sticky;top:12px}
     .editor h1{font-size:20px;margin:0;color:#0f172a}.hint{font-size:12px;color:#64748b;line-height:1.45;font-weight:800}
     .grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.field{display:flex;flex-direction:column;gap:5px}.field label{font-size:11px;font-weight:1000;color:#334155;text-transform:uppercase;letter-spacing:.04em}
-    input,textarea{border:1px solid #e2e8f0;border-radius:13px;padding:10px;font-weight:800;background:#fff;width:100%;font-family:inherit}
+    input,textarea,select{border:1px solid #e2e8f0;border-radius:13px;padding:10px;font-weight:800;background:#fff;width:100%;font-family:inherit}
     textarea{min-height:88px;resize:vertical}.pkg-edit{border:1px solid #e2e8f0;background:#f8fafc;border-radius:16px;padding:10px;display:grid;gap:8px}
     .pkg-title{font-size:13px;font-weight:1000;color:#0f172a}
     .btnrow{display:flex;gap:8px;flex-wrap:wrap}.btn{border:0;border-radius:999px;padding:11px 15px;font-weight:1000;cursor:pointer;background:#0f172a;color:#fff;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:6px;line-height:1.2}
-    .btn.primary{background:#ea580c}.btn.soft{background:#fff;color:#0f172a;border:1px solid #cbd5e1}.btn.green{background:#16a34a}.btn.red{background:#dc2626}.btn.blue{background:#2563eb}
+    .btn.icon{width:38px;height:38px;padding:0;font-size:18px}.btn.primary{background:#ea580c}.btn.soft{background:#fff;color:#0f172a;border:1px solid #cbd5e1}.btn.green{background:#16a34a}.btn.red{background:#dc2626}.btn.blue{background:#2563eb}
     .statusbox{border-radius:18px;padding:12px;border:1px solid #e2e8f0;background:#f8fafc;font-size:13px;font-weight:900;line-height:1.5}.statusbox.sent{background:#dcfce7;border-color:#86efac;color:#166534}.statusbox.unsent{background:#fffbeb;border-color:#fde68a;color:#92400e}
     .preview-wrap{display:grid;gap:10px;justify-items:center}.toolbar{width:min(100%,520px);display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
     .receipt{width:440px;max-width:100%;padding:20px;background:#fff}
@@ -29,113 +29,132 @@
     .installment-box{display:grid;gap:8px;margin-top:12px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:20px;padding:12px}.money-row{display:flex;justify-content:space-between;gap:12px;font-weight:1000;border-bottom:1px dashed #bfdbfe;padding-bottom:7px}.money-row:last-child{border-bottom:0;padding-bottom:0}.money-row .k{color:#1d4ed8}.money-row .v{color:#0f172a}.money-row.remaining .v{font-size:24px;color:#15803d}
     .qr-zone{margin-top:12px;display:grid;grid-template-columns:130px 1fr;gap:12px;align-items:center;background:#f8fafc;border:1px solid #e2e8f0;border-radius:20px;padding:12px}.qr{width:130px;height:130px;object-fit:contain;background:#fff;border-radius:16px;padding:6px}.qr-title{font-size:15px;font-weight:1000}.qr-sub{font-size:12px;color:#64748b;font-weight:800;line-height:1.45;margin-top:4px}
     .note{margin-top:12px;border-radius:18px;background:#fff7ed;border:1px solid #fed7aa;padding:12px;color:#9a3412;font-size:13px;font-weight:900;line-height:1.55}.foot{text-align:center;margin-top:12px;color:#64748b;font-size:11px;font-weight:800}
-    @media(max-width:980px){.page{grid-template-columns:1fr}.editor{position:static}.receipt{width:min(100%,440px)}.btn{flex:1}}
+    @media(max-width:980px){.page{grid-template-columns:1fr}.editor{position:static}.receipt{width:min(100%,440px)}.btn{flex:1}.btn.icon{flex:0 0 38px}}
     @media(max-width:480px){.page{padding:8px}.editor{border-radius:20px;padding:12px}.receipt{border-radius:0;width:100%;padding:16px}.toolbar{position:sticky;top:6px;z-index:5}.date-row{grid-template-columns:1fr}.qr-zone{grid-template-columns:1fr;justify-items:center;text-align:center}.grid{grid-template-columns:1fr}}
   </style>
 </head>
 <body>
   <div class="page">
-    <form method="post" class="editor">
-      {% csrf_token %}
-      <div>
-        <h1>{{ notice.get_notice_type_display }}</h1>
-        <div class="hint">แก้ไขข้อมูลด้านล่างแล้วกดบันทึก ภาพ preview ด้านขวาจะใช้ข้อมูลล่าสุดหลังบันทึก</div>
-      </div>
-
-      {% if notice.is_sent_to_parent %}
-        <div class="statusbox sent">✅ ส่งแจ้งผู้ปกครองแล้ว<br>วันที่ส่ง: {{ notice.sent_to_parent_at|date:"d/m/Y H:i" }}</div>
-      {% else %}
-        <div class="statusbox unsent">⏳ ยังไม่ได้กดบันทึกว่าส่งแจ้งผู้ปกครองแล้ว<br>การเปิดรูป/Copy รูป ยังไม่ถือว่าส่งแล้ว</div>
-      {% endif %}
-
-      <div class="btnrow">
-        <a class="btn soft" href="/course-renewal-notices/">← กลับหน้า List</a>
-        <a class="btn soft" href="{{ student_admin_url }}" target="_blank">เปิด Student</a>
-        <a class="btn soft" href="{{ enrollment_admin_url }}" target="_blank">เปิด Enrollment</a>
-      </div>
-
-      <div class="grid">
-        <div class="field">
-          <label>วันที่คาดว่าจะครบคอร์ส</label>
-          <input type="date" name="expected_course_end_date" value="{{ notice.expected_course_end_date|date:'Y-m-d' }}">
+    <div class="editor">
+      <form method="post" id="editForm" style="display:grid;gap:12px;">
+        {% csrf_token %}
+        <div>
+          <h1>{{ notice.get_notice_type_display }}{% if notice.notice_type == "installment" and notice.installment_no %} งวดที่ {{ notice.installment_no }}{% endif %}</h1>
+          <div class="hint">เลือกประเภทใบแจ้งและแก้ข้อมูลด้านล่างได้เลย จากนั้นกดบันทึก ภาพ preview ด้านขวาจะอัปเดตหลังบันทึก</div>
         </div>
-        <div class="field">
-          <label>วันที่เริ่มต้นใหม่</label>
-          <input type="date" name="next_course_start_date" value="{{ notice.next_course_start_date|date:'Y-m-d' }}">
-        </div>
-      </div>
 
-      {% if notice.notice_type == 'installment' %}
-        <div class="pkg-edit">
-          <div class="pkg-title">ยอดแบ่งชำระ / งวดถัดไป</div>
-          <div class="grid">
-            <div class="field">
-              <label>ยอดเต็ม</label>
-              <input type="number" step="0.01" name="installment_full_amount" value="{{ notice.installment_full_amount }}">
+        {% if notice.is_sent_to_parent %}
+          <div class="statusbox sent">✅ ส่งแจ้งผู้ปกครองแล้ว<br>วันที่ส่ง: {{ notice.sent_to_parent_at|date:"d/m/Y H:i" }}</div>
+        {% else %}
+          <div class="statusbox unsent">⏳ ยังไม่ได้กดส่งแจ้งผู้ปกครอง</div>
+        {% endif %}
+
+        <div class="btnrow">
+          <a class="btn soft" href="/course-renewal-notices/">← กลับหน้า list</a>
+          <a class="btn icon soft" title="Student" href="{{ student_admin_url }}">👤</a>
+          <a class="btn icon soft" title="Enrollment" href="{{ enrollment_admin_url }}">📚</a>
+        </div>
+
+        <div class="field">
+          <label>ประเภทใบแจ้ง</label>
+          <select name="notice_kind" id="noticeKind">
+            <option value="renewal" {% if notice_kind == "renewal" %}selected{% endif %}>ใบแจ้งต่อคอร์สปกติ</option>
+            <option value="installment_2" {% if notice_kind == "installment_2" %}selected{% endif %}>ใบแจ้งชำระงวดที่ 2</option>
+            <option value="installment_3" {% if notice_kind == "installment_3" %}selected{% endif %}>ใบแจ้งชำระงวดที่ 3</option>
+            <option value="installment_4" {% if notice_kind == "installment_4" %}selected{% endif %}>ใบแจ้งชำระงวดที่ 4</option>
+          </select>
+        </div>
+
+        <div class="grid">
+          <div class="field">
+            <label>วันที่คาดว่าจะครบคอร์ส</label>
+            <input type="date" name="expected_course_end_date" value="{{ notice.expected_course_end_date|date:'Y-m-d' }}">
+          </div>
+          <div class="field">
+            <label>วันที่เริ่มต้นใหม่</label>
+            <input type="date" name="next_course_start_date" value="{{ notice.next_course_start_date|date:'Y-m-d' }}">
+          </div>
+        </div>
+
+        <div id="renewalEditor">
+          <div class="pkg-edit">
+            <div class="pkg-title">ต่อคอร์ส 10 สัปดาห์</div>
+            <div class="grid">
+              <div class="field"><label>ราคาเต็ม</label><input name="package_10_full_price" value="{{ notice.package_10_full_price }}"></div>
+              <div class="field"><label>ส่วนลด</label><input name="package_10_discount" value="{{ notice.package_10_discount }}"></div>
+            </div>
+          </div>
+          <div class="pkg-edit">
+            <div class="pkg-title">ต่อคอร์ส 20 สัปดาห์</div>
+            <div class="grid">
+              <div class="field"><label>ราคาเต็ม</label><input name="package_20_full_price" value="{{ notice.package_20_full_price }}"></div>
+              <div class="field"><label>ส่วนลด</label><input name="package_20_discount" value="{{ notice.package_20_discount }}"></div>
+            </div>
+          </div>
+          <div class="pkg-edit">
+            <div class="pkg-title">ต่อคอร์ส 30 สัปดาห์</div>
+            <div class="grid">
+              <div class="field"><label>ราคาเต็ม</label><input name="package_30_full_price" value="{{ notice.package_30_full_price }}"></div>
+              <div class="field"><label>ส่วนลด</label><input name="package_30_discount" value="{{ notice.package_30_discount }}"></div>
+            </div>
+          </div>
+        </div>
+
+        <div id="installmentEditor">
+          <div class="pkg-edit">
+            <div class="pkg-title">ข้อมูลยอดชำระงวดที่ 2/3/4</div>
+            <div class="grid">
+              <div class="field"><label>ยอดเต็ม</label><input name="installment_full_amount" value="{{ notice.installment_full_amount }}"></div>
+              <div class="field"><label>ยอดที่ชำระแล้ว</label><input name="installment_paid_amount" value="{{ notice.installment_paid_amount }}"></div>
             </div>
             <div class="field">
-              <label>ชำระแล้ว</label>
-              <input type="number" step="0.01" name="installment_paid_amount" value="{{ notice.installment_paid_amount }}">
+              <label>จำนวนครั้งที่ให้เรียนจากงวดนี้</label>
+              <input type="number" min="0" step="1" name="installment_sessions" value="{{ notice.installment_sessions }}">
             </div>
-          </div>
-          <div class="hint">ยอดคงเหลือจะคำนวณอัตโนมัติจากยอดเต็ม - ชำระแล้ว หลังบันทึก</div>
-          {% if notice.source_payment %}
-            <a class="btn soft" href="/course-payments/{{ notice.source_payment.id }}/" target="_blank">เปิดใบเสร็จอ้างอิง {{ notice.source_payment.receipt_no }}</a>
-          {% endif %}
-        </div>
-      {% else %}
-        <div class="pkg-edit">
-          <div class="pkg-title">แพ็กเกจ 10 สัปดาห์</div>
-          <div class="grid">
-            <div class="field"><label>ราคาเต็ม</label><input type="number" step="0.01" name="package_10_full_price" value="{{ notice.package_10_full_price }}"></div>
-            <div class="field"><label>ส่วนลด</label><input type="number" step="0.01" name="package_10_discount" value="{{ notice.package_10_discount }}"></div>
+            <div class="hint">ยอดคงเหลือจะคำนวณจากยอดเต็ม - ยอดที่ชำระแล้ว หลังจากกดบันทึก</div>
           </div>
         </div>
 
-        <div class="pkg-edit">
-          <div class="pkg-title">แพ็กเกจ 20 สัปดาห์</div>
-          <div class="grid">
-            <div class="field"><label>ราคาเต็ม</label><input type="number" step="0.01" name="package_20_full_price" value="{{ notice.package_20_full_price }}"></div>
-            <div class="field"><label>ส่วนลด</label><input type="number" step="0.01" name="package_20_discount" value="{{ notice.package_20_discount }}"></div>
-          </div>
+        <div class="field">
+          <label>ข้อความท้ายใบแจ้ง</label>
+          <textarea name="note_wording">{{ notice.note_wording }}</textarea>
         </div>
 
-        <div class="pkg-edit">
-          <div class="pkg-title">แพ็กเกจ 30 สัปดาห์</div>
-          <div class="grid">
-            <div class="field"><label>ราคาเต็ม</label><input type="number" step="0.01" name="package_30_full_price" value="{{ notice.package_30_full_price }}"></div>
-            <div class="field"><label>ส่วนลด</label><input type="number" step="0.01" name="package_30_discount" value="{{ notice.package_30_discount }}"></div>
-          </div>
-        </div>
-      {% endif %}
-
-      <div class="field">
-        <label>Wording ด้านล่าง</label>
-        <textarea name="note_wording">{{ notice.note_wording }}</textarea>
-      </div>
-
-      <button class="btn primary" type="submit">บันทึกข้อมูลใบแจ้ง</button>
+        <button class="btn primary" type="submit">บันทึกข้อมูลใบแจ้ง</button>
+      </form>
 
       <div class="btnrow">
         {% if notice.is_sent_to_parent %}
-          <button type="submit" form="unmarkSentForm" class="btn red">ยกเลิกสถานะส่งแล้ว</button>
+          <form method="post" action="{% url 'core:course_renewal_notice_unmark_sent' notice.id %}" style="flex:1;">
+            {% csrf_token %}
+            <button class="btn red" type="submit" style="width:100%;">ยกเลิกสถานะส่งแล้ว</button>
+          </form>
         {% else %}
-          <button type="submit" form="markSentForm" class="btn green">ส่งแจ้งผู้ปกครองแล้ว</button>
+          <form method="post" action="{% url 'core:course_renewal_notice_mark_sent' notice.id %}" style="flex:1;">
+            {% csrf_token %}
+            <button class="btn green" type="submit" style="width:100%;">ส่งแจ้งผู้ปกครองแล้ว</button>
+          </form>
         {% endif %}
       </div>
-    </form>
+    </div>
 
     <div class="preview-wrap">
       <div class="toolbar">
-        <button class="btn primary" onclick="openImage()">Open Image in New Tab</button>
-        <button class="btn green" onclick="copyImage()">Copy Image</button>
-        <button class="btn soft" onclick="downloadImage()">Download PNG</button>
+        <button class="btn blue" type="button" onclick="openImage()">Open Image in New Tab</button>
+        <button class="btn green" type="button" onclick="copyImage()">Copy Image</button>
+        <button class="btn soft" type="button" onclick="downloadImage()">Download PNG</button>
       </div>
 
-      <div class="receipt" id="noticeCard">
+      <div class="receipt" id="receiptCard">
         <div class="top">
-          <img class="logo" src="{% static 'core/logo2.png' %}" alt="Pkanoon Tutor">
-          <div class="doc">{% if notice.notice_type == 'installment' %}ใบแจ้งชำระงวดถัดไป{% else %}ใบแจ้งต่อคอร์ส{% endif %}</div>
+          <img class="logo" src="{% static 'core/logo2.png' %}" alt="logo">
+          <div class="doc">
+            {% if notice.notice_type == "installment" %}
+              ใบแจ้งชำระงวดที่ {{ notice.installment_no|default:"2" }}
+            {% else %}
+              ใบแจ้งต่อคอร์ส
+            {% endif %}
+          </div>
           <div class="school">พี่ขนุนติวเตอร์</div>
         </div>
 
@@ -143,39 +162,31 @@
           <div class="student-name">{{ student.nickname|default:"-" }} · {{ student.full_name }}</div>
           <div class="meta">
             คอร์สที่เรียน: {{ tutoring_class.name }}<br>
-            Enrollment: {{ enrollment.sale_run_no|default:enrollment.id }} · คงเหลือ {{ enrollment.remaining_sessions }} ครั้ง
+            ระดับชั้น: {{ student.grade_level|default:"-" }}<br>
+            เลขที่ Enrollment: {{ enrollment.sale_run_no|default:enrollment.id }}
           </div>
         </div>
 
         <div class="date-row">
-          <div class="date-box end">
-            <div class="k">คาดว่าจะครบคอร์ส</div>
-            <div class="v">{{ notice.expected_course_end_date|date:"d/m/Y" }}</div>
-          </div>
-          <div class="date-box start">
-            <div class="k">เริ่มคอร์สใหม่</div>
-            <div class="v">{{ notice.next_course_start_date|date:"d/m/Y" }}</div>
-          </div>
+          <div class="date-box end"><div class="k">คาดว่าจะครบคอร์ส</div><div class="v">{{ notice.expected_course_end_date|date:"d/m/Y" }}</div></div>
+          <div class="date-box start"><div class="k">เริ่มเรียนรอบใหม่</div><div class="v">{{ notice.next_course_start_date|date:"d/m/Y" }}</div></div>
         </div>
 
-        {% if notice.notice_type == 'installment' %}
+        {% if notice.notice_type == "installment" %}
           <div class="installment-box">
-            <div class="money-row"><span class="k">ยอดเต็ม</span><span class="v">฿{{ notice.installment_full_amount|floatformat:0 }}</span></div>
-            <div class="money-row"><span class="k">ชำระแล้ว</span><span class="v">฿{{ notice.installment_paid_amount|floatformat:0 }}</span></div>
-            <div class="money-row remaining"><span class="k">ยอดคงเหลือที่ต้องชำระ</span><span class="v">฿{{ notice.installment_remaining_amount|floatformat:0 }}</span></div>
+            <div class="money-row"><span class="k">ยอดเต็ม</span><span class="v">{{ notice.installment_full_amount|floatformat:0 }} บาท</span></div>
+            <div class="money-row"><span class="k">ชำระแล้ว</span><span class="v">{{ notice.installment_paid_amount|floatformat:0 }} บาท</span></div>
+            <div class="money-row remaining"><span class="k">ยอดคงเหลือต้องชำระ</span><span class="v">{{ notice.installment_remaining_amount|floatformat:0 }} บาท</span></div>
+            <div class="money-row"><span class="k">จำนวนครั้งที่ได้รับจากงวดนี้</span><span class="v">{{ notice.installment_sessions }} ครั้ง</span></div>
           </div>
         {% else %}
           <div class="packages">
             {% for p in packages %}
-            <div class="pkg {{ p.accent }}">
-              <div class="pkg-head">
-                <div class="pkg-name">{{ p.label }}</div>
-                <div class="net">฿{{ p.net_price|floatformat:0 }}</div>
+              <div class="pkg {{ p.accent }}">
+                <div class="pkg-head"><div class="pkg-name">{{ p.label }}</div><div class="net">{{ p.net_price|floatformat:0 }} บาท</div></div>
+                <div class="price-line"><span>ราคาเต็ม</span><span class="full">{{ p.full_price|floatformat:0 }} บาท</span></div>
+                <div class="price-line"><span>ส่วนลด</span><span class="discount">-{{ p.discount|floatformat:0 }} บาท</span></div>
               </div>
-              <div class="price-line"><span>ราคาเต็ม</span><span class="full">฿{{ p.full_price|floatformat:0 }}</span></div>
-              <div class="price-line"><span>ส่วนลด</span><span class="discount">- ฿{{ p.discount|floatformat:0 }}</span></div>
-              <div class="price-line"><span>ราคาสุทธิ</span><span>฿{{ p.net_price|floatformat:0 }}</span></div>
-            </div>
             {% endfor %}
           </div>
         {% endif %}
@@ -184,55 +195,54 @@
           <img class="qr" src="{% static 'core/QRPromptpay.png' %}" alt="QR PromptPay">
           <div>
             <div class="qr-title">สแกน QR เพื่อชำระเงิน</div>
-            <div class="qr-sub">หลังชำระแล้ว สามารถส่งสลิปทาง Line เพื่อยืนยันการต่อคอร์สได้เลยครับ</div>
+            <div class="qr-sub">หลังชำระแล้วสามารถส่งสลิปผ่าน Line Official ได้เลยครับ</div>
           </div>
         </div>
 
         <div class="note">{{ notice.note_wording }}</div>
-        <div class="foot">
-          สร้างเมื่อ {{ notice.created_at|date:"d/m/Y H:i" }} · อัปเดตล่าสุด {{ notice.updated_at|date:"d/m/Y H:i" }}
-          {% if notice.is_sent_to_parent %}<br>ส่งแจ้งผู้ปกครองแล้วเมื่อ {{ notice.sent_to_parent_at|date:"d/m/Y H:i" }}{% endif %}
-        </div>
+        <div class="foot">สร้างเมื่อ {{ notice.created_at|date:"d/m/Y H:i" }} · อัปเดตล่าสุด {{ notice.updated_at|date:"d/m/Y H:i" }}</div>
       </div>
     </div>
   </div>
 
-  <form id="markSentForm" method="post" action="{% url 'core:course_renewal_notice_mark_sent' notice.id %}" style="display:none;">
-    {% csrf_token %}
-  </form>
-  <form id="unmarkSentForm" method="post" action="{% url 'core:course_renewal_notice_unmark_sent' notice.id %}" style="display:none;">
-    {% csrf_token %}
-  </form>
-
-<script>
-  async function renderCanvas(){
-    const node = document.getElementById("noticeCard");
-    return await html2canvas(node, {scale: 2, backgroundColor: "#ffffff", useCORS: true});
-  }
-  async function openImage(){
-    const canvas = await renderCanvas();
-    const dataUrl = canvas.toDataURL("image/png");
-    const w = window.open("");
-    w.document.write('<title>Course Renewal Notice</title><img src="'+dataUrl+'" style="max-width:100%;height:auto;display:block;margin:0 auto;">');
-  }
-  async function downloadImage(){
-    const canvas = await renderCanvas();
-    const a = document.createElement("a");
-    a.href = canvas.toDataURL("image/png");
-    a.download = "course-renewal-notice-{{ notice.id }}.png";
-    a.click();
-  }
-  async function copyImage(){
-    try{
-      const canvas = await renderCanvas();
-      canvas.toBlob(async (blob) => {
-        await navigator.clipboard.write([new ClipboardItem({"image/png": blob})]);
-        alert("Copy รูปใบแจ้งแล้วครับ");
-      });
-    }catch(e){
-      alert("Browser นี้อาจไม่รองรับ Copy Image โดยตรง ให้ใช้ Open Image หรือ Download PNG แทนครับ");
+  <script>
+    function updateMode() {
+      const kind = document.getElementById("noticeKind").value;
+      const isInstallment = kind.startsWith("installment");
+      document.getElementById("renewalEditor").style.display = isInstallment ? "none" : "grid";
+      document.getElementById("installmentEditor").style.display = isInstallment ? "grid" : "none";
     }
-  }
-</script>
+    document.getElementById("noticeKind").addEventListener("change", updateMode);
+    updateMode();
+
+    async function makeCanvas() {
+      const el = document.getElementById("receiptCard");
+      return await html2canvas(el, {scale: 3, backgroundColor: "#ffffff", useCORS: true});
+    }
+    async function openImage() {
+      const canvas = await makeCanvas();
+      const url = canvas.toDataURL("image/png");
+      const win = window.open();
+      win.document.write('<img src="' + url + '" style="max-width:100%;height:auto;">');
+    }
+    async function downloadImage() {
+      const canvas = await makeCanvas();
+      const a = document.createElement("a");
+      a.href = canvas.toDataURL("image/png");
+      a.download = "course-renewal-notice-{{ notice.id }}.png";
+      a.click();
+    }
+    async function copyImage() {
+      try {
+        const canvas = await makeCanvas();
+        canvas.toBlob(async (blob) => {
+          await navigator.clipboard.write([new ClipboardItem({"image/png": blob})]);
+          alert("Copy รูปใบแจ้งแล้วครับ");
+        });
+      } catch (e) {
+        alert("Browser นี้อาจไม่รองรับ Copy Image โดยตรง ให้ใช้ Open Image หรือ Download PNG แทนครับ");
+      }
+    }
+  </script>
 </body>
 </html>

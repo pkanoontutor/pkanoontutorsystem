@@ -1784,8 +1784,6 @@ def _school_finance_filtered_data(request: HttpRequest):
     }
 
 
-@login_required
-
 
 # =========================================================
 # ✅ Course Renewal Notice Module

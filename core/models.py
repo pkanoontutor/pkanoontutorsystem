@@ -606,6 +606,87 @@ class CoursePayment(models.Model):
         return self.student.display_name if self.student_id else "-"
 
 
+
+
+# -----------------------
+# Course Renewal Notice
+# -----------------------
+class CourseRenewalNotice(models.Model):
+    """
+    ใบแจ้งการต่อคอร์ส:
+    สร้างจาก Enrollment ที่ใกล้ครบคอร์ส และเก็บประวัติใบแจ้งที่เคยสร้างไว้
+    """
+    enrollment = models.ForeignKey(
+        Enrollment,
+        verbose_name="Enrollment",
+        on_delete=models.PROTECT,
+        related_name="renewal_notices",
+    )
+    student = models.ForeignKey(
+        Student,
+        verbose_name="นักเรียน",
+        on_delete=models.PROTECT,
+        related_name="renewal_notices",
+    )
+    tutoring_class = models.ForeignKey(
+        TutoringClass,
+        verbose_name="คอร์ส/คลาส",
+        on_delete=models.PROTECT,
+        related_name="renewal_notices",
+    )
+
+    expected_course_end_date = models.DateField("วันที่คาดว่าจะครบคอร์ส")
+    next_course_start_date = models.DateField("วันที่เริ่มต้นคอร์สใหม่")
+
+    package_10_full_price = models.DecimalField("10 สัปดาห์ - ราคาเต็ม", max_digits=10, decimal_places=2, default=3990)
+    package_10_discount = models.DecimalField("10 สัปดาห์ - ส่วนลด", max_digits=10, decimal_places=2, default=100)
+    package_10_net_price = models.DecimalField("10 สัปดาห์ - ราคาสุทธิ", max_digits=10, decimal_places=2, default=3890)
+
+    package_20_full_price = models.DecimalField("20 สัปดาห์ - ราคาเต็ม", max_digits=10, decimal_places=2, default=7980)
+    package_20_discount = models.DecimalField("20 สัปดาห์ - ส่วนลด", max_digits=10, decimal_places=2, default=500)
+    package_20_net_price = models.DecimalField("20 สัปดาห์ - ราคาสุทธิ", max_digits=10, decimal_places=2, default=7480)
+
+    package_30_full_price = models.DecimalField("30 สัปดาห์ - ราคาเต็ม", max_digits=10, decimal_places=2, default=11970)
+    package_30_discount = models.DecimalField("30 สัปดาห์ - ส่วนลด", max_digits=10, decimal_places=2, default=1000)
+    package_30_net_price = models.DecimalField("30 สัปดาห์ - ราคาสุทธิ", max_digits=10, decimal_places=2, default=10970)
+
+    note_wording = models.TextField(
+        "ข้อความท้ายใบแจ้ง",
+        default="ผู้ปกครองสามารถขอชะลอจ่าย เลื่อนจ่ายเป็นสิ้นเดือนได้โดยนักเรียนไม่ต้องเว้นวรรคการเรียนครับ ติดต่อแจ้งพี่ขนุนทาง Line @ ครับ",
+    )
+
+    created_by = models.ForeignKey(
+        "auth.User",
+        verbose_name="ผู้สร้าง",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="created_course_renewal_notices",
+    )
+    created_at = models.DateTimeField("วันที่สร้าง", default=timezone.now)
+    updated_at = models.DateTimeField("อัปเดตล่าสุด", auto_now=True)
+
+    class Meta:
+        verbose_name = "Course Renewal Notice"
+        verbose_name_plural = "Course Renewal Notices"
+        ordering = ("-created_at",)
+
+    def __str__(self) -> str:
+        return f"{self.student} | {self.tutoring_class} | {self.expected_course_end_date}"
+
+    def save(self, *args, **kwargs):
+        self.package_10_net_price = max((self.package_10_full_price or 0) - (self.package_10_discount or 0), Decimal("0"))
+        self.package_20_net_price = max((self.package_20_full_price or 0) - (self.package_20_discount or 0), Decimal("0"))
+        self.package_30_net_price = max((self.package_30_full_price or 0) - (self.package_30_discount or 0), Decimal("0"))
+        super().save(*args, **kwargs)
+
+    @property
+    def remaining_sessions_snapshot(self) -> int:
+        try:
+            return int(self.enrollment.remaining_sessions)
+        except Exception:
+            return 0
+
 # -----------------------
 # Attendance (เช็คชื่อแบบ 3 ปุ่ม)
 # -----------------------

@@ -613,9 +613,21 @@ class CoursePayment(models.Model):
 # -----------------------
 class CourseRenewalNotice(models.Model):
     """
-    ใบแจ้งการต่อคอร์ส:
-    สร้างจาก Enrollment ที่ใกล้ครบคอร์ส และเก็บประวัติใบแจ้งที่เคยสร้างไว้
+    ใบแจ้งการต่อคอร์ส / ใบแจ้งชำระงวดถัดไป:
+    สร้างจาก Enrollment และเก็บประวัติใบแจ้งที่เคยสร้างไว้
     """
+
+    class NoticeType(models.TextChoices):
+        RENEWAL = "renewal", "ใบแจ้งต่อคอร์ส"
+        INSTALLMENT = "installment", "ใบแจ้งชำระงวดถัดไป"
+
+    notice_type = models.CharField(
+        "ประเภทใบแจ้ง",
+        max_length=20,
+        choices=NoticeType.choices,
+        default=NoticeType.RENEWAL,
+    )
+
     enrollment = models.ForeignKey(
         Enrollment,
         verbose_name="Enrollment",
@@ -635,6 +647,16 @@ class CourseRenewalNotice(models.Model):
         related_name="renewal_notices",
     )
 
+    source_payment = models.ForeignKey(
+        CoursePayment,
+        verbose_name="ใบเสร็จอ้างอิง / งวดแรก",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="renewal_notices",
+        help_text="ใช้กับใบแจ้งชำระงวดถัดไป เพื่ออ้างอิงใบเสร็จงวดแรกหรือรายการที่เกี่ยวข้อง",
+    )
+
     expected_course_end_date = models.DateField("วันที่คาดว่าจะครบคอร์ส")
     next_course_start_date = models.DateField("วันที่เริ่มต้นคอร์สใหม่")
 
@@ -650,9 +672,42 @@ class CourseRenewalNotice(models.Model):
     package_30_discount = models.DecimalField("30 สัปดาห์ - ส่วนลด", max_digits=10, decimal_places=2, default=1000)
     package_30_net_price = models.DecimalField("30 สัปดาห์ - ราคาสุทธิ", max_digits=10, decimal_places=2, default=10970)
 
+    installment_full_amount = models.DecimalField(
+        "แบ่งชำระ - ยอดเต็ม",
+        max_digits=10,
+        decimal_places=2,
+        default=0,
+        help_text="ยอดเต็มของคอร์ส ใช้กับใบแจ้งชำระงวดถัดไป",
+    )
+    installment_paid_amount = models.DecimalField(
+        "แบ่งชำระ - ชำระแล้ว",
+        max_digits=10,
+        decimal_places=2,
+        default=0,
+        help_text="ยอดที่ชำระแล้ว ใช้กับใบแจ้งชำระงวดถัดไป",
+    )
+    installment_remaining_amount = models.DecimalField(
+        "แบ่งชำระ - ยอดคงเหลือ",
+        max_digits=10,
+        decimal_places=2,
+        default=0,
+        help_text="ยอดคงเหลือ ระบบคำนวณจากยอดเต็ม - ชำระแล้ว แต่ยังสามารถแก้ยอดเต็ม/ชำระแล้วก่อนบันทึกได้",
+    )
+
     note_wording = models.TextField(
         "ข้อความท้ายใบแจ้ง",
         default="ผู้ปกครองสามารถขอชะลอจ่าย เลื่อนจ่ายเป็นสิ้นเดือนได้โดยนักเรียนไม่ต้องเว้นวรรคการเรียนครับ ติดต่อแจ้งพี่ขนุนทาง Line @ ครับ",
+    )
+
+    is_sent_to_parent = models.BooleanField("ส่งแจ้งผู้ปกครองแล้ว", default=False)
+    sent_to_parent_at = models.DateTimeField("วันที่ส่งแจ้งผู้ปกครอง", null=True, blank=True)
+    sent_to_parent_by = models.ForeignKey(
+        "auth.User",
+        verbose_name="ผู้กดส่งแจ้ง",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="sent_course_renewal_notices",
     )
 
     created_by = models.ForeignKey(
@@ -672,12 +727,19 @@ class CourseRenewalNotice(models.Model):
         ordering = ("-created_at",)
 
     def __str__(self) -> str:
-        return f"{self.student} | {self.tutoring_class} | {self.expected_course_end_date}"
+        return f"{self.get_notice_type_display()} | {self.student} | {self.tutoring_class} | {self.expected_course_end_date}"
 
     def save(self, *args, **kwargs):
         self.package_10_net_price = max((self.package_10_full_price or 0) - (self.package_10_discount or 0), Decimal("0"))
         self.package_20_net_price = max((self.package_20_full_price or 0) - (self.package_20_discount or 0), Decimal("0"))
         self.package_30_net_price = max((self.package_30_full_price or 0) - (self.package_30_discount or 0), Decimal("0"))
+
+        if self.notice_type == self.NoticeType.INSTALLMENT:
+            self.installment_remaining_amount = max(
+                (self.installment_full_amount or 0) - (self.installment_paid_amount or 0),
+                Decimal("0"),
+            )
+
         super().save(*args, **kwargs)
 
     @property
@@ -686,6 +748,7 @@ class CourseRenewalNotice(models.Model):
             return int(self.enrollment.remaining_sessions)
         except Exception:
             return 0
+
 
 # -----------------------
 # Attendance (เช็คชื่อแบบ 3 ปุ่ม)

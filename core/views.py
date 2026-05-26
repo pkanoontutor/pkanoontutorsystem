@@ -31,6 +31,7 @@ from .models import (
     Tutor,
     TutorPayrollEntry,
     CoursePayment,
+    CourseRenewalNotice,
     TeachingTutor,
     TeachingClassSubjectTemplate,
     TeachingWeeklyAssignment,
@@ -1784,6 +1785,192 @@ def _school_finance_filtered_data(request: HttpRequest):
 
 
 @login_required
+
+
+# =========================================================
+# ✅ Course Renewal Notice Module
+# =========================================================
+def _default_renewal_dates(enrollment: Enrollment) -> tuple[date, date]:
+    """
+    Default วันครบคอร์ส:
+    - Class เสาร์เช้า/เสาร์บ่าย → วันเสาร์ที่กำลังจะมาถึง
+    - Class อาทิตย์เช้า/อาทิตย์บ่าย → วันอาทิตย์ที่กำลังจะมาถึง
+    - อื่น ๆ → วันเสาร์ที่กำลังจะมาถึง
+    """
+    today = timezone.localdate()
+    time_slot = getattr(enrollment.tutoring_class, "time_slot", "") if enrollment and enrollment.tutoring_class_id else ""
+
+    if time_slot in (
+        TutoringClass.TimeSlot.SUN_MORNING,
+        TutoringClass.TimeSlot.SUN_AFTERNOON,
+    ):
+        target_weekday = 6  # Sunday
+    else:
+        target_weekday = 5  # Saturday
+
+    days_ahead = (target_weekday - today.weekday()) % 7
+    expected_end = today + timedelta(days=days_ahead)
+    next_start = expected_end + timedelta(days=7)
+    return expected_end, next_start
+
+
+def _decimal_from_post(value, default: Decimal) -> Decimal:
+    try:
+        s = str(value or "").replace(",", "").strip()
+        if s == "":
+            return default
+        return Decimal(s)
+    except Exception:
+        return default
+
+
+def _renewal_notice_packages(notice: CourseRenewalNotice) -> list[dict]:
+    return [
+        {
+            "label": "ต่อคอร์ส 10 สัปดาห์",
+            "weeks": 10,
+            "full_price": notice.package_10_full_price,
+            "discount": notice.package_10_discount,
+            "net_price": notice.package_10_net_price,
+            "accent": "blue",
+        },
+        {
+            "label": "ต่อคอร์ส 20 สัปดาห์",
+            "weeks": 20,
+            "full_price": notice.package_20_full_price,
+            "discount": notice.package_20_discount,
+            "net_price": notice.package_20_net_price,
+            "accent": "green",
+        },
+        {
+            "label": "ต่อคอร์ส 30 สัปดาห์",
+            "weeks": 30,
+            "full_price": notice.package_30_full_price,
+            "discount": notice.package_30_discount,
+            "net_price": notice.package_30_net_price,
+            "accent": "purple",
+        },
+    ]
+
+
+@login_required
+def course_renewal_notice_list(request: HttpRequest) -> HttpResponse:
+    """
+    รายการ Enrollment ที่เหลือน้อยกว่า 2 ครั้ง และยัง active
+    รวมถึงกรณีเหลือ 1, 0 หรือติดลบ
+    """
+    q = (request.GET.get("q") or "").strip()
+
+    enrollments_qs = (
+        Enrollment.objects
+        .select_related("student", "tutoring_class")
+        .filter(
+            is_active=True,
+            student__is_active=True,
+            tutoring_class__is_active=True,
+        )
+        .order_by("tutoring_class__time_slot", "tutoring_class__name", "student__nickname", "student__full_name")
+    )
+
+    if q:
+        enrollments_qs = enrollments_qs.filter(
+            Q(student__nickname__icontains=q) |
+            Q(student__full_name__icontains=q) |
+            Q(student__student_code__icontains=q) |
+            Q(tutoring_class__name__icontains=q)
+        )
+
+    rows = []
+    for enrollment in enrollments_qs:
+        remaining = int(enrollment.remaining_sessions or 0)
+        if remaining < 2:
+            last_notice = (
+                CourseRenewalNotice.objects
+                .filter(enrollment=enrollment)
+                .order_by("-created_at")
+                .first()
+            )
+            expected_end, next_start = _default_renewal_dates(enrollment)
+            rows.append({
+                "enrollment": enrollment,
+                "student": enrollment.student,
+                "tutoring_class": enrollment.tutoring_class,
+                "remaining": remaining,
+                "last_notice": last_notice,
+                "default_expected_end": expected_end,
+                "default_next_start": next_start,
+            })
+
+    recent_notices = (
+        CourseRenewalNotice.objects
+        .select_related("student", "tutoring_class", "enrollment")
+        .order_by("-created_at")[:30]
+    )
+
+    return render(request, "core/course_renewal_notice_list.html", {
+        "rows": rows,
+        "recent_notices": recent_notices,
+        "q": q,
+    })
+
+
+@login_required
+def course_renewal_notice_create(request: HttpRequest, enrollment_id: int) -> HttpResponse:
+    enrollment = get_object_or_404(
+        Enrollment.objects.select_related("student", "tutoring_class"),
+        id=enrollment_id,
+        is_active=True,
+        student__is_active=True,
+        tutoring_class__is_active=True,
+    )
+
+    expected_end, next_start = _default_renewal_dates(enrollment)
+
+    notice = CourseRenewalNotice.objects.create(
+        enrollment=enrollment,
+        student=enrollment.student,
+        tutoring_class=enrollment.tutoring_class,
+        expected_course_end_date=expected_end,
+        next_course_start_date=next_start,
+        created_by=request.user if request.user.is_authenticated else None,
+    )
+
+    return redirect("core:course_renewal_notice_detail", pk=notice.pk)
+
+
+@login_required
+def course_renewal_notice_detail(request: HttpRequest, pk: int) -> HttpResponse:
+    notice = get_object_or_404(
+        CourseRenewalNotice.objects.select_related("student", "tutoring_class", "enrollment"),
+        pk=pk,
+    )
+
+    if request.method == "POST":
+        notice.expected_course_end_date = _parse_date(request.POST.get("expected_course_end_date"))
+        notice.next_course_start_date = _parse_date(request.POST.get("next_course_start_date"))
+
+        notice.package_10_full_price = _decimal_from_post(request.POST.get("package_10_full_price"), notice.package_10_full_price)
+        notice.package_10_discount = _decimal_from_post(request.POST.get("package_10_discount"), notice.package_10_discount)
+
+        notice.package_20_full_price = _decimal_from_post(request.POST.get("package_20_full_price"), notice.package_20_full_price)
+        notice.package_20_discount = _decimal_from_post(request.POST.get("package_20_discount"), notice.package_20_discount)
+
+        notice.package_30_full_price = _decimal_from_post(request.POST.get("package_30_full_price"), notice.package_30_full_price)
+        notice.package_30_discount = _decimal_from_post(request.POST.get("package_30_discount"), notice.package_30_discount)
+
+        notice.note_wording = (request.POST.get("note_wording") or "").strip() or notice.note_wording
+        notice.save()
+        return redirect("core:course_renewal_notice_detail", pk=notice.pk)
+
+    return render(request, "core/course_renewal_notice_detail.html", {
+        "notice": notice,
+        "student": notice.student,
+        "enrollment": notice.enrollment,
+        "tutoring_class": notice.tutoring_class,
+        "packages": _renewal_notice_packages(notice),
+    })
+
+
 def pkanoon_admin_tool(request: HttpRequest) -> HttpResponse:
     """Private landing page for sensitive school tools."""
     return render(request, "core/pkanoon_admin_tool.html")

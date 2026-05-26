@@ -653,16 +653,21 @@ class TeachingProgressUpdateAdmin(admin.ModelAdmin):
 class CourseRenewalNoticeAdmin(admin.ModelAdmin):
     list_display = (
         "created_at",
+        "notice_type",
         "student",
         "tutoring_class",
         "enrollment",
+        "source_payment",
         "expected_course_end_date",
         "next_course_start_date",
-        "package_10_net_price",
-        "package_20_net_price",
-        "package_30_net_price",
+        "is_sent_to_parent",
+        "sent_to_parent_at",
+        "installment_remaining_amount",
     )
     list_filter = (
+        "notice_type",
+        "is_sent_to_parent",
+        "sent_to_parent_at",
         "expected_course_end_date",
         "next_course_start_date",
         "tutoring_class",
@@ -674,8 +679,23 @@ class CourseRenewalNoticeAdmin(admin.ModelAdmin):
         "student__full_name",
         "tutoring_class__name",
         "enrollment__sale_run_no",
+        "source_payment__receipt_no",
     )
-    autocomplete_fields = ("student", "tutoring_class", "enrollment", "created_by")
-    readonly_fields = ("created_at", "updated_at")
+    autocomplete_fields = (
+        "student",
+        "tutoring_class",
+        "enrollment",
+        "source_payment",
+        "created_by",
+        "sent_to_parent_by",
+    )
+    readonly_fields = (
+        "created_at",
+        "updated_at",
+        "package_10_net_price",
+        "package_20_net_price",
+        "package_30_net_price",
+        "installment_remaining_amount",
+    )
     ordering = ("-created_at",)
 

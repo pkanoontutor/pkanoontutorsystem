@@ -3,28 +3,31 @@
 
 {% block head %}
 <style>
-  .renew-wrap{max-width:1320px;margin:0 auto;display:grid;gap:14px;}
-  .hero{background:linear-gradient(135deg,#0f172a,#ea580c,#f59e0b);color:#fff;border-radius:26px;padding:24px;box-shadow:0 14px 30px rgba(15,23,42,.20);display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;align-items:flex-start;}
+  .renew-wrap{max-width:1320px;margin:0 auto;display:grid;gap:14px}
+  .hero{background:linear-gradient(135deg,#0f172a,#ea580c,#f59e0b);color:#fff;border-radius:26px;padding:24px;box-shadow:0 14px 30px rgba(15,23,42,.20);display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;align-items:flex-start}
   .title{font-size:28px;font-weight:1000;letter-spacing:-.04em}.sub{color:#fff7ed;font-size:13px;margin-top:6px;line-height:1.6}
   .actions{display:flex;gap:8px;flex-wrap:wrap}.btnx{border:0;border-radius:14px;padding:10px 14px;font-weight:1000;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:7px;cursor:pointer;line-height:1.2}
-  .primary{background:#ea580c;color:#fff}.soft{background:#fff;color:#0f172a;border:1px solid #e2e8f0}.dark{background:#0f172a;color:#fff}.green{background:#16a34a;color:#fff}.blue{background:#2563eb;color:#fff}.red{background:#dc2626;color:#fff}
+  .btn-sm{width:36px;height:36px;padding:0;border-radius:999px;font-size:17px}
+  .primary{background:#ea580c;color:#fff}.soft{background:#fff;color:#0f172a;border:1px solid #e2e8f0}.dark{background:#0f172a;color:#fff}.green{background:#16a34a;color:#fff}.blue{background:#2563eb;color:#fff}.red{background:#dc2626;color:#fff}.amber{background:#f59e0b;color:#fff}
   .panel{background:#fff;border-radius:22px;padding:16px;box-shadow:0 6px 16px rgba(15,23,42,.08);border:1px solid rgba(255,255,255,.88)}
   .filter{display:grid;grid-template-columns:1.3fr 180px 180px auto auto;gap:10px;align-items:end}.field{display:flex;flex-direction:column;gap:5px}.field label{font-size:11px;font-weight:1000;color:#334155;text-transform:uppercase;letter-spacing:.04em}
   input{border:1px solid #e2e8f0;border-radius:13px;padding:10px 11px;font-weight:800;background:#fff;width:100%;min-width:0}
   .grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
-  .enroll-card,.notice-card{background:#fff;border:1px solid #e2e8f0;border-radius:20px;padding:14px;box-shadow:0 4px 12px rgba(15,23,42,.06);display:grid;gap:10px}
-  .notice-card.unsent{border-color:#fed7aa;background:#fff7ed}.notice-card.sent{border-color:#bbf7d0;background:#f0fdf4}.notice-card.installment{border-color:#bfdbfe;background:#eff6ff}
+  .enroll-card{background:#fff;border:1px solid #e2e8f0;border-radius:20px;padding:14px;box-shadow:0 4px 12px rgba(15,23,42,.06);display:grid;gap:10px}
+  .enroll-card.notified{background:#f0fdf4;border-color:#bbf7d0}.enroll-card.not-yet{background:#fff7ed;border-color:#fed7aa}
+  .student-line{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
   .student{font-size:18px;font-weight:1000;color:#0f172a;line-height:1.3}.meta{font-size:12px;color:#64748b;font-weight:800;line-height:1.5}
+  .icon-links{display:flex;gap:6px;flex:0 0 auto}
   .pillrow{display:flex;gap:6px;flex-wrap:wrap}.pill{border-radius:999px;padding:5px 10px;font-size:12px;font-weight:1000;border:1px solid #e2e8f0;background:#f8fafc;color:#334155}
   .dangerpill{background:#fee2e2;color:#991b1b;border-color:#fecaca}.warnpill{background:#fffbeb;color:#92400e;border-color:#fde68a}.bluepill{background:#eff6ff;color:#1d4ed8;border-color:#bfdbfe}.greenpill{background:#dcfce7;color:#166534;border-color:#86efac}.orangepill{background:#ffedd5;color:#9a3412;border-color:#fed7aa}
   .datebox{display:grid;grid-template-columns:1fr 1fr;gap:8px}.dateitem{border-radius:16px;background:#fff;border:1px solid #e2e8f0;padding:10px}.dateitem .k{font-size:11px;color:#64748b;font-weight:1000;text-transform:uppercase}.dateitem .v{font-size:14px;color:#0f172a;font-weight:1000;margin-top:3px}
-  .moneybox{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}.moneyitem{background:#fff;border:1px solid #bfdbfe;border-radius:16px;padding:10px}.moneyitem .k{font-size:11px;color:#1d4ed8;font-weight:1000}.moneyitem .v{font-size:15px;font-weight:1000;margin-top:3px;color:#0f172a}
   .section-head{display:flex;justify-content:space-between;align-items:flex-end;gap:10px;flex-wrap:wrap;margin-bottom:10px}.section-title{font-size:18px;font-weight:1000;color:#0f172a}.section-sub{font-size:12px;color:#64748b;font-weight:800;margin-top:2px}
   .empty{padding:26px;text-align:center;color:#64748b;font-weight:900;background:#f8fafc;border-radius:16px;border:1px dashed #cbd5e1}
   form.inline{display:inline}.action-row{display:flex;gap:8px;flex-wrap:wrap}.action-row .btnx{flex:1}
+  .mini-group{display:flex;gap:6px;flex-wrap:wrap}.mini-group .btnx{font-size:12px;padding:8px 10px}
   .table-wrap{overflow:auto;border:1px solid #e2e8f0;border-radius:16px}.recent-table{width:100%;border-collapse:collapse;min-width:900px}.recent-table th,.recent-table td{padding:10px;border-bottom:1px solid #edf2f7;text-align:left;vertical-align:top}.recent-table th{font-size:11px;color:#475569;background:#f8fafc;text-transform:uppercase}.recent-table td{font-size:13px;font-weight:700;color:#334155}
-  @media(max-width:1050px){.grid{grid-template-columns:1fr 1fr}.filter{grid-template-columns:1fr 1fr}.btnx{width:100%}.hero .btnx{width:auto}.moneybox{grid-template-columns:1fr}}
-  @media(max-width:640px){.grid{grid-template-columns:1fr}.datebox{grid-template-columns:1fr}.title{font-size:23px}.filter{grid-template-columns:1fr}.hero .btnx{width:100%}}
+  @media(max-width:1050px){.grid{grid-template-columns:1fr 1fr}.filter{grid-template-columns:1fr 1fr}.btnx{width:100%}.hero .btnx,.btn-sm{width:auto}.datebox{grid-template-columns:1fr}}
+  @media(max-width:640px){.grid{grid-template-columns:1fr}.title{font-size:23px}.filter{grid-template-columns:1fr}.hero .btnx{width:100%}}
 </style>
 {% endblock %}
 
@@ -33,7 +36,7 @@
   <section class="hero">
     <div>
       <div class="title">🔁 ระบบสร้างใบแจ้งต่อคอร์ส</div>
-      <div class="sub">แสดง Enrollment ที่ใกล้ครบคอร์ส, ใบแจ้งที่สร้างแล้วแต่ยังไม่ส่ง, ใบแจ้งที่ส่งผู้ปกครองแล้ว และรายการแบ่งชำระที่ยังมียอดคงเหลือ</div>
+      <div class="sub">แบ่งตามสถานะการกดส่งผู้ปกครองเท่านั้น: เปิด/สร้างใบแจ้งยังไม่ถือว่าส่งแล้ว ต้องกดปุ่ม “ส่งแจ้งผู้ปกครองแล้ว” ครับ</div>
     </div>
     <div class="actions">
       <a class="btnx soft" href="/pkanoon-admin-tool/">← Admin Tool</a>
@@ -63,60 +66,25 @@
   <section class="panel">
     <div class="section-head">
       <div>
-        <div class="section-title">สร้างใบแจ้งแล้ว แต่ยังไม่ได้ส่งผู้ปกครอง</div>
-        <div class="section-sub">รายการจะอยู่ตรงนี้จนกว่าจะกดปุ่ม “ส่งแจ้งผู้ปกครองแล้ว” เท่านั้น การเปิดรูป/Copy รูปจะไม่ถือว่าส่งแล้ว</div>
+        <div class="section-title">Enrollment ที่ใกล้ครบคอร์สแต่ยังไม่แจ้ง</div>
+        <div class="section-sub">รวมรายการที่ยังไม่เคยกด “ส่งแจ้งผู้ปกครองแล้ว” แม้จะเคยสร้างใบแจ้งไว้แล้วก็ตาม</div>
       </div>
-      <span class="pill orangepill">{{ unsent_notices|length }} รายการ</span>
+      <span class="pill orangepill">{{ not_notified_rows|length }} รายการ</span>
     </div>
     <div class="grid">
-      {% for n in unsent_notices %}
-      <div class="notice-card unsent {% if n.notice_type == 'installment' %}installment{% endif %}">
-        <div>
-          <div class="student">{{ n.student.nickname|default:"-" }} · {{ n.student.full_name }}</div>
-          <div class="meta">{{ n.tutoring_class.name }} · {{ n.enrollment.sale_run_no|default:n.enrollment.id }}<br>สร้างเมื่อ {{ n.created_at|date:"d/m/Y H:i" }}</div>
-        </div>
-        <div class="pillrow">
-          {% if n.notice_type == 'installment' %}
-            <span class="pill bluepill">ใบแจ้งชำระงวดถัดไป</span>
-            <span class="pill">คงเหลือ ฿{{ n.installment_remaining_amount|floatformat:0 }}</span>
-          {% else %}
-            <span class="pill warnpill">ใบแจ้งต่อคอร์ส</span>
-            <span class="pill">คาดครบ {{ n.expected_course_end_date|date:"d/m/Y" }}</span>
-          {% endif %}
-          <span class="pill orangepill">ยังไม่ส่ง</span>
-        </div>
-        <div class="action-row">
-          <a class="btnx soft" href="{% url 'core:course_renewal_notice_detail' n.id %}">เปิด/แก้ไข</a>
-          <a class="btnx soft" href="/adminlublub/core/student/{{ n.student.id }}/change/" target="_blank">Student</a>
-          <a class="btnx soft" href="/adminlublub/core/enrollment/{{ n.enrollment.id }}/change/" target="_blank">Enrollment</a>
-          <form class="inline" method="post" action="{% url 'core:course_renewal_notice_mark_sent' n.id %}">
-            {% csrf_token %}
-            <button class="btnx green" type="submit">ส่งแจ้งผู้ปกครองแล้ว</button>
-          </form>
-        </div>
-      </div>
-      {% empty %}
-        <div class="empty">ไม่มีใบแจ้งที่ค้างส่ง</div>
-      {% endfor %}
-    </div>
-  </section>
-
-  <section class="panel">
-    <div class="section-head">
-      <div>
-        <div class="section-title">Enrollment ที่ใกล้ครบคอร์ส</div>
-        <div class="section-sub">แสดงเฉพาะ Active Enrollment ที่เหลือน้อยกว่า 2 ครั้ง และยังไม่มีใบแจ้งต่อคอร์สที่ค้างส่งอยู่</div>
-      </div>
-      <span class="pill warnpill">{{ rows|length }} รายการ</span>
-    </div>
-    <div class="grid">
-      {% for row in rows %}
-        <div class="enroll-card">
-          <div>
-            <div class="student">{{ row.student.nickname|default:"-" }} · {{ row.student.full_name }}</div>
-            <div class="meta">
-              {{ row.student.student_code }} · {{ row.student.grade_level|default:"-" }}<br>
-              {{ row.tutoring_class.name }} · {{ row.tutoring_class.get_time_slot_display }}
+      {% for row in not_notified_rows %}
+        <div class="enroll-card not-yet">
+          <div class="student-line">
+            <div>
+              <div class="student">{{ row.student.nickname|default:"-" }} · {{ row.student.full_name }}</div>
+              <div class="meta">
+                {{ row.student.student_code }} · {{ row.student.grade_level|default:"-" }}<br>
+                {{ row.tutoring_class.name }} · {{ row.tutoring_class.get_time_slot_display }}
+              </div>
+            </div>
+            <div class="icon-links">
+              <a class="btnx soft btn-sm" title="Student" href="{{ row.student_admin_url }}">👤</a>
+              <a class="btnx soft btn-sm" title="Enrollment" href="{{ row.enrollment_admin_url }}">📚</a>
             </div>
           </div>
 
@@ -126,13 +94,10 @@
             {% else %}
               <span class="pill warnpill">เหลือ {{ row.remaining }} ครั้ง</span>
             {% endif %}
-            <span class="pill bluepill">Active</span>
-            {% if row.last_notice %}
-              {% if row.last_notice.is_sent_to_parent %}
-                <span class="pill greenpill">เคยส่งแล้ว {{ row.last_notice.sent_to_parent_at|date:"d/m/Y" }}</span>
-              {% else %}
-                <span class="pill orangepill">เคยสร้างแล้ว ยังไม่ส่ง</span>
-              {% endif %}
+            {% if row.latest_unsent_notice %}
+              <span class="pill orangepill">สร้างใบแจ้งไว้แล้ว ยังไม่ส่ง</span>
+            {% else %}
+              <span class="pill">ยังไม่สร้างใบแจ้ง</span>
             {% endif %}
           </div>
 
@@ -142,13 +107,23 @@
           </div>
 
           <div class="action-row">
-            <a class="btnx soft" href="{{ row.student_admin_url }}" target="_blank">Student</a>
-            <a class="btnx soft" href="{{ row.enrollment_admin_url }}" target="_blank">Enrollment</a>
-            <a class="btnx green" href="{% url 'core:course_renewal_notice_create' row.enrollment.id %}">สร้างใบแจ้งการต่อคอร์ส</a>
+            {% if row.latest_unsent_notice %}
+              <a class="btnx blue" href="{% url 'core:course_renewal_notice_detail' row.latest_unsent_notice.id %}">เปิดใบแจ้ง</a>
+              <form class="inline" method="post" action="{% url 'core:course_renewal_notice_mark_sent' row.latest_unsent_notice.id %}">
+                {% csrf_token %}
+                <button class="btnx green" type="submit">ส่งแจ้งผู้ปกครองแล้ว</button>
+              </form>
+            {% endif %}
+            <a class="btnx green" href="{% url 'core:course_renewal_notice_create' row.enrollment.id %}">สร้างใบแจ้งต่อคอร์สใหม่</a>
+          </div>
+          <div class="mini-group">
+            <a class="btnx soft" href="{% url 'core:course_installment_notice_create' row.enrollment.id %}?installment_no=2">สร้างงวด 2</a>
+            <a class="btnx soft" href="{% url 'core:course_installment_notice_create' row.enrollment.id %}?installment_no=3">สร้างงวด 3</a>
+            <a class="btnx soft" href="{% url 'core:course_installment_notice_create' row.enrollment.id %}?installment_no=4">สร้างงวด 4</a>
           </div>
         </div>
       {% empty %}
-        <div class="empty">ยังไม่มี Enrollment ที่เข้าเงื่อนไข หรือมีใบแจ้งที่ค้างส่งอยู่แล้ว</div>
+        <div class="empty">ไม่มี Enrollment ที่ใกล้ครบคอร์สและยังไม่แจ้ง</div>
       {% endfor %}
     </div>
   </section>
@@ -156,31 +131,53 @@
   <section class="panel">
     <div class="section-head">
       <div>
-        <div class="section-title">ใบแจ้งชำระงวดถัดไป / ส่วนที่สอง</div>
-        <div class="section-sub">รวมยอดจ่ายจริงจากใบเสร็จสถานะออกใบเสร็จแล้วเท่านั้น ไม่รวมใบที่ยกเลิก และยังสามารถแก้ยอดในหน้าใบแจ้งได้</div>
+        <div class="section-title">Enrollment ที่ใกล้ครบคอร์สและแจ้งแล้ว</div>
+        <div class="section-sub">รายการที่เคยกด “ส่งแจ้งผู้ปกครองแล้ว” อย่างน้อย 1 ครั้ง และยังสามารถสร้างใบแจ้งใหม่ได้</div>
       </div>
-      <span class="pill bluepill">{{ installment_rows|length }} รายการ</span>
+      <span class="pill greenpill">{{ notified_rows|length }} รายการ</span>
     </div>
     <div class="grid">
-      {% for row in installment_rows %}
-        <div class="enroll-card">
-          <div>
-            <div class="student">{{ row.student.nickname|default:"-" }} · {{ row.student.full_name }}</div>
-            <div class="meta">{{ row.tutoring_class.name }} · {{ row.enrollment.sale_run_no|default:row.enrollment.id }}</div>
+      {% for row in notified_rows %}
+        <div class="enroll-card notified">
+          <div class="student-line">
+            <div>
+              <div class="student">{{ row.student.nickname|default:"-" }} · {{ row.student.full_name }}</div>
+              <div class="meta">
+                {{ row.student.student_code }} · {{ row.student.grade_level|default:"-" }}<br>
+                {{ row.tutoring_class.name }} · {{ row.tutoring_class.get_time_slot_display }}
+              </div>
+            </div>
+            <div class="icon-links">
+              <a class="btnx soft btn-sm" title="Student" href="{{ row.student_admin_url }}">👤</a>
+              <a class="btnx soft btn-sm" title="Enrollment" href="{{ row.enrollment_admin_url }}">📚</a>
+            </div>
           </div>
-          <div class="moneybox">
-            <div class="moneyitem"><div class="k">ยอดเต็ม</div><div class="v">฿{{ row.full_amount|floatformat:0 }}</div></div>
-            <div class="moneyitem"><div class="k">ชำระแล้ว</div><div class="v">฿{{ row.paid_amount|floatformat:0 }}</div></div>
-            <div class="moneyitem"><div class="k">คงเหลือ</div><div class="v">฿{{ row.remaining_amount|floatformat:0 }}</div></div>
+
+          <div class="pillrow">
+            {% if row.remaining <= 0 %}
+              <span class="pill dangerpill">เหลือ {{ row.remaining }} ครั้ง</span>
+            {% else %}
+              <span class="pill warnpill">เหลือ {{ row.remaining }} ครั้ง</span>
+            {% endif %}
+            <span class="pill greenpill">แจ้งแล้ว {{ row.latest_sent_notice.sent_to_parent_at|date:"d/m/Y H:i" }}</span>
           </div>
+
           <div class="action-row">
-            <a class="btnx soft" href="{{ row.student_admin_url }}" target="_blank">Student</a>
-            <a class="btnx soft" href="{{ row.enrollment_admin_url }}" target="_blank">Enrollment</a>
-            <a class="btnx blue" href="{% url 'core:course_installment_notice_create' row.enrollment.id %}">สร้างใบแจ้งชำระงวดถัดไป</a>
+            <a class="btnx blue" href="{% url 'core:course_renewal_notice_detail' row.latest_sent_notice.id %}">เปิดใบล่าสุด</a>
+            <form class="inline" method="post" action="{% url 'core:course_renewal_notice_unmark_sent' row.latest_sent_notice.id %}">
+              {% csrf_token %}
+              <button class="btnx red" type="submit">ยกเลิกสถานะส่งแล้ว</button>
+            </form>
+            <a class="btnx green" href="{% url 'core:course_renewal_notice_create' row.enrollment.id %}">สร้างใบแจ้งใหม่</a>
+          </div>
+          <div class="mini-group">
+            <a class="btnx soft" href="{% url 'core:course_installment_notice_create' row.enrollment.id %}?installment_no=2">สร้างงวด 2</a>
+            <a class="btnx soft" href="{% url 'core:course_installment_notice_create' row.enrollment.id %}?installment_no=3">สร้างงวด 3</a>
+            <a class="btnx soft" href="{% url 'core:course_installment_notice_create' row.enrollment.id %}?installment_no=4">สร้างงวด 4</a>
           </div>
         </div>
       {% empty %}
-        <div class="empty">ยังไม่มีรายการแบ่งชำระที่มียอดคงเหลือ หรือมีใบแจ้งงวดถัดไปที่ค้างส่งอยู่แล้ว</div>
+        <div class="empty">ยังไม่มี Enrollment ที่ใกล้ครบคอร์สและแจ้งแล้ว</div>
       {% endfor %}
     </div>
   </section>
@@ -188,20 +185,20 @@
   <section class="panel">
     <div class="section-head">
       <div>
-        <div class="section-title">ส่งแจ้งผู้ปกครองแล้ว</div>
-        <div class="section-sub">แสดงทั้งหมดตาม filter วันที่ส่งแจ้ง สามารถกดยกเลิกสถานะส่งแล้วได้ถ้ากดผิด</div>
+        <div class="section-title">ประวัติใบแจ้งที่ส่งผู้ปกครองแล้ว</div>
+        <div class="section-sub">ใช้ filter วันที่ด้านบนได้</div>
       </div>
     </div>
     <div class="table-wrap">
       <table class="recent-table">
         <thead>
           <tr>
-            <th>วันที่ส่ง</th>
+            <th>ส่งเมื่อ</th>
             <th>ประเภท</th>
             <th>นักเรียน</th>
             <th>Class</th>
-            <th>ยอดคงเหลือ/วันครบ</th>
-            <th>ผู้กดส่ง</th>
+            <th>คาดว่าจะครบ / เริ่มใหม่</th>
+            <th>โดย</th>
             <th></th>
           </tr>
         </thead>
@@ -209,29 +206,18 @@
           {% for n in sent_notices %}
           <tr>
             <td>{{ n.sent_to_parent_at|date:"d/m/Y H:i" }}</td>
-            <td>{{ n.get_notice_type_display }}</td>
+            <td>
+              {{ n.get_notice_type_display }}
+              {% if n.notice_type == "installment" and n.installment_no %}<br><span class="pill bluepill">งวดที่ {{ n.installment_no }}</span>{% endif %}
+            </td>
             <td>{{ n.student.nickname|default:"-" }} · {{ n.student.full_name }}</td>
             <td>{{ n.tutoring_class.name }}</td>
-            <td>
-              {% if n.notice_type == 'installment' %}
-                คงเหลือ ฿{{ n.installment_remaining_amount|floatformat:0 }}
-              {% else %}
-                คาดครบ {{ n.expected_course_end_date|date:"d/m/Y" }}
-              {% endif %}
-            </td>
-            <td>{% if n.sent_to_parent_by %}{{ n.sent_to_parent_by }}{% else %}-{% endif %}</td>
-            <td>
-              <div class="action-row">
-                <a class="btnx soft" href="{% url 'core:course_renewal_notice_detail' n.id %}">เปิด</a>
-                <form class="inline" method="post" action="{% url 'core:course_renewal_notice_unmark_sent' n.id %}">
-                  {% csrf_token %}
-                  <button class="btnx red" type="submit">ยกเลิกสถานะส่งแล้ว</button>
-                </form>
-              </div>
-            </td>
+            <td>{{ n.expected_course_end_date|date:"d/m/Y" }} / {{ n.next_course_start_date|date:"d/m/Y" }}</td>
+            <td>{{ n.sent_to_parent_by|default:"-" }}</td>
+            <td><a class="btnx soft" href="{% url 'core:course_renewal_notice_detail' n.id %}">เปิด</a></td>
           </tr>
           {% empty %}
-          <tr><td colspan="7" class="empty">ยังไม่มีรายการที่ส่งแล้วในช่วงวันที่ที่เลือก</td></tr>
+          <tr><td colspan="7" class="empty">ยังไม่มีประวัติใบแจ้งที่ส่งแล้ว</td></tr>
           {% endfor %}
         </tbody>
       </table>

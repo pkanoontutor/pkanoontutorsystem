@@ -1,0 +1,124 @@
+{% extends "core/base.html" %}
+{% block title %}ระบบสร้างใบแจ้งต่อคอร์ส{% endblock %}
+
+{% block head %}
+<style>
+  .renew-wrap{max-width:1280px;margin:0 auto;display:grid;gap:14px;}
+  .hero{background:linear-gradient(135deg,#0f172a,#ea580c,#f59e0b);color:#fff;border-radius:26px;padding:24px;box-shadow:0 14px 30px rgba(15,23,42,.20);display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;align-items:flex-start;}
+  .title{font-size:28px;font-weight:1000;letter-spacing:-.04em}.sub{color:#fff7ed;font-size:13px;margin-top:6px;line-height:1.6}
+  .actions{display:flex;gap:8px;flex-wrap:wrap}.btnx{border:0;border-radius:14px;padding:10px 14px;font-weight:1000;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:7px;cursor:pointer}
+  .primary{background:#ea580c;color:#fff}.soft{background:#fff;color:#0f172a;border:1px solid #e2e8f0}.dark{background:#0f172a;color:#fff}.green{background:#16a34a;color:#fff}
+  .panel{background:#fff;border-radius:22px;padding:16px;box-shadow:0 6px 16px rgba(15,23,42,.08);border:1px solid rgba(255,255,255,.88)}
+  .filter{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:end}.field{display:flex;flex-direction:column;gap:5px}.field label{font-size:11px;font-weight:1000;color:#334155;text-transform:uppercase;letter-spacing:.04em}
+  input{border:1px solid #e2e8f0;border-radius:13px;padding:10px 11px;font-weight:800;background:#fff;width:100%}
+  .grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+  .enroll-card{background:#fff;border:1px solid #e2e8f0;border-radius:20px;padding:14px;box-shadow:0 4px 12px rgba(15,23,42,.06);display:grid;gap:10px}
+  .student{font-size:18px;font-weight:1000;color:#0f172a;line-height:1.3}.meta{font-size:12px;color:#64748b;font-weight:800;line-height:1.5}
+  .pillrow{display:flex;gap:6px;flex-wrap:wrap}.pill{border-radius:999px;padding:5px 10px;font-size:12px;font-weight:1000;border:1px solid #e2e8f0;background:#f8fafc;color:#334155}
+  .dangerpill{background:#fee2e2;color:#991b1b;border-color:#fecaca}.warnpill{background:#fffbeb;color:#92400e;border-color:#fde68a}.bluepill{background:#eff6ff;color:#1d4ed8;border-color:#bfdbfe}
+  .datebox{display:grid;grid-template-columns:1fr 1fr;gap:8px}.dateitem{border-radius:16px;background:#fff7ed;border:1px solid #fed7aa;padding:10px}.dateitem .k{font-size:11px;color:#9a3412;font-weight:1000;text-transform:uppercase}.dateitem .v{font-size:14px;color:#0f172a;font-weight:1000;margin-top:3px}
+  .section-title{font-size:18px;font-weight:1000;color:#0f172a;margin:2px 0 8px}.recent-table{width:100%;border-collapse:collapse}.recent-table th,.recent-table td{padding:10px;border-bottom:1px solid #edf2f7;text-align:left}.recent-table th{font-size:11px;color:#475569;background:#f8fafc;text-transform:uppercase}
+  .empty{padding:26px;text-align:center;color:#64748b;font-weight:900}
+  @media(max-width:980px){.grid{grid-template-columns:1fr 1fr}.filter{grid-template-columns:1fr}.btnx{width:100%}.hero .btnx{width:auto}}
+  @media(max-width:640px){.grid{grid-template-columns:1fr}.datebox{grid-template-columns:1fr}.title{font-size:23px}}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="renew-wrap">
+  <section class="hero">
+    <div>
+      <div class="title">🔁 ระบบสร้างใบแจ้งต่อคอร์ส</div>
+      <div class="sub">แสดงเฉพาะ Enrollment ที่ยัง Active และเหลือจำนวนน้อยกว่า 2 ครั้ง รวมถึง 1, 0 และติดลบ</div>
+    </div>
+    <div class="actions">
+      <a class="btnx soft" href="/pkanoon-admin-tool/">← Admin Tool</a>
+      <a class="btnx soft" href="/dashboard/">Dashboard</a>
+    </div>
+  </section>
+
+  <section class="panel">
+    <form method="get" class="filter">
+      <div class="field">
+        <label>ค้นหา</label>
+        <input name="q" value="{{ q }}" placeholder="ชื่อเล่น / ชื่อจริง / รหัสนักเรียน / ชื่อ class">
+      </div>
+      <button class="btnx primary" type="submit">ค้นหา</button>
+    </form>
+  </section>
+
+  <section class="panel">
+    <div class="section-title">Enrollment ที่ใกล้ครบคอร์ส</div>
+    <div class="grid">
+      {% for row in rows %}
+        <div class="enroll-card">
+          <div>
+            <div class="student">{{ row.student.nickname|default:"-" }} · {{ row.student.full_name }}</div>
+            <div class="meta">
+              {{ row.student.student_code }} · {{ row.student.grade_level|default:"-" }}<br>
+              {{ row.tutoring_class.name }} · {{ row.tutoring_class.get_time_slot_display }}
+            </div>
+          </div>
+
+          <div class="pillrow">
+            {% if row.remaining <= 0 %}
+              <span class="pill dangerpill">เหลือ {{ row.remaining }} ครั้ง</span>
+            {% else %}
+              <span class="pill warnpill">เหลือ {{ row.remaining }} ครั้ง</span>
+            {% endif %}
+            <span class="pill bluepill">Active</span>
+            {% if row.last_notice %}<span class="pill">เคยสร้างแล้ว {{ row.last_notice.created_at|date:"d/m/Y" }}</span>{% endif %}
+          </div>
+
+          <div class="datebox">
+            <div class="dateitem">
+              <div class="k">คาดว่าจะครบ</div>
+              <div class="v">{{ row.default_expected_end|date:"d/m/Y" }}</div>
+            </div>
+            <div class="dateitem">
+              <div class="k">เริ่มใหม่</div>
+              <div class="v">{{ row.default_next_start|date:"d/m/Y" }}</div>
+            </div>
+          </div>
+
+          <a class="btnx green" href="{% url 'core:course_renewal_notice_create' row.enrollment.id %}">สร้างใบแจ้งการต่อคอร์ส</a>
+        </div>
+      {% empty %}
+        <div class="empty">ยังไม่มี Enrollment ที่เหลือน้อยกว่า 2 ครั้ง</div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="section-title">ประวัติใบแจ้งล่าสุด</div>
+    <div style="overflow:auto;border:1px solid #e2e8f0;border-radius:16px;">
+      <table class="recent-table">
+        <thead>
+          <tr>
+            <th>วันที่สร้าง</th>
+            <th>นักเรียน</th>
+            <th>Class</th>
+            <th>คาดว่าจะครบ</th>
+            <th>เริ่มใหม่</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for n in recent_notices %}
+          <tr>
+            <td>{{ n.created_at|date:"d/m/Y H:i" }}</td>
+            <td>{{ n.student.nickname|default:"-" }} · {{ n.student.full_name }}</td>
+            <td>{{ n.tutoring_class.name }}</td>
+            <td>{{ n.expected_course_end_date|date:"d/m/Y" }}</td>
+            <td>{{ n.next_course_start_date|date:"d/m/Y" }}</td>
+            <td><a class="btnx soft" href="{% url 'core:course_renewal_notice_detail' n.id %}">เปิด</a></td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="6" class="empty">ยังไม่มีประวัติใบแจ้ง</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+{% endblock %}

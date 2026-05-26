@@ -619,7 +619,7 @@ class CourseRenewalNotice(models.Model):
 
     class NoticeType(models.TextChoices):
         RENEWAL = "renewal", "ใบแจ้งต่อคอร์ส"
-        INSTALLMENT = "installment", "ใบแจ้งชำระงวดถัดไป"
+        INSTALLMENT = "installment", "ใบแจ้งชำระงวดที่ 2/3/4"
 
     notice_type = models.CharField(
         "ประเภทใบแจ้ง",
@@ -694,6 +694,19 @@ class CourseRenewalNotice(models.Model):
         help_text="ยอดคงเหลือ ระบบคำนวณจากยอดเต็ม - ชำระแล้ว แต่ยังสามารถแก้ยอดเต็ม/ชำระแล้วก่อนบันทึกได้",
     )
 
+    installment_no = models.PositiveSmallIntegerField(
+        "งวดที่แจ้งชำระ",
+        null=True,
+        blank=True,
+        choices=((2, "งวดที่ 2"), (3, "งวดที่ 3"), (4, "งวดที่ 4")),
+        help_text="ใช้กับใบแจ้งชำระงวดที่ 2/3/4",
+    )
+    installment_sessions = models.PositiveIntegerField(
+        "จำนวนครั้งที่ให้เรียนจากงวดนี้",
+        default=0,
+        help_text="กรอกเองสำหรับใบแจ้งชำระงวดที่ 2/3/4",
+    )
+
     note_wording = models.TextField(
         "ข้อความท้ายใบแจ้ง",
         default="ผู้ปกครองสามารถขอชะลอจ่าย เลื่อนจ่ายเป็นสิ้นเดือนได้โดยนักเรียนไม่ต้องเว้นวรรคการเรียนครับ ติดต่อแจ้งพี่ขนุนทาง Line @ ครับ",
@@ -739,6 +752,11 @@ class CourseRenewalNotice(models.Model):
                 (self.installment_full_amount or 0) - (self.installment_paid_amount or 0),
                 Decimal("0"),
             )
+            if not self.installment_no:
+                self.installment_no = 2
+        else:
+            self.installment_no = None
+            self.installment_sessions = 0
 
         super().save(*args, **kwargs)
 

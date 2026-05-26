@@ -38,6 +38,13 @@ urlpatterns = [
     path("school-finance/delete-payroll/<int:pk>/", views.tutor_payroll_delete, name="tutor_payroll_delete"),
 
 
+
+
+# Course renewal notices
+path("course-renewal-notices/", views.course_renewal_notice_list, name="course_renewal_notice_list"),
+path("course-renewal-notices/create/<int:enrollment_id>/", views.course_renewal_notice_create, name="course_renewal_notice_create"),
+path("course-renewal-notices/<int:pk>/", views.course_renewal_notice_detail, name="course_renewal_notice_detail"),
+
     # Course payments / receipts
     path("course-payments/", views.course_payment_list, name="course_payment_list"),
     path("course-payments/new/", views.course_payment_create, name="course_payment_create"),

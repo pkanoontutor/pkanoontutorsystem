@@ -654,6 +654,8 @@ class CourseRenewalNoticeAdmin(admin.ModelAdmin):
     list_display = (
         "created_at",
         "notice_type",
+        "installment_no",
+        "installment_sessions",
         "student",
         "tutoring_class",
         "enrollment",
@@ -666,6 +668,7 @@ class CourseRenewalNoticeAdmin(admin.ModelAdmin):
     )
     list_filter = (
         "notice_type",
+        "installment_no",
         "is_sent_to_parent",
         "sent_to_parent_at",
         "expected_course_end_date",

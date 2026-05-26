@@ -20,6 +20,7 @@ from .models import (
     Tutor,
     TutorPayrollEntry,
     CoursePayment,
+    CourseRenewalNotice,
     TeachingTutor,
     TeachingClassSubjectTemplate,
     TeachingWeeklyAssignment,
@@ -641,4 +642,40 @@ class TeachingProgressUpdateAdmin(admin.ModelAdmin):
     @admin.display(description="ติวเตอร์")
     def tutor_display(self, obj):
         return obj.assignment.tutor.name if obj.assignment_id and obj.assignment.tutor_id else "-"
+
+
+
+
+# -----------------------
+# Course Renewal Notice
+# -----------------------
+@admin.register(CourseRenewalNotice)
+class CourseRenewalNoticeAdmin(admin.ModelAdmin):
+    list_display = (
+        "created_at",
+        "student",
+        "tutoring_class",
+        "enrollment",
+        "expected_course_end_date",
+        "next_course_start_date",
+        "package_10_net_price",
+        "package_20_net_price",
+        "package_30_net_price",
+    )
+    list_filter = (
+        "expected_course_end_date",
+        "next_course_start_date",
+        "tutoring_class",
+        "created_at",
+    )
+    search_fields = (
+        "student__student_code",
+        "student__nickname",
+        "student__full_name",
+        "tutoring_class__name",
+        "enrollment__sale_run_no",
+    )
+    autocomplete_fields = ("student", "tutoring_class", "enrollment", "created_by")
+    readonly_fields = ("created_at", "updated_at")
+    ordering = ("-created_at",)
 

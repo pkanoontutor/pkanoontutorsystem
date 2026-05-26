@@ -1851,13 +1851,48 @@ def _renewal_notice_packages(notice: CourseRenewalNotice) -> list[dict]:
     ]
 
 
+def _issued_payments_for_enrollment(enrollment: Enrollment):
+    return (
+        CoursePayment.objects
+        .filter(enrollment=enrollment, status=CoursePayment.ReceiptStatus.ISSUED)
+        .order_by("payment_date", "created_at")
+    )
+
+
+def _installment_amounts_for_enrollment(enrollment: Enrollment) -> dict:
+    payments = _issued_payments_for_enrollment(enrollment)
+    paid = payments.aggregate(total=Sum("amount_paid")).get("total") or Decimal("0")
+    full = Decimal(str(enrollment.net_price or enrollment.course_price or 0))
+    remaining = max(full - paid, Decimal("0"))
+    return {
+        "full": full,
+        "paid": paid,
+        "remaining": remaining,
+        "first_payment": payments.first(),
+    }
+
+
+def _admin_student_url(student: Student) -> str:
+    return f"/adminlublub/core/student/{student.id}/change/" if student and student.id else "#"
+
+
+def _admin_enrollment_url(enrollment: Enrollment) -> str:
+    return f"/adminlublub/core/enrollment/{enrollment.id}/change/" if enrollment and enrollment.id else "#"
+
+
 @login_required
 def course_renewal_notice_list(request: HttpRequest) -> HttpResponse:
     """
     รายการ Enrollment ที่เหลือน้อยกว่า 2 ครั้ง และยัง active
     รวมถึงกรณีเหลือ 1, 0 หรือติดลบ
+
+    แยกใบแจ้งเป็น:
+    - สร้างแล้ว แต่ยังไม่ได้กดส่งแจ้งผู้ปกครอง
+    - ส่งแจ้งผู้ปกครองแล้ว
     """
     q = (request.GET.get("q") or "").strip()
+    date_from = _safe_date(request.GET.get("date_from"))
+    date_to = _safe_date(request.GET.get("date_to"))
 
     enrollments_qs = (
         Enrollment.objects
@@ -1875,16 +1910,48 @@ def course_renewal_notice_list(request: HttpRequest) -> HttpResponse:
             Q(student__nickname__icontains=q) |
             Q(student__full_name__icontains=q) |
             Q(student__student_code__icontains=q) |
-            Q(tutoring_class__name__icontains=q)
+            Q(tutoring_class__name__icontains=q) |
+            Q(sale_run_no__icontains=q)
         )
 
+    unsent_notices_qs = (
+        CourseRenewalNotice.objects
+        .select_related("student", "tutoring_class", "enrollment", "source_payment")
+        .filter(is_sent_to_parent=False)
+    )
+    if q:
+        unsent_notices_qs = unsent_notices_qs.filter(
+            Q(student__nickname__icontains=q) |
+            Q(student__full_name__icontains=q) |
+            Q(student__student_code__icontains=q) |
+            Q(tutoring_class__name__icontains=q) |
+            Q(enrollment__sale_run_no__icontains=q)
+        )
+    if date_from:
+        unsent_notices_qs = unsent_notices_qs.filter(created_at__date__gte=date_from)
+    if date_to:
+        unsent_notices_qs = unsent_notices_qs.filter(created_at__date__lte=date_to)
+
+    unsent_notices = list(unsent_notices_qs.order_by("-created_at"))
+
+    unsent_renewal_enrollment_ids = {
+        n.enrollment_id for n in unsent_notices
+        if n.notice_type == CourseRenewalNotice.NoticeType.RENEWAL
+    }
+    unsent_installment_enrollment_ids = {
+        n.enrollment_id for n in unsent_notices
+        if n.notice_type == CourseRenewalNotice.NoticeType.INSTALLMENT
+    }
+
     rows = []
+    installment_rows = []
     for enrollment in enrollments_qs:
-        remaining = int(enrollment.remaining_sessions or 0)
-        if remaining < 2:
+        remaining_sessions = int(enrollment.remaining_sessions or 0)
+
+        if remaining_sessions < 2 and enrollment.id not in unsent_renewal_enrollment_ids:
             last_notice = (
                 CourseRenewalNotice.objects
-                .filter(enrollment=enrollment)
+                .filter(enrollment=enrollment, notice_type=CourseRenewalNotice.NoticeType.RENEWAL)
                 .order_by("-created_at")
                 .first()
             )
@@ -1893,22 +1960,60 @@ def course_renewal_notice_list(request: HttpRequest) -> HttpResponse:
                 "enrollment": enrollment,
                 "student": enrollment.student,
                 "tutoring_class": enrollment.tutoring_class,
-                "remaining": remaining,
+                "remaining": remaining_sessions,
                 "last_notice": last_notice,
                 "default_expected_end": expected_end,
                 "default_next_start": next_start,
+                "student_admin_url": _admin_student_url(enrollment.student),
+                "enrollment_admin_url": _admin_enrollment_url(enrollment),
             })
 
-    recent_notices = (
+        amounts = _installment_amounts_for_enrollment(enrollment)
+        is_installment_like = (
+            enrollment.payment_type == Enrollment.PaymentType.INSTALLMENT
+            or amounts["paid"] > Decimal("0")
+        )
+        if is_installment_like and amounts["remaining"] > Decimal("0") and enrollment.id not in unsent_installment_enrollment_ids:
+            installment_rows.append({
+                "enrollment": enrollment,
+                "student": enrollment.student,
+                "tutoring_class": enrollment.tutoring_class,
+                "full_amount": amounts["full"],
+                "paid_amount": amounts["paid"],
+                "remaining_amount": amounts["remaining"],
+                "first_payment": amounts["first_payment"],
+                "student_admin_url": _admin_student_url(enrollment.student),
+                "enrollment_admin_url": _admin_enrollment_url(enrollment),
+            })
+
+    sent_notices_qs = (
         CourseRenewalNotice.objects
-        .select_related("student", "tutoring_class", "enrollment")
-        .order_by("-created_at")[:30]
+        .select_related("student", "tutoring_class", "enrollment", "source_payment", "sent_to_parent_by")
+        .filter(is_sent_to_parent=True)
     )
+    if q:
+        sent_notices_qs = sent_notices_qs.filter(
+            Q(student__nickname__icontains=q) |
+            Q(student__full_name__icontains=q) |
+            Q(student__student_code__icontains=q) |
+            Q(tutoring_class__name__icontains=q) |
+            Q(enrollment__sale_run_no__icontains=q)
+        )
+    if date_from:
+        sent_notices_qs = sent_notices_qs.filter(sent_to_parent_at__date__gte=date_from)
+    if date_to:
+        sent_notices_qs = sent_notices_qs.filter(sent_to_parent_at__date__lte=date_to)
+
+    sent_notices = sent_notices_qs.order_by("-sent_to_parent_at", "-created_at")
 
     return render(request, "core/course_renewal_notice_list.html", {
         "rows": rows,
-        "recent_notices": recent_notices,
+        "installment_rows": installment_rows,
+        "unsent_notices": unsent_notices,
+        "sent_notices": sent_notices,
         "q": q,
+        "date_from": date_from.isoformat() if date_from else "",
+        "date_to": date_to.isoformat() if date_to else "",
     })
 
 
@@ -1925,6 +2030,7 @@ def course_renewal_notice_create(request: HttpRequest, enrollment_id: int) -> Ht
     expected_end, next_start = _default_renewal_dates(enrollment)
 
     notice = CourseRenewalNotice.objects.create(
+        notice_type=CourseRenewalNotice.NoticeType.RENEWAL,
         enrollment=enrollment,
         student=enrollment.student,
         tutoring_class=enrollment.tutoring_class,
@@ -1937,9 +2043,60 @@ def course_renewal_notice_create(request: HttpRequest, enrollment_id: int) -> Ht
 
 
 @login_required
+def course_installment_notice_create(request: HttpRequest, enrollment_id: int) -> HttpResponse:
+    enrollment = get_object_or_404(
+        Enrollment.objects.select_related("student", "tutoring_class"),
+        id=enrollment_id,
+        is_active=True,
+        student__is_active=True,
+        tutoring_class__is_active=True,
+    )
+
+    expected_end, next_start = _default_renewal_dates(enrollment)
+    amounts = _installment_amounts_for_enrollment(enrollment)
+
+    notice = CourseRenewalNotice.objects.create(
+        notice_type=CourseRenewalNotice.NoticeType.INSTALLMENT,
+        enrollment=enrollment,
+        student=enrollment.student,
+        tutoring_class=enrollment.tutoring_class,
+        source_payment=amounts["first_payment"],
+        expected_course_end_date=expected_end,
+        next_course_start_date=next_start,
+        installment_full_amount=amounts["full"],
+        installment_paid_amount=amounts["paid"],
+        created_by=request.user if request.user.is_authenticated else None,
+    )
+
+    return redirect("core:course_renewal_notice_detail", pk=notice.pk)
+
+
+@require_POST
+@login_required
+def course_renewal_notice_mark_sent(request: HttpRequest, pk: int) -> HttpResponse:
+    notice = get_object_or_404(CourseRenewalNotice, pk=pk)
+    notice.is_sent_to_parent = True
+    notice.sent_to_parent_at = timezone.now()
+    notice.sent_to_parent_by = request.user if request.user.is_authenticated else None
+    notice.save()
+    return redirect(request.META.get("HTTP_REFERER") or "core:course_renewal_notice_list")
+
+
+@require_POST
+@login_required
+def course_renewal_notice_unmark_sent(request: HttpRequest, pk: int) -> HttpResponse:
+    notice = get_object_or_404(CourseRenewalNotice, pk=pk)
+    notice.is_sent_to_parent = False
+    notice.sent_to_parent_at = None
+    notice.sent_to_parent_by = None
+    notice.save()
+    return redirect(request.META.get("HTTP_REFERER") or "core:course_renewal_notice_list")
+
+
+@login_required
 def course_renewal_notice_detail(request: HttpRequest, pk: int) -> HttpResponse:
     notice = get_object_or_404(
-        CourseRenewalNotice.objects.select_related("student", "tutoring_class", "enrollment"),
+        CourseRenewalNotice.objects.select_related("student", "tutoring_class", "enrollment", "source_payment"),
         pk=pk,
     )
 
@@ -1956,6 +2113,9 @@ def course_renewal_notice_detail(request: HttpRequest, pk: int) -> HttpResponse:
         notice.package_30_full_price = _decimal_from_post(request.POST.get("package_30_full_price"), notice.package_30_full_price)
         notice.package_30_discount = _decimal_from_post(request.POST.get("package_30_discount"), notice.package_30_discount)
 
+        notice.installment_full_amount = _decimal_from_post(request.POST.get("installment_full_amount"), notice.installment_full_amount)
+        notice.installment_paid_amount = _decimal_from_post(request.POST.get("installment_paid_amount"), notice.installment_paid_amount)
+
         notice.note_wording = (request.POST.get("note_wording") or "").strip() or notice.note_wording
         notice.save()
         return redirect("core:course_renewal_notice_detail", pk=notice.pk)
@@ -1966,6 +2126,8 @@ def course_renewal_notice_detail(request: HttpRequest, pk: int) -> HttpResponse:
         "enrollment": notice.enrollment,
         "tutoring_class": notice.tutoring_class,
         "packages": _renewal_notice_packages(notice),
+        "student_admin_url": _admin_student_url(notice.student),
+        "enrollment_admin_url": _admin_enrollment_url(notice.enrollment),
     })
 
 

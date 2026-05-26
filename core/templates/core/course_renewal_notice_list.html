@@ -10,6 +10,13 @@
   .btn-sm{width:36px;height:36px;padding:0;border-radius:999px;font-size:17px}
   .primary{background:#ea580c;color:#fff}.soft{background:#fff;color:#0f172a;border:1px solid #e2e8f0}.dark{background:#0f172a;color:#fff}.green{background:#16a34a;color:#fff}.blue{background:#2563eb;color:#fff}.red{background:#dc2626;color:#fff}.amber{background:#f59e0b;color:#fff}
   .panel{background:#fff;border-radius:22px;padding:16px;box-shadow:0 6px 16px rgba(15,23,42,.08);border:1px solid rgba(255,255,255,.88)}
+  details.panel{padding:0;overflow:hidden}
+  details.panel>summary{list-style:none;cursor:pointer;padding:16px;user-select:none}
+  details.panel>summary::-webkit-details-marker{display:none}
+  details.panel>.details-body{padding:0 16px 16px}
+  .toggle-hint{font-size:12px;font-weight:1000;color:#64748b;background:#f8fafc;border:1px solid #e2e8f0;border-radius:999px;padding:6px 10px}
+  details[open] .toggle-hint::after{content:'ย่อ'}
+  details:not([open]) .toggle-hint::after{content:'กดเพื่อขยาย'}
   .filter{display:grid;grid-template-columns:1.3fr 180px 180px auto auto;gap:10px;align-items:end}.field{display:flex;flex-direction:column;gap:5px}.field label{font-size:11px;font-weight:1000;color:#334155;text-transform:uppercase;letter-spacing:.04em}
   input{border:1px solid #e2e8f0;border-radius:13px;padding:10px 11px;font-weight:800;background:#fff;width:100%;min-width:0}
   .grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
@@ -63,14 +70,15 @@
     </form>
   </section>
 
-  <section class="panel">
-    <div class="section-head">
+  <details class="panel" open>
+    <summary class="section-head">
       <div>
         <div class="section-title">Enrollment ที่ใกล้ครบคอร์สแต่ยังไม่แจ้ง</div>
         <div class="section-sub">รวมรายการที่ยังไม่เคยกด “ส่งแจ้งผู้ปกครองแล้ว” แม้จะเคยสร้างใบแจ้งไว้แล้วก็ตาม</div>
       </div>
-      <span class="pill orangepill">{{ not_notified_rows|length }} รายการ</span>
-    </div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="pill orangepill">{{ not_notified_rows|length }} รายการ</span><span class="toggle-hint"></span></div>
+    </summary>
+    <div class="details-body">
     <div class="grid">
       {% for row in not_notified_rows %}
         <div class="enroll-card not-yet">
@@ -126,16 +134,18 @@
         <div class="empty">ไม่มี Enrollment ที่ใกล้ครบคอร์สและยังไม่แจ้ง</div>
       {% endfor %}
     </div>
-  </section>
+    </div>
+  </details>
 
-  <section class="panel">
-    <div class="section-head">
+  <details class="panel">
+    <summary class="section-head">
       <div>
         <div class="section-title">Enrollment ที่ใกล้ครบคอร์สและแจ้งแล้ว</div>
         <div class="section-sub">รายการที่เคยกด “ส่งแจ้งผู้ปกครองแล้ว” อย่างน้อย 1 ครั้ง และยังสามารถสร้างใบแจ้งใหม่ได้</div>
       </div>
-      <span class="pill greenpill">{{ notified_rows|length }} รายการ</span>
-    </div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="pill greenpill">{{ notified_rows|length }} รายการ</span><span class="toggle-hint"></span></div>
+    </summary>
+    <div class="details-body">
     <div class="grid">
       {% for row in notified_rows %}
         <div class="enroll-card notified">
@@ -180,7 +190,8 @@
         <div class="empty">ยังไม่มี Enrollment ที่ใกล้ครบคอร์สและแจ้งแล้ว</div>
       {% endfor %}
     </div>
-  </section>
+    </div>
+  </details>
 
   <section class="panel">
     <div class="section-head">

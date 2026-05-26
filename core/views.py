@@ -1883,11 +1883,13 @@ def _admin_enrollment_url(enrollment: Enrollment) -> str:
 @login_required
 def course_renewal_notice_list(request: HttpRequest) -> HttpResponse:
     """
-    รายการ Enrollment ที่ใกล้ครบคอร์ส แบ่งตามสถานะ "แจ้งผู้ปกครองแล้ว" เท่านั้น
+    รายการ Enrollment ที่ใกล้ครบคอร์ส แบ่งตามสถานะ "กดส่งแจ้งผู้ปกครองแล้ว" เท่านั้น
 
-    - ไม่ถือว่าแจ้งแล้วจากการสร้าง/เปิดใบแจ้ง
-    - จะถือว่าแจ้งแล้วเฉพาะเมื่อกดปุ่ม "ส่งแจ้งผู้ปกครองแล้ว"
-    - ถ้าเคยแจ้งแล้ว ยังสามารถสร้างใบแจ้งใหม่ได้อีก
+    หลักการสำคัญ:
+    - ไม่สนใจว่าเคยกดสร้างใบแจ้งแล้วหรือยัง
+    - ถ้า enrollment เหลือ < 2 และยังไม่มีใบแจ้งใดที่ถูก mark ว่า sent → อยู่ในกลุ่ม "ยังไม่แจ้ง"
+    - ถ้า enrollment เหลือ < 2 และมีใบแจ้งอย่างน้อย 1 ใบที่ถูก mark ว่า sent → อยู่ในกลุ่ม "แจ้งแล้ว"
+    - date_from/date_to ใช้กรองเฉพาะประวัติใบแจ้งที่ส่งแล้วด้านล่าง ไม่กระทบการแบ่งกลุ่มหลัก
     """
     q = (request.GET.get("q") or "").strip()
     date_from = _safe_date(request.GET.get("date_from"))
@@ -1921,6 +1923,8 @@ def course_renewal_notice_list(request: HttpRequest) -> HttpResponse:
         if remaining_sessions >= 2:
             continue
 
+        # Do NOT apply date filters here.
+        # Main grouping must depend only on whether this enrollment has ever been marked as sent.
         notices_qs = (
             CourseRenewalNotice.objects
             .select_related("student", "tutoring_class", "enrollment", "source_payment", "sent_to_parent_by")
@@ -1928,20 +1932,14 @@ def course_renewal_notice_list(request: HttpRequest) -> HttpResponse:
             .order_by("-created_at")
         )
 
-        if date_from:
-            notices_qs = notices_qs.filter(
-                Q(sent_to_parent_at__date__gte=date_from) |
-                Q(created_at__date__gte=date_from)
-            )
-        if date_to:
-            notices_qs = notices_qs.filter(
-                Q(sent_to_parent_at__date__lte=date_to) |
-                Q(created_at__date__lte=date_to)
-            )
-
         latest_notice = notices_qs.first()
         latest_unsent_notice = notices_qs.filter(is_sent_to_parent=False).first()
-        latest_sent_notice = notices_qs.filter(is_sent_to_parent=True).order_by("-sent_to_parent_at", "-created_at").first()
+        latest_sent_notice = (
+            notices_qs
+            .filter(is_sent_to_parent=True)
+            .order_by("-sent_to_parent_at", "-created_at")
+            .first()
+        )
 
         expected_end, next_start = _default_renewal_dates(enrollment)
         amounts = _installment_amounts_for_enrollment(enrollment)
@@ -1992,18 +1990,15 @@ def course_renewal_notice_list(request: HttpRequest) -> HttpResponse:
         sent_history_qs = sent_history_qs.filter(sent_to_parent_at__date__lte=date_to)
 
     sent_notices = sent_history_qs.order_by("-sent_to_parent_at", "-created_at")
-    unsent_notices = all_notices_qs.filter(is_sent_to_parent=False)[:50]
 
     return render(request, "core/course_renewal_notice_list.html", {
         "not_notified_rows": not_notified_rows,
         "notified_rows": notified_rows,
-        "unsent_notices": unsent_notices,
         "sent_notices": sent_notices,
         "q": q,
         "date_from": date_from.isoformat() if date_from else "",
         "date_to": date_to.isoformat() if date_to else "",
     })
-
 
 @login_required
 def course_renewal_notice_create(request: HttpRequest, enrollment_id: int) -> HttpResponse:

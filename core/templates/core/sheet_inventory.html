@@ -22,6 +22,10 @@
   .pillrow{display:flex;gap:6px;flex-wrap:wrap}.pill{border-radius:999px;padding:5px 9px;font-size:12px;font-weight:1000;border:1px solid #e2e8f0;background:#f8fafc;color:#334155}.low{background:#fee2e2;color:#991b1b;border-color:#fecaca}.ok{background:#dcfce7;color:#166534;border-color:#86efac}.blue{background:#eff6ff;color:#1d4ed8;border-color:#bfdbfe}.orange{background:#ffedd5;color:#9a3412;border-color:#fed7aa}
   .class-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.class-card{border:1px solid #e2e8f0;border-radius:20px;padding:13px;background:#fff;display:grid;gap:10px}.class-card.short{border-color:#fecaca;background:#fff7f7}.class-title{font-size:17px;font-weight:1000;color:#0f172a;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}.sheet-need{border-radius:15px;background:#f8fafc;border:1px solid #e2e8f0;padding:10px;display:grid;gap:5px}
   .inline-form{display:flex;gap:6px;align-items:center;flex-wrap:wrap}.inline-form select,.inline-form input{min-width:80px}.inline-form .btnx{padding:9px 11px}
+  .bulk-result{border-radius:18px;padding:12px;border:1px solid #bae6fd;background:#f0f9ff;color:#0c4a6e;font-weight:900;display:grid;gap:7px}
+  .bulk-result.bad{background:#fef2f2;border-color:#fecaca;color:#991b1b}
+  .bulk-metrics{display:flex;gap:7px;flex-wrap:wrap}.bulk-metrics span{border-radius:999px;background:#fff;border:1px solid #e2e8f0;padding:6px 10px;font-size:12px;font-weight:1000}
+  .error-list{margin:0;padding-left:18px;font-size:12px;line-height:1.45}
   @media(max-width:1100px){.grid2,.class-grid{grid-template-columns:1fr}.grid4{grid-template-columns:1fr 1fr}.btnx{width:100%}.hero .btnx{width:auto}}
   @media(max-width:700px){.grid3,.grid4{grid-template-columns:1fr}.title{font-size:23px}.hero .btnx{width:100%}.scan-input{font-size:18px}.table-wrap table{min-width:980px}}
 </style>
@@ -38,6 +42,63 @@
       <a class="btnx soft" href="/pkanoon-admin-tool/">← Admin Tool</a>
       <a class="btnx soft" href="/sheet-inventory/export/">Export Excel</a>
     </div>
+  </section>
+
+
+  <section class="panel">
+    <div class="section-head">
+      <div>
+        <div class="section-title">⬆️ Bulk Upload ชีทเข้าระบบ</div>
+        <div class="section-sub">
+          รองรับ Excel (.xlsx) และ CSV โดยอ่านคอลัมน์: ระดับชั้น / วิชา / รหัสชีท / ชื่อชีท / initial_quantity / total_pages / total_questions / minimum_stock
+        </div>
+      </div>
+    </div>
+
+    {% if bulk_result %}
+      <div class="bulk-result {% if bulk_result.error_count %}bad{% endif %}">
+        <div>ผลการ Upload</div>
+        <div class="bulk-metrics">
+          <span>สร้างใหม่ {{ bulk_result.created }}</span>
+          <span>อัปเดต {{ bulk_result.updated }}</span>
+          <span>ข้าม {{ bulk_result.skipped }}</span>
+          <span>บันทึก stock movement {{ bulk_result.movements }}</span>
+          <span>Error {{ bulk_result.error_count }}</span>
+        </div>
+        {% if bulk_result.errors %}
+          <ul class="error-list">
+            {% for err in bulk_result.errors %}
+              <li>{{ err }}</li>
+            {% endfor %}
+          </ul>
+        {% endif %}
+      </div>
+      <div style="height:10px"></div>
+    {% endif %}
+
+    <form method="post" enctype="multipart/form-data" action="{% url 'core:sheet_inventory_bulk_upload' %}" class="grid4">
+      {% csrf_token %}
+      <div class="field">
+        <label>ไฟล์ Excel / CSV</label>
+        <input type="file" name="bulk_file" accept=".xlsx,.csv" required>
+      </div>
+      <div class="field">
+        <label>จัดการ initial_quantity</label>
+        <select name="stock_mode">
+          <option value="set">ตั้งยอดจริงตามไฟล์</option>
+          <option value="add">เพิ่มเข้า stock เดิม</option>
+          <option value="skip">ไม่อัปเดต stock</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Column ขั้นต่ำที่ต้องมี</label>
+        <input value="วิชา / รหัสชีท / ชื่อชีท" readonly>
+      </div>
+      <div class="field">
+        <label>&nbsp;</label>
+        <button class="btnx green" type="submit">Upload เข้าระบบ</button>
+      </div>
+    </form>
   </section>
 
   <section class="grid2">

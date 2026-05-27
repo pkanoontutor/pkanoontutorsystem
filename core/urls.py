@@ -46,13 +46,13 @@ urlpatterns = [
 
 
 
-# Course renewal notices
-path("course-renewal-notices/", views.course_renewal_notice_list, name="course_renewal_notice_list"),
-path("course-renewal-notices/create/<int:enrollment_id>/", views.course_renewal_notice_create, name="course_renewal_notice_create"),
-path("course-renewal-notices/create-installment/<int:enrollment_id>/", views.course_installment_notice_create, name="course_installment_notice_create"),
-path("course-renewal-notices/<int:pk>/", views.course_renewal_notice_detail, name="course_renewal_notice_detail"),
-path("course-renewal-notices/<int:pk>/mark-sent/", views.course_renewal_notice_mark_sent, name="course_renewal_notice_mark_sent"),
-path("course-renewal-notices/<int:pk>/unmark-sent/", views.course_renewal_notice_unmark_sent, name="course_renewal_notice_unmark_sent"),
+    # Course renewal notices
+    path("course-renewal-notices/", views.course_renewal_notice_list, name="course_renewal_notice_list"),
+    path("course-renewal-notices/create/<int:enrollment_id>/", views.course_renewal_notice_create, name="course_renewal_notice_create"),
+    path("course-renewal-notices/create-installment/<int:enrollment_id>/", views.course_installment_notice_create, name="course_installment_notice_create"),
+    path("course-renewal-notices/<int:pk>/", views.course_renewal_notice_detail, name="course_renewal_notice_detail"),
+    path("course-renewal-notices/<int:pk>/mark-sent/", views.course_renewal_notice_mark_sent, name="course_renewal_notice_mark_sent"),
+    path("course-renewal-notices/<int:pk>/unmark-sent/", views.course_renewal_notice_unmark_sent, name="course_renewal_notice_unmark_sent"),
 
     # Course payments / receipts
     path("course-payments/", views.course_payment_list, name="course_payment_list"),

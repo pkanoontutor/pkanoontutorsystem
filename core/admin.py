@@ -13,6 +13,8 @@ from .models import (
     Attendance,
     EnrollmentInstallment,
     SheetInventory,
+    SheetInventoryMovement,
+    SheetClassMapping,
     AdmissionInquiry,
     FinanceSetting,
     ExpenseCategory,
@@ -351,6 +353,8 @@ class SheetInventoryAdmin(admin.ModelAdmin):
     list_display = (
         "sheet",
         "quantity",
+        "minimum_stock",
+        "stock_status",
         "is_finished",
         "updated_at",
     )
@@ -359,6 +363,49 @@ class SheetInventoryAdmin(admin.ModelAdmin):
     autocomplete_fields = ("sheet",)
     ordering = ("sheet__code",)
     readonly_fields = ("updated_at",)
+
+    @admin.display(description="สถานะ")
+    def stock_status(self, obj):
+        minimum = int(getattr(obj, "minimum_stock", 0) or 0)
+        qty = int(obj.quantity or 0)
+        if minimum > 0 and qty <= minimum:
+            return "ใกล้หมด"
+        return "ปกติ"
+
+
+@admin.register(SheetInventoryMovement)
+class SheetInventoryMovementAdmin(admin.ModelAdmin):
+    list_display = (
+        "created_at",
+        "sheet",
+        "movement_type",
+        "quantity",
+        "balance_before",
+        "balance_after",
+        "created_by",
+        "note",
+    )
+    list_filter = ("movement_type", "created_at", "sheet__subject")
+    search_fields = ("sheet__code", "sheet__title", "note")
+    autocomplete_fields = ("sheet", "created_by")
+    readonly_fields = ("created_at",)
+    ordering = ("-created_at",)
+
+
+@admin.register(SheetClassMapping)
+class SheetClassMappingAdmin(admin.ModelAdmin):
+    list_display = (
+        "tutoring_class",
+        "sheet",
+        "quantity_per_student",
+        "is_active",
+        "updated_at",
+    )
+    list_filter = ("is_active", "tutoring_class", "sheet__subject")
+    search_fields = ("tutoring_class__name", "sheet__code", "sheet__title")
+    autocomplete_fields = ("tutoring_class", "sheet")
+    ordering = ("tutoring_class__time_slot", "tutoring_class__name", "sheet__code")
+
 
 # -----------------------
 # Admission Inquiry

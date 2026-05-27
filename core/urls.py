@@ -37,6 +37,12 @@ urlpatterns = [
     path("school-finance/delete-expense/<int:pk>/", views.school_expense_delete, name="school_expense_delete"),
     path("school-finance/delete-payroll/<int:pk>/", views.tutor_payroll_delete, name="tutor_payroll_delete"),
 
+    # Sheet Inventory
+    path("sheet-inventory/", views.sheet_inventory_dashboard, name="sheet_inventory_dashboard"),
+    path("sheet-inventory/scan/", views.sheet_inventory_scan, name="sheet_inventory_scan"),
+    path("sheet-inventory/export/", views.sheet_inventory_export, name="sheet_inventory_export"),
+    path("sheet-inventory/sheet/<int:pk>/", views.sheet_inventory_profile, name="sheet_inventory_profile"),
+
 
 
 

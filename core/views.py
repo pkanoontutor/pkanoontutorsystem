@@ -2,6 +2,7 @@ from __future__ import annotations
 from collections import OrderedDict, defaultdict
 
 import json
+import re
 from datetime import date, timedelta, datetime
 from decimal import Decimal
 from io import BytesIO
@@ -21,9 +22,15 @@ from openpyxl.utils import get_column_letter
 from .models import (
     Student,
     School,
+    Subject,
+    Sheet,
+    ClassSubject,
     Attendance,
     Enrollment,
     TutoringClass,
+    SheetInventory,
+    SheetInventoryMovement,
+    SheetClassMapping,
     AdmissionInquiry,
     FinanceSetting,
     ExpenseCategory,
@@ -265,6 +272,533 @@ def _autosize(ws):
                 continue
             max_len = max(max_len, len(str(v)))
         ws.column_dimensions[col_letter].width = min(max_len + 2, 60)
+
+
+
+# =========================================================
+# ✅ Sheet Inventory Module
+# =========================================================
+def _sheet_code_from_text(text: str | None) -> str:
+    """Extract a likely sheet code from free text such as 'M-P6-01 เศษส่วน'."""
+    raw = (text or "").strip()
+    if not raw:
+        return ""
+    # Try exact token first; sheet codes in the system usually look like M-P6-01.
+    tokens = re.split(r"[\s,;:/|]+", raw)
+    for token in tokens:
+        t = token.strip().upper()
+        if t and Sheet.objects.filter(code__iexact=t).exists():
+            return t
+    # Fallback: if the whole text is the code.
+    if Sheet.objects.filter(code__iexact=raw.upper()).exists():
+        return raw.upper()
+    return ""
+
+
+def _inventory_for_sheet(sheet: Sheet) -> SheetInventory | None:
+    try:
+        return sheet.inventory
+    except SheetInventory.DoesNotExist:
+        return None
+
+
+def _apply_sheet_inventory_movement(
+    *,
+    sheet: Sheet,
+    movement_type: str,
+    quantity: int,
+    note: str = "",
+    user=None,
+) -> tuple[bool, str, SheetInventory | None, SheetInventoryMovement | None]:
+    """
+    Centralized stock update.
+    - ADD: add quantity to stock
+    - DEDUCT: deduct quantity, but block if result would be negative
+    - SET / COUNT: set balance to quantity
+    """
+    if quantity is None:
+        quantity = 0
+
+    try:
+        quantity = int(quantity)
+    except Exception:
+        return False, "จำนวนไม่ถูกต้อง", None, None
+
+    if movement_type in {SheetInventoryMovement.MovementType.ADD, SheetInventoryMovement.MovementType.DEDUCT}:
+        if quantity <= 0:
+            return False, "กรุณาระบุจำนวนมากกว่า 0", None, None
+    elif movement_type in {SheetInventoryMovement.MovementType.SET, SheetInventoryMovement.MovementType.COUNT}:
+        if quantity < 0:
+            return False, "ยอดจริงต้องไม่ติดลบ", None, None
+    else:
+        return False, "ประเภท movement ไม่ถูกต้อง", None, None
+
+    with transaction.atomic():
+        inventory, _ = SheetInventory.objects.select_for_update().get_or_create(
+            sheet=sheet,
+            defaults={"quantity": 0},
+        )
+        before = int(inventory.quantity or 0)
+
+        if movement_type == SheetInventoryMovement.MovementType.ADD:
+            after = before + quantity
+            movement_qty = quantity
+        elif movement_type == SheetInventoryMovement.MovementType.DEDUCT:
+            if before - quantity < 0:
+                return False, f"ตัด stock ไม่ได้ เพราะคงเหลือ {before} ชุด", inventory, None
+            after = before - quantity
+            movement_qty = quantity
+        else:
+            after = quantity
+            movement_qty = quantity
+
+        inventory.quantity = max(after, 0)
+        inventory.save()
+
+        movement = SheetInventoryMovement.objects.create(
+            sheet=sheet,
+            movement_type=movement_type,
+            quantity=movement_qty,
+            balance_before=before,
+            balance_after=inventory.quantity,
+            note=(note or "").strip(),
+            created_by=user if getattr(user, "is_authenticated", False) else None,
+        )
+
+    return True, "บันทึกสำเร็จ", inventory, movement
+
+
+def _active_admissions_for_sheet_demand() -> list[AdmissionInquiry]:
+    return list(
+        AdmissionInquiry.objects
+        .filter(is_completed=False)
+        .only("id", "grade_level", "preferred_time_slot", "request_type", "first_lesson_date")
+        .order_by("first_lesson_date", "created_at")
+    )
+
+
+def _class_matches_inquiry(tutoring_class: TutoringClass, inquiry: AdmissionInquiry) -> bool:
+    if getattr(tutoring_class, "time_slot", "") != getattr(inquiry, "preferred_time_slot", ""):
+        return False
+
+    class_name = (tutoring_class.name or "").lower()
+    grade_display = ""
+    try:
+        grade_display = inquiry.get_grade_level_display()
+    except Exception:
+        grade_display = ""
+
+    grade_code = (inquiry.grade_level or "").lower()
+    tokens = {
+        grade_code,
+        grade_code.replace("p", "ป."),
+        grade_code.replace("m", "ม."),
+        grade_display,
+        grade_display.replace(".", ""),
+        grade_display.replace(" ", ""),
+    }
+    tokens = {t.lower() for t in tokens if t}
+
+    return any(token in class_name for token in tokens)
+
+
+def _demand_count_for_class(tutoring_class: TutoringClass, pending_inquiries: list[AdmissionInquiry]) -> int:
+    return sum(1 for i in pending_inquiries if _class_matches_inquiry(tutoring_class, i))
+
+
+def _sheet_row(sheet: Sheet) -> dict:
+    inv = _inventory_for_sheet(sheet)
+    qty = int(inv.quantity or 0) if inv else 0
+    minimum = int(getattr(inv, "minimum_stock", 0) or 0) if inv else 0
+    return {
+        "sheet": sheet,
+        "inventory": inv,
+        "quantity": qty,
+        "minimum_stock": minimum,
+        "is_low": minimum > 0 and qty <= minimum,
+    }
+
+
+def _build_class_sheet_rows() -> list[dict]:
+    """
+    Build class-sheet requirements using:
+    1) Manual SheetClassMapping records
+    2) ClassSubject.current_sheet from the older sheet update setup
+    3) TeachingClassSubjectTemplate.default_sheet_name from the tutor update module
+    4) TeachingProgressUpdate.sheet_name from recent tutor updates
+    Demand count is based on active AdmissionInquiry records, not Enrollment.
+    """
+    pending_inquiries = _active_admissions_for_sheet_demand()
+    classes = list(TutoringClass.objects.filter(is_active=True).order_by("time_slot", "name"))
+
+    # Preload mappings
+    manual_mappings = (
+        SheetClassMapping.objects
+        .select_related("sheet", "sheet__subject", "tutoring_class")
+        .filter(is_active=True)
+    )
+    manual_by_class: dict[int, list[SheetClassMapping]] = defaultdict(list)
+    for m in manual_mappings:
+        manual_by_class[m.tutoring_class_id].append(m)
+
+    current_sheet_links = (
+        ClassSubject.objects
+        .select_related("tutoring_class", "current_sheet", "current_sheet__subject")
+        .filter(is_active=True, current_sheet__isnull=False, tutoring_class__is_active=True)
+    )
+    current_by_class: dict[int, list[Sheet]] = defaultdict(list)
+    for cs in current_sheet_links:
+        current_by_class[cs.tutoring_class_id].append(cs.current_sheet)
+
+    templates = (
+        TeachingClassSubjectTemplate.objects
+        .select_related("tutoring_class")
+        .filter(is_active=True, tutoring_class__is_active=True)
+        .exclude(default_sheet_name="")
+    )
+    template_by_class: dict[int, list[Sheet]] = defaultdict(list)
+    for t in templates:
+        code = _sheet_code_from_text(t.default_sheet_name)
+        if code:
+            sheet = Sheet.objects.filter(code__iexact=code).select_related("subject").first()
+            if sheet:
+                template_by_class[t.tutoring_class_id].append(sheet)
+
+    progress_updates = (
+        TeachingProgressUpdate.objects
+        .select_related("assignment__tutoring_class")
+        .filter(assignment__tutoring_class__is_active=True)
+        .exclude(sheet_name="")
+        .order_by("-updated_at")[:500]
+    )
+    progress_by_class: dict[int, list[Sheet]] = defaultdict(list)
+    for p in progress_updates:
+        code = _sheet_code_from_text(p.sheet_name)
+        if code:
+            sheet = Sheet.objects.filter(code__iexact=code).select_related("subject").first()
+            if sheet:
+                progress_by_class[p.assignment.tutoring_class_id].append(sheet)
+
+    rows = []
+    for cls in classes:
+        demand_count = _demand_count_for_class(cls, pending_inquiries)
+        seen: dict[int, dict] = {}
+
+        for m in manual_by_class.get(cls.id, []):
+            seen[m.sheet_id] = {
+                "sheet": m.sheet,
+                "source": "manual",
+                "source_label": "Manual",
+                "quantity_per_student": int(m.quantity_per_student or 1),
+                "mapping": m,
+            }
+
+        for s in current_by_class.get(cls.id, []):
+            seen.setdefault(s.id, {
+                "sheet": s,
+                "source": "current_sheet",
+                "source_label": "Current Sheet",
+                "quantity_per_student": 1,
+                "mapping": None,
+            })
+
+        for s in template_by_class.get(cls.id, []):
+            seen.setdefault(s.id, {
+                "sheet": s,
+                "source": "template",
+                "source_label": "Template",
+                "quantity_per_student": 1,
+                "mapping": None,
+            })
+
+        for s in progress_by_class.get(cls.id, []):
+            seen.setdefault(s.id, {
+                "sheet": s,
+                "source": "tutor_update",
+                "source_label": "Tutor Update",
+                "quantity_per_student": 1,
+                "mapping": None,
+            })
+
+        entries = []
+        for item in seen.values():
+            sheet = item["sheet"]
+            inv = _inventory_for_sheet(sheet)
+            balance = int(inv.quantity or 0) if inv else 0
+            required = demand_count * int(item["quantity_per_student"] or 1)
+            entries.append({
+                **item,
+                "balance": balance,
+                "required": required,
+                "shortage": max(required - balance, 0),
+            })
+
+        rows.append({
+            "class": cls,
+            "demand_count": demand_count,
+            "entries": sorted(entries, key=lambda x: x["sheet"].code),
+            "has_shortage": any(e["shortage"] > 0 for e in entries),
+        })
+
+    return rows
+
+
+@login_required
+def sheet_inventory_dashboard(request: HttpRequest) -> HttpResponse:
+    if request.method == "POST":
+        action = (request.POST.get("action") or "").strip()
+
+        if action == "create_sheet":
+            code = (request.POST.get("code") or "").strip().upper()
+            title = (request.POST.get("title") or "").strip()
+            subject_id = (request.POST.get("subject_id") or "").strip()
+            new_subject = (request.POST.get("new_subject") or "").strip()
+            total_pages = int(request.POST.get("total_pages") or 0)
+            total_questions = int(request.POST.get("total_questions") or 0)
+            initial_qty = int(request.POST.get("initial_qty") or 0)
+            minimum_stock = int(request.POST.get("minimum_stock") or 0)
+
+            if code and title:
+                if subject_id:
+                    subject = Subject.objects.filter(id=subject_id).first()
+                elif new_subject:
+                    subject, _ = Subject.objects.get_or_create(name=new_subject, defaults={"is_active": True})
+                else:
+                    subject, _ = Subject.objects.get_or_create(name="General", defaults={"is_active": True})
+
+                sheet, created = Sheet.objects.get_or_create(
+                    code=code,
+                    defaults={
+                        "title": title,
+                        "subject": subject,
+                        "total_pages": total_pages,
+                        "total_questions": total_questions,
+                        "is_active": True,
+                    }
+                )
+                if created:
+                    inv, _ = SheetInventory.objects.get_or_create(sheet=sheet, defaults={"quantity": 0})
+                    inv.minimum_stock = max(minimum_stock, 0)
+                    inv.save()
+                    if initial_qty > 0:
+                        _apply_sheet_inventory_movement(
+                            sheet=sheet,
+                            movement_type=SheetInventoryMovement.MovementType.ADD,
+                            quantity=initial_qty,
+                            note="Initial stock from Sheet Inventory module",
+                            user=request.user,
+                        )
+                return redirect("core:sheet_inventory_profile", pk=sheet.pk)
+
+        elif action == "stock_single":
+            sheet = get_object_or_404(Sheet, id=request.POST.get("sheet_id"))
+            mode = request.POST.get("movement_type") or SheetInventoryMovement.MovementType.ADD
+            qty = int(request.POST.get("quantity") or 0)
+            note = request.POST.get("note") or ""
+            _apply_sheet_inventory_movement(sheet=sheet, movement_type=mode, quantity=qty, note=note, user=request.user)
+            return redirect("core:sheet_inventory_dashboard")
+
+        elif action == "bulk_stock":
+            for key, val in request.POST.items():
+                if not key.startswith("bulk_qty_"):
+                    continue
+                sheet_id = key.replace("bulk_qty_", "")
+                raw_qty = (val or "").strip()
+                if raw_qty == "":
+                    continue
+                sheet = Sheet.objects.filter(id=sheet_id).first()
+                if not sheet:
+                    continue
+                mode = request.POST.get(f"bulk_mode_{sheet_id}") or SheetInventoryMovement.MovementType.ADD
+                note = request.POST.get(f"bulk_note_{sheet_id}") or "Bulk update"
+                try:
+                    qty = int(raw_qty)
+                except Exception:
+                    continue
+                _apply_sheet_inventory_movement(sheet=sheet, movement_type=mode, quantity=qty, note=note, user=request.user)
+            return redirect("core:sheet_inventory_dashboard")
+
+        elif action == "link_class_sheet":
+            class_id = request.POST.get("class_id")
+            sheet_id = request.POST.get("sheet_id")
+            qty_per = int(request.POST.get("quantity_per_student") or 1)
+            note = request.POST.get("note") or ""
+            if class_id and sheet_id:
+                SheetClassMapping.objects.update_or_create(
+                    tutoring_class_id=class_id,
+                    sheet_id=sheet_id,
+                    defaults={
+                        "quantity_per_student": max(qty_per, 1),
+                        "note": note,
+                        "is_active": True,
+                    }
+                )
+            return redirect("core:sheet_inventory_dashboard")
+
+        elif action == "unlink_class_sheet":
+            mapping = get_object_or_404(SheetClassMapping, id=request.POST.get("mapping_id"))
+            mapping.is_active = False
+            mapping.save()
+            return redirect("core:sheet_inventory_dashboard")
+
+    q = (request.GET.get("q") or "").strip()
+    sheets_qs = Sheet.objects.select_related("subject").all()
+    if q:
+        sheets_qs = sheets_qs.filter(
+            Q(code__icontains=q) |
+            Q(title__icontains=q) |
+            Q(subject__name__icontains=q)
+        )
+    sheets = list(sheets_qs.order_by("subject__name", "code"))
+    sheet_rows = [_sheet_row(s) for s in sheets]
+
+    movements = (
+        SheetInventoryMovement.objects
+        .select_related("sheet", "created_by")
+        .order_by("-created_at")[:30]
+    )
+
+    return render(request, "core/sheet_inventory.html", {
+        "q": q,
+        "sheet_rows": sheet_rows,
+        "subjects": Subject.objects.filter(is_active=True).order_by("name"),
+        "classes": TutoringClass.objects.filter(is_active=True).order_by("time_slot", "name"),
+        "all_sheets": Sheet.objects.select_related("subject").filter(is_active=True).order_by("subject__name", "code"),
+        "class_rows": _build_class_sheet_rows(),
+        "movements": movements,
+        "movement_type_choices": SheetInventoryMovement.MovementType.choices,
+    })
+
+
+@require_POST
+@login_required
+def sheet_inventory_scan(request: HttpRequest) -> JsonResponse:
+    try:
+        data = json.loads(request.body.decode("utf-8"))
+    except Exception:
+        data = request.POST
+
+    code = (data.get("code") or "").strip().upper()
+    mode = (data.get("mode") or SheetInventoryMovement.MovementType.DEDUCT).strip()
+    qty = data.get("quantity") or 1
+    note = data.get("note") or "QR scanner"
+
+    if mode == "count":
+        mode = SheetInventoryMovement.MovementType.COUNT
+
+    if not code:
+        return JsonResponse({"ok": False, "error": "ไม่พบรหัสชีท"}, status=400)
+
+    sheet = Sheet.objects.filter(code__iexact=code).select_related("subject").first()
+    if not sheet:
+        return JsonResponse({"ok": False, "error": f"ไม่พบรหัสชีท {code}", "code": code}, status=404)
+
+    ok, message, inventory, movement = _apply_sheet_inventory_movement(
+        sheet=sheet,
+        movement_type=mode,
+        quantity=int(qty or 1),
+        note=note,
+        user=request.user,
+    )
+    if not ok:
+        return JsonResponse({"ok": False, "error": message, "code": code}, status=400)
+
+    return JsonResponse({
+        "ok": True,
+        "message": message,
+        "code": sheet.code,
+        "title": sheet.title,
+        "quantity": int(inventory.quantity or 0) if inventory else 0,
+        "movement_type": movement.get_movement_type_display() if movement else "",
+        "movement_at": _fmt_dt_th(movement.created_at) if movement else "",
+    })
+
+
+@login_required
+def sheet_inventory_profile(request: HttpRequest, pk: int) -> HttpResponse:
+    sheet = get_object_or_404(Sheet.objects.select_related("subject"), pk=pk)
+    inventory, _ = SheetInventory.objects.get_or_create(sheet=sheet, defaults={"quantity": 0})
+    movements = SheetInventoryMovement.objects.filter(sheet=sheet).select_related("created_by").order_by("-created_at")[:80]
+    mappings = SheetClassMapping.objects.filter(sheet=sheet, is_active=True).select_related("tutoring_class")
+
+    return render(request, "core/sheet_inventory_profile.html", {
+        "sheet": sheet,
+        "inventory": inventory,
+        "movements": movements,
+        "mappings": mappings,
+    })
+
+
+@login_required
+def sheet_inventory_export(request: HttpRequest) -> HttpResponse:
+    wb = Workbook()
+
+    ws = wb.active
+    ws.title = "Sheet Stock"
+    ws.append(["Sheet Code", "Title", "Subject", "Balance", "Minimum Stock", "Low Stock?", "Is Finished"])
+    for sheet in Sheet.objects.select_related("subject").order_by("subject__name", "code"):
+        inv = _inventory_for_sheet(sheet)
+        qty = int(inv.quantity or 0) if inv else 0
+        minimum = int(getattr(inv, "minimum_stock", 0) or 0) if inv else 0
+        ws.append([
+            sheet.code,
+            sheet.title,
+            sheet.subject.name if sheet.subject_id else "",
+            qty,
+            minimum,
+            "YES" if minimum > 0 and qty <= minimum else "NO",
+            "YES" if inv and inv.is_finished else "NO",
+        ])
+    _autosize(ws)
+
+    ws2 = wb.create_sheet("Class Requirement")
+    ws2.append(["Class", "Time Slot", "Pending Inquiries", "Sheet Code", "Sheet Title", "Source", "Required Qty", "Balance", "Shortage"])
+    for row in _build_class_sheet_rows():
+        cls = row["class"]
+        if not row["entries"]:
+            ws2.append([cls.name, cls.get_time_slot_display(), row["demand_count"], "", "", "", 0, 0, 0])
+        for e in row["entries"]:
+            ws2.append([
+                cls.name,
+                cls.get_time_slot_display(),
+                row["demand_count"],
+                e["sheet"].code,
+                e["sheet"].title,
+                e["source_label"],
+                e["required"],
+                e["balance"],
+                e["shortage"],
+            ])
+    _autosize(ws2)
+
+    ws3 = wb.create_sheet("Movements")
+    ws3.append(["Created At", "Sheet Code", "Movement Type", "Quantity", "Balance Before", "Balance After", "Note", "Created By"])
+    movements = SheetInventoryMovement.objects.select_related("sheet", "created_by").order_by("-created_at")[:2000]
+    for m in movements:
+        ws3.append([
+            timezone.localtime(m.created_at).strftime("%Y-%m-%d %H:%M") if m.created_at else "",
+            m.sheet.code,
+            m.get_movement_type_display(),
+            m.quantity,
+            m.balance_before,
+            m.balance_after,
+            m.note,
+            m.created_by.get_username() if m.created_by else "",
+        ])
+    _autosize(ws3)
+
+    buff = BytesIO()
+    wb.save(buff)
+    buff.seek(0)
+
+    filename = f"sheet_inventory_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    resp = HttpResponse(
+        buff.getvalue(),
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+    resp["Content-Disposition"] = f'attachment; filename="{filename}"'
+    return resp
+
 
 
 @login_required

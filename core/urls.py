@@ -40,19 +40,20 @@ urlpatterns = [
     # Sheet Inventory
     path("sheet-inventory/", views.sheet_inventory_dashboard, name="sheet_inventory_dashboard"),
     path("sheet-inventory/scan/", views.sheet_inventory_scan, name="sheet_inventory_scan"),
+    path("sheet-inventory/bulk-upload/", views.sheet_inventory_bulk_upload, name="sheet_inventory_bulk_upload"),
     path("sheet-inventory/export/", views.sheet_inventory_export, name="sheet_inventory_export"),
     path("sheet-inventory/sheet/<int:pk>/", views.sheet_inventory_profile, name="sheet_inventory_profile"),
 
 
 
 
-    # Course renewal notices
-    path("course-renewal-notices/", views.course_renewal_notice_list, name="course_renewal_notice_list"),
-    path("course-renewal-notices/create/<int:enrollment_id>/", views.course_renewal_notice_create, name="course_renewal_notice_create"),
-    path("course-renewal-notices/create-installment/<int:enrollment_id>/", views.course_installment_notice_create, name="course_installment_notice_create"),
-    path("course-renewal-notices/<int:pk>/", views.course_renewal_notice_detail, name="course_renewal_notice_detail"),
-    path("course-renewal-notices/<int:pk>/mark-sent/", views.course_renewal_notice_mark_sent, name="course_renewal_notice_mark_sent"),
-    path("course-renewal-notices/<int:pk>/unmark-sent/", views.course_renewal_notice_unmark_sent, name="course_renewal_notice_unmark_sent"),
+# Course renewal notices
+path("course-renewal-notices/", views.course_renewal_notice_list, name="course_renewal_notice_list"),
+path("course-renewal-notices/create/<int:enrollment_id>/", views.course_renewal_notice_create, name="course_renewal_notice_create"),
+path("course-renewal-notices/create-installment/<int:enrollment_id>/", views.course_installment_notice_create, name="course_installment_notice_create"),
+path("course-renewal-notices/<int:pk>/", views.course_renewal_notice_detail, name="course_renewal_notice_detail"),
+path("course-renewal-notices/<int:pk>/mark-sent/", views.course_renewal_notice_mark_sent, name="course_renewal_notice_mark_sent"),
+path("course-renewal-notices/<int:pk>/unmark-sent/", views.course_renewal_notice_unmark_sent, name="course_renewal_notice_unmark_sent"),
 
     # Course payments / receipts
     path("course-payments/", views.course_payment_list, name="course_payment_list"),

@@ -2,6 +2,7 @@ from __future__ import annotations
 from collections import OrderedDict, defaultdict
 
 import json
+import csv
 import re
 from datetime import date, timedelta, datetime
 from decimal import Decimal
@@ -16,7 +17,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST, require_GET
 
-from openpyxl import Workbook
+from openpyxl import Workbook, load_workbook
 from openpyxl.utils import get_column_letter
 
 from .models import (
@@ -543,6 +544,249 @@ def _build_class_sheet_rows() -> list[dict]:
     return rows
 
 
+
+def _sheet_inventory_context(*, q: str = "", extra: dict | None = None) -> dict:
+    sheets_qs = Sheet.objects.select_related("subject").all()
+    if q:
+        sheets_qs = sheets_qs.filter(
+            Q(code__icontains=q) |
+            Q(title__icontains=q) |
+            Q(subject__name__icontains=q)
+        )
+
+    sheets = list(sheets_qs.order_by("subject__name", "code"))
+    context = {
+        "q": q,
+        "sheet_rows": [_sheet_row(s) for s in sheets],
+        "subjects": Subject.objects.filter(is_active=True).order_by("name"),
+        "classes": TutoringClass.objects.filter(is_active=True).order_by("time_slot", "name"),
+        "all_sheets": Sheet.objects.select_related("subject").filter(is_active=True).order_by("subject__name", "code"),
+        "class_rows": _build_class_sheet_rows(),
+        "movements": (
+            SheetInventoryMovement.objects
+            .select_related("sheet", "created_by")
+            .order_by("-created_at")[:30]
+        ),
+        "movement_type_choices": SheetInventoryMovement.MovementType.choices,
+    }
+    if extra:
+        context.update(extra)
+    return context
+
+
+def _clean_cell(value) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, float) and value.is_integer():
+        return str(int(value)).strip()
+    return str(value).strip()
+
+
+def _parse_int_cell(value, default=None):
+    raw = _clean_cell(value)
+    if raw == "":
+        return default
+    try:
+        return max(int(float(raw.replace(",", ""))), 0)
+    except Exception:
+        return default
+
+
+def _parse_bool_cell(value, default=True):
+    raw = _clean_cell(value).lower()
+    if raw == "":
+        return default
+    return raw in {"1", "true", "yes", "y", "active", "ใช่", "เปิด", "เปิดใช้งาน"}
+
+
+def _normalize_upload_header(value) -> str:
+    raw = _clean_cell(value).lower()
+    return re.sub(r"[\s_\-./()]+", "", raw)
+
+
+def _pick_upload_value(row: dict, aliases: list[str]):
+    normalized_aliases = {_normalize_upload_header(a) for a in aliases}
+    for key, value in row.items():
+        if _normalize_upload_header(key) in normalized_aliases:
+            return value
+    return ""
+
+
+def _read_sheet_upload_rows(uploaded_file) -> list[dict]:
+    filename = (getattr(uploaded_file, "name", "") or "").lower()
+
+    if filename.endswith(".csv"):
+        raw = uploaded_file.read()
+        try:
+            text = raw.decode("utf-8-sig")
+        except UnicodeDecodeError:
+            text = raw.decode("cp874", errors="replace")
+        reader = csv.DictReader(text.splitlines())
+        return [dict(r) for r in reader]
+
+    # Default to Excel workbook
+    wb = load_workbook(BytesIO(uploaded_file.read()), data_only=True)
+    ws = wb.active
+    rows = list(ws.iter_rows(values_only=True))
+    if not rows:
+        return []
+
+    headers = [_clean_cell(h) for h in rows[0]]
+    result = []
+    for row_values in rows[1:]:
+        if not any(_clean_cell(v) for v in row_values):
+            continue
+        result.append({headers[i]: row_values[i] if i < len(row_values) else "" for i in range(len(headers))})
+    return result
+
+
+def _import_sheet_rows_from_upload(rows: list[dict], *, user=None, stock_mode: str = "set") -> dict:
+    """
+    Import rows from Excel/CSV.
+    Required columns:
+    - รหัสชีท / code
+    - ชื่อชีท / title
+    - วิชา / subject
+
+    Optional:
+    - ระดับชั้น / grade_level (accepted for template compatibility; current Sheet model does not store grade separately)
+    - initial_quantity
+    - total_pages
+    - total_questions
+    - minimum_stock
+    - is_active
+    """
+    created_count = 0
+    updated_count = 0
+    skipped_count = 0
+    movement_count = 0
+    errors: list[str] = []
+
+    code_aliases = ["รหัสชีท", "sheet code", "sheet_code", "code", "รหัส"]
+    title_aliases = ["ชื่อชีท", "ชื่อเรื่อง", "sheet name", "sheet_name", "title", "ชื่อ"]
+    subject_aliases = ["วิชา", "subject", "subject_name"]
+    grade_aliases = ["ระดับชั้น", "grade", "grade_level", "ชั้น"]
+    initial_aliases = ["initial_quantity", "initial qty", "ยอดเริ่มต้น", "จำนวนคงเหลือ", "stock", "quantity"]
+    pages_aliases = ["total_pages", "จำนวนหน้า", "pages"]
+    questions_aliases = ["total_questions", "จำนวนข้อ", "questions"]
+    min_aliases = ["minimum_stock", "ขั้นต่ำที่ควรมี", "min stock", "minimum"]
+    active_aliases = ["is_active", "active", "เปิดใช้งาน"]
+
+    stock_mode = (stock_mode or "set").strip()
+    if stock_mode not in {"skip", "set", "add"}:
+        stock_mode = "set"
+
+    with transaction.atomic():
+        for idx, row in enumerate(rows, start=2):
+            code = _clean_cell(_pick_upload_value(row, code_aliases)).upper()
+            title = _clean_cell(_pick_upload_value(row, title_aliases))
+            subject_name = _clean_cell(_pick_upload_value(row, subject_aliases))
+            grade_level = _clean_cell(_pick_upload_value(row, grade_aliases))
+
+            if not code and not title and not subject_name:
+                skipped_count += 1
+                continue
+
+            if not code:
+                errors.append(f"แถว {idx}: ไม่มีรหัสชีท")
+                skipped_count += 1
+                continue
+            if not title:
+                errors.append(f"แถว {idx}: ไม่มีชื่อชีทสำหรับรหัส {code}")
+                skipped_count += 1
+                continue
+            if not subject_name:
+                errors.append(f"แถว {idx}: ไม่มีวิชาสำหรับรหัส {code}")
+                skipped_count += 1
+                continue
+
+            subject, _ = Subject.objects.get_or_create(
+                name=subject_name,
+                defaults={"is_active": True},
+            )
+
+            total_pages = _parse_int_cell(_pick_upload_value(row, pages_aliases), default=None)
+            total_questions = _parse_int_cell(_pick_upload_value(row, questions_aliases), default=None)
+            minimum_stock = _parse_int_cell(_pick_upload_value(row, min_aliases), default=None)
+            initial_qty = _parse_int_cell(_pick_upload_value(row, initial_aliases), default=None)
+            is_active = _parse_bool_cell(_pick_upload_value(row, active_aliases), default=True)
+
+            sheet, created = Sheet.objects.get_or_create(
+                code=code,
+                defaults={
+                    "title": title,
+                    "subject": subject,
+                    "total_pages": total_pages or 0,
+                    "total_questions": total_questions or 0,
+                    "is_active": is_active,
+                },
+            )
+
+            if created:
+                created_count += 1
+            else:
+                changed = False
+                if sheet.title != title:
+                    sheet.title = title
+                    changed = True
+                if sheet.subject_id != subject.id:
+                    sheet.subject = subject
+                    changed = True
+                if total_pages is not None and sheet.total_pages != total_pages:
+                    sheet.total_pages = total_pages
+                    changed = True
+                if total_questions is not None and sheet.total_questions != total_questions:
+                    sheet.total_questions = total_questions
+                    changed = True
+                if sheet.is_active != is_active:
+                    sheet.is_active = is_active
+                    changed = True
+                if changed:
+                    sheet.save()
+                updated_count += 1
+
+            inventory, _ = SheetInventory.objects.get_or_create(sheet=sheet, defaults={"quantity": 0})
+
+            if minimum_stock is not None:
+                inventory.minimum_stock = minimum_stock
+                inventory.save()
+
+            if initial_qty is not None and stock_mode != "skip":
+                movement_type = (
+                    SheetInventoryMovement.MovementType.ADD
+                    if stock_mode == "add"
+                    else SheetInventoryMovement.MovementType.SET
+                )
+
+                if movement_type == SheetInventoryMovement.MovementType.ADD and initial_qty <= 0:
+                    pass
+                else:
+                    note_parts = ["Bulk upload"]
+                    if grade_level:
+                        note_parts.append(f"grade={grade_level}")
+                    ok, msg, inv, mv = _apply_sheet_inventory_movement(
+                        sheet=sheet,
+                        movement_type=movement_type,
+                        quantity=initial_qty,
+                        note="; ".join(note_parts),
+                        user=user,
+                    )
+                    if ok and mv:
+                        movement_count += 1
+                    elif not ok:
+                        errors.append(f"แถว {idx} ({code}): {msg}")
+
+    return {
+        "created": created_count,
+        "updated": updated_count,
+        "skipped": skipped_count,
+        "movements": movement_count,
+        "errors": errors[:30],
+        "error_count": len(errors),
+    }
+
+
+
 @login_required
 def sheet_inventory_dashboard(request: HttpRequest) -> HttpResponse:
     if request.method == "POST":
@@ -652,22 +896,47 @@ def sheet_inventory_dashboard(request: HttpRequest) -> HttpResponse:
     sheets = list(sheets_qs.order_by("subject__name", "code"))
     sheet_rows = [_sheet_row(s) for s in sheets]
 
-    movements = (
-        SheetInventoryMovement.objects
-        .select_related("sheet", "created_by")
-        .order_by("-created_at")[:30]
-    )
+    return render(request, "core/sheet_inventory.html", _sheet_inventory_context(q=q))
 
-    return render(request, "core/sheet_inventory.html", {
-        "q": q,
-        "sheet_rows": sheet_rows,
-        "subjects": Subject.objects.filter(is_active=True).order_by("name"),
-        "classes": TutoringClass.objects.filter(is_active=True).order_by("time_slot", "name"),
-        "all_sheets": Sheet.objects.select_related("subject").filter(is_active=True).order_by("subject__name", "code"),
-        "class_rows": _build_class_sheet_rows(),
-        "movements": movements,
-        "movement_type_choices": SheetInventoryMovement.MovementType.choices,
-    })
+
+@require_POST
+@login_required
+def sheet_inventory_bulk_upload(request: HttpRequest) -> HttpResponse:
+    uploaded = request.FILES.get("bulk_file")
+    stock_mode = request.POST.get("stock_mode") or "set"
+
+    if not uploaded:
+        context = _sheet_inventory_context(extra={
+            "bulk_result": {
+                "created": 0,
+                "updated": 0,
+                "skipped": 0,
+                "movements": 0,
+                "errors": ["กรุณาเลือกไฟล์ Excel หรือ CSV ก่อนอัปโหลด"],
+                "error_count": 1,
+            }
+        })
+        return render(request, "core/sheet_inventory.html", context)
+
+    try:
+        rows = _read_sheet_upload_rows(uploaded)
+        result = _import_sheet_rows_from_upload(
+            rows,
+            user=request.user,
+            stock_mode=stock_mode,
+        )
+    except Exception as exc:
+        result = {
+            "created": 0,
+            "updated": 0,
+            "skipped": 0,
+            "movements": 0,
+            "errors": [f"อ่านไฟล์ไม่สำเร็จ: {exc}"],
+            "error_count": 1,
+        }
+
+    context = _sheet_inventory_context(extra={"bulk_result": result})
+    return render(request, "core/sheet_inventory.html", context)
 
 
 @require_POST

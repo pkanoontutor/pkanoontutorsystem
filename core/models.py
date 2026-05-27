@@ -847,6 +847,11 @@ class SheetUpdateEntry(models.Model):
 class SheetInventory(models.Model):
     sheet = models.OneToOneField(Sheet, on_delete=models.CASCADE, related_name="inventory")
     quantity = models.IntegerField("จำนวนคงเหลือ", default=0)
+    minimum_stock = models.PositiveIntegerField(
+        "ขั้นต่ำที่ควรมี",
+        default=0,
+        help_text="ใช้สำหรับเตือนชีทใกล้หมด",
+    )
 
     is_finished = models.BooleanField("จบชีทแล้ว", default=False)
     finished_at = models.DateTimeField("วันที่จบชีท", null=True, blank=True)
@@ -874,6 +879,86 @@ class SheetInventory(models.Model):
         if not self.is_finished:
             self.finished_at = None
         super().save(*args, **kwargs)
+
+
+class SheetInventoryMovement(models.Model):
+    class MovementType(models.TextChoices):
+        ADD = "add", "เพิ่ม stock"
+        DEDUCT = "deduct", "ตัด stock"
+        SET = "set", "ตั้งยอดจริง"
+        COUNT = "count", "นับ stock"
+
+    sheet = models.ForeignKey(
+        Sheet,
+        verbose_name="ชีท",
+        on_delete=models.PROTECT,
+        related_name="inventory_movements",
+    )
+    movement_type = models.CharField(
+        "ประเภท movement",
+        max_length=20,
+        choices=MovementType.choices,
+    )
+    quantity = models.PositiveIntegerField("จำนวน", default=0)
+    balance_before = models.IntegerField("ยอดก่อนทำรายการ", default=0)
+    balance_after = models.IntegerField("ยอดหลังทำรายการ", default=0)
+    note = models.CharField("หมายเหตุ", max_length=255, blank=True)
+    created_by = models.ForeignKey(
+        "auth.User",
+        verbose_name="ผู้บันทึก",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="sheet_inventory_movements",
+    )
+    created_at = models.DateTimeField("วันที่บันทึก", default=timezone.now)
+
+    class Meta:
+        verbose_name = "Sheet Inventory Movement"
+        verbose_name_plural = "Sheet Inventory Movements"
+        ordering = ("-created_at", "-id")
+
+    def __str__(self) -> str:
+        return f"{self.sheet.code} | {self.get_movement_type_display()} | {self.quantity}"
+
+
+class SheetClassMapping(models.Model):
+    tutoring_class = models.ForeignKey(
+        TutoringClass,
+        verbose_name="Class",
+        on_delete=models.CASCADE,
+        related_name="sheet_mappings",
+    )
+    sheet = models.ForeignKey(
+        Sheet,
+        verbose_name="ชีท",
+        on_delete=models.CASCADE,
+        related_name="class_mappings",
+    )
+    quantity_per_student = models.PositiveIntegerField(
+        "จำนวนชีทต่อเด็ก 1 คน",
+        default=1,
+        help_text="ใช้คำนวณว่ารายการสมัคร/ทดลองเรียนต้องใช้ชีทกี่ชุด",
+    )
+    is_active = models.BooleanField("ใช้งาน", default=True)
+    note = models.CharField("หมายเหตุ", max_length=255, blank=True)
+    created_at = models.DateTimeField("วันที่สร้าง", default=timezone.now)
+    updated_at = models.DateTimeField("อัปเดตล่าสุด", auto_now=True)
+
+    class Meta:
+        verbose_name = "Sheet Class Mapping"
+        verbose_name_plural = "Sheet Class Mappings"
+        ordering = ("tutoring_class__time_slot", "tutoring_class__name", "sheet__code")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["tutoring_class", "sheet"],
+                name="uniq_sheet_mapping_per_class",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.tutoring_class} | {self.sheet.code}"
+
 
 # -----------------------
 # ✅ Admission Inquiry (สมัครเรียน / จองทดลองเรียน)

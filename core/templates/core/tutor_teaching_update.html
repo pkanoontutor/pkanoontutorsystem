@@ -166,7 +166,13 @@
 
                     <div class="field">
                       <label>ชื่อชีท/เอกสาร</label>
-                      <input type="text" name="sheet_name" value="{% if curr %}{{ curr.sheet_name }}{% elif prev %}{{ prev.sheet_name }}{% else %}{{ a.subject_template.default_sheet_name }}{% endif %}" placeholder="ชื่อชีท/เอกสาร">
+                      <input id="sheetInput{{ a.id }}" type="text" name="sheet_name" value="{% if curr %}{{ curr.sheet_name }}{% elif prev %}{{ prev.sheet_name }}{% else %}{{ a.subject_template.default_sheet_name }}{% endif %}" placeholder="ชื่อชีท/เอกสาร">
+                      <select class="sheet-update-picker" data-grade="{{ a.class_grade_level }}" data-target="#sheetInput{{ a.id }}" style="margin-top:6px;">
+                        <option value="">เลือกจาก Sheet Inventory / หรือกรอกเอง</option>
+                        {% for s in sheet_choices %}
+                          <option value="{{ s.code }} {{ s.title }}" data-grade="{{ s.grade_level }}">{{ s.get_grade_level_display|default:"ไม่ระบุ" }} · {{ s.code }} · {{ s.title }}</option>
+                        {% endfor %}
+                      </select>
                     </div>
                     <div class="field" data-page-field>
                       <label>สอนถึงหน้า <span style="color:#dc2626;">*</span></label>
@@ -268,5 +274,25 @@
       });
     });
   });
+</script>
+
+<script>
+(function(){
+  function filterPicker(picker){
+    const grade = picker.dataset.grade || "";
+    Array.from(picker.options).forEach(opt => {
+      if(!opt.value){ opt.hidden = false; return; }
+      const optGrade = opt.dataset.grade || "";
+      opt.hidden = !!(grade && optGrade && optGrade !== grade);
+    });
+  }
+  document.querySelectorAll(".sheet-update-picker").forEach(picker => {
+    filterPicker(picker);
+    picker.addEventListener("change", function(){
+      const target = document.querySelector(picker.dataset.target || "");
+      if(target && picker.value) target.value = picker.value;
+    });
+  });
+})();
 </script>
 {% endblock %}

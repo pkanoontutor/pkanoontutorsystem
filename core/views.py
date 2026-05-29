@@ -45,6 +45,10 @@ from .models import (
     TeachingClassSubjectTemplate,
     TeachingWeeklyAssignment,
     TeachingProgressUpdate,
+    TestRound,
+    TestSubject,
+    TestParticipant,
+    TestScore,
 )
 
 
@@ -4176,3 +4180,528 @@ def teaching_update_report(request: HttpRequest) -> HttpResponse:
         "no_teaching": no_teaching,
         "pending": total - done,
     })
+
+# =========================================================
+# ✅ Test Score Announcement Module
+# =========================================================
+def _digits_only(value: str | None) -> str:
+    return "".join(ch for ch in (value or "") if ch.isdigit())
+
+
+def _to_decimal(value, default="0") -> Decimal:
+    raw = str(value if value is not None else "").strip().replace(",", "")
+    if raw == "":
+        raw = str(default)
+    try:
+        return Decimal(raw)
+    except Exception:
+        return Decimal(default)
+
+
+def _pct(score: Decimal, full_score: Decimal) -> float:
+    if not full_score or full_score <= 0:
+        return 0.0
+    return float((score / full_score) * Decimal("100"))
+
+
+def _shared_ranks(values: dict[int, float]) -> dict[int, int]:
+    """Competition rank: 95,95,90 = 1,1,3."""
+    ranks = {}
+    sorted_items = sorted(values.items(), key=lambda kv: (-kv[1], kv[0]))
+    previous_value = None
+    previous_rank = 0
+    for idx, (pk, value) in enumerate(sorted_items, start=1):
+        if previous_value is None or value != previous_value:
+            previous_rank = idx
+            previous_value = value
+        ranks[pk] = previous_rank
+    return ranks
+
+
+def _snapshot_from_student(student: Student) -> dict:
+    return {
+        "source_type": TestParticipant.SourceType.STUDENT,
+        "student": student,
+        "nickname": student.nickname or "",
+        "full_name": student.full_name or "",
+        "school_name": student.school.name if student.school else "",
+        "contact_phone": student.parent_phone or "",
+        "grade_level": student.grade_level or "",
+    }
+
+
+def _snapshot_from_admission(inquiry: AdmissionInquiry) -> dict:
+    return {
+        "source_type": TestParticipant.SourceType.ADMISSION,
+        "admission_inquiry": inquiry,
+        "nickname": inquiry.nickname or "",
+        "full_name": inquiry.full_name or "",
+        "school_name": inquiry.school_name or "",
+        "contact_phone": inquiry.contact_phone or "",
+        "grade_level": inquiry.grade_level or "",
+    }
+
+
+def _build_test_score_context(test_round: TestRound, current_participant: TestParticipant | None = None) -> dict:
+    subjects = list(test_round.subjects.filter(is_active=True).order_by("display_order", "id"))
+    participants = list(
+        test_round.participants.filter(is_active=True).order_by("full_name", "nickname", "id")
+    )
+    score_objs = TestScore.objects.filter(participant__in=participants, subject__in=subjects).select_related("participant", "subject")
+    score_map = {(s.participant_id, s.subject_id): s for s in score_objs}
+
+    subject_pct_values: dict[int, dict[int, float]] = {s.id: {} for s in subjects}
+    total_pct_values: dict[int, float] = {}
+    rows = []
+
+    total_full_score = sum((s.full_score or Decimal("0")) for s in subjects)
+
+    for p in participants:
+        subject_cells = []
+        total_score = Decimal("0")
+        for s in subjects:
+            score_obj = score_map.get((p.id, s.id))
+            score = score_obj.score if score_obj else Decimal("0")
+            score_pct = _pct(score, s.full_score)
+            total_score += score
+            subject_pct_values[s.id][p.id] = score_pct
+            subject_cells.append({
+                "subject": s,
+                "score": score,
+                "full_score": s.full_score,
+                "pct": score_pct,
+                "score_obj": score_obj,
+            })
+        total_pct = _pct(total_score, total_full_score)
+        total_pct_values[p.id] = total_pct
+        rows.append({
+            "participant": p,
+            "subject_cells": subject_cells,
+            "total_score": total_score,
+            "total_full_score": total_full_score,
+            "total_pct": total_pct,
+            "is_current": bool(current_participant and p.id == current_participant.id),
+        })
+
+    subject_avg_pct = {}
+    subject_ranks = {}
+    for s in subjects:
+        values = subject_pct_values.get(s.id, {})
+        subject_avg_pct[s.id] = round(sum(values.values()) / len(values), 2) if values else 0
+        subject_ranks[s.id] = _shared_ranks(values)
+
+    total_avg_pct = round(sum(total_pct_values.values()) / len(total_pct_values), 2) if total_pct_values else 0
+    total_ranks = _shared_ranks(total_pct_values)
+
+    for row in rows:
+        p = row["participant"]
+        row["total_rank"] = total_ranks.get(p.id, "-")
+        row["display_name"] = p.display_name if row["is_current"] else "xxxxx"
+        for cell in row["subject_cells"]:
+            sid = cell["subject"].id
+            cell["avg_pct"] = subject_avg_pct.get(sid, 0)
+            cell["rank"] = subject_ranks.get(sid, {}).get(p.id, "-")
+
+    current_row = None
+    for row in rows:
+        if row["is_current"]:
+            current_row = row
+            break
+
+    chart_rows = []
+    narrative = ""
+    if current_row:
+        for cell in current_row["subject_cells"]:
+            chart_rows.append({
+                "label": cell["subject"].name,
+                "student_pct": round(cell["pct"], 2),
+                "avg_pct": round(cell["avg_pct"], 2),
+            })
+        chart_rows.append({
+            "label": "คะแนนรวม",
+            "student_pct": round(current_row["total_pct"], 2),
+            "avg_pct": round(total_avg_pct, 2),
+        })
+
+        diff = round(current_row["total_pct"] - total_avg_pct, 2)
+        best = max(current_row["subject_cells"], key=lambda c: c["pct"], default=None)
+        focus = min(current_row["subject_cells"], key=lambda c: c["pct"], default=None)
+        if diff >= 5:
+            main = f"ภาพรวมคะแนนของน้องสูงกว่าค่าเฉลี่ยประมาณ {abs(diff):.1f}% ถือว่าทำได้ดีมากครับ"
+        elif diff <= -5:
+            main = f"ภาพรวมคะแนนของน้องต่ำกว่าค่าเฉลี่ยประมาณ {abs(diff):.1f}% ยังมีจุดที่สามารถค่อย ๆ เสริมเพิ่มได้ครับ"
+        else:
+            main = "ภาพรวมคะแนนของน้องอยู่ใกล้เคียงค่าเฉลี่ยของรอบสอบนี้ครับ"
+        if best and focus and best["subject"].id != focus["subject"].id:
+            narrative = f"{main} วิชาที่เด่นที่สุดคือ {best['subject'].name} ส่วนวิชาที่ควรทบทวนเพิ่มคือ {focus['subject'].name} ครับ"
+        else:
+            narrative = main
+
+    return {
+        "test_round": test_round,
+        "subjects": subjects,
+        "participants": participants,
+        "rows": rows,
+        "current_row": current_row,
+        "chart_rows": chart_rows,
+        "subject_avg_pct": subject_avg_pct,
+        "total_avg_pct": total_avg_pct,
+        "narrative": narrative,
+    }
+
+
+def test_score_round_list(request: HttpRequest) -> HttpResponse:
+    rounds = TestRound.objects.filter(is_published=True).order_by("-exam_date", "-created_at")
+    return render(request, "core/test_score_round_list.html", {"rounds": rounds})
+
+
+@require_GET
+def test_score_participant_search(request: HttpRequest, round_id: int) -> JsonResponse:
+    test_round = get_object_or_404(TestRound, id=round_id, is_published=True)
+    q = (request.GET.get("q") or "").strip()
+    qs = test_round.participants.filter(is_active=True)
+    if q:
+        qs = qs.filter(
+            Q(nickname__icontains=q) |
+            Q(full_name__icontains=q) |
+            Q(school_name__icontains=q)
+        )
+    qs = qs.order_by("full_name", "nickname")[:30]
+    results = []
+    for p in qs:
+        text = f"{p.nickname or '-'} | {p.full_name}"
+        if p.school_name:
+            text += f" | {p.school_name}"
+        results.append({"id": str(p.id), "text": text})
+    return JsonResponse({"results": results})
+
+
+def test_score_login(request: HttpRequest, round_id: int) -> HttpResponse:
+    test_round = get_object_or_404(TestRound, id=round_id, is_published=True)
+    error = ""
+    if request.method == "POST":
+        participant_id = (request.POST.get("participant_id") or "").strip()
+        phone = (request.POST.get("parent_phone") or "").strip()
+        participant = test_round.participants.filter(id=participant_id, is_active=True).first()
+        if not participant:
+            error = "กรุณาเลือกชื่อนักเรียนจากรายการที่ขึ้นมา"
+        elif phone != "kanoon" and _digits_only(participant.contact_phone) != _digits_only(phone):
+            error = "เบอร์มือถือไม่ถูกต้อง"
+        else:
+            request.session[f"test_score_participant_id_{test_round.id}"] = participant.id
+            return redirect("core:test_score_result", round_id=test_round.id)
+    return render(request, "core/test_score_login.html", {"test_round": test_round, "error": error})
+
+
+def test_score_result(request: HttpRequest, round_id: int) -> HttpResponse:
+    test_round = get_object_or_404(TestRound, id=round_id, is_published=True)
+    participant_id = request.session.get(f"test_score_participant_id_{test_round.id}")
+    participant = test_round.participants.filter(id=participant_id, is_active=True).first()
+    if not participant:
+        return redirect("core:test_score_login", round_id=test_round.id)
+    context = _build_test_score_context(test_round, participant)
+    return render(request, "core/test_score_result.html", context)
+
+
+def test_score_logout(request: HttpRequest, round_id: int) -> HttpResponse:
+    request.session.pop(f"test_score_participant_id_{round_id}", None)
+    return redirect("core:test_score_login", round_id=round_id)
+
+
+@login_required
+def test_score_admin(request: HttpRequest) -> HttpResponse:
+    if request.method == "POST":
+        title = (request.POST.get("title") or "").strip()
+        exam_date = request.POST.get("exam_date") or None
+        note = (request.POST.get("note") or "").strip()
+        is_published = request.POST.get("is_published") == "on"
+        if title:
+            test_round = TestRound.objects.create(
+                title=title,
+                exam_date=exam_date or None,
+                note=note,
+                is_published=is_published,
+            )
+            return redirect("core:test_score_round_manage", round_id=test_round.id)
+    rounds = TestRound.objects.all().order_by("-exam_date", "-created_at")
+    return render(request, "core/test_score_admin.html", {"rounds": rounds})
+
+
+@require_GET
+@login_required
+def test_score_student_search(request: HttpRequest) -> JsonResponse:
+    q = (request.GET.get("q") or "").strip()
+    qs = Student.objects.filter(is_active=True)
+    if q:
+        qs = qs.filter(
+            Q(nickname__icontains=q) |
+            Q(full_name__icontains=q) |
+            Q(student_code__icontains=q) |
+            Q(school__name__icontains=q)
+        )
+    qs = qs.select_related("school").order_by("grade_level", "student_code")[:30]
+    results = []
+    for s in qs:
+        text = f"{s.nickname or '-'} | {s.full_name}"
+        if s.school:
+            text += f" | {s.school.name}"
+        results.append({"id": str(s.id), "text": text})
+    return JsonResponse({"results": results})
+
+
+@require_GET
+@login_required
+def test_score_admission_search(request: HttpRequest) -> JsonResponse:
+    q = (request.GET.get("q") or "").strip()
+    qs = AdmissionInquiry.objects.all()
+    if q:
+        qs = qs.filter(
+            Q(nickname__icontains=q) |
+            Q(first_name__icontains=q) |
+            Q(last_name__icontains=q) |
+            Q(school_name__icontains=q) |
+            Q(contact_phone__icontains=q)
+        )
+    qs = qs.order_by("-created_at")[:30]
+    results = []
+    for i in qs:
+        text = f"{i.nickname or '-'} | {i.full_name}"
+        if i.school_name:
+            text += f" | {i.school_name}"
+        results.append({"id": str(i.id), "text": text})
+    return JsonResponse({"results": results})
+
+
+def _upsert_score(participant: TestParticipant, subject: TestSubject, value, note: str = ""):
+    score = _to_decimal(value, default="0")
+    if score < 0:
+        score = Decimal("0")
+    if subject.full_score and score > subject.full_score:
+        score = subject.full_score
+    TestScore.objects.update_or_create(
+        participant=participant,
+        subject=subject,
+        defaults={"score": score, "note": note or ""},
+    )
+
+
+@login_required
+def test_score_round_manage(request: HttpRequest, round_id: int) -> HttpResponse:
+    test_round = get_object_or_404(TestRound, id=round_id)
+    result_message = ""
+
+    if request.method == "POST":
+        action = (request.POST.get("action") or "").strip()
+
+        if action == "update_round":
+            test_round.title = (request.POST.get("title") or test_round.title).strip()
+            test_round.exam_date = request.POST.get("exam_date") or None
+            test_round.note = request.POST.get("note") or ""
+            test_round.is_published = request.POST.get("is_published") == "on"
+            test_round.save()
+            return redirect("core:test_score_round_manage", round_id=test_round.id)
+
+        if action == "add_subject":
+            name = (request.POST.get("subject_name") or "").strip()
+            full_score = _to_decimal(request.POST.get("full_score"), default="100")
+            if name:
+                next_order = (test_round.subjects.aggregate(m=Count("id")).get("m") or 0) + 1
+                TestSubject.objects.create(test_round=test_round, name=name, full_score=full_score, display_order=next_order)
+            return redirect("core:test_score_round_manage", round_id=test_round.id)
+
+        if action == "save_subjects":
+            for subject in test_round.subjects.all():
+                subject.name = (request.POST.get(f"subject_name_{subject.id}") or subject.name).strip()
+                subject.full_score = _to_decimal(request.POST.get(f"full_score_{subject.id}"), default=str(subject.full_score or 100))
+                subject.display_order = int(request.POST.get(f"display_order_{subject.id}") or subject.display_order or 1)
+                subject.is_active = request.POST.get(f"subject_active_{subject.id}") == "on"
+                subject.save()
+            return redirect("core:test_score_round_manage", round_id=test_round.id)
+
+        if action == "add_student_participant":
+            student = Student.objects.filter(id=request.POST.get("student_id"), is_active=True).first()
+            if student:
+                defaults = _snapshot_from_student(student)
+                TestParticipant.objects.update_or_create(
+                    test_round=test_round,
+                    source_type=TestParticipant.SourceType.STUDENT,
+                    student=student,
+                    defaults={**defaults, "is_active": True},
+                )
+            return redirect("core:test_score_round_manage", round_id=test_round.id)
+
+        if action == "add_admission_participant":
+            inquiry = AdmissionInquiry.objects.filter(id=request.POST.get("admission_id")).first()
+            if inquiry:
+                defaults = _snapshot_from_admission(inquiry)
+                TestParticipant.objects.update_or_create(
+                    test_round=test_round,
+                    source_type=TestParticipant.SourceType.ADMISSION,
+                    admission_inquiry=inquiry,
+                    defaults={**defaults, "is_active": True},
+                )
+            return redirect("core:test_score_round_manage", round_id=test_round.id)
+
+        if action == "add_manual_participant":
+            full_name = (request.POST.get("full_name") or "").strip()
+            if full_name:
+                TestParticipant.objects.create(
+                    test_round=test_round,
+                    source_type=TestParticipant.SourceType.MANUAL,
+                    nickname=(request.POST.get("nickname") or "").strip(),
+                    full_name=full_name,
+                    school_name=(request.POST.get("school_name") or "").strip(),
+                    contact_phone=(request.POST.get("contact_phone") or "").strip(),
+                    grade_level=(request.POST.get("grade_level") or "").strip(),
+                )
+            return redirect("core:test_score_round_manage", round_id=test_round.id)
+
+        if action == "save_scores":
+            subjects = list(test_round.subjects.filter(is_active=True).order_by("display_order", "id"))
+            participants = list(test_round.participants.filter(is_active=True))
+            with transaction.atomic():
+                for p in participants:
+                    p.note = request.POST.get(f"participant_note_{p.id}") or ""
+                    p.save(update_fields=["note", "updated_at"])
+                    for s in subjects:
+                        _upsert_score(p, s, request.POST.get(f"score_{p.id}_{s.id}"), "")
+            return redirect("core:test_score_round_manage", round_id=test_round.id)
+
+        if action == "import_scores":
+            uploaded = request.FILES.get("score_file")
+            if uploaded:
+                try:
+                    rows = _read_test_score_import_rows(uploaded)
+                    result_message = _import_test_score_rows(test_round, rows)
+                except Exception as exc:
+                    result_message = f"Import ไม่สำเร็จ: {exc}"
+
+    context = _build_test_score_context(test_round, None)
+    context.update({"result_message": result_message})
+    return render(request, "core/test_score_round_manage.html", context)
+
+
+def _read_test_score_import_rows(uploaded_file) -> list[dict]:
+    filename = (getattr(uploaded_file, "name", "") or "").lower()
+    if filename.endswith(".csv"):
+        raw = uploaded_file.read()
+        try:
+            text = raw.decode("utf-8-sig")
+        except UnicodeDecodeError:
+            text = raw.decode("cp874", errors="replace")
+        return [dict(r) for r in csv.DictReader(text.splitlines())]
+
+    wb = load_workbook(BytesIO(uploaded_file.read()), data_only=True)
+    ws = wb.active
+    rows = list(ws.iter_rows(values_only=True))
+    if not rows:
+        return []
+    headers = [_clean_cell(h) for h in rows[0]]
+    result = []
+    for values in rows[1:]:
+        if not any(_clean_cell(v) for v in values):
+            continue
+        result.append({headers[i]: values[i] if i < len(values) else "" for i in range(len(headers))})
+    return result
+
+
+def _import_test_score_rows(test_round: TestRound, rows: list[dict]) -> str:
+    subjects = list(test_round.subjects.filter(is_active=True).order_by("display_order", "id"))
+    created = updated = 0
+    with transaction.atomic():
+        for row in rows:
+            student_id = _clean_cell(row.get("student_id") or row.get("Student ID"))
+            admission_id = _clean_cell(row.get("admission_id") or row.get("Admission ID"))
+            participant = None
+            if student_id:
+                student = Student.objects.filter(id=student_id).select_related("school").first()
+                if student:
+                    defaults = _snapshot_from_student(student)
+                    participant, was_created = TestParticipant.objects.update_or_create(
+                        test_round=test_round,
+                        source_type=TestParticipant.SourceType.STUDENT,
+                        student=student,
+                        defaults={**defaults, "is_active": True},
+                    )
+                    created += int(was_created)
+                    updated += int(not was_created)
+            if not participant and admission_id:
+                inquiry = AdmissionInquiry.objects.filter(id=admission_id).first()
+                if inquiry:
+                    defaults = _snapshot_from_admission(inquiry)
+                    participant, was_created = TestParticipant.objects.update_or_create(
+                        test_round=test_round,
+                        source_type=TestParticipant.SourceType.ADMISSION,
+                        admission_inquiry=inquiry,
+                        defaults={**defaults, "is_active": True},
+                    )
+                    created += int(was_created)
+                    updated += int(not was_created)
+            if not participant:
+                full_name = _clean_cell(row.get("full_name") or row.get("ชื่อจริงนามสกุล") or row.get("ชื่อจริง นามสกุล"))
+                nickname = _clean_cell(row.get("nickname") or row.get("ชื่อเล่น"))
+                contact_phone = _clean_cell(row.get("contact_phone") or row.get("เบอร์มือถือ") or row.get("เบอร์ติดต่อ"))
+                if not full_name and not nickname:
+                    continue
+                participant, was_created = TestParticipant.objects.update_or_create(
+                    test_round=test_round,
+                    source_type=TestParticipant.SourceType.MANUAL,
+                    full_name=full_name or nickname,
+                    contact_phone=contact_phone,
+                    defaults={
+                        "nickname": nickname,
+                        "school_name": _clean_cell(row.get("school_name") or row.get("โรงเรียน")),
+                        "grade_level": _clean_cell(row.get("grade_level") or row.get("ระดับชั้น")),
+                        "note": _clean_cell(row.get("note") or row.get("หมายเหตุ")),
+                        "is_active": True,
+                    },
+                )
+                created += int(was_created)
+                updated += int(not was_created)
+
+            participant.note = _clean_cell(row.get("note") or row.get("หมายเหตุ"))
+            participant.save(update_fields=["note", "updated_at"])
+            for subject in subjects:
+                value = row.get(subject.name)
+                if value is None:
+                    value = row.get(f"{subject.name} ({subject.full_score})")
+                _upsert_score(participant, subject, value if value is not None else 0, "")
+    return f"Import สำเร็จ: เพิ่มใหม่ {created} รายการ / อัปเดต {updated} รายการ"
+
+
+@login_required
+def test_score_import_template(request: HttpRequest, round_id: int) -> HttpResponse:
+    test_round = get_object_or_404(TestRound, id=round_id)
+    subjects = list(test_round.subjects.filter(is_active=True).order_by("display_order", "id"))
+    participants = list(test_round.participants.filter(is_active=True).order_by("full_name", "nickname"))
+    score_objs = TestScore.objects.filter(participant__in=participants, subject__in=subjects)
+    score_map = {(s.participant_id, s.subject_id): s.score for s in score_objs}
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Import Scores"
+    headers = ["student_id", "admission_id", "nickname", "full_name", "school_name", "contact_phone", "grade_level", "note"] + [s.name for s in subjects]
+    ws.append(headers)
+    for p in participants:
+        ws.append([
+            p.student_id or "",
+            p.admission_inquiry_id or "",
+            p.nickname,
+            p.full_name,
+            p.school_name,
+            p.contact_phone,
+            p.grade_level,
+            p.note,
+            *[score_map.get((p.id, s.id), 0) for s in subjects],
+        ])
+    if not participants:
+        ws.append(["", "", "ตัวอย่าง", "ชื่อจริง นามสกุล", "โรงเรียน", "0999999999", "ป.6", "", *[0 for _ in subjects]])
+    for col in range(1, ws.max_column + 1):
+        ws.column_dimensions[get_column_letter(col)].width = 18
+    buffer = BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+    response = HttpResponse(buffer.getvalue(), content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    response["Content-Disposition"] = f'attachment; filename="test_score_import_template_{test_round.id}.xlsx"'
+    return response
+

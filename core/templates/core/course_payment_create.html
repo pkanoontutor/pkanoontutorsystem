@@ -23,6 +23,11 @@
   .search-note{border:1px solid #bfdbfe;background:#eff6ff;color:#1d4ed8;border-radius:14px;padding:9px 10px;font-size:12px;font-weight:900;line-height:1.45;}
   .mini-card{border:1px solid #e2e8f0;background:#f8fafc;border-radius:16px;padding:11px;color:#334155;font-size:12px;line-height:1.5;}
   .mini-card b{color:#0f172a;}
+  .payment-method-toggle{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;}
+  .payment-method-card{justify-content:center;text-align:center;background:#fff;}
+  .payment-method-card:has(input:checked){background:#ecfdf5;border-color:#86efac;color:#166534;box-shadow:0 0 0 3px rgba(22,163,74,.10);}
+  @media(max-width:800px){.payment-method-toggle{grid-template-columns:1fr 1fr;}}
+  @media(max-width:520px){.payment-method-toggle{grid-template-columns:1fr;}}
   @media(max-width:800px){.grid{grid-template-columns:1fr}.span2{grid-column:auto}.btnx{width:100%}.hero .btnx{width:auto}.title{font-size:23px;}}
 </style>
 {% endblock %}
@@ -100,7 +105,7 @@
           <label>Class</label>
           <select name="tutoring_class_id" id="classSelect" onchange="applyClassPrice()">
             <option value="">-- เลือก Class --</option>
-            {% for c in classes %}<option value="{{ c.id }}" data-price="{{ c.course_price }}">{{ c.name }} | {{ c.get_time_slot_display }} | ราคา {{ c.course_price|floatformat:0 }}</option>{% endfor %}
+            {% for c in classes %}<option value="{{ c.id }}" data-price="{{ c.course_price }}">{{ c.name }} | {{ c.get_time_slot_display }} | ราคา {{ c.course_price|floatformat:"0g" }}</option>{% endfor %}
           </select>
         </div>
       </div>
@@ -127,7 +132,17 @@
       <div class="grid">
         <div class="field"><label>วันที่รับเงิน</label><input type="date" name="payment_date" value="{{ today|date:'Y-m-d' }}" required></div>
         <div class="field"><label>รูปแบบการชำระ</label><select name="payment_type">{% for value,label in payment_type_choices %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</select></div>
-        <div class="field"><label>วิธีชำระเงิน</label><select name="payment_method">{% for value,label in payment_method_choices %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</select></div>
+        <div class="field span2">
+          <label>วิธีชำระเงิน</label>
+          <div class="toggle payment-method-toggle">
+            {% for value,label in payment_method_choices %}
+              <label class="radio-card payment-method-card">
+                <input type="radio" name="payment_method" value="{{ value }}" {% if value == "bank_transfer" %}checked{% endif %}>
+                {{ label }}
+              </label>
+            {% endfor %}
+          </div>
+        </div>
 
         <div class="field"><label>จำนวนครั้ง</label><select name="session_package" id="sessionPackage" onchange="applySessionPackage()"><option value="10" data-sessions="10" selected>10 ครั้ง</option><option value="12" data-sessions="12">10 แถม 2 = 12 ครั้ง</option><option value="20" data-sessions="20">20 ครั้ง</option><option value="30" data-sessions="30">30 ครั้ง</option><option value="custom" data-sessions="10">กรอกเอง</option></select></div>
         <div class="field"><label>กรอกจำนวนครั้งเอง</label><input type="number" name="custom_sessions" id="customSessions" min="1" value="10" oninput="updateSummary(true)"></div>

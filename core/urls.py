@@ -44,6 +44,11 @@ urlpatterns = [
     path("sheet-inventory/export/", views.sheet_inventory_export, name="sheet_inventory_export"),
     path("sheet-inventory/sheet/<int:pk>/", views.sheet_inventory_profile, name="sheet_inventory_profile"),
 
+    # Sheet print orders
+    path("sheet-print-orders/", views.sheet_print_order_admin, name="sheet_print_order_admin"),
+    path("print-shop/", views.print_shop_order_list, name="print_shop_order_list"),
+    path("print-shop/order/<int:pk>/ready/", views.print_shop_mark_ready, name="print_shop_mark_ready"),
+
 
 
 

@@ -74,6 +74,19 @@ urlpatterns = [
     path("teaching/report/", views.teaching_update_report, name="teaching_update_report"),
     path("tutor-teaching-update/", views.tutor_teaching_update, name="tutor_teaching_update"),
 
+
+    # Test score announcement
+    path("test-scores/", views.test_score_round_list, name="test_score_round_list"),
+    path("test-scores/round/<int:round_id>/login/", views.test_score_login, name="test_score_login"),
+    path("test-scores/round/<int:round_id>/participant-search/", views.test_score_participant_search, name="test_score_participant_search"),
+    path("test-scores/round/<int:round_id>/result/", views.test_score_result, name="test_score_result"),
+    path("test-scores/round/<int:round_id>/logout/", views.test_score_logout, name="test_score_logout"),
+    path("test-score-admin/", views.test_score_admin, name="test_score_admin"),
+    path("test-score-admin/round/<int:round_id>/", views.test_score_round_manage, name="test_score_round_manage"),
+    path("test-score-admin/round/<int:round_id>/template/", views.test_score_import_template, name="test_score_import_template"),
+    path("test-score-admin/student-search/", views.test_score_student_search, name="test_score_student_search"),
+    path("test-score-admin/admission-search/", views.test_score_admission_search, name="test_score_admission_search"),
+
     # Student Portal
     path("student-portal/", views.student_portal_login, name="student_portal_login"),
     path("student-portal/student-search/", views.student_portal_student_search, name="student_portal_student_search"),

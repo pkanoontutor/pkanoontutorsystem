@@ -3,31 +3,25 @@
 
 {% block head %}
 <style>
-  .si-wrap{max-width:1380px;margin:0 auto;display:grid;gap:14px;}
-  .hero{background:linear-gradient(135deg,#0f172a,#0ea5e9,#22c55e);color:#fff;border-radius:26px;padding:24px;box-shadow:0 14px 30px rgba(15,23,42,.20);display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;align-items:flex-start;}
-  .title{font-size:28px;font-weight:1000;letter-spacing:-.04em}.sub{color:#e0f2fe;font-size:13px;margin-top:6px;line-height:1.6}
-  .actions{display:flex;gap:8px;flex-wrap:wrap}.btnx{border:0;border-radius:14px;padding:10px 14px;font-weight:1000;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:7px;cursor:pointer;line-height:1.2}
+  .si-wrap{max-width:1380px;margin:0 auto;display:grid;gap:12px;}
+  .hero{background:linear-gradient(135deg,#0f172a,#0ea5e9,#22c55e);color:#fff;border-radius:22px;padding:18px 20px;box-shadow:0 12px 24px rgba(15,23,42,.18);display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:flex-start;}
+  .title{font-size:25px;font-weight:1000;letter-spacing:-.04em}.sub{color:#e0f2fe;font-size:12px;margin-top:4px;line-height:1.45}
+  .actions{display:flex;gap:7px;flex-wrap:wrap}.btnx{border:0;border-radius:12px;padding:8px 11px;font-weight:1000;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;line-height:1.15;font-size:12px;white-space:nowrap;}
   .primary{background:#0ea5e9;color:#fff}.green{background:#16a34a;color:#fff}.dark{background:#0f172a;color:#fff}.soft{background:#fff;color:#0f172a;border:1px solid #e2e8f0}.red{background:#dc2626;color:#fff}.amber{background:#f59e0b;color:#111827}
-  .panel{background:#fff;border-radius:22px;padding:16px;box-shadow:0 6px 16px rgba(15,23,42,.08);border:1px solid rgba(255,255,255,.88)}
-  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.grid4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
-  .field{display:flex;flex-direction:column;gap:5px;min-width:0}.field label{font-size:11px;font-weight:1000;color:#334155;text-transform:uppercase;letter-spacing:.04em}
-  input,select{border:1px solid #e2e8f0;border-radius:13px;padding:10px 11px;font-weight:800;background:#fff;width:100%;min-width:0}
+  .panel{background:#fff;border-radius:18px;padding:13px;box-shadow:0 4px 12px rgba(15,23,42,.07);border:1px solid rgba(255,255,255,.88)}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.grid4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+  .field{display:flex;flex-direction:column;gap:4px;min-width:0}.field label{font-size:10px;font-weight:1000;color:#334155;text-transform:uppercase;letter-spacing:.04em}
+  input,select{border:1px solid #e2e8f0;border-radius:11px;padding:8px 9px;font-weight:800;background:#fff;width:100%;min-width:0;font-size:12px;}
   input:focus,select:focus{outline:none;border-color:#0ea5e9;box-shadow:0 0 0 3px rgba(14,165,233,.12)}
-  .section-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:12px}.section-title{font-size:18px;font-weight:1000;color:#0f172a}.section-sub{font-size:12px;color:#64748b;font-weight:800;margin-top:2px;line-height:1.4}
-  .scan-box{background:linear-gradient(135deg,#ecfeff,#f0fdf4);border:1px solid #bae6fd;border-radius:22px;padding:16px;display:grid;gap:12px}
-  .scan-input{font-size:24px;border-radius:18px;padding:16px;background:#fff;border:2px solid #0ea5e9}
-  .scan-result{border-radius:16px;padding:12px;font-weight:1000;background:#f8fafc;border:1px solid #e2e8f0;color:#334155}
-  .scan-result.ok{background:#dcfce7;border-color:#86efac;color:#166534}.scan-result.bad{background:#fee2e2;border-color:#fecaca;color:#991b1b}
-  .table-wrap{overflow:auto;border:1px solid #e2e8f0;border-radius:16px;background:#fff}table{width:100%;border-collapse:collapse;min-width:1100px}th,td{padding:10px;border-bottom:1px solid #edf2f7;text-align:left;vertical-align:top}th{font-size:11px;color:#475569;background:#f8fafc;text-transform:uppercase;letter-spacing:.04em}td{font-size:13px;font-weight:800;color:#334155}.mini{font-size:12px;color:#64748b;font-weight:800;line-height:1.45}
-  .pillrow{display:flex;gap:6px;flex-wrap:wrap}.pill{border-radius:999px;padding:5px 9px;font-size:12px;font-weight:1000;border:1px solid #e2e8f0;background:#f8fafc;color:#334155}.low{background:#fee2e2;color:#991b1b;border-color:#fecaca}.ok{background:#dcfce7;color:#166534;border-color:#86efac}.blue{background:#eff6ff;color:#1d4ed8;border-color:#bfdbfe}.orange{background:#ffedd5;color:#9a3412;border-color:#fed7aa}
-  .class-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.class-card{border:1px solid #e2e8f0;border-radius:20px;padding:13px;background:#fff;display:grid;gap:10px}.class-card.short{border-color:#fecaca;background:#fff7f7}.class-title{font-size:17px;font-weight:1000;color:#0f172a;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}.sheet-need{border-radius:15px;background:#f8fafc;border:1px solid #e2e8f0;padding:10px;display:grid;gap:5px}
-  .inline-form{display:flex;gap:6px;align-items:center;flex-wrap:wrap}.inline-form select,.inline-form input{min-width:80px}.inline-form .btnx{padding:9px 11px}
-  .bulk-result{border-radius:18px;padding:12px;border:1px solid #bae6fd;background:#f0f9ff;color:#0c4a6e;font-weight:900;display:grid;gap:7px}
-  .bulk-result.bad{background:#fef2f2;border-color:#fecaca;color:#991b1b}
-  .bulk-metrics{display:flex;gap:7px;flex-wrap:wrap}.bulk-metrics span{border-radius:999px;background:#fff;border:1px solid #e2e8f0;padding:6px 10px;font-size:12px;font-weight:1000}
-  .error-list{margin:0;padding-left:18px;font-size:12px;line-height:1.45}
-  @media(max-width:1100px){.grid2,.class-grid{grid-template-columns:1fr}.grid4{grid-template-columns:1fr 1fr}.btnx{width:100%}.hero .btnx{width:auto}}
-  @media(max-width:700px){.grid3,.grid4{grid-template-columns:1fr}.title{font-size:23px}.hero .btnx{width:100%}.scan-input{font-size:18px}.table-wrap table{min-width:980px}}
+  .section-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:10px}.section-title{font-size:16px;font-weight:1000;color:#0f172a}.section-sub{font-size:11px;color:#64748b;font-weight:800;margin-top:2px;line-height:1.35}
+  .scan-box{background:linear-gradient(135deg,#ecfeff,#f0fdf4);border:1px solid #bae6fd;border-radius:18px;padding:12px;display:grid;gap:9px}.scan-input{font-size:18px;border-radius:15px;padding:13px;background:#fff;border:2px solid #0ea5e9}.scan-result{border-radius:13px;padding:9px;font-size:12px;font-weight:1000;background:#f8fafc;border:1px solid #e2e8f0;color:#334155}.scan-result.ok{background:#dcfce7;border-color:#86efac;color:#166534}.scan-result.bad{background:#fee2e2;border-color:#fecaca;color:#991b1b}
+  .mini{font-size:11px;color:#64748b;font-weight:800;line-height:1.35}.pillrow{display:flex;gap:5px;flex-wrap:wrap}.pill{border-radius:999px;padding:4px 8px;font-size:11px;font-weight:1000;border:1px solid #e2e8f0;background:#f8fafc;color:#334155}.low{background:#fee2e2;color:#991b1b;border-color:#fecaca}.ok{background:#dcfce7;color:#166534;border-color:#86efac}.blue{background:#eff6ff;color:#1d4ed8;border-color:#bfdbfe}.orange{background:#ffedd5;color:#9a3412;border-color:#fed7aa}
+  .bulk-result{border-radius:15px;padding:10px;border:1px solid #bae6fd;background:#f0f9ff;color:#0c4a6e;font-weight:900;display:grid;gap:6px}.bulk-result.bad{background:#fef2f2;border-color:#fecaca;color:#991b1b}.bulk-metrics{display:flex;gap:6px;flex-wrap:wrap}.bulk-metrics span{border-radius:999px;background:#fff;border:1px solid #e2e8f0;padding:5px 8px;font-size:11px;font-weight:1000}.error-list{margin:0;padding-left:18px;font-size:11px;line-height:1.4}
+  .grade-section{border:1px solid #e2e8f0;border-radius:18px;background:#fff;overflow:hidden;margin-bottom:10px}.grade-section summary{cursor:pointer;list-style:none;padding:12px 14px;background:linear-gradient(135deg,#f8fafc,#eff6ff);display:flex;justify-content:space-between;gap:10px;align-items:center}.grade-section summary::-webkit-details-marker{display:none}.grade-name{font-size:18px;font-weight:1000;color:#0f172a}.grade-hint{font-size:11px;color:#64748b;font-weight:900}.sheet-card-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;padding:10px}.sheet-card{border:1px solid #e2e8f0;border-radius:15px;background:#fff;padding:10px;display:grid;gap:8px;min-width:0}.sheet-card:hover{box-shadow:0 6px 14px rgba(15,23,42,.08)}.sheet-top{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}.sheet-code{font-size:15px;font-weight:1000;color:#0f172a}.sheet-title{font-size:12px;font-weight:850;color:#334155;line-height:1.25;overflow-wrap:anywhere}.compact-line{display:grid;grid-template-columns:1fr 1fr;gap:5px}.inline-mini{display:grid;grid-template-columns:72px 58px 1fr auto;gap:5px;align-items:center}.bulk-mini{display:grid;grid-template-columns:72px 58px 1fr;gap:5px;align-items:center}.profile-link{width:100%;}
+  .class-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.class-card{border:1px solid #e2e8f0;border-radius:17px;padding:11px;background:#fff;display:grid;gap:8px}.class-card.short{border-color:#fecaca;background:#fff7f7}.class-title{font-size:15px;font-weight:1000;color:#0f172a;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}.sheet-need{border-radius:13px;background:#f8fafc;border:1px solid #e2e8f0;padding:8px;display:grid;gap:5px}
+  .table-wrap{overflow:auto;border:1px solid #e2e8f0;border-radius:14px;background:#fff}table{width:100%;border-collapse:collapse;min-width:900px}th,td{padding:8px;border-bottom:1px solid #edf2f7;text-align:left;vertical-align:top}th{font-size:10px;color:#475569;background:#f8fafc;text-transform:uppercase;letter-spacing:.04em}td{font-size:12px;font-weight:800;color:#334155}
+  @media(max-width:1100px){.grid2,.class-grid{grid-template-columns:1fr}.grid4{grid-template-columns:1fr 1fr}.sheet-card-grid{grid-template-columns:1fr 1fr}.btnx{width:100%}.hero .btnx{width:auto}}
+  @media(max-width:720px){.grid3,.grid4,.sheet-card-grid{grid-template-columns:1fr}.title{font-size:22px}.hero .btnx{width:100%}.inline-mini,.bulk-mini{grid-template-columns:1fr 1fr}.inline-mini input[name='note']{grid-column:1/-1}.scan-input{font-size:16px}}
 </style>
 {% endblock %}
 
@@ -36,7 +30,7 @@
   <section class="hero">
     <div>
       <div class="title">📦 Sheet Inventory</div>
-      <div class="sub">สร้างชีท จัดการ stock ผูกชีทกับ class และใช้ QR scanner ตัด/นับสต๊อกแบบ real time</div>
+      <div class="sub">จัดกลุ่มชีทตามระดับชั้น สร้างชีท จัดการ stock ผูกชีทกับ class และใช้ QR scanner ตัด/นับสต๊อก</div>
     </div>
     <div class="actions">
       <a class="btnx soft" href="/pkanoon-admin-tool/">← Admin Tool</a>
@@ -46,74 +40,31 @@
     </div>
   </section>
 
-
   <section class="panel">
-    <div class="section-head">
-      <div>
-        <div class="section-title">⬆️ Bulk Upload ชีทเข้าระบบ</div>
-        <div class="section-sub">
-          รองรับ Excel (.xlsx) และ CSV โดยอ่านคอลัมน์: ระดับชั้น / วิชา / รหัสชีท / ชื่อชีท / initial_quantity / total_pages / total_questions / minimum_stock
-        </div>
-      </div>
-    </div>
-
+    <div class="section-head"><div><div class="section-title">⬆️ Bulk Upload ชีทเข้าระบบ</div><div class="section-sub">รองรับ Excel (.xlsx) และ CSV: ระดับชั้น / วิชา / รหัสชีท / ชื่อชีท / initial_quantity / total_pages / total_questions / minimum_stock</div></div></div>
     {% if bulk_result %}
       <div class="bulk-result {% if bulk_result.error_count %}bad{% endif %}">
         <div>ผลการ Upload</div>
-        <div class="bulk-metrics">
-          <span>สร้างใหม่ {{ bulk_result.created }}</span>
-          <span>อัปเดต {{ bulk_result.updated }}</span>
-          <span>ข้าม {{ bulk_result.skipped }}</span>
-          <span>บันทึก stock movement {{ bulk_result.movements }}</span>
-          <span>Error {{ bulk_result.error_count }}</span>
-        </div>
-        {% if bulk_result.errors %}
-          <ul class="error-list">
-            {% for err in bulk_result.errors %}
-              <li>{{ err }}</li>
-            {% endfor %}
-          </ul>
-        {% endif %}
-      </div>
-      <div style="height:10px"></div>
+        <div class="bulk-metrics"><span>สร้างใหม่ {{ bulk_result.created }}</span><span>อัปเดต {{ bulk_result.updated }}</span><span>ข้าม {{ bulk_result.skipped }}</span><span>Stock movement {{ bulk_result.movements }}</span><span>Error {{ bulk_result.error_count }}</span></div>
+        {% if bulk_result.errors %}<ul class="error-list">{% for err in bulk_result.errors %}<li>{{ err }}</li>{% endfor %}</ul>{% endif %}
+      </div><div style="height:8px"></div>
     {% endif %}
-
     <form method="post" enctype="multipart/form-data" action="{% url 'core:sheet_inventory_bulk_upload' %}" class="grid4">
       {% csrf_token %}
-      <div class="field">
-        <label>ไฟล์ Excel / CSV</label>
-        <input type="file" name="bulk_file" accept=".xlsx,.csv" required>
-      </div>
-      <div class="field">
-        <label>จัดการ initial_quantity</label>
-        <select name="stock_mode">
-          <option value="set">ตั้งยอดจริงตามไฟล์</option>
-          <option value="add">เพิ่มเข้า stock เดิม</option>
-          <option value="skip">ไม่อัปเดต stock</option>
-        </select>
-      </div>
-      <div class="field">
-        <label>Column ขั้นต่ำที่ต้องมี</label>
-        <input value="วิชา / รหัสชีท / ชื่อชีท" readonly>
-      </div>
-      <div class="field">
-        <label>&nbsp;</label>
-        <button class="btnx green" type="submit">Upload เข้าระบบ</button>
-      </div>
+      <div class="field"><label>ไฟล์ Excel / CSV</label><input type="file" name="bulk_file" accept=".xlsx,.csv" required></div>
+      <div class="field"><label>จัดการ initial_quantity</label><select name="stock_mode"><option value="set">ตั้งยอดจริงตามไฟล์</option><option value="add">เพิ่มเข้า stock เดิม</option><option value="skip">ไม่อัปเดต stock</option></select></div>
+      <div class="field"><label>Column ขั้นต่ำ</label><input value="ระดับชั้น / วิชา / รหัสชีท / ชื่อชีท" readonly></div>
+      <div class="field"><label>&nbsp;</label><button class="btnx green" type="submit">Upload เข้าระบบ</button></div>
     </form>
   </section>
 
   <section class="grid2">
     <div class="panel">
-      <div class="section-head">
-        <div>
-          <div class="section-title">➕ สร้างชีทใหม่</div>
-          <div class="section-sub">เมื่อสร้างแล้ว ระบบจะมี QR จากรหัสชีทให้ในหน้าโปรไฟล์ทันที</div>
-        </div>
-      </div>
+      <div class="section-head"><div><div class="section-title">➕ สร้างชีทใหม่</div><div class="section-sub">เมื่อสร้างแล้ว ระบบจะมี QR จากรหัสชีทให้ในหน้าโปรไฟล์ทันที</div></div></div>
       <form method="post" class="grid3">
         {% csrf_token %}
         <input type="hidden" name="action" value="create_sheet">
+        <div class="field"><label>ระดับชั้น</label><select name="grade_level"><option value="">ให้ระบบเดาจากรหัสชีท</option>{% for value,label in sheet_grade_choices %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</select></div>
         <div class="field"><label>รหัสชีท</label><input name="code" placeholder="เช่น M-P6-01" required></div>
         <div class="field"><label>ชื่อชีท</label><input name="title" placeholder="ชื่อเรื่อง / ชุดชีท" required></div>
         <div class="field"><label>วิชาเดิม</label><select name="subject_id"><option value="">เลือกวิชาเดิม</option>{% for s in subjects %}<option value="{{ s.id }}">{{ s.name }}</option>{% endfor %}</select></div>
@@ -127,18 +78,9 @@
     </div>
 
     <div class="panel">
-      <div class="section-head">
-        <div>
-          <div class="section-title">⚡ QR Scanner / Cashier Mode</div>
-          <div class="section-sub">ตั้งโหมดแล้ว scan QR Code ได้เลย เครื่องสแกนจะพิมพ์รหัสชีทลงช่องนี้เหมือน keyboard</div>
-        </div>
-      </div>
+      <div class="section-head"><div><div class="section-title">⚡ QR Scanner / Cashier Mode</div><div class="section-sub">ตั้งโหมดแล้ว scan QR Code ได้เลย เครื่องสแกนจะพิมพ์รหัสชีทลงช่องนี้เหมือน keyboard</div></div></div>
       <div class="scan-box">
-        <div class="grid3">
-          <div class="field"><label>โหมด</label><select id="scanMode"><option value="deduct">ตัด stock</option><option value="add">เพิ่ม stock</option><option value="set">ตั้งยอดจริง</option></select></div>
-          <div class="field"><label>จำนวนต่อ scan</label><input id="scanQty" type="number" min="0" value="1"></div>
-          <div class="field"><label>หมายเหตุ</label><input id="scanNote" value="QR scanner"></div>
-        </div>
+        <div class="grid3"><div class="field"><label>โหมด</label><select id="scanMode"><option value="deduct">ตัด stock</option><option value="add">เพิ่ม stock</option><option value="set">ตั้งยอดจริง</option></select></div><div class="field"><label>จำนวนต่อ scan</label><input id="scanQty" type="number" min="0" value="1"></div><div class="field"><label>หมายเหตุ</label><input id="scanNote" value="QR scanner"></div></div>
         <input id="scanInput" class="scan-input" placeholder="Scan QR / พิมพ์รหัสชีท แล้วกด Enter" autocomplete="off">
         <div id="scanResult" class="scan-result">พร้อม scan แล้วครับ</div>
       </div>
@@ -146,17 +88,12 @@
   </section>
 
   <section class="panel">
-    <div class="section-head">
-      <div>
-        <div class="section-title">🔗 ผูก Class กับชีทแบบ Manual</div>
-        <div class="section-sub">ใช้ override เพิ่มเองได้ แม้ระบบจะดึงจากชีทที่กรอกใน tutor update อยู่แล้ว</div>
-      </div>
-    </div>
+    <div class="section-head"><div><div class="section-title">🔗 ผูก Class กับชีทแบบ Manual</div><div class="section-sub">ใช้ override เพิ่มเองได้ แม้ระบบจะดึงจากชีทที่กรอกใน tutor update อยู่แล้ว</div></div></div>
     <form method="post" class="grid4">
       {% csrf_token %}
       <input type="hidden" name="action" value="link_class_sheet">
       <div class="field"><label>Class</label><select name="class_id" required>{% for c in classes %}<option value="{{ c.id }}">{{ c.get_time_slot_display }} · {{ c.name }}</option>{% endfor %}</select></div>
-      <div class="field"><label>ชีท</label><select name="sheet_id" required>{% for s in all_sheets %}<option value="{{ s.id }}">{{ s.code }} · {{ s.title }}</option>{% endfor %}</select></div>
+      <div class="field"><label>ชีท</label><select name="sheet_id" required>{% for s in all_sheets %}<option value="{{ s.id }}">{{ s.get_grade_level_display|default:'ไม่ระบุ' }} · {{ s.code }} · {{ s.title }}</option>{% endfor %}</select></div>
       <div class="field"><label>จำนวนต่อเด็ก 1 คน</label><input type="number" name="quantity_per_student" min="1" value="1"></div>
       <div class="field"><label>หมายเหตุ</label><input name="note" placeholder="เช่น แจกตอนสมัครใหม่"></div>
       <div style="grid-column:1/-1"><button class="btnx primary" type="submit">บันทึกการผูกชีท</button></div>
@@ -165,157 +102,64 @@
 
   <section class="panel">
     <div class="section-head">
-      <div>
-        <div class="section-title">📚 Stock ชีททั้งหมด</div>
-        <div class="section-sub">กรอกทีละชีท หรือใส่หลายรายการแล้วกด Bulk Save ด้านล่างได้</div>
-      </div>
-      <form method="get" class="inline-form">
-        <input name="q" value="{{ q }}" placeholder="ค้นหารหัส / ชื่อชีท / วิชา">
-        <button class="btnx primary" type="submit">ค้นหา</button>
-        <a class="btnx soft" href="/sheet-inventory/">Clear</a>
-      </form>
+      <div><div class="section-title">📚 Stock ชีททั้งหมด</div><div class="section-sub">แยกตามระดับชั้น สามารถกด hide / expand ได้ และ default เป็น expand</div></div>
+      <form method="get" class="actions"><input name="q" value="{{ q }}" placeholder="ค้นหารหัส / ชื่อชีท / วิชา"><button class="btnx primary" type="submit">ค้นหา</button><a class="btnx soft" href="/sheet-inventory/">Clear</a></form>
     </div>
 
-    <form method="post">
+    <form id="bulkStockForm" method="post">
       {% csrf_token %}
       <input type="hidden" name="action" value="bulk_stock">
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>ชีท</th>
-              <th>Stock</th>
-              <th>บันทึกทีละชีท</th>
-              <th>Bulk Update</th>
-              <th>QR/Profile</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for row in sheet_rows %}
-            <tr>
-              <td>
-                <div style="font-weight:1000;color:#0f172a">{{ row.sheet.code }}</div>
-                <div>{{ row.sheet.title }}</div>
-                <div class="mini">{{ row.sheet.subject.name }}</div>
-              </td>
-              <td>
-                <div class="pillrow">
-                  <span class="pill {% if row.is_low %}low{% else %}ok{% endif %}">คงเหลือ {{ row.quantity }}</span>
-                  <span class="pill">ขั้นต่ำ {{ row.minimum_stock }}</span>
-                  {% if row.is_low %}<span class="pill low">ใกล้หมด</span>{% endif %}
-                </div>
-              </td>
-              <td>
-                <form method="post" class="inline-form">
-                  {% csrf_token %}
-                  <input type="hidden" name="action" value="stock_single">
-                  <input type="hidden" name="sheet_id" value="{{ row.sheet.id }}">
-                  <select name="movement_type">
-                    <option value="add">เพิ่ม</option>
-                    <option value="deduct">ตัด</option>
-                    <option value="set">ตั้งยอดจริง</option>
-                  </select>
-                  <input type="number" name="quantity" min="0" value="1" style="max-width:90px">
-                  <input name="note" placeholder="note" style="max-width:150px">
-                  <button class="btnx dark" type="submit">บันทึก</button>
-                </form>
-              </td>
-              <td>
-                <div class="inline-form">
-                  <select name="bulk_mode_{{ row.sheet.id }}">
-                    <option value="add">เพิ่ม</option>
-                    <option value="deduct">ตัด</option>
-                    <option value="set">ตั้งยอดจริง</option>
-                  </select>
-                  <input type="number" name="bulk_qty_{{ row.sheet.id }}" min="0" placeholder="จำนวน" style="max-width:90px">
-                  <input name="bulk_note_{{ row.sheet.id }}" placeholder="note" style="max-width:150px">
-                </div>
-              </td>
-              <td><a class="btnx soft" href="{% url 'core:sheet_inventory_profile' row.sheet.id %}">QR / Profile</a></td>
-            </tr>
-            {% empty %}
-            <tr><td colspan="5" class="mini">ยังไม่มีชีทในระบบ</td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-      <div style="margin-top:10px"><button class="btnx green" type="submit">Bulk Save หลายชีทพร้อมกัน</button></div>
     </form>
+
+    {% for group in sheet_grade_groups %}
+      <details class="grade-section" open>
+        <summary><div><div class="grade-name">{{ group.label }}</div><div class="grade-hint">{{ group.count }} รายการ</div></div><span class="pill blue">กดเพื่อย่อ/ขยาย</span></summary>
+        <div class="sheet-card-grid">
+          {% for row in group.rows %}
+            <div class="sheet-card">
+              <div class="sheet-top">
+                <div><div class="sheet-code">{{ row.sheet.code }}</div><div class="sheet-title">{{ row.sheet.title }}</div><div class="mini">{{ row.sheet.subject.name }} · {{ row.grade_label }}</div></div>
+                <a class="btnx soft" href="{% url 'core:sheet_inventory_profile' row.sheet.id %}">QR</a>
+              </div>
+              <div class="pillrow"><span class="pill {% if row.is_low %}low{% else %}ok{% endif %}">คงเหลือ {{ row.quantity }}</span><span class="pill">ขั้นต่ำ {{ row.minimum_stock }}</span>{% if row.is_low %}<span class="pill low">ใกล้หมด</span>{% endif %}</div>
+              <form method="post" class="inline-mini">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="stock_single"><input type="hidden" name="sheet_id" value="{{ row.sheet.id }}">
+                <select name="movement_type"><option value="add">เพิ่ม</option><option value="deduct">ตัด</option><option value="set">ตั้งยอด</option></select>
+                <input type="number" name="quantity" min="0" value="1">
+                <input name="note" placeholder="note">
+                <button class="btnx dark" type="submit">บันทึก</button>
+              </form>
+              <div class="bulk-mini">
+                <select name="bulk_mode_{{ row.sheet.id }}" form="bulkStockForm"><option value="add">เพิ่ม</option><option value="deduct">ตัด</option><option value="set">ตั้งยอด</option></select>
+                <input type="number" name="bulk_qty_{{ row.sheet.id }}" min="0" placeholder="จำนวน" form="bulkStockForm">
+                <input name="bulk_note_{{ row.sheet.id }}" placeholder="note bulk" form="bulkStockForm">
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      </details>
+    {% empty %}
+      <div class="mini">ยังไม่มีชีทในระบบ</div>
+    {% endfor %}
+    <div style="margin-top:8px"><button class="btnx green" type="submit" form="bulkStockForm">Bulk Save หลายชีทพร้อมกัน</button></div>
   </section>
 
   <section class="panel">
-    <div class="section-head">
-      <div>
-        <div class="section-title">🏫 ชีทที่ต้องใช้ตาม Class / รายการสมัครและทดลองเรียน</div>
-        <div class="section-sub">จำนวนที่ต้องใช้คำนวณจากรายการสมัคร/ทดลองเรียน/จองล่วงหน้าที่ยังไม่ปิดงาน โดย match จากรอบเวลา + ระดับชั้นในชื่อ class</div>
-      </div>
-    </div>
+    <div class="section-head"><div><div class="section-title">🏫 ชีทที่ต้องใช้ตาม Class / รายการสมัครและทดลองเรียน</div><div class="section-sub">จำนวนที่ต้องใช้คำนวณจากรายการสมัคร/ทดลองเรียน/จองล่วงหน้าที่ยังไม่ปิดงาน โดย match จากรอบเวลา + ระดับชั้นในชื่อ class</div></div></div>
     <div class="class-grid">
       {% for row in class_rows %}
       <div class="class-card {% if row.has_shortage %}short{% endif %}">
-        <div class="class-title">
-          <span>{{ row.class.get_time_slot_display }} · {{ row.class.name }}</span>
-          <span class="pill {% if row.demand_count %}orange{% else %}blue{% endif %}">คาดว่าต้องแจก {{ row.demand_count }} คน</span>
-        </div>
-        {% if row.entries %}
-          {% for e in row.entries %}
-          <div class="sheet-need">
-            <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap">
-              <b>{{ e.sheet.code }}</b>
-              <span class="pill {% if e.shortage > 0 %}low{% else %}ok{% endif %}">ขาด {{ e.shortage }}</span>
-            </div>
-            <div class="mini">{{ e.sheet.title }} · {{ e.source_label }}</div>
-            <div class="pillrow">
-              <span class="pill">ต้องใช้ {{ e.required }}</span>
-              <span class="pill">มี {{ e.balance }}</span>
-              <span class="pill">ต่อคน {{ e.quantity_per_student }}</span>
-            </div>
-            {% if e.mapping %}
-            <form method="post">
-              {% csrf_token %}
-              <input type="hidden" name="action" value="unlink_class_sheet">
-              <input type="hidden" name="mapping_id" value="{{ e.mapping.id }}">
-              <button class="btnx red" style="padding:7px 10px" type="submit">ปิด manual link</button>
-            </form>
-            {% endif %}
-          </div>
-          {% endfor %}
-        {% else %}
-          <div class="mini">ยังไม่มีชีทที่ผูกกับ class นี้</div>
-        {% endif %}
+        <div class="class-title"><span>{{ row.class.get_time_slot_display }} · {{ row.class.name }}</span><span class="pill {% if row.demand_count %}orange{% else %}blue{% endif %}">คาดว่าต้องแจก {{ row.demand_count }} คน</span></div>
+        {% if row.entries %}{% for e in row.entries %}<div class="sheet-need"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><b>{{ e.sheet.code }}</b><span class="pill {% if e.shortage > 0 %}low{% else %}ok{% endif %}">ขาด {{ e.shortage }}</span></div><div class="mini">{{ e.sheet.title }} · {{ e.source_label }}</div><div class="pillrow"><span class="pill">ต้องใช้ {{ e.required }}</span><span class="pill">มี {{ e.balance }}</span><span class="pill">ต่อคน {{ e.quantity_per_student }}</span></div>{% if e.mapping %}<form method="post">{% csrf_token %}<input type="hidden" name="action" value="unlink_class_sheet"><input type="hidden" name="mapping_id" value="{{ e.mapping.id }}"><button class="btnx red" type="submit">ปิด manual link</button></form>{% endif %}</div>{% endfor %}{% else %}<div class="mini">ยังไม่มีชีทที่ผูกกับ class นี้</div>{% endif %}
       </div>
       {% endfor %}
     </div>
   </section>
 
   <section class="panel">
-    <div class="section-head">
-      <div>
-        <div class="section-title">🕘 Movement ล่าสุด</div>
-        <div class="section-sub">เก็บประวัติการเพิ่ม/ตัด/ตั้งยอด เพื่อย้อนดูได้</div>
-      </div>
-    </div>
-    <div class="table-wrap">
-      <table>
-        <thead><tr><th>เวลา</th><th>ชีท</th><th>ประเภท</th><th>จำนวน</th><th>ก่อน</th><th>หลัง</th><th>Note</th><th>ผู้บันทึก</th></tr></thead>
-        <tbody>
-          {% for m in movements %}
-          <tr>
-            <td>{{ m.created_at|date:"d/m/Y H:i" }}</td>
-            <td>{{ m.sheet.code }}</td>
-            <td>{{ m.get_movement_type_display }}</td>
-            <td>{{ m.quantity }}</td>
-            <td>{{ m.balance_before }}</td>
-            <td>{{ m.balance_after }}</td>
-            <td>{{ m.note|default:"-" }}</td>
-            <td>{{ m.created_by|default:"-" }}</td>
-          </tr>
-          {% empty %}
-          <tr><td colspan="8" class="mini">ยังไม่มี movement</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
+    <div class="section-head"><div><div class="section-title">🕘 Movement ล่าสุด</div><div class="section-sub">เก็บประวัติการเพิ่ม/ตัด/ตั้งยอด เพื่อย้อนดูได้</div></div></div>
+    <div class="table-wrap"><table><thead><tr><th>เวลา</th><th>ชีท</th><th>ประเภท</th><th>จำนวน</th><th>ก่อน</th><th>หลัง</th><th>Note</th><th>ผู้บันทึก</th></tr></thead><tbody>{% for m in movements %}<tr><td>{{ m.created_at|date:"d/m/Y H:i" }}</td><td>{{ m.sheet.code }}</td><td>{{ m.get_movement_type_display }}</td><td>{{ m.quantity }}</td><td>{{ m.balance_before }}</td><td>{{ m.balance_after }}</td><td>{{ m.note|default:"-" }}</td><td>{{ m.created_by|default:"-" }}</td></tr>{% empty %}<tr><td colspan="8" class="mini">ยังไม่มี movement</td></tr>{% endfor %}</tbody></table></div>
   </section>
 </div>
 
@@ -326,52 +170,14 @@
   const qty = document.getElementById('scanQty');
   const note = document.getElementById('scanNote');
   const result = document.getElementById('scanResult');
-
-  function getCookie(name){
-    const value = `; ${document.cookie}`;
-    const parts = value.split(`; ${name}=`);
-    if(parts.length === 2) return parts.pop().split(';').shift();
-  }
-
-  function show(msg, ok){
-    result.textContent = msg;
-    result.className = 'scan-result ' + (ok ? 'ok' : 'bad');
-  }
-
+  function getCookie(name){const value=`; ${document.cookie}`;const parts=value.split(`; ${name}=`);if(parts.length===2)return parts.pop().split(';').shift();}
+  function show(msg, ok){result.textContent=msg;result.className='scan-result '+(ok?'ok':'bad');}
   input && input.addEventListener('keydown', async function(e){
-    if(e.key !== 'Enter') return;
-    e.preventDefault();
-    const code = input.value.trim();
-    if(!code){ return; }
-
-    show('กำลังบันทึก ' + code + ' ...', true);
-    try{
-      const res = await fetch("{% url 'core:sheet_inventory_scan' %}", {
-        method:'POST',
-        headers:{
-          'Content-Type':'application/json',
-          'X-CSRFToken': getCookie('csrftoken')
-        },
-        body: JSON.stringify({
-          code: code,
-          mode: mode.value,
-          quantity: qty.value || 1,
-          note: note.value || 'QR scanner'
-        })
-      });
-      const data = await res.json();
-      if(!data.ok){
-        show('❌ ' + (data.error || 'บันทึกไม่สำเร็จ'), false);
-      }else{
-        show('✅ ' + data.code + ' · ' + data.title + ' · คงเหลือ ' + data.quantity + ' ชุด', true);
-      }
-    }catch(err){
-      show('❌ เกิดข้อผิดพลาด: ' + err, false);
-    }
-    input.value = '';
-    input.focus();
+    if(e.key!=='Enter') return; e.preventDefault(); const code=input.value.trim(); if(!code){return;}
+    show('กำลังบันทึก '+code+' ...', true);
+    try{const res=await fetch("{% url 'core:sheet_inventory_scan' %}",{method:'POST',headers:{'Content-Type':'application/json','X-CSRFToken':getCookie('csrftoken')},body:JSON.stringify({code:code,mode:mode.value,quantity:qty.value||1,note:note.value||'QR scanner'})}); const data=await res.json(); if(!data.ok){show('❌ '+(data.error||'บันทึกไม่สำเร็จ'),false);}else{show('✅ '+data.code+' · '+data.title+' · คงเหลือ '+data.quantity+' ชุด',true);}}
+    catch(err){show('❌ เกิดข้อผิดพลาด: '+err,false);} input.value=''; input.focus();
   });
-
   setTimeout(()=>{ if(input) input.focus(); }, 400);
 })();
 </script>

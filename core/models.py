@@ -1445,3 +1445,95 @@ class TeachingProgressUpdate(models.Model):
             return f"สัปดาห์นี้ไม่มีสอน · ข้อมูลล่าสุด: {text}"
         return text
 
+# =========================================================
+# ✅ Test Score Announcement Module
+# =========================================================
+class TestRound(models.Model):
+    title = models.CharField("ชื่อรอบสอบ", max_length=255)
+    exam_date = models.DateField("วันที่สอบ", null=True, blank=True)
+    is_published = models.BooleanField("เปิดให้ผู้ปกครองดู", default=False)
+    note = models.TextField("หมายเหตุ", blank=True)
+    created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Test Round"
+        verbose_name_plural = "Test Rounds"
+        ordering = ("-exam_date", "-created_at")
+
+    def __str__(self) -> str:
+        return self.title
+
+
+class TestSubject(models.Model):
+    test_round = models.ForeignKey(TestRound, on_delete=models.CASCADE, related_name="subjects")
+    name = models.CharField("ชื่อวิชา", max_length=120)
+    full_score = models.DecimalField("คะแนนเต็ม", max_digits=8, decimal_places=2, default=100)
+    display_order = models.PositiveIntegerField("ลำดับ", default=1)
+    is_active = models.BooleanField("ใช้งาน", default=True)
+    note = models.CharField("หมายเหตุ", max_length=255, blank=True)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        verbose_name = "Test Subject"
+        verbose_name_plural = "Test Subjects"
+        ordering = ("test_round", "display_order", "id")
+
+    def __str__(self) -> str:
+        return f"{self.test_round} - {self.name}"
+
+
+class TestParticipant(models.Model):
+    class SourceType(models.TextChoices):
+        STUDENT = "student", "นักเรียนในระบบ"
+        ADMISSION = "admission", "จากระบบรับสมัคร"
+        MANUAL = "manual", "กรอกเอง"
+
+    test_round = models.ForeignKey(TestRound, on_delete=models.CASCADE, related_name="participants")
+    source_type = models.CharField("แหล่งข้อมูล", max_length=20, choices=SourceType.choices, default=SourceType.MANUAL)
+    student = models.ForeignKey("Student", on_delete=models.SET_NULL, null=True, blank=True, related_name="test_participations")
+    admission_inquiry = models.ForeignKey("AdmissionInquiry", on_delete=models.SET_NULL, null=True, blank=True, related_name="test_participations")
+
+    nickname = models.CharField("ชื่อเล่น", max_length=100, blank=True)
+    full_name = models.CharField("ชื่อจริงนามสกุล", max_length=255)
+    school_name = models.CharField("โรงเรียน", max_length=255, blank=True)
+    contact_phone = models.CharField("เบอร์ติดต่อ", max_length=50, blank=True)
+    grade_level = models.CharField("ระดับชั้น", max_length=50, blank=True)
+    note = models.TextField("หมายเหตุ", blank=True)
+    is_active = models.BooleanField("ใช้งาน", default=True)
+    created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Test Participant"
+        verbose_name_plural = "Test Participants"
+        ordering = ("test_round", "full_name", "nickname")
+
+    def __str__(self) -> str:
+        return f"{self.nickname or '-'} | {self.full_name}"
+
+    @property
+    def display_name(self) -> str:
+        if self.nickname:
+            return f"{self.nickname} - {self.full_name}"
+        return self.full_name
+
+
+class TestScore(models.Model):
+    participant = models.ForeignKey(TestParticipant, on_delete=models.CASCADE, related_name="scores")
+    subject = models.ForeignKey(TestSubject, on_delete=models.CASCADE, related_name="scores")
+    score = models.DecimalField("คะแนนที่ได้", max_digits=8, decimal_places=2, default=0)
+    note = models.CharField("หมายเหตุรายวิชา", max_length=255, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Test Score"
+        verbose_name_plural = "Test Scores"
+        constraints = [
+            models.UniqueConstraint(fields=["participant", "subject"], name="uniq_test_score_per_subject")
+        ]
+        ordering = ("participant", "subject__display_order", "subject_id")
+
+    def __str__(self) -> str:
+        return f"{self.participant} - {self.subject.name}: {self.score}"
+

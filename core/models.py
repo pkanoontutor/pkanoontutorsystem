@@ -199,9 +199,26 @@ class Subject(models.Model):
 # Sheet (ชีท) - Admin เพิ่มได้
 # -----------------------
 class Sheet(models.Model):
+    class GradeLevel(models.TextChoices):
+        P4 = "p4", "ป.4"
+        P5 = "p5", "ป.5"
+        P6 = "p6", "ป.6"
+        M1 = "m1", "ม.1"
+        M2 = "m2", "ม.2"
+        M3 = "m3", "ม.3"
+        M4 = "m4", "ม.4"
+
     code = models.CharField("รหัสชีท", max_length=50, unique=True)
     title = models.CharField("เรื่อง", max_length=255)
     subject = models.ForeignKey(Subject, on_delete=models.PROTECT, related_name="sheets")
+    grade_level = models.CharField(
+        "ระดับชั้น",
+        max_length=20,
+        choices=GradeLevel.choices,
+        blank=True,
+        default="",
+        help_text="ใช้จัดกลุ่มชีทใน Sheet Inventory และช่วย filter ชีทให้ตรงกับ class",
+    )
 
     total_pages = models.PositiveIntegerField("จำนวนหน้า", default=0)
     total_questions = models.PositiveIntegerField("จำนวนข้อ", default=0)  # ถ้าไม่ใช้ ใส่ 0
@@ -211,7 +228,7 @@ class Sheet(models.Model):
     class Meta:
         verbose_name = "Sheet"
         verbose_name_plural = "Sheets"
-        ordering = ("subject__name", "code")
+        ordering = ("grade_level", "subject__name", "code")
 
     def __str__(self) -> str:
         return f"{self.code} - {self.title}"

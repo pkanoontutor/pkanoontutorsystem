@@ -26,6 +26,7 @@
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <a class="btnx soft" href="/sheet-inventory/">← Sheet Inventory</a>
+      <a class="btnx soft" href="/sheet-print-orders/">🖨️ ระบบส่งปรินท์ชีท</a>
       <button class="btnx soft" onclick="window.print()">พิมพ์ QR</button>
     </div>
   </section>
@@ -50,6 +51,30 @@
         <b>จำนวนหน้า:</b> {{ sheet.total_pages }} · <b>จำนวนข้อ:</b> {{ sheet.total_questions }}<br>
         <b>สถานะ:</b> {% if sheet.is_active %}ใช้งาน{% else %}ปิดใช้งาน{% endif %}
       </div>
+
+      <h3 style="margin:18px 0 10px;font-size:18px">ตั้งค่าการส่งปรินท์</h3>
+      <form method="post" action="/sheet-print-orders/" style="display:grid;gap:8px;border:1px solid #e2e8f0;border-radius:16px;padding:12px;background:#f8fafc;">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="update_sheet_print_setting">
+        <input type="hidden" name="sheet_id" value="{{ sheet.id }}">
+        <label style="font-size:12px;font-weight:1000;color:#334155;">จำนวนที่ต้องการมีในคลัง</label>
+        <input type="number" name="target_stock" min="0" value="{{ inventory.target_stock|default:0 }}" style="border:1px solid #e2e8f0;border-radius:12px;padding:10px;font-weight:900;">
+        <label style="font-size:12px;font-weight:1000;color:#334155;">ลิงก์ OneDrive</label>
+        <input name="onedrive_url" value="{{ inventory.onedrive_url }}" placeholder="วางลิงก์ไฟล์ชีท" style="border:1px solid #e2e8f0;border-radius:12px;padding:10px;font-weight:900;">
+        <button class="btnx green" type="submit">บันทึกค่าคลัง / ลิงก์</button>
+      </form>
+
+      <form method="post" action="/sheet-print-orders/" style="margin-top:10px;display:grid;gap:8px;border:1px solid #bae6fd;border-radius:16px;padding:12px;background:#f0f9ff;">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="create_print_order">
+        <input type="hidden" name="sheet_id" value="{{ sheet.id }}">
+        <input type="hidden" name="onedrive_url" value="{{ inventory.onedrive_url }}">
+        <label style="font-size:12px;font-weight:1000;color:#075985;">จำนวนที่สั่งปรินท์</label>
+        <input type="number" name="quantity" min="1" value="1" required style="border:1px solid #bae6fd;border-radius:12px;padding:10px;font-weight:900;">
+        <label style="font-size:12px;font-weight:1000;color:#075985;">วันที่ต้องส่ง</label>
+        <input type="date" name="due_date" style="border:1px solid #bae6fd;border-radius:12px;padding:10px;font-weight:900;">
+        <button class="btnx dark" type="submit">สร้างรายการรอปรินท์</button>
+      </form>
 
       <h3 style="margin:18px 0 10px;font-size:18px">Class ที่ผูกแบบ Manual</h3>
       <div class="pillrow">

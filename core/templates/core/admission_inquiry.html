@@ -69,9 +69,26 @@
       border:1px solid #e2e8f0;
       border-radius:14px;
       padding:12px 13px;
-      font-size:15px;
+      font-size:16px;
+      line-height:1.35;
+      min-height:48px;
       background:#f8fafc;
       outline:none;
+      position:relative;
+      z-index:2;
+      pointer-events:auto;
+      touch-action:manipulation;
+      -webkit-appearance:auto;
+      appearance:auto;
+    }
+    select, input[type="date"]{
+      cursor:pointer;
+    }
+    input[type="date"]::-webkit-calendar-picker-indicator{
+      opacity:1;
+      cursor:pointer;
+      padding:8px;
+      margin-right:-4px;
     }
     input:focus, select:focus{
       border-color:#f97316;
@@ -209,12 +226,6 @@
           </div>
 
           <div class="field">
-            <label for="{{ form.contact_phone.id_for_label }}">เบอร์ติดต่อ</label>
-            {{ form.contact_phone }}
-            {% for error in form.contact_phone.errors %}<div class="err">{{ error }}</div>{% endfor %}
-          </div>
-
-          <div class="field">
             <label for="{{ form.first_name.id_for_label }}">ชื่อจริง</label>
             {{ form.first_name }}
             {% for error in form.first_name.errors %}<div class="err">{{ error }}</div>{% endfor %}
@@ -224,6 +235,12 @@
             <label for="{{ form.last_name.id_for_label }}">นามสกุล</label>
             {{ form.last_name }}
             {% for error in form.last_name.errors %}<div class="err">{{ error }}</div>{% endfor %}
+          </div>
+
+          <div class="field">
+            <label for="{{ form.contact_phone.id_for_label }}">เบอร์ติดต่อ</label>
+            {{ form.contact_phone }}
+            {% for error in form.contact_phone.errors %}<div class="err">{{ error }}</div>{% endfor %}
           </div>
 
           <div class="field">
@@ -268,5 +285,25 @@
       </div>
     </div>
   </div>
+
+  <script>
+    // Android compatibility: make native date picker and select controls respond reliably to taps.
+    document.addEventListener('DOMContentLoaded', function () {
+      const nativeControls = document.querySelectorAll('input[type="date"], select');
+      nativeControls.forEach(function (el) {
+        el.style.pointerEvents = 'auto';
+        el.style.touchAction = 'manipulation';
+
+        function openNativePicker() {
+          if (typeof el.showPicker === 'function') {
+            try { el.showPicker(); } catch (err) { /* browser will still open normally */ }
+          }
+        }
+
+        el.addEventListener('touchend', openNativePicker, { passive: true });
+        el.addEventListener('click', openNativePicker);
+      });
+    });
+  </script>
 </body>
 </html>

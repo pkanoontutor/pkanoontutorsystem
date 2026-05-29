@@ -32,15 +32,37 @@
       </div>
     {% endif %}
 
-    <form method="post">
+    <form method="post" id="portalLoginForm">
       {% csrf_token %}
 
-      <div class="field">
-        <label for="id_student_id">
+      <div class="field student-search-field">
+        <label for="studentSearchInput">
           เลือกชื่อน้อง (ค้นหาด้วยชื่อเล่นได้)
         </label>
 
-        {{ form.student_id }}
+        <input
+          type="hidden"
+          name="student_id"
+          id="id_student_id"
+          value="{{ request.POST.student_id|default:'' }}"
+        >
+
+        <div class="student-search-wrap">
+          <input
+            type="text"
+            id="studentSearchInput"
+            class="student-search-input"
+            placeholder="พิมพ์ชื่อเล่น / ชื่อจริง / รหัสนักเรียน"
+            autocomplete="off"
+            inputmode="search"
+          >
+
+          <div id="studentSearchResults" class="student-search-results" hidden></div>
+        </div>
+
+        <div id="studentPickedText" class="student-picked-text">
+          กรุณาพิมพ์ค้นหา แล้วเลือกชื่อน้องจากรายการที่ขึ้นมา
+        </div>
       </div>
 
       <div class="field">
@@ -59,62 +81,217 @@
     </form>
   </div>
 
-  <!-- ================= Select2 ================= -->
-
-  <link
-    href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css"
-    rel="stylesheet"
-  />
-
   <style>
-    .select2-container .select2-selection--single {
-      height: 40px;
-      padding: 6px 10px;
-      border-radius: 6px;
-      border: 1px solid #ccc;
+    .student-search-field {
+      position: relative;
     }
 
-    .select2-container--default
-    .select2-selection--single
-    .select2-selection__rendered {
-      line-height: 26px;
+    .student-search-wrap {
+      position: relative;
+    }
+
+    .student-search-input {
+      width: 100%;
+      height: 42px;
+      border: 1px solid #cbd5e1;
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-weight: 800;
+      background: #ffffff;
+      box-sizing: border-box;
+      font-family: inherit;
+      font-size: 15px;
+    }
+
+    .student-search-input:focus {
+      outline: none;
+      border-color: #2563eb;
+      box-shadow: 0 0 0 4px rgba(37, 99, 235, .12);
+    }
+
+    .student-search-results {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: calc(100% + 6px);
+      z-index: 50;
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      border-radius: 14px;
+      box-shadow: 0 14px 30px rgba(15, 23, 42, .16);
+      overflow: hidden;
+      max-height: 260px;
+      overflow-y: auto;
+    }
+
+    .student-result-item {
+      width: 100%;
+      border: 0;
+      background: #ffffff;
+      text-align: left;
+      padding: 11px 12px;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 850;
+      color: #0f172a;
+      border-bottom: 1px solid #eef2f7;
+    }
+
+    .student-result-item:last-child {
+      border-bottom: 0;
+    }
+
+    .student-result-item:hover,
+    .student-result-item:focus {
+      background: #eff6ff;
+      outline: none;
+    }
+
+    .student-result-empty {
+      padding: 12px;
+      font-size: 13px;
+      font-weight: 800;
+      color: #64748b;
+      background: #f8fafc;
+    }
+
+    .student-picked-text {
+      margin-top: 7px;
+      font-size: 12px;
+      font-weight: 800;
+      color: #64748b;
+      line-height: 1.45;
+    }
+
+    .student-picked-text.selected {
+      color: #166534;
+      background: #dcfce7;
+      border: 1px solid #bbf7d0;
+      padding: 7px 9px;
+      border-radius: 10px;
     }
   </style>
 
-  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-
-  <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
-
   <script>
-    $(document).ready(function () {
+    (function () {
+      const searchInput = document.getElementById("studentSearchInput");
+      const hiddenInput = document.getElementById("id_student_id");
+      const resultsBox = document.getElementById("studentSearchResults");
+      const pickedText = document.getElementById("studentPickedText");
+      const form = document.getElementById("portalLoginForm");
 
-      const $studentSelect = $("#id_student_id");
+      let debounceTimer = null;
+      let lastController = null;
 
-      $studentSelect.select2({
-        width: "100%",
-        placeholder: "พิมพ์ชื่อเล่น / ชื่อจริง / รหัสนักเรียน",
-        allowClear: true,
+      function hideResults() {
+        resultsBox.hidden = true;
+        resultsBox.innerHTML = "";
+      }
 
-        ajax: {
-          url: "{% url 'core:student_portal_student_search' %}",
-          dataType: "json",
-          delay: 250,
+      function showMessage(message) {
+        resultsBox.innerHTML = `<div class="student-result-empty">${message}</div>`;
+        resultsBox.hidden = false;
+      }
 
-          data: function (params) {
-            return {
-              q: params.term || ""
-            };
-          },
+      function clearSelectedStudent() {
+        hiddenInput.value = "";
+        pickedText.classList.remove("selected");
+        pickedText.textContent = "กรุณาพิมพ์ค้นหา แล้วเลือกชื่อน้องจากรายการที่ขึ้นมา";
+      }
 
-          processResults: function (data) {
-            return data;
-          },
+      function chooseStudent(student) {
+        hiddenInput.value = student.id;
+        searchInput.value = student.text;
+        pickedText.classList.add("selected");
+        pickedText.textContent = `เลือกแล้ว: ${student.text}`;
+        hideResults();
+      }
 
-          cache: true
+      async function fetchStudents(term) {
+        if (lastController) {
+          lastController.abort();
+        }
+
+        lastController = new AbortController();
+        const url = "{% url 'core:student_portal_student_search' %}" + "?q=" + encodeURIComponent(term);
+        const response = await fetch(url, {
+          headers: {"X-Requested-With": "XMLHttpRequest"},
+          signal: lastController.signal
+        });
+
+        if (!response.ok) {
+          throw new Error("search failed");
+        }
+
+        return response.json();
+      }
+
+      function renderResults(items) {
+        if (!items || items.length === 0) {
+          showMessage("ไม่พบนักเรียนที่ตรงกับคำค้นหา");
+          return;
+        }
+
+        resultsBox.innerHTML = "";
+        items.forEach(function (item) {
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "student-result-item";
+          btn.textContent = item.text;
+          btn.addEventListener("click", function () {
+            chooseStudent(item);
+          });
+          resultsBox.appendChild(btn);
+        });
+        resultsBox.hidden = false;
+      }
+
+      searchInput.addEventListener("input", function () {
+        const term = searchInput.value.trim();
+        clearSelectedStudent();
+
+        window.clearTimeout(debounceTimer);
+
+        if (term.length < 1) {
+          hideResults();
+          return;
+        }
+
+        debounceTimer = window.setTimeout(async function () {
+          showMessage("กำลังค้นหา...");
+          try {
+            const data = await fetchStudents(term);
+            renderResults(data.results || []);
+          } catch (err) {
+            if (err.name !== "AbortError") {
+              showMessage("ค้นหาไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
+            }
+          }
+        }, 220);
+      });
+
+      searchInput.addEventListener("focus", function () {
+        const term = searchInput.value.trim();
+        if (term.length >= 1 && resultsBox.innerHTML.trim() !== "") {
+          resultsBox.hidden = false;
         }
       });
 
-    });
+      document.addEventListener("click", function (event) {
+        if (!event.target.closest(".student-search-field")) {
+          hideResults();
+        }
+      });
+
+      form.addEventListener("submit", function (event) {
+        if (!hiddenInput.value) {
+          event.preventDefault();
+          searchInput.focus();
+          showMessage("กรุณาเลือกชื่อน้องจากรายการที่ค้นหาก่อนเข้าสู่ระบบ");
+        }
+      });
+    })();
   </script>
 
 {% endblock %}

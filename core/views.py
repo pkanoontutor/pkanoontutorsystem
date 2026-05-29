@@ -1786,8 +1786,8 @@ class AdmissionInquiryForm(forms.ModelForm):
             "nickname",
             "first_name",
             "last_name",
-            "school_name",
             "contact_phone",
+            "school_name",
             "latest_gpa",
             "first_lesson_date",
             "grade_level",
@@ -1795,18 +1795,27 @@ class AdmissionInquiryForm(forms.ModelForm):
         ]
         widgets = {
             "request_type": forms.RadioSelect,
-            "nickname": forms.TextInput(attrs={"placeholder": "เช่น น้องข้าวหอม"}),
-            "first_name": forms.TextInput(attrs={"placeholder": "ชื่อจริงของนักเรียน"}),
-            "last_name": forms.TextInput(attrs={"placeholder": "นามสกุลของนักเรียน"}),
-            "school_name": forms.TextInput(attrs={"placeholder": "ชื่อโรงเรียน"}),
-            "contact_phone": forms.TextInput(attrs={"placeholder": "เบอร์ผู้ปกครอง / เบอร์ติดต่อ"}),
+            "nickname": forms.TextInput(attrs={"placeholder": "เช่น น้องข้าวหอม", "autocomplete": "given-name"}),
+            "first_name": forms.TextInput(attrs={"placeholder": "ชื่อจริงของนักเรียน", "autocomplete": "given-name"}),
+            "last_name": forms.TextInput(attrs={"placeholder": "นามสกุลของนักเรียน", "autocomplete": "family-name"}),
+            "school_name": forms.TextInput(attrs={"placeholder": "ชื่อโรงเรียน", "autocomplete": "organization"}),
+            "contact_phone": forms.TextInput(attrs={
+                "placeholder": "เบอร์ผู้ปกครอง / เบอร์ติดต่อ",
+                "inputmode": "tel",
+                "autocomplete": "tel",
+            }),
             "latest_gpa": forms.NumberInput(attrs={
                 "placeholder": "เช่น 3.50",
                 "step": "0.01",
                 "min": "0",
                 "max": "4",
+                "inputmode": "decimal",
             }),
-            "first_lesson_date": forms.DateInput(attrs={"type": "date"}),
+            "first_lesson_date": forms.DateInput(attrs={
+                "type": "date",
+                "autocomplete": "off",
+                "data-native-picker": "date",
+            }),
         }
 
     def clean_contact_phone(self):

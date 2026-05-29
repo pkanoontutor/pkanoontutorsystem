@@ -28,6 +28,10 @@ from .models import (
     TeachingClassSubjectTemplate,
     TeachingWeeklyAssignment,
     TeachingProgressUpdate,
+    TestRound,
+    TestSubject,
+    TestParticipant,
+    TestScore,
 )
 
 
@@ -768,4 +772,55 @@ class CourseRenewalNoticeAdmin(admin.ModelAdmin):
         "installment_remaining_amount",
     )
     ordering = ("-created_at",)
+
+# -----------------------
+# Test Score Announcement
+# -----------------------
+class TestSubjectInline(admin.TabularInline):
+    model = TestSubject
+    extra = 0
+    fields = ("display_order", "name", "full_score", "is_active", "note")
+
+
+class TestScoreInline(admin.TabularInline):
+    model = TestScore
+    extra = 0
+    autocomplete_fields = ("subject",)
+    fields = ("subject", "score", "note", "updated_at")
+    readonly_fields = ("updated_at",)
+
+
+@admin.register(TestRound)
+class TestRoundAdmin(admin.ModelAdmin):
+    list_display = ("title", "exam_date", "is_published", "created_at", "updated_at")
+    list_filter = ("is_published", "exam_date")
+    search_fields = ("title", "note")
+    inlines = (TestSubjectInline,)
+    ordering = ("-exam_date", "-created_at")
+
+
+@admin.register(TestSubject)
+class TestSubjectAdmin(admin.ModelAdmin):
+    list_display = ("test_round", "display_order", "name", "full_score", "is_active")
+    list_filter = ("test_round", "is_active")
+    search_fields = ("test_round__title", "name")
+    ordering = ("test_round", "display_order", "id")
+
+
+@admin.register(TestParticipant)
+class TestParticipantAdmin(admin.ModelAdmin):
+    list_display = ("test_round", "nickname", "full_name", "school_name", "source_type", "is_active")
+    list_filter = ("test_round", "source_type", "is_active")
+    search_fields = ("nickname", "full_name", "school_name", "contact_phone", "student__student_code")
+    autocomplete_fields = ("test_round", "student", "admission_inquiry")
+    inlines = (TestScoreInline,)
+    ordering = ("test_round", "full_name")
+
+
+@admin.register(TestScore)
+class TestScoreAdmin(admin.ModelAdmin):
+    list_display = ("participant", "subject", "score", "updated_at")
+    list_filter = ("subject__test_round", "subject")
+    search_fields = ("participant__nickname", "participant__full_name", "subject__name")
+    autocomplete_fields = ("participant", "subject")
 

@@ -15,6 +15,7 @@ from .models import (
     SheetInventory,
     SheetInventoryMovement,
     SheetClassMapping,
+    SheetPrintOrder,
     AdmissionInquiry,
     FinanceSetting,
     ExpenseCategory,
@@ -165,14 +166,15 @@ class SheetAdmin(admin.ModelAdmin):
     list_display = (
         "code",
         "title",
+        "grade_level",
         "subject",
         "total_pages",
         "total_questions",
         "is_active",
     )
-    search_fields = ("code", "title")
-    list_filter = ("subject", "is_active")
-    ordering = ("subject__name", "code")
+    search_fields = ("code", "title", "subject__name")
+    list_filter = ("grade_level", "subject", "is_active")
+    ordering = ("grade_level", "subject__name", "code")
     autocomplete_fields = ("subject",)
 
 
@@ -358,7 +360,7 @@ class SheetInventoryAdmin(admin.ModelAdmin):
         "is_finished",
         "updated_at",
     )
-    list_filter = ("is_finished", "sheet__subject")
+    list_filter = ("is_finished", "sheet__grade_level", "sheet__subject")
     search_fields = ("sheet__code", "sheet__title")
     autocomplete_fields = ("sheet",)
     ordering = ("sheet__code",)
@@ -385,7 +387,7 @@ class SheetInventoryMovementAdmin(admin.ModelAdmin):
         "created_by",
         "note",
     )
-    list_filter = ("movement_type", "created_at", "sheet__subject")
+    list_filter = ("movement_type", "created_at", "sheet__grade_level", "sheet__subject")
     search_fields = ("sheet__code", "sheet__title", "note")
     autocomplete_fields = ("sheet", "created_by")
     readonly_fields = ("created_at",)
@@ -401,10 +403,28 @@ class SheetClassMappingAdmin(admin.ModelAdmin):
         "is_active",
         "updated_at",
     )
-    list_filter = ("is_active", "tutoring_class", "sheet__subject")
+    list_filter = ("is_active", "tutoring_class", "sheet__grade_level", "sheet__subject")
     search_fields = ("tutoring_class__name", "sheet__code", "sheet__title")
     autocomplete_fields = ("tutoring_class", "sheet")
     ordering = ("tutoring_class__time_slot", "tutoring_class__name", "sheet__code")
+
+
+@admin.register(SheetPrintOrder)
+class SheetPrintOrderAdmin(admin.ModelAdmin):
+    list_display = (
+        "created_at",
+        "sheet",
+        "quantity",
+        "due_date",
+        "status",
+        "requested_by",
+        "completed_at",
+    )
+    list_filter = ("status", "due_date", "sheet__grade_level", "sheet__subject")
+    search_fields = ("sheet__code", "sheet__title", "note", "onedrive_url")
+    autocomplete_fields = ("sheet", "requested_by")
+    readonly_fields = ("created_at", "updated_at", "completed_at")
+    ordering = ("status", "due_date", "created_at")
 
 
 # -----------------------

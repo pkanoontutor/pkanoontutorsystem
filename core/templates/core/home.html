@@ -5,169 +5,26 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>PKanoon Tutor</title>
-
   <style>
-    body{
-      margin:0;
-      font-family:'Poppins', system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-      background:#FDCF72;
-      color:#111;
-    }
-
-    .wrap{
-      max-width:1200px;
-      margin:0 auto;
-      padding:16px;
-    }
-
-    /* ===== LOGO ===== */
-    .logo{
-      display:flex;
-      justify-content:center;
-      margin:12px 0 20px;
-    }
-
-    .logo img{
-      max-height:260px;
-      width:auto;
-    }
-
-    /* ===== IMAGE GRID ===== */
-    .grid{
-      display:grid;
-      grid-template-columns:repeat(2, 1fr);
-      gap:12px;
-      margin-bottom:28px;
-    }
-
-    .tile{
-      background:#fff;
-      border-radius:18px;
-      overflow:hidden;
-      box-shadow:0 6px 18px rgba(0,0,0,.08);
-      aspect-ratio:1/1;
-    }
-
-    .tile img{
-      width:100%;
-      height:100%;
-      object-fit:cover;
-      display:block;
-    }
-
-    @media (min-width: 768px){
-      .grid{
-        grid-template-columns:repeat(4, 1fr);
-      }
-      .logo img{
-        max-height:320px;
-      }
-    }
-
-    /* ===== BUTTONS ===== */
-    .actions{
-      display:flex;
-      flex-direction:column;
-      gap:14px;
-      align-items:center;
-      margin-bottom:8px;
-    }
-
-    .btn{
-      width:100%;
-      max-width:360px;
-      padding:16px 22px;
-      border-radius:20px;
-      font-size:18px;
-      font-weight:700;
-      text-decoration:none;
-      text-align:center;
-      letter-spacing:.3px;
-      box-shadow:0 10px 26px rgba(0,0,0,.15);
-      transition:transform .15s ease, box-shadow .15s ease;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      gap:10px;
-    }
-
-    .btn:hover{
-      transform:translateY(-2px);
-      box-shadow:0 16px 34px rgba(0,0,0,.22);
-    }
-
-    .btn-student{
-      color:#fff;
-      background:linear-gradient(135deg,#22c55e,#16a34a);
-    }
-
-    .btn-admission{
-      color:#fff;
-      background:linear-gradient(135deg,#f97316,#ea580c);
-    }
-
-    .btn-online{
-      color:#fff;
-      background:linear-gradient(135deg,#0ea5e9,#2563eb);
-    }
-
-    .btn-quiz{
-      color:#fff;
-      background:linear-gradient(135deg,#a855f7,#7c3aed);
-    }
-
-    .hint{
-      font-size:13px;
-      color:#333;
-      text-align:center;
-      margin-top:10px;
-    }
+    *{box-sizing:border-box} body{margin:0;font-family:'Poppins',system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:radial-gradient(circle at 20% 0%,rgba(255,255,255,.45),transparent 25%),linear-gradient(180deg,#FDCF72,#F7B84D);color:#111827}.wrap{max-width:1180px;margin:0 auto;padding:14px 14px 22px}.logo{display:flex;justify-content:center;margin:8px 0 14px}.logo img{max-height:250px;width:auto}.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:18px}.tile{background:#fff;border-radius:18px;overflow:hidden;box-shadow:0 8px 20px rgba(0,0,0,.10);aspect-ratio:1/1}.tile img{width:100%;height:100%;object-fit:cover;display:block}.action-panel{background:rgba(255,255,255,.78);border:1px solid rgba(255,255,255,.85);box-shadow:0 14px 34px rgba(0,0,0,.12);border-radius:26px;padding:16px;margin-top:8px}.panel-head{text-align:center;margin-bottom:12px}.panel-title{font-size:24px;font-weight:1000;letter-spacing:-.03em}.panel-sub{font-size:13px;color:#475569;font-weight:800;margin-top:4px}.actions{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.btn-card{min-height:128px;border-radius:22px;text-decoration:none;color:#0f172a;background:#fff;padding:16px;box-shadow:0 8px 18px rgba(15,23,42,.10);border:1px solid #fff;display:flex;flex-direction:column;justify-content:space-between;transition:.14s}.btn-card:hover{transform:translateY(-3px);box-shadow:0 14px 28px rgba(15,23,42,.16)}.icon{width:46px;height:46px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:25px;margin-bottom:10px}.orange{background:#ffedd5}.green{background:#dcfce7}.blue{background:#dbeafe}.purple{background:#ede9fe}.card-name{font-size:16px;font-weight:1000;line-height:1.25}.card-desc{font-size:12px;color:#64748b;font-weight:800;line-height:1.4;margin-top:4px}.hint{font-size:13px;color:#333;text-align:center;margin-top:14px;line-height:1.6;font-weight:700}@media(min-width:768px){.grid{grid-template-columns:repeat(4,1fr)}.logo img{max-height:300px}}@media(max-width:860px){.actions{grid-template-columns:repeat(2,minmax(0,1fr))}.logo img{max-height:210px}}@media(max-width:520px){.actions{grid-template-columns:1fr}.btn-card{min-height:108px}.panel-title{font-size:21px}.logo img{max-height:170px}.grid{gap:8px}}
   </style>
 </head>
-
 <body>
   <div class="wrap">
-
-    <!-- LOGO -->
-    <div class="logo">
-      <img src="{% static 'core/logo.png' %}" alt="PKanoon Tutor">
-    </div>
-
-    <!-- IMAGE GRID -->
+    <div class="logo"><img src="{% static 'core/logo.png' %}" alt="PKanoon Tutor"></div>
     <div class="grid">
-      {% for i in "12345678" %}
-        <div class="tile">
-          <img src="{% static 'core/home/'|add:i|add:'.jpg' %}" alt="home {{ i }}">
-        </div>
-      {% endfor %}
+      {% for i in "12345678" %}<div class="tile"><img src="{% static 'core/home/'|add:i|add:'.jpg' %}" alt="home {{ i }}"></div>{% endfor %}
     </div>
-
-    <!-- ACTION BUTTONS -->
-    <div class="actions">
-
-      <a class="btn btn-admission" href="/admission/">
-        📝 ระบบสมัครเรียน/จองทดลองเรียน
-      </a>
-
-      <a class="btn btn-student" href="/student-portal/">
-        ⏳ ระบบตรวจสอบชั่วโมงคงเหลือ
-      </a>
-
-      <a class="btn btn-online" href="/online-course-p6/">
-        🎓 คอร์สติวออนไลน์ ป.6
-      </a>
-
-      <a class="btn btn-quiz" href="/quiz/">
-        ✏️ ระบบ P'Kanoon E-Pretest (เร็วๆนี้)
-      </a>
-
-    </div>
-
-    <div class="hint">
-      หากเข้าระบบไม่ได้ กรุณาติดต่อพี่ขนุนติวเตอร์ Line : @pkanoontutor<br>
-      สงวนลิขสิทธิ์ : ระบบนี้ได้รับการพัฒนาโดย หจก.พี่ขนุนติวเตอร์
-    </div>
-
+    <section class="action-panel">
+      <div class="panel-head"><div class="panel-title">เลือกบริการที่ต้องการใช้งาน</div><div class="panel-sub">ระบบสำหรับผู้ปกครองและนักเรียนพี่ขนุนติวเตอร์</div></div>
+      <div class="actions">
+        <a class="btn-card" href="/admission/"><div><div class="icon orange">📝</div><div class="card-name">สมัครเรียน / จองทดลองเรียน</div><div class="card-desc">กรอกข้อมูลจองรอบเรียน ทดลองเรียน หรือจองที่นั่งล่วงหน้า</div></div></a>
+        <a class="btn-card" href="/student-portal/"><div><div class="icon green">⏳</div><div class="card-name">ตรวจสอบชั่วโมงคงเหลือ</div><div class="card-desc">ดูจำนวนครั้งเรียนคงเหลือและประวัติการเข้าเรียน</div></div></a>
+        <a class="btn-card" href="/test-scores/"><div><div class="icon purple">🏆</div><div class="card-name">ระบบประกาศผลการสอบ</div><div class="card-desc">ตรวจสอบคะแนนสอบ อันดับ และสรุปผลรายบุคคล</div></div></a>
+        <a class="btn-card" href="/online-course-p6/"><div><div class="icon blue">🎓</div><div class="card-name">คอร์สติวออนไลน์ ป.6</div><div class="card-desc">เข้าเรียนออนไลน์ เอกสาร และคลิปย้อนหลัง</div></div></a>
+      </div>
+    </section>
+    <div class="hint">หากเข้าระบบไม่ได้ กรุณาติดต่อพี่ขนุนติวเตอร์ Line : @pkanoontutor<br>สงวนลิขสิทธิ์ : ระบบนี้ได้รับการพัฒนาโดย หจก.พี่ขนุนติวเตอร์</div>
   </div>
 </body>
 </html>

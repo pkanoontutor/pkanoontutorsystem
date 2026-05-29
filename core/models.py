@@ -853,6 +853,18 @@ class SheetInventory(models.Model):
         help_text="ใช้สำหรับเตือนชีทใกล้หมด",
     )
 
+    target_stock = models.PositiveIntegerField(
+        "จำนวนที่ต้องการมีในคลัง",
+        default=0,
+        help_text="ใช้คำนวณจำนวนที่ควรสั่งปรินท์เพิ่ม",
+    )
+    onedrive_url = models.URLField(
+        "ลิงก์ไฟล์ OneDrive",
+        max_length=1000,
+        blank=True,
+        help_text="ลิงก์ไฟล์ชีทสำหรับส่งร้านปรินท์",
+    )
+
     is_finished = models.BooleanField("จบชีทแล้ว", default=False)
     finished_at = models.DateTimeField("วันที่จบชีท", null=True, blank=True)
 
@@ -920,6 +932,53 @@ class SheetInventoryMovement(models.Model):
 
     def __str__(self) -> str:
         return f"{self.sheet.code} | {self.get_movement_type_display()} | {self.quantity}"
+
+
+class SheetPrintOrder(models.Model):
+    class Status(models.TextChoices):
+        PENDING = "pending", "รอปรินท์"
+        READY = "ready", "ปรินท์เสร็จแล้วพร้อมส่ง"
+
+    sheet = models.ForeignKey(
+        Sheet,
+        verbose_name="ชีท",
+        on_delete=models.PROTECT,
+        related_name="print_orders",
+    )
+    quantity = models.PositiveIntegerField("จำนวนที่สั่งปรินท์", default=1)
+    due_date = models.DateField("วันที่ต้องส่ง", null=True, blank=True)
+    onedrive_url = models.URLField("ลิงก์ไฟล์ OneDrive", max_length=1000, blank=True)
+    note = models.TextField("หมายเหตุ", blank=True)
+    status = models.CharField(
+        "สถานะ",
+        max_length=20,
+        choices=Status.choices,
+        default=Status.PENDING,
+    )
+    requested_by = models.ForeignKey(
+        "auth.User",
+        verbose_name="ผู้สั่งปรินท์",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="sheet_print_orders",
+    )
+    created_at = models.DateTimeField("วันที่สั่ง", default=timezone.now)
+    updated_at = models.DateTimeField("อัปเดตล่าสุด", auto_now=True)
+    completed_at = models.DateTimeField("วันที่ร้านกดเสร็จแล้ว", null=True, blank=True)
+
+    class Meta:
+        verbose_name = "Sheet Print Order"
+        verbose_name_plural = "Sheet Print Orders"
+        ordering = ("status", "due_date", "created_at")
+
+    def __str__(self) -> str:
+        return f"{self.sheet.code} | {self.quantity} | {self.get_status_display()}"
+
+    def mark_ready(self):
+        self.status = self.Status.READY
+        self.completed_at = timezone.now()
+        self.save(update_fields=["status", "completed_at", "updated_at"])
 
 
 class SheetClassMapping(models.Model):

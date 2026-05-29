@@ -111,6 +111,73 @@ TIME_SLOT_ORDER = [
 ]
 
 
+SHEET_GRADE_ORDER = ["p4", "p5", "p6", "m1", "m2", "m3", "m4", ""]
+
+
+def _sheet_grade_label(value: str | None) -> str:
+    labels = {
+        "p4": "ป.4",
+        "p5": "ป.5",
+        "p6": "ป.6",
+        "m1": "ม.1",
+        "m2": "ม.2",
+        "m3": "ม.3",
+        "m4": "ม.4",
+        "": "ไม่ระบุระดับชั้น",
+    }
+    return labels.get((value or "").strip().lower(), value or "ไม่ระบุระดับชั้น")
+
+
+def _normalize_sheet_grade_level(value: str | None) -> str:
+    raw = (value or "").strip().lower().replace(" ", "")
+    if not raw:
+        return ""
+    raw = raw.replace(".", "")
+    mapping = {
+        "p4": "p4", "ป4": "p4", "ประถม4": "p4", "ป.4": "p4",
+        "p5": "p5", "ป5": "p5", "ประถม5": "p5", "ป.5": "p5",
+        "p6": "p6", "ป6": "p6", "ประถม6": "p6", "ป.6": "p6",
+        "m1": "m1", "ม1": "m1", "มัธยม1": "m1", "ม.1": "m1",
+        "m2": "m2", "ม2": "m2", "มัธยม2": "m2", "ม.2": "m2",
+        "m3": "m3", "ม3": "m3", "มัธยม3": "m3", "ม.3": "m3",
+        "m4": "m4", "ม4": "m4", "มัธยม4": "m4", "ม.4": "m4",
+    }
+    return mapping.get(raw, "")
+
+
+def _infer_sheet_grade_level(*texts: str | None) -> str:
+    combined = " ".join((t or "") for t in texts).lower()
+    # Match explicit code patterns first e.g. E-P4-01 / M-M1-01.
+    for grade in ["p4", "p5", "p6", "m1", "m2", "m3", "m4"]:
+        if re.search(rf"(^|[^a-z0-9]){grade}([^a-z0-9]|$)", combined, re.I):
+            return grade
+    for value in ["ป.4", "ป4", "ป.5", "ป5", "ป.6", "ป6", "ม.1", "ม1", "ม.2", "ม2", "ม.3", "ม3", "ม.4", "ม4"]:
+        normalized = _normalize_sheet_grade_level(value)
+        if value.replace(".", "") in combined.replace(".", "").replace(" ", "") and normalized:
+            return normalized
+    return ""
+
+
+def _class_grade_level(tutoring_class: TutoringClass | None) -> str:
+    if not tutoring_class:
+        return ""
+    return _infer_sheet_grade_level(getattr(tutoring_class, "name", ""))
+
+
+def _ordered_grade_groups(rows: list[dict]) -> list[dict]:
+    buckets = {g: [] for g in SHEET_GRADE_ORDER}
+    for row in rows:
+        grade = (getattr(row.get("sheet"), "grade_level", "") or "").lower()
+        if grade not in buckets:
+            buckets.setdefault(grade, [])
+        buckets[grade].append(row)
+    return [
+        {"grade": grade, "label": _sheet_grade_label(grade), "rows": buckets.get(grade, []), "count": len(buckets.get(grade, []))}
+        for grade in SHEET_GRADE_ORDER
+        if buckets.get(grade)
+    ]
+
+
 @login_required
 def dashboard(request: HttpRequest) -> HttpResponse:
     """
@@ -417,6 +484,8 @@ def _sheet_row(sheet: Sheet) -> dict:
         "inventory": inv,
         "quantity": qty,
         "minimum_stock": minimum,
+        "grade_level": getattr(sheet, "grade_level", "") or "",
+        "grade_label": _sheet_grade_label(getattr(sheet, "grade_level", "") or ""),
         "is_low": minimum > 0 and qty <= minimum,
     }
 
@@ -549,19 +618,29 @@ def _build_class_sheet_rows() -> list[dict]:
 def _sheet_inventory_context(*, q: str = "", extra: dict | None = None) -> dict:
     sheets_qs = Sheet.objects.select_related("subject").all()
     if q:
-        sheets_qs = sheets_qs.filter(
+        grade_q = _normalize_sheet_grade_level(q)
+        query = (
             Q(code__icontains=q) |
             Q(title__icontains=q) |
             Q(subject__name__icontains=q)
         )
+        if grade_q:
+            query |= Q(grade_level=grade_q)
+        sheets_qs = sheets_qs.filter(query)
 
-    sheets = list(sheets_qs.order_by("subject__name", "code"))
+    sheets = list(sheets_qs.order_by("grade_level", "subject__name", "code"))
+    sheet_rows = [_sheet_row(s) for s in sheets]
+    all_sheets = Sheet.objects.select_related("subject").filter(is_active=True).order_by("grade_level", "subject__name", "code")
+    active_classes = TutoringClass.objects.filter(is_active=True).order_by("time_slot", "name")
     context = {
         "q": q,
-        "sheet_rows": [_sheet_row(s) for s in sheets],
+        "sheet_rows": sheet_rows,
+        "sheet_grade_groups": _ordered_grade_groups(sheet_rows),
+        "sheet_grade_choices": Sheet.GradeLevel.choices,
         "subjects": Subject.objects.filter(is_active=True).order_by("name"),
-        "classes": TutoringClass.objects.filter(is_active=True).order_by("time_slot", "name"),
-        "all_sheets": Sheet.objects.select_related("subject").filter(is_active=True).order_by("subject__name", "code"),
+        "classes": active_classes,
+        "all_sheets": all_sheets,
+        "sheet_choices": all_sheets,
         "class_rows": _build_class_sheet_rows(),
         "movements": (
             SheetInventoryMovement.objects
@@ -666,7 +745,7 @@ def _import_sheet_rows_from_upload(rows: list[dict], *, user=None, stock_mode: s
     code_aliases = ["รหัสชีท", "sheet code", "sheet_code", "code", "รหัส"]
     title_aliases = ["ชื่อชีท", "ชื่อเรื่อง", "sheet name", "sheet_name", "title", "ชื่อ"]
     subject_aliases = ["วิชา", "subject", "subject_name"]
-    grade_aliases = ["ระดับชั้น", "grade", "grade_level", "ชั้น"]
+    grade_aliases = ["ระดับชั้น", "grade", "grade_level", "gradelevel", "ชั้น", "level"]
     initial_aliases = ["initial_quantity", "initial qty", "ยอดเริ่มต้น", "จำนวนคงเหลือ", "stock", "quantity"]
     pages_aliases = ["total_pages", "จำนวนหน้า", "pages"]
     questions_aliases = ["total_questions", "จำนวนข้อ", "questions"]
@@ -682,7 +761,8 @@ def _import_sheet_rows_from_upload(rows: list[dict], *, user=None, stock_mode: s
             code = _clean_cell(_pick_upload_value(row, code_aliases)).upper()
             title = _clean_cell(_pick_upload_value(row, title_aliases))
             subject_name = _clean_cell(_pick_upload_value(row, subject_aliases))
-            grade_level = _clean_cell(_pick_upload_value(row, grade_aliases))
+            grade_level_raw = _clean_cell(_pick_upload_value(row, grade_aliases))
+            grade_level = _normalize_sheet_grade_level(grade_level_raw) or _infer_sheet_grade_level(code, title)
 
             if not code and not title and not subject_name:
                 skipped_count += 1
@@ -717,6 +797,7 @@ def _import_sheet_rows_from_upload(rows: list[dict], *, user=None, stock_mode: s
                 defaults={
                     "title": title,
                     "subject": subject,
+                    "grade_level": grade_level,
                     "total_pages": total_pages or 0,
                     "total_questions": total_questions or 0,
                     "is_active": is_active,
@@ -732,6 +813,9 @@ def _import_sheet_rows_from_upload(rows: list[dict], *, user=None, stock_mode: s
                     changed = True
                 if sheet.subject_id != subject.id:
                     sheet.subject = subject
+                    changed = True
+                if grade_level and getattr(sheet, "grade_level", "") != grade_level:
+                    sheet.grade_level = grade_level
                     changed = True
                 if total_pages is not None and sheet.total_pages != total_pages:
                     sheet.total_pages = total_pages
@@ -798,6 +882,7 @@ def sheet_inventory_dashboard(request: HttpRequest) -> HttpResponse:
             title = (request.POST.get("title") or "").strip()
             subject_id = (request.POST.get("subject_id") or "").strip()
             new_subject = (request.POST.get("new_subject") or "").strip()
+            grade_level = _normalize_sheet_grade_level(request.POST.get("grade_level")) or _infer_sheet_grade_level(code, title)
             total_pages = int(request.POST.get("total_pages") or 0)
             total_questions = int(request.POST.get("total_questions") or 0)
             initial_qty = int(request.POST.get("initial_qty") or 0)
@@ -816,6 +901,7 @@ def sheet_inventory_dashboard(request: HttpRequest) -> HttpResponse:
                     defaults={
                         "title": title,
                         "subject": subject,
+                        "grade_level": grade_level,
                         "total_pages": total_pages,
                         "total_questions": total_questions,
                         "is_active": True,
@@ -894,7 +980,7 @@ def sheet_inventory_dashboard(request: HttpRequest) -> HttpResponse:
             Q(title__icontains=q) |
             Q(subject__name__icontains=q)
         )
-    sheets = list(sheets_qs.order_by("subject__name", "code"))
+    sheets = list(sheets_qs.order_by("grade_level", "subject__name", "code"))
     sheet_rows = [_sheet_row(s) for s in sheets]
 
     return render(request, "core/sheet_inventory.html", _sheet_inventory_context(q=q))
@@ -1005,12 +1091,13 @@ def sheet_inventory_export(request: HttpRequest) -> HttpResponse:
 
     ws = wb.active
     ws.title = "Sheet Stock"
-    ws.append(["Sheet Code", "Title", "Subject", "Balance", "Minimum Stock", "Low Stock?", "Is Finished"])
-    for sheet in Sheet.objects.select_related("subject").order_by("subject__name", "code"):
+    ws.append(["Grade", "Sheet Code", "Title", "Subject", "Balance", "Minimum Stock", "Low Stock?", "Is Finished"])
+    for sheet in Sheet.objects.select_related("subject").order_by("grade_level", "subject__name", "code"):
         inv = _inventory_for_sheet(sheet)
         qty = int(inv.quantity or 0) if inv else 0
         minimum = int(getattr(inv, "minimum_stock", 0) or 0) if inv else 0
         ws.append([
+            sheet.get_grade_level_display() if getattr(sheet, "grade_level", "") else "",
             sheet.code,
             sheet.title,
             sheet.subject.name if sheet.subject_id else "",
@@ -1093,7 +1180,7 @@ def _print_order_dashboard_rows() -> list[dict]:
     }
 
     rows = []
-    sheets = Sheet.objects.select_related("subject").filter(is_active=True).order_by("subject__name", "code")
+    sheets = Sheet.objects.select_related("subject").filter(is_active=True).order_by("grade_level", "subject__name", "code")
     for sheet in sheets:
         inv = _inventory_for_sheet(sheet)
         current_qty = int(inv.quantity or 0) if inv else 0
@@ -3714,8 +3801,12 @@ def _ensure_teaching_assignments(week_start: date, week_end: date) -> None:
 
 @login_required
 def teaching_template_manage(request: HttpRequest) -> HttpResponse:
-    classes = TutoringClass.objects.filter(is_active=True).order_by("name")
+    classes = list(TutoringClass.objects.filter(is_active=True).order_by("name"))
+    for c in classes:
+        c.sheet_grade_level = _class_grade_level(c)
     tutors = TeachingTutor.objects.filter(is_active=True).order_by("name")
+    sheet_choices = Sheet.objects.select_related("subject").filter(is_active=True).order_by("grade_level", "subject__name", "code")
+    class_grade_map = {str(c.id): c.sheet_grade_level for c in classes}
 
     selected_class_id = (request.GET.get("class_id") or request.POST.get("class_id") or "").strip()
 
@@ -3775,12 +3866,17 @@ def teaching_template_manage(request: HttpRequest) -> HttpResponse:
     )
     if selected_class_id:
         templates = templates.filter(tutoring_class_id=selected_class_id)
+    templates = list(templates)
+    for tmpl in templates:
+        tmpl.class_grade_level = _class_grade_level(tmpl.tutoring_class)
 
     return render(request, "core/teaching_template_manage.html", {
         "classes": classes,
         "templates": templates,
         "tutors": tutors,
         "selected_class_id": selected_class_id,
+        "sheet_choices": sheet_choices,
+        "class_grade_map": class_grade_map,
     })
 
 
@@ -3967,6 +4063,8 @@ def tutor_teaching_update(request: HttpRequest) -> HttpResponse:
         assignments = assignments.filter(tutor_id=selected_tutor_id)
 
     all_assignments = list(assignments)
+    for a in all_assignments:
+        a.class_grade_level = _class_grade_level(a.tutoring_class)
     template_ids = [a.subject_template_id for a in all_assignments]
 
     previous_updates = {}
@@ -3995,6 +4093,7 @@ def tutor_teaching_update(request: HttpRequest) -> HttpResponse:
             current_updates.setdefault(upd.assignment_id, upd)
 
     tutor_choices = TeachingTutor.objects.filter(is_active=True).order_by("name")
+    sheet_choices = Sheet.objects.select_related("subject").filter(is_active=True).order_by("grade_level", "subject__name", "code")
     grouped_slots = _teaching_slot_groups_from_assignments(all_assignments, previous_updates, current_updates)
 
     return render(request, "core/tutor_teaching_update.html", {
@@ -4005,6 +4104,7 @@ def tutor_teaching_update(request: HttpRequest) -> HttpResponse:
         "selected_tutor_id": selected_tutor_id,
         "grouped_slots": grouped_slots,
         "error_code": (request.GET.get("error") or "").strip(),
+        "sheet_choices": sheet_choices,
     })
 
 

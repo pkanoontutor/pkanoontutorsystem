@@ -1,0 +1,142 @@
+{% extends "core/base.html" %}
+{% block title %}ระบบส่งปรินท์ชีท{% endblock %}
+
+{% block head %}
+<style>
+  .po-wrap{max-width:1380px;margin:0 auto;display:grid;gap:14px;}
+  .hero{background:linear-gradient(135deg,#111827,#7c3aed,#0ea5e9);color:#fff;border-radius:26px;padding:24px;box-shadow:0 14px 30px rgba(15,23,42,.20);display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;align-items:flex-start;}
+  .title{font-size:28px;font-weight:1000;letter-spacing:-.04em}.sub{color:#e0f2fe;font-size:13px;margin-top:6px;line-height:1.6;max-width:760px}
+  .actions{display:flex;gap:8px;flex-wrap:wrap}.btnx{border:0;border-radius:14px;padding:10px 14px;font-weight:1000;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:7px;cursor:pointer;line-height:1.2}.soft{background:#fff;color:#0f172a;border:1px solid #e2e8f0}.primary{background:#2563eb;color:#fff}.green{background:#16a34a;color:#fff}.dark{background:#0f172a;color:#fff}.amber{background:#f59e0b;color:#111827}
+  .panel{background:#fff;border-radius:22px;padding:16px;box-shadow:0 6px 16px rgba(15,23,42,.08);border:1px solid rgba(255,255,255,.88)}
+  .section-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:12px}.section-title{font-size:18px;font-weight:1000;color:#0f172a}.section-sub{font-size:12px;color:#64748b;font-weight:800;margin-top:2px;line-height:1.4}
+  .table-wrap{overflow:auto;border:1px solid #e2e8f0;border-radius:16px;background:#fff}table{width:100%;border-collapse:collapse;min-width:1280px}th,td{padding:10px;border-bottom:1px solid #edf2f7;text-align:left;vertical-align:top}th{font-size:11px;color:#475569;background:#f8fafc;text-transform:uppercase;letter-spacing:.04em}td{font-size:13px;font-weight:800;color:#334155}.mini{font-size:12px;color:#64748b;font-weight:800;line-height:1.45}.code{font-weight:1000;color:#0f172a}.sheet-title{font-size:12px;color:#64748b;font-weight:800;margin-top:3px;line-height:1.35}
+  input,textarea{border:1px solid #e2e8f0;border-radius:12px;padding:9px 10px;font-weight:850;background:#fff;width:100%;min-width:0}textarea{min-height:42px;resize:vertical}input:focus,textarea:focus{outline:none;border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.12)}
+  .inline-form{display:grid;gap:7px;min-width:180px}.order-form{display:grid;grid-template-columns:82px 130px minmax(160px,1fr);gap:6px;align-items:center;min-width:440px}.order-form textarea{grid-column:1/-1}.pillrow{display:flex;gap:6px;flex-wrap:wrap}.pill{border-radius:999px;padding:5px 9px;font-size:12px;font-weight:1000;border:1px solid #e2e8f0;background:#f8fafc;color:#334155}.ok{background:#dcfce7;color:#166534;border-color:#86efac}.low{background:#fee2e2;color:#991b1b;border-color:#fecaca}.blue{background:#eff6ff;color:#1d4ed8;border-color:#bfdbfe}.orange{background:#ffedd5;color:#9a3412;border-color:#fed7aa}
+  .cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.order-card{border:1px solid #e2e8f0;border-radius:18px;padding:13px;background:#fff;display:grid;gap:9px}.order-card.ready{background:#f0fdf4;border-color:#bbf7d0}.order-top{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}.order-name{font-size:16px;font-weight:1000;color:#0f172a}.due{font-weight:1000;color:#7c2d12;background:#ffedd5;border:1px solid #fed7aa;border-radius:999px;padding:5px 9px;font-size:12px}
+  @media(max-width:900px){.cards{grid-template-columns:1fr}.hero .btnx{width:100%}.order-form{grid-template-columns:1fr;min-width:260px}.btnx{width:100%}.title{font-size:23px}}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="po-wrap">
+  <section class="hero">
+    <div>
+      <div class="title">🖨️ ระบบส่งปรินท์ชีท</div>
+      <div class="sub">กำหนดจำนวนที่ต้องการมีในคลัง ใส่ลิงก์ OneDrive และสร้างรายการสั่งปรินท์ให้ร้านเห็นได้ทันที โดยฝั่งร้านเข้าได้ไม่ต้อง login</div>
+    </div>
+    <div class="actions">
+      <a class="btnx soft" href="/sheet-inventory/">← Sheet Inventory</a>
+      <a class="btnx soft" href="/pkanoon-admin-tool/">Admin Tool</a>
+      <a class="btnx amber" href="/print-shop/" target="_blank">เปิดหน้าร้านปรินท์</a>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="section-head">
+      <div>
+        <div class="section-title">📌 Link สำหรับร้านปรินท์</div>
+        <div class="section-sub">ส่ง link นี้ให้ร้านปรินท์เปิดดูรายการรอปรินท์ได้โดยไม่ต้อง login</div>
+      </div>
+    </div>
+    <input value="{{ shop_url }}" readonly onclick="this.select()">
+  </section>
+
+  <section class="panel">
+    <div class="section-head">
+      <div>
+        <div class="section-title">📚 ชีท active ทั้งหมด / ตั้งค่าคลัง / สั่งปรินท์</div>
+        <div class="section-sub">จำนวนที่ควรสั่งเพิ่มคำนวณจาก จำนวนที่ต้องการมีในคลัง - คงเหลือ - รายการรอปรินท์ที่ยังไม่เสร็จ</div>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>ชีท</th><th>คลัง</th><th>ตั้งค่าที่ต้องการมี</th><th>OneDrive</th><th>สั่งปรินท์</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in rows %}
+          <tr>
+            <td>
+              <div class="code">{{ row.sheet.code }}</div>
+              <div class="sheet-title">{{ row.sheet.title }} · {{ row.sheet.subject.name }}</div>
+              <div style="margin-top:7px"><a class="btnx soft" style="padding:7px 10px" href="{% url 'core:sheet_inventory_profile' row.sheet.id %}">Profile / QR</a></div>
+            </td>
+            <td>
+              <div class="pillrow">
+                <span class="pill {% if row.shortage > 0 %}low{% else %}ok{% endif %}">คงเหลือ {{ row.current_qty }}</span>
+                <span class="pill blue">เป้าหมาย {{ row.target_stock }}</span>
+                <span class="pill orange">รอปรินท์ {{ row.pending_print_qty }}</span>
+                <span class="pill {% if row.suggested_print_qty > 0 %}low{% else %}ok{% endif %}">ควรสั่งเพิ่ม {{ row.suggested_print_qty }}</span>
+              </div>
+            </td>
+            <td>
+              <form method="post" class="inline-form">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="update_sheet_print_setting">
+                <input type="hidden" name="sheet_id" value="{{ row.sheet.id }}">
+                <input type="number" name="target_stock" min="0" value="{{ row.target_stock }}" placeholder="จำนวนที่ต้องการมี">
+                <input name="onedrive_url" value="{{ row.onedrive_url }}" placeholder="OneDrive link">
+                <button class="btnx green" type="submit">บันทึก</button>
+              </form>
+            </td>
+            <td>
+              {% if row.onedrive_url %}<a class="btnx soft" href="{{ row.onedrive_url }}" target="_blank">เปิด OneDrive</a>{% else %}<span class="mini">ยังไม่มี link</span>{% endif %}
+            </td>
+            <td>
+              <form method="post" class="order-form">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="create_print_order">
+                <input type="hidden" name="sheet_id" value="{{ row.sheet.id }}">
+                <input name="quantity" type="number" min="1" value="{% if row.suggested_print_qty > 0 %}{{ row.suggested_print_qty }}{% else %}1{% endif %}" required>
+                <input name="due_date" type="date" value="{{ default_due_date|date:'Y-m-d' }}">
+                <input name="onedrive_url" value="{{ row.onedrive_url }}" placeholder="OneDrive link">
+                <textarea name="note" placeholder="หมายเหตุถึงร้านปรินท์ เช่น เข้าเล่ม / หน้าเดียว / สองหน้า"></textarea>
+                <button class="btnx dark" type="submit">สั่งปรินท์</button>
+              </form>
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="5">ยังไม่มีชีท active</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="section-head">
+      <div><div class="section-title">🕘 รายการรอปรินท์</div><div class="section-sub">รายการเหล่านี้จะขึ้นที่หน้าร้านปรินท์</div></div>
+    </div>
+    <div class="cards">
+      {% for o in pending_orders %}
+        <div class="order-card">
+          <div class="order-top"><div class="order-name">{{ o.sheet.code }} · {{ o.sheet.title }}</div><span class="due">ส่งภายใน {{ o.due_date|date:'d/m/Y'|default:'ไม่ระบุ' }}</span></div>
+          <div class="pillrow"><span class="pill orange">จำนวน {{ o.quantity }}</span><span class="pill blue">{{ o.sheet.subject.name }}</span></div>
+          {% if o.onedrive_url %}<a class="btnx soft" href="{{ o.onedrive_url }}" target="_blank">เปิด OneDrive</a>{% endif %}
+          {% if o.note %}<div class="mini">{{ o.note }}</div>{% endif %}
+        </div>
+      {% empty %}
+        <div class="mini">ยังไม่มีรายการรอปรินท์</div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="section-head">
+      <div><div class="section-title">✅ ดำเนินการเสร็จแล้วล่าสุด</div><div class="section-sub">ร้านกดว่าปรินท์เสร็จแล้วพร้อมส่ง</div></div>
+    </div>
+    <div class="cards">
+      {% for o in ready_orders %}
+        <div class="order-card ready">
+          <div class="order-top"><div class="order-name">{{ o.sheet.code }} · {{ o.sheet.title }}</div><span class="pill ok">เสร็จแล้ว</span></div>
+          <div class="pillrow"><span class="pill">จำนวน {{ o.quantity }}</span><span class="pill">{{ o.completed_at|date:'d/m/Y H:i' }}</span></div>
+        </div>
+      {% empty %}
+        <div class="mini">ยังไม่มีรายการที่เสร็จแล้ว</div>
+      {% endfor %}
+    </div>
+  </section>
+</div>
+{% endblock %}

@@ -32,6 +32,7 @@ from .models import (
     SheetInventory,
     SheetInventoryMovement,
     SheetClassMapping,
+    SheetPrintOrder,
     AdmissionInquiry,
     FinanceSetting,
     ExpenseCategory,
@@ -1067,6 +1068,139 @@ def sheet_inventory_export(request: HttpRequest) -> HttpResponse:
     )
     resp["Content-Disposition"] = f'attachment; filename="{filename}"'
     return resp
+
+
+
+def _parse_optional_date(value: str | None):
+    raw = (value or "").strip()
+    if not raw:
+        return None
+    try:
+        return date.fromisoformat(raw)
+    except ValueError:
+        return None
+
+
+def _print_order_dashboard_rows() -> list[dict]:
+    pending_by_sheet = {
+        item["sheet_id"]: item["qty"] or 0
+        for item in (
+            SheetPrintOrder.objects
+            .filter(status=SheetPrintOrder.Status.PENDING)
+            .values("sheet_id")
+            .annotate(qty=Sum("quantity"))
+        )
+    }
+
+    rows = []
+    sheets = Sheet.objects.select_related("subject").filter(is_active=True).order_by("subject__name", "code")
+    for sheet in sheets:
+        inv = _inventory_for_sheet(sheet)
+        current_qty = int(inv.quantity or 0) if inv else 0
+        target_stock = int(getattr(inv, "target_stock", 0) or 0) if inv else 0
+        onedrive_url = (getattr(inv, "onedrive_url", "") or "") if inv else ""
+        pending_qty = int(pending_by_sheet.get(sheet.id, 0) or 0)
+        shortage = max(target_stock - current_qty, 0)
+        suggested_print_qty = max(target_stock - current_qty - pending_qty, 0)
+        rows.append({
+            "sheet": sheet,
+            "inventory": inv,
+            "current_qty": current_qty,
+            "target_stock": target_stock,
+            "onedrive_url": onedrive_url,
+            "pending_print_qty": pending_qty,
+            "shortage": shortage,
+            "suggested_print_qty": suggested_print_qty,
+        })
+    return rows
+
+
+@login_required
+def sheet_print_order_admin(request: HttpRequest) -> HttpResponse:
+    if request.method == "POST":
+        action = (request.POST.get("action") or "").strip()
+
+        if action == "update_sheet_print_setting":
+            sheet = get_object_or_404(Sheet, id=request.POST.get("sheet_id"))
+            target_stock = max(int(request.POST.get("target_stock") or 0), 0)
+            onedrive_url = (request.POST.get("onedrive_url") or "").strip()
+            inventory, _ = SheetInventory.objects.get_or_create(sheet=sheet, defaults={"quantity": 0})
+            inventory.target_stock = target_stock
+            inventory.onedrive_url = onedrive_url
+            inventory.save()
+            return redirect("core:sheet_print_order_admin")
+
+        if action == "create_print_order":
+            sheet = get_object_or_404(Sheet, id=request.POST.get("sheet_id"))
+            quantity = max(int(request.POST.get("quantity") or 0), 0)
+            due_date = _parse_optional_date(request.POST.get("due_date"))
+            onedrive_url = (request.POST.get("onedrive_url") or "").strip()
+            note = (request.POST.get("note") or "").strip()
+
+            if quantity > 0:
+                inventory, _ = SheetInventory.objects.get_or_create(sheet=sheet, defaults={"quantity": 0})
+                if not onedrive_url:
+                    onedrive_url = inventory.onedrive_url or ""
+
+                SheetPrintOrder.objects.create(
+                    sheet=sheet,
+                    quantity=quantity,
+                    due_date=due_date,
+                    onedrive_url=onedrive_url,
+                    note=note,
+                    requested_by=request.user if getattr(request.user, "is_authenticated", False) else None,
+                )
+                return redirect("core:print_shop_order_list")
+
+            return redirect("core:sheet_print_order_admin")
+
+    pending_orders = (
+        SheetPrintOrder.objects
+        .select_related("sheet", "sheet__subject", "requested_by")
+        .filter(status=SheetPrintOrder.Status.PENDING)
+        .order_by("due_date", "created_at")
+    )
+    ready_orders = (
+        SheetPrintOrder.objects
+        .select_related("sheet", "sheet__subject", "requested_by")
+        .filter(status=SheetPrintOrder.Status.READY)
+        .order_by("-completed_at", "-updated_at")[:80]
+    )
+
+    return render(request, "core/sheet_print_order_admin.html", {
+        "rows": _print_order_dashboard_rows(),
+        "pending_orders": pending_orders,
+        "ready_orders": ready_orders,
+        "default_due_date": timezone.localdate() + timedelta(days=3),
+        "shop_url": request.build_absolute_uri("/print-shop/"),
+    })
+
+
+def print_shop_order_list(request: HttpRequest) -> HttpResponse:
+    pending_orders = (
+        SheetPrintOrder.objects
+        .select_related("sheet", "sheet__subject")
+        .filter(status=SheetPrintOrder.Status.PENDING)
+        .order_by("due_date", "created_at")
+    )
+    ready_orders = (
+        SheetPrintOrder.objects
+        .select_related("sheet", "sheet__subject")
+        .filter(status=SheetPrintOrder.Status.READY)
+        .order_by("-completed_at", "-updated_at")[:80]
+    )
+    return render(request, "core/print_shop_orders.html", {
+        "pending_orders": pending_orders,
+        "ready_orders": ready_orders,
+    })
+
+
+@require_POST
+def print_shop_mark_ready(request: HttpRequest, pk: int) -> HttpResponse:
+    order = get_object_or_404(SheetPrintOrder, pk=pk)
+    if order.status == SheetPrintOrder.Status.PENDING:
+        order.mark_ready()
+    return redirect("core:print_shop_order_list")
 
 
 

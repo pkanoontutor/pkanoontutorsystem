@@ -4,16 +4,17 @@
 {% block head %}
 <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 <style>
-  .profile-wrap{max-width:1180px;margin:0 auto;display:grid;gap:14px;}
-  .hero{background:linear-gradient(135deg,#0f172a,#0ea5e9);color:#fff;border-radius:26px;padding:24px;box-shadow:0 14px 30px rgba(15,23,42,.20);display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;align-items:flex-start;}
-  .title{font-size:28px;font-weight:1000;letter-spacing:-.04em}.sub{color:#e0f2fe;font-size:13px;margin-top:6px;line-height:1.6}
-  .btnx{border:0;border-radius:14px;padding:10px 14px;font-weight:1000;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:7px;cursor:pointer;line-height:1.2}
+  .profile-wrap{max-width:1100px;margin:0 auto;display:grid;gap:12px;}
+  .hero{background:linear-gradient(135deg,#0f172a,#0ea5e9);color:#fff;border-radius:22px;padding:18px 20px;box-shadow:0 12px 24px rgba(15,23,42,.18);display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:flex-start;}
+  .title{font-size:25px;font-weight:1000;letter-spacing:-.04em}.sub{color:#e0f2fe;font-size:12px;margin-top:4px;line-height:1.45}
+  .btnx{border:0;border-radius:12px;padding:8px 11px;font-weight:1000;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;line-height:1.15;font-size:12px;white-space:nowrap;}
   .soft{background:#fff;color:#0f172a;border:1px solid #e2e8f0}.dark{background:#0f172a;color:#fff}.green{background:#16a34a;color:#fff}
-  .grid2{display:grid;grid-template-columns:380px 1fr;gap:14px;align-items:start}.panel{background:#fff;border-radius:22px;padding:16px;box-shadow:0 6px 16px rgba(15,23,42,.08);border:1px solid rgba(255,255,255,.88)}
-  .qr-card{text-align:center}.qr-box{display:inline-flex;background:#fff;border:1px solid #e2e8f0;border-radius:24px;padding:18px;margin:12px auto}.code{font-size:26px;font-weight:1000;color:#0f172a;margin-top:8px}.meta{font-size:13px;color:#64748b;font-weight:900;line-height:1.55}
-  .pillrow{display:flex;gap:6px;flex-wrap:wrap}.pill{border-radius:999px;padding:5px 10px;font-size:12px;font-weight:1000;border:1px solid #e2e8f0;background:#f8fafc;color:#334155}.ok{background:#dcfce7;color:#166534;border-color:#86efac}.low{background:#fee2e2;color:#991b1b;border-color:#fecaca}
-  table{width:100%;border-collapse:collapse}th,td{padding:10px;border-bottom:1px solid #edf2f7;text-align:left}th{font-size:11px;color:#475569;background:#f8fafc;text-transform:uppercase}td{font-size:13px;font-weight:800;color:#334155}.table-wrap{overflow:auto;border:1px solid #e2e8f0;border-radius:16px}
-  @media(max-width:900px){.grid2{grid-template-columns:1fr}.title{font-size:23px}.btnx{width:100%}.hero .btnx{width:auto}}
+  .grid2{display:grid;grid-template-columns:320px 1fr;gap:12px;align-items:start}.panel{background:#fff;border-radius:18px;padding:13px;box-shadow:0 4px 12px rgba(15,23,42,.07);border:1px solid rgba(255,255,255,.88)}
+  .qr-card{text-align:center}.qr-box{display:inline-flex;background:#fff;border:1px solid #e2e8f0;border-radius:18px;padding:14px;margin:6px auto}.code{font-size:22px;font-weight:1000;color:#0f172a;margin-top:6px}.meta{font-size:12px;color:#64748b;font-weight:850;line-height:1.45}
+  .pillrow{display:flex;gap:5px;flex-wrap:wrap}.pill{border-radius:999px;padding:4px 8px;font-size:11px;font-weight:1000;border:1px solid #e2e8f0;background:#f8fafc;color:#334155}.ok{background:#dcfce7;color:#166534;border-color:#86efac}.low{background:#fee2e2;color:#991b1b;border-color:#fecaca}.blue{background:#eff6ff;color:#1d4ed8;border-color:#bfdbfe}
+  .settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.field{display:flex;flex-direction:column;gap:4px}.field label{font-size:10px;font-weight:1000;color:#334155;text-transform:uppercase;letter-spacing:.04em}input{border:1px solid #e2e8f0;border-radius:11px;padding:8px 9px;font-weight:800;background:#fff;width:100%;font-size:12px;}
+  table{width:100%;border-collapse:collapse}th,td{padding:8px;border-bottom:1px solid #edf2f7;text-align:left}th{font-size:10px;color:#475569;background:#f8fafc;text-transform:uppercase}td{font-size:12px;font-weight:800;color:#334155}.table-wrap{overflow:auto;border:1px solid #e2e8f0;border-radius:14px}
+  @media(max-width:900px){.grid2{grid-template-columns:1fr}.title{font-size:22px}.btnx{width:100%}.hero .btnx{width:auto}.settings-grid{grid-template-columns:1fr}}
 </style>
 {% endblock %}
 
@@ -22,9 +23,9 @@
   <section class="hero">
     <div>
       <div class="title">🏷️ {{ sheet.code }}</div>
-      <div class="sub">{{ sheet.title }} · {{ sheet.subject.name }}</div>
+      <div class="sub">{{ sheet.title }} · {{ sheet.get_grade_level_display|default:"ไม่ระบุระดับชั้น" }} · {{ sheet.subject.name }}</div>
     </div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <div style="display:flex;gap:7px;flex-wrap:wrap">
       <a class="btnx soft" href="/sheet-inventory/">← Sheet Inventory</a>
       <a class="btnx soft" href="/sheet-print-orders/">🖨️ ระบบส่งปรินท์ชีท</a>
       <button class="btnx soft" onclick="window.print()">พิมพ์ QR</button>
@@ -36,76 +37,58 @@
       <div class="qr-box"><div id="qrcode"></div></div>
       <div class="code">{{ sheet.code }}</div>
       <div class="meta">QR นี้สร้างจากรหัสชีทโดยตรง เวลา scan จะส่งค่า <b>{{ sheet.code }}</b> เข้า scanner</div>
-      <div style="margin-top:12px" class="pillrow">
+      <div style="margin-top:10px" class="pillrow">
+        <span class="pill blue">{{ sheet.get_grade_level_display|default:"ไม่ระบุ" }}</span>
         <span class="pill {% if inventory.minimum_stock > 0 and inventory.quantity <= inventory.minimum_stock %}low{% else %}ok{% endif %}">คงเหลือ {{ inventory.quantity }}</span>
         <span class="pill">ขั้นต่ำ {{ inventory.minimum_stock }}</span>
+        <span class="pill">เป้าคลัง {{ inventory.target_stock }}</span>
       </div>
     </div>
 
     <div class="panel">
-      <h3 style="margin:0 0 10px;font-size:18px">รายละเอียดชีท</h3>
+      <h3 style="margin:0 0 8px;font-size:16px">รายละเอียดชีท</h3>
       <div class="meta">
         <b>รหัส:</b> {{ sheet.code }}<br>
         <b>ชื่อชีท:</b> {{ sheet.title }}<br>
-        <b>วิชา:</b> {{ sheet.subject.name }}<br>
+        <b>ระดับชั้น:</b> {{ sheet.get_grade_level_display|default:"ไม่ระบุระดับชั้น" }} · <b>วิชา:</b> {{ sheet.subject.name }}<br>
         <b>จำนวนหน้า:</b> {{ sheet.total_pages }} · <b>จำนวนข้อ:</b> {{ sheet.total_questions }}<br>
         <b>สถานะ:</b> {% if sheet.is_active %}ใช้งาน{% else %}ปิดใช้งาน{% endif %}
       </div>
 
-      <h3 style="margin:18px 0 10px;font-size:18px">ตั้งค่าการส่งปรินท์</h3>
-      <form method="post" action="/sheet-print-orders/" style="display:grid;gap:8px;border:1px solid #e2e8f0;border-radius:16px;padding:12px;background:#f8fafc;">
+      <h3 style="margin:16px 0 8px;font-size:16px">ตั้งค่าการส่งปรินท์</h3>
+      <form method="post" action="/sheet-print-orders/" class="settings-grid" style="border:1px solid #e2e8f0;border-radius:14px;padding:10px;background:#f8fafc;">
         {% csrf_token %}
         <input type="hidden" name="action" value="update_sheet_print_setting">
         <input type="hidden" name="sheet_id" value="{{ sheet.id }}">
-        <label style="font-size:12px;font-weight:1000;color:#334155;">จำนวนที่ต้องการมีในคลัง</label>
-        <input type="number" name="target_stock" min="0" value="{{ inventory.target_stock|default:0 }}" style="border:1px solid #e2e8f0;border-radius:12px;padding:10px;font-weight:900;">
-        <label style="font-size:12px;font-weight:1000;color:#334155;">ลิงก์ OneDrive</label>
-        <input name="onedrive_url" value="{{ inventory.onedrive_url }}" placeholder="วางลิงก์ไฟล์ชีท" style="border:1px solid #e2e8f0;border-radius:12px;padding:10px;font-weight:900;">
-        <button class="btnx green" type="submit">บันทึกค่าคลัง / ลิงก์</button>
+        <div class="field"><label>จำนวนที่ต้องการมีในคลัง</label><input type="number" name="target_stock" min="0" value="{{ inventory.target_stock|default:0 }}"></div>
+        <div class="field"><label>ลิงก์ OneDrive</label><input name="onedrive_url" value="{{ inventory.onedrive_url }}" placeholder="วางลิงก์ไฟล์ชีท"></div>
+        <div style="grid-column:1/-1"><button class="btnx green" type="submit">บันทึกค่าคลัง / ลิงก์</button></div>
       </form>
 
-      <form method="post" action="/sheet-print-orders/" style="margin-top:10px;display:grid;gap:8px;border:1px solid #bae6fd;border-radius:16px;padding:12px;background:#f0f9ff;">
+      <form method="post" action="/sheet-print-orders/" class="settings-grid" style="margin-top:8px;border:1px solid #bae6fd;border-radius:14px;padding:10px;background:#f0f9ff;">
         {% csrf_token %}
         <input type="hidden" name="action" value="create_print_order">
         <input type="hidden" name="sheet_id" value="{{ sheet.id }}">
         <input type="hidden" name="onedrive_url" value="{{ inventory.onedrive_url }}">
-        <label style="font-size:12px;font-weight:1000;color:#075985;">จำนวนที่สั่งปรินท์</label>
-        <input type="number" name="quantity" min="1" value="1" required style="border:1px solid #bae6fd;border-radius:12px;padding:10px;font-weight:900;">
-        <label style="font-size:12px;font-weight:1000;color:#075985;">วันที่ต้องส่ง</label>
-        <input type="date" name="due_date" style="border:1px solid #bae6fd;border-radius:12px;padding:10px;font-weight:900;">
-        <button class="btnx dark" type="submit">สร้างรายการรอปรินท์</button>
+        <div class="field"><label>จำนวนที่สั่งปรินท์</label><input type="number" name="quantity" min="1" value="1" required></div>
+        <div class="field"><label>วันที่ต้องส่ง</label><input type="date" name="due_date"></div>
+        <div style="grid-column:1/-1"><button class="btnx dark" type="submit">สร้างรายการรอปรินท์</button></div>
       </form>
 
-      <h3 style="margin:18px 0 10px;font-size:18px">Class ที่ผูกแบบ Manual</h3>
+      <h3 style="margin:16px 0 8px;font-size:16px">Class ที่ผูกแบบ Manual</h3>
       <div class="pillrow">
-        {% for m in mappings %}
-          <span class="pill">{{ m.tutoring_class.get_time_slot_display }} · {{ m.tutoring_class.name }} · ต่อคน {{ m.quantity_per_student }}</span>
-        {% empty %}
-          <span class="pill">ยังไม่มี manual mapping</span>
-        {% endfor %}
+        {% for m in mappings %}<span class="pill">{{ m.tutoring_class.get_time_slot_display }} · {{ m.tutoring_class.name }} · ต่อคน {{ m.quantity_per_student }}</span>{% empty %}<span class="pill">ยังไม่มี manual mapping</span>{% endfor %}
       </div>
     </div>
   </section>
 
   <section class="panel">
-    <h3 style="margin:0 0 10px;font-size:18px">Movement History</h3>
+    <h3 style="margin:0 0 8px;font-size:16px">Movement History</h3>
     <div class="table-wrap">
       <table>
         <thead><tr><th>เวลา</th><th>ประเภท</th><th>จำนวน</th><th>ก่อน</th><th>หลัง</th><th>Note</th><th>ผู้บันทึก</th></tr></thead>
         <tbody>
-          {% for m in movements %}
-          <tr>
-            <td>{{ m.created_at|date:"d/m/Y H:i" }}</td>
-            <td>{{ m.get_movement_type_display }}</td>
-            <td>{{ m.quantity }}</td>
-            <td>{{ m.balance_before }}</td>
-            <td>{{ m.balance_after }}</td>
-            <td>{{ m.note|default:"-" }}</td>
-            <td>{{ m.created_by|default:"-" }}</td>
-          </tr>
-          {% empty %}
-          <tr><td colspan="7">ยังไม่มี movement</td></tr>
-          {% endfor %}
+          {% for m in movements %}<tr><td>{{ m.created_at|date:"d/m/Y H:i" }}</td><td>{{ m.get_movement_type_display }}</td><td>{{ m.quantity }}</td><td>{{ m.balance_before }}</td><td>{{ m.balance_after }}</td><td>{{ m.note|default:"-" }}</td><td>{{ m.created_by|default:"-" }}</td></tr>{% empty %}<tr><td colspan="7">ยังไม่มี movement</td></tr>{% endfor %}
         </tbody>
       </table>
     </div>
@@ -113,11 +96,6 @@
 </div>
 
 <script>
-  new QRCode(document.getElementById("qrcode"), {
-    text: "{{ sheet.code|escapejs }}",
-    width: 220,
-    height: 220,
-    correctLevel: QRCode.CorrectLevel.M
-  });
+  new QRCode(document.getElementById("qrcode"), {text: "{{ sheet.code|escapejs }}", width: 190, height: 190, correctLevel: QRCode.CorrectLevel.M});
 </script>
 {% endblock %}

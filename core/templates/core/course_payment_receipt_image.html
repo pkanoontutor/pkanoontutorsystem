@@ -107,15 +107,15 @@
             <div class="item-row">
               <div>ค่าเรียน {{ payment.tutoring_class.name }}</div>
               <div class="num">{{ payment.sessions_granted }} ครั้ง</div>
-              <div class="num">{{ payment.course_price|floatformat:2 }}</div>
+              <div class="num">{{ payment.course_price|floatformat:"0g" }}</div>
             </div>
-            <div class="item-total"><div>ส่วนลด</div><div></div><div class="num">{{ payment.discount_amount|floatformat:2 }}</div></div>
-            <div class="item-total grand"><div>ยอดสุทธิ</div><div></div><div class="num">{{ payment.net_amount|floatformat:2 }}</div></div>
+            <div class="item-total"><div>ส่วนลด</div><div></div><div class="num">{{ payment.discount_amount|floatformat:"0g" }}</div></div>
+            <div class="item-total grand"><div>ยอดสุทธิ</div><div></div><div class="num">{{ payment.net_amount|floatformat:"0g" }}</div></div>
           </div>
 
           <div class="paid-box">
             <div class="paid-label">ยอดรับชำระ</div>
-            <div class="paid-amount">฿{{ payment.amount_paid|floatformat:2 }}</div>
+            <div class="paid-amount">฿{{ payment.amount_paid|floatformat:"0g" }}</div>
           </div>
 
           {% if payment.note %}<div class="note">หมายเหตุ: {{ payment.note }}</div>{% endif %}

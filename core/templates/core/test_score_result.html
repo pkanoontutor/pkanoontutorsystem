@@ -1,4 +1,393 @@
 {% extends "core/base_portal.html" %}
 {% block title %}ผลคะแนน {{ test_round.title }}{% endblock %}
-{% block head %}<style>.score-wrap{max-width:1180px;margin:0 auto;display:grid;gap:14px}.hero{background:linear-gradient(135deg,#4c1d95,#2563eb);color:#fff;border-radius:24px;padding:20px;box-shadow:0 12px 26px rgba(15,23,42,.20)}.title{font-size:25px;font-weight:1000}.sub{font-size:13px;color:#dbeafe;margin-top:5px}.panel{background:#fff;border-radius:20px;padding:16px;box-shadow:0 5px 14px rgba(15,23,42,.08)}.student-name{font-size:22px;font-weight:1000;color:#0f172a}.muted{color:#64748b;font-size:12px;font-weight:800}.narrative{background:#f0f9ff;border:1px solid #bae6fd;color:#075985;border-radius:18px;padding:13px;font-weight:900;line-height:1.55}.chart-row{display:grid;grid-template-columns:120px 1fr;gap:10px;align-items:center;margin:9px 0}.barset{display:grid;gap:4px}.bar-bg{height:18px;background:#e2e8f0;border-radius:999px;overflow:hidden}.bar{height:100%;border-radius:999px}.me{background:#7c3aed}.avg{background:#94a3b8}.legend{display:flex;gap:12px;font-size:12px;font-weight:900;color:#475569;flex-wrap:wrap}.dot{width:10px;height:10px;border-radius:999px;display:inline-block}.table-wrap{overflow:auto;border:1px solid #e2e8f0;border-radius:16px}table{min-width:980px}.current-row{background:#fef9c3!important}.rank{font-weight:1000;color:#7c2d12}.pct{font-weight:1000;color:#1d4ed8}@media(max-width:720px){.chart-row{grid-template-columns:1fr}.title{font-size:22px}}</style>{% endblock %}
-{% block content %}<div class="score-wrap"><div class="hero"><div class="title">🏆 {{ test_round.title }}</div><div class="sub">ผลคะแนนสอบรายบุคคล</div></div>{% if current_row %}<section class="panel"><div class="student-name">{{ current_row.participant.display_name }}</div><div class="muted">{{ current_row.participant.full_name }} · {{ current_row.participant.school_name|default:"ไม่ระบุโรงเรียน" }}</div><div style="height:10px"></div><div class="narrative">{{ narrative }}</div></section><section class="panel"><h3 style="margin:0 0 10px">กราฟเทียบคะแนน (%) กับค่าเฉลี่ย</h3><div class="legend"><span><i class="dot me"></i> คะแนนของน้อง</span><span><i class="dot avg"></i> ค่าเฉลี่ย</span></div>{% for c in chart_rows %}<div class="chart-row"><div style="font-weight:1000">{{ c.label }}</div><div class="barset"><div class="muted">น้อง {{ c.student_pct|floatformat:1 }}%</div><div class="bar-bg"><div class="bar me" style="width:{{ c.student_pct|floatformat:0 }}%"></div></div><div class="muted">เฉลี่ย {{ c.avg_pct|floatformat:1 }}%</div><div class="bar-bg"><div class="bar avg" style="width:{{ c.avg_pct|floatformat:0 }}%"></div></div></div></div>{% endfor %}</section><section class="panel"><h3 style="margin:0 0 10px">สรุปคะแนนของน้อง</h3><div class="table-wrap"><table><thead><tr><th>รายการ</th>{% for s in subjects %}<th>{{ s.name }}<br><span class="muted">เต็ม {{ s.full_score|floatformat:0 }}</span></th>{% endfor %}<th>รวม</th></tr></thead><tbody><tr><td>คะแนน</td>{% for c in current_row.subject_cells %}<td>{{ c.score|floatformat:0 }}</td>{% endfor %}<td>{{ current_row.total_score|floatformat:0 }}</td></tr><tr><td>% ที่ได้</td>{% for c in current_row.subject_cells %}<td class="pct">{{ c.pct|floatformat:1 }}%</td>{% endfor %}<td class="pct">{{ current_row.total_pct|floatformat:1 }}%</td></tr><tr><td>อันดับ</td>{% for c in current_row.subject_cells %}<td class="rank">{{ c.rank }}</td>{% endfor %}<td class="rank">{{ current_row.total_rank }}</td></tr><tr><td>ค่าเฉลี่ย</td>{% for c in current_row.subject_cells %}<td>{{ c.avg_pct|floatformat:1 }}%</td>{% endfor %}<td>{{ total_avg_pct|floatformat:1 }}%</td></tr></tbody></table></div></section><section class="panel"><h3 style="margin:0 0 10px">ตารางภาพรวมทุกคน</h3><div class="muted" style="margin-bottom:8px">ชื่อของนักเรียนคนอื่นถูกซ่อนไว้เป็น xxxxx</div><div class="table-wrap"><table><thead><tr><th>ชื่อ</th><th>โรงเรียน</th>{% for s in subjects %}<th>{{ s.name }} คะแนน / % / อันดับ</th>{% endfor %}<th>รวม / % / อันดับ</th></tr></thead><tbody>{% for row in rows %}<tr class="{% if row.is_current %}current-row{% endif %}"><td>{{ row.display_name }}</td><td>{% if row.is_current %}{{ row.participant.school_name|default:"-" }}{% else %}xxxxx{% endif %}</td>{% for c in row.subject_cells %}<td>{{ c.score|floatformat:0 }} · <span class="pct">{{ c.pct|floatformat:1 }}%</span> · <span class="rank">#{{ c.rank }}</span></td>{% endfor %}<td>{{ row.total_score|floatformat:0 }} · <span class="pct">{{ row.total_pct|floatformat:1 }}%</span> · <span class="rank">#{{ row.total_rank }}</span></td></tr>{% endfor %}</tbody></table></div></section>{% else %}<section class="panel">ยังไม่มีคะแนนของนักเรียนคนนี้ครับ</section>{% endif %}<div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap"><a class="btn" href="{% url 'core:test_score_round_list' %}" style="background:#f8fafc;color:#0f172a">กลับไปเลือกรอบสอบ</a><a class="btn btn-dark" href="{% url 'core:test_score_logout' test_round.id %}">ออกจากผลคะแนน</a></div></div>{% endblock %}
+
+{% block head %}
+<style>
+  .score-wrap{
+    max-width:1180px;
+    margin:0 auto;
+    display:grid;
+    gap:14px;
+  }
+  .hero{
+    background:linear-gradient(135deg,#4c1d95,#2563eb);
+    color:#fff;
+    border-radius:24px;
+    padding:20px;
+    box-shadow:0 12px 26px rgba(15,23,42,.20);
+  }
+  .title{font-size:25px;font-weight:1000;letter-spacing:-.03em}
+  .sub{font-size:13px;color:#dbeafe;margin-top:5px;line-height:1.5}
+  .panel{
+    background:#fff;
+    border-radius:20px;
+    padding:16px;
+    box-shadow:0 5px 14px rgba(15,23,42,.08);
+    border:1px solid rgba(255,255,255,.9);
+  }
+  .panel-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-end;
+    gap:10px;
+    flex-wrap:wrap;
+    margin-bottom:12px;
+  }
+  .panel-title{
+    margin:0;
+    font-size:18px;
+    font-weight:1000;
+    color:#0f172a;
+    letter-spacing:-.02em;
+  }
+  .panel-sub{
+    font-size:12px;
+    font-weight:800;
+    color:#64748b;
+    margin-top:3px;
+  }
+  .student-card{
+    display:grid;
+    grid-template-columns:1fr auto;
+    gap:12px;
+    align-items:center;
+  }
+  .student-name{
+    font-size:22px;
+    font-weight:1000;
+    color:#0f172a;
+    letter-spacing:-.02em;
+  }
+  .muted{color:#64748b;font-size:12px;font-weight:800;line-height:1.45}
+  .narrative{
+    background:linear-gradient(135deg,#eff6ff,#f0f9ff);
+    border:1px solid #bae6fd;
+    color:#075985;
+    border-radius:18px;
+    padding:13px;
+    font-weight:900;
+    line-height:1.6;
+  }
+  .score-badge{
+    background:#fef3c7;
+    border:1px solid #fde68a;
+    color:#92400e;
+    border-radius:18px;
+    padding:10px 12px;
+    font-weight:1000;
+    text-align:center;
+    min-width:110px;
+  }
+  .score-badge .big{font-size:24px;line-height:1}
+  .legend{
+    display:flex;
+    gap:10px;
+    font-size:12px;
+    font-weight:900;
+    color:#475569;
+    flex-wrap:wrap;
+  }
+  .legend span{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    background:#f8fafc;
+    border:1px solid #e2e8f0;
+    border-radius:999px;
+    padding:5px 9px;
+  }
+  .dot{width:10px;height:10px;border-radius:999px;display:inline-block}
+  .dot.me{background:#7c3aed}
+  .dot.avg{background:#94a3b8}
+
+  .chart-list{display:grid;gap:10px}
+  .chart-card{
+    display:grid;
+    grid-template-columns:135px 1fr;
+    gap:12px;
+    align-items:center;
+    border:1px solid #e2e8f0;
+    border-radius:16px;
+    padding:10px;
+    background:#ffffff;
+  }
+  .chart-label{
+    font-size:14px;
+    font-weight:1000;
+    color:#0f172a;
+  }
+  .chart-bars{display:grid;gap:7px}
+  .bar-line{
+    display:grid;
+    grid-template-columns:72px 1fr 58px;
+    gap:8px;
+    align-items:center;
+  }
+  .bar-name{font-size:11px;font-weight:1000;color:#475569}
+  .bar-value{font-size:12px;font-weight:1000;text-align:right}
+  .bar-bg{
+    height:18px;
+    background:#e2e8f0;
+    border-radius:999px;
+    overflow:hidden;
+    position:relative;
+  }
+  .bar{
+    height:100%;
+    border-radius:999px;
+    min-width:4px;
+  }
+  .bar.me{background:linear-gradient(90deg,#8b5cf6,#6d28d9)}
+  .bar.avg{background:linear-gradient(90deg,#cbd5e1,#64748b)}
+  .table-wrap{
+    overflow:auto;
+    border:1px solid #e2e8f0;
+    border-radius:16px;
+    background:#fff;
+  }
+  table{
+    width:100%;
+    border-collapse:collapse;
+    min-width:980px;
+  }
+  th,td{
+    padding:10px 9px;
+    border-bottom:1px solid #edf2f7;
+    text-align:left;
+    vertical-align:middle;
+  }
+  th{
+    background:#f8fafc;
+    color:#334155;
+    font-size:11px;
+    font-weight:1000;
+    text-transform:uppercase;
+    letter-spacing:.03em;
+    position:sticky;
+    top:0;
+    z-index:1;
+  }
+  td{
+    font-size:13px;
+    font-weight:850;
+    color:#334155;
+  }
+  tr:last-child td{border-bottom:0}
+  .current-row{
+    background:#fef9c3!important;
+  }
+  .total-row{
+    background:#f8fafc;
+    font-weight:1000;
+  }
+  .rank{
+    font-weight:1000;
+    color:#7c2d12;
+    display:inline-flex;
+    align-items:center;
+    gap:3px;
+  }
+  .pct{
+    font-weight:1000;
+    color:#1d4ed8;
+  }
+  .score-pill{
+    border-radius:999px;
+    padding:4px 8px;
+    background:#eff6ff;
+    border:1px solid #bfdbfe;
+    color:#1d4ed8;
+    font-weight:1000;
+    display:inline-block;
+  }
+  .name-mask{
+    color:#94a3b8;
+    letter-spacing:.08em;
+    font-weight:1000;
+  }
+  .subject-cell{
+    line-height:1.55;
+    white-space:nowrap;
+  }
+  @media(max-width:720px){
+    .student-card{grid-template-columns:1fr}
+    .chart-card{grid-template-columns:1fr}
+    .bar-line{grid-template-columns:60px 1fr 54px}
+    .title{font-size:22px}
+    .panel{padding:13px}
+    table{min-width:860px}
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="score-wrap">
+  <div class="hero">
+    <div class="title">🏆 {{ test_round.title }}</div>
+    <div class="sub">ผลคะแนนสอบรายบุคคล และตารางเปรียบเทียบภาพรวมของรอบสอบนี้</div>
+  </div>
+
+  {% if current_row %}
+    <section class="panel">
+      <div class="student-card">
+        <div>
+          <div class="student-name">{{ current_row.participant.display_name }}</div>
+          <div class="muted">
+            {{ current_row.participant.full_name }} · {{ current_row.participant.school_name|default:"ไม่ระบุโรงเรียน" }}
+          </div>
+        </div>
+        <div class="score-badge">
+          <div class="big">{{ current_row.total_pct|floatformat:1 }}%</div>
+          <div style="font-size:11px;margin-top:3px">อันดับรวม #{{ current_row.total_rank }}</div>
+        </div>
+      </div>
+      <div style="height:10px"></div>
+      <div class="narrative">{{ narrative }}</div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <div>
+          <h3 class="panel-title">กราฟเทียบคะแนน (%) กับค่าเฉลี่ย</h3>
+          <div class="panel-sub">แถบสีม่วงคือคะแนนของน้อง ส่วนแถบสีเทาคือค่าเฉลี่ยของผู้เข้าสอบทั้งหมด</div>
+        </div>
+        <div class="legend">
+          <span><i class="dot me"></i> คะแนนของน้อง</span>
+          <span><i class="dot avg"></i> ค่าเฉลี่ย</span>
+        </div>
+      </div>
+
+      <div class="chart-list">
+        {% for c in chart_rows %}
+          <div class="chart-card">
+            <div class="chart-label">{{ c.label }}</div>
+            <div class="chart-bars">
+              <div class="bar-line">
+                <div class="bar-name">น้อง</div>
+                <div class="bar-bg"><div class="bar me" style="width:{{ c.student_pct|floatformat:0 }}%"></div></div>
+                <div class="bar-value pct">{{ c.student_pct|floatformat:1 }}%</div>
+              </div>
+              <div class="bar-line">
+                <div class="bar-name">เฉลี่ย</div>
+                <div class="bar-bg"><div class="bar avg" style="width:{{ c.avg_pct|floatformat:0 }}%"></div></div>
+                <div class="bar-value">{{ c.avg_pct|floatformat:1 }}%</div>
+              </div>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <div>
+          <h3 class="panel-title">สรุปคะแนนของน้อง{{ current_row.participant.nickname|default:current_row.participant.display_name }}</h3>
+          <div class="panel-sub">ดูคะแนนจริง เปอร์เซ็นต์ ค่าเฉลี่ย และอันดับของแต่ละวิชาในตารางเดียว</div>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>วิชา / รายการ</th>
+              <th>คะแนนที่ได้</th>
+              <th>% ที่ได้</th>
+              <th>% เฉลี่ย</th>
+              <th>อันดับ</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for c in current_row.subject_cells %}
+              <tr>
+                <td>
+                  <b>{{ c.subject_name|default:"วิชา" }}</b>
+                  {% if c.full_score %}
+                    <div class="muted">เต็ม {{ c.full_score|floatformat:0 }}</div>
+                  {% endif %}
+                </td>
+                <td><span class="score-pill">{{ c.score|floatformat:0 }}</span></td>
+                <td class="pct">{{ c.pct|floatformat:1 }}%</td>
+                <td>{{ c.avg_pct|floatformat:1 }}%</td>
+                <td><span class="rank">#{{ c.rank }}</span></td>
+              </tr>
+            {% endfor %}
+            <tr class="total-row">
+              <td><b>รวมทุกวิชา</b></td>
+              <td><span class="score-pill">{{ current_row.total_score|floatformat:0 }}</span></td>
+              <td class="pct">{{ current_row.total_pct|floatformat:1 }}%</td>
+              <td>{{ total_avg_pct|floatformat:1 }}%</td>
+              <td><span class="rank">#{{ current_row.total_rank }}</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <div>
+          <h3 class="panel-title">ตารางภาพรวมทุกคน</h3>
+          <div class="panel-sub">เรียงจาก % คะแนนรวมมากไปน้อย และซ่อนชื่อของนักเรียนคนอื่นเป็น xxxxx</div>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>อันดับรวม</th>
+              <th>ชื่อ</th>
+              <th>โรงเรียน</th>
+              {% for s in subjects %}
+                <th>{{ s.name }}<br><span class="muted">คะแนน / % / อันดับ</span></th>
+              {% endfor %}
+              <th>รวม<br><span class="muted">คะแนน / % / อันดับ</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in rows|dictsortreversed:"total_pct" %}
+              <tr class="{% if row.is_current %}current-row{% endif %}">
+                <td><span class="rank">#{{ row.total_rank }}</span></td>
+                <td>
+                  {% if row.is_current %}
+                    {{ row.display_name }}
+                  {% else %}
+                    <span class="name-mask">xxxxx</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if row.is_current %}
+                    {{ row.participant.school_name|default:"-" }}
+                  {% else %}
+                    <span class="name-mask">xxxxx</span>
+                  {% endif %}
+                </td>
+                {% for c in row.subject_cells %}
+                  <td class="subject-cell">
+                    {{ c.score|floatformat:0 }}
+                    · <span class="pct">{{ c.pct|floatformat:1 }}%</span>
+                    · <span class="rank">#{{ c.rank }}</span>
+                  </td>
+                {% endfor %}
+                <td class="subject-cell">
+                  <b>{{ row.total_score|floatformat:0 }}</b>
+                  · <span class="pct">{{ row.total_pct|floatformat:1 }}%</span>
+                  · <span class="rank">#{{ row.total_rank }}</span>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  {% else %}
+    <section class="panel">ยังไม่มีคะแนนของนักเรียนคนนี้ครับ</section>
+  {% endif %}
+
+  <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+    <a class="btn" href="{% url 'core:test_score_round_list' %}" style="background:#f8fafc;color:#0f172a">กลับไปเลือกรอบสอบ</a>
+    <a class="btn btn-dark" href="{% url 'core:test_score_logout' test_round.id %}">ออกจากผลคะแนน</a>
+  </div>
+</div>
+{% endblock %}

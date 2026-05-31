@@ -345,7 +345,7 @@
       <div class="panel-head">
         <div>
           <h3 class="panel-title">ตารางภาพรวมทุกคน</h3>
-          <div class="panel-sub">เรียงจาก % คะแนนรวมมากไปน้อย และซ่อนชื่อของนักเรียนคนอื่นเป็น xxxxx</div>
+          <div class="panel-sub">เรียงจาก % คะแนนรวมมากไปน้อย โดย % รวมคำนวณแบบถ่วงน้ำหนักตามคะแนนเต็มของแต่ละวิชา และซ่อนชื่อของนักเรียนคนอื่นเป็น xxxxx</div>
         </div>
       </div>
 
@@ -363,7 +363,7 @@
             </tr>
           </thead>
           <tbody>
-            {% for row in rows|dictsortreversed:"total_pct" %}
+            {% for row in rows_sorted_by_total_pct %}
               <tr class="{% if row.is_current %}current-row{% endif %}">
                 <td><span class="rank">#{{ row.total_rank }}</span></td>
                 <td>

@@ -1162,6 +1162,37 @@ def sheet_inventory_export(request: HttpRequest) -> HttpResponse:
 
 
 
+
+def _default_spine_color_for_subject(subject_name: str | None) -> str:
+    raw = (subject_name or "").strip().lower().replace(" ", "")
+    # Specific rules first
+    if "คณิตเสริม" in raw or "อังกฤษเสริม" in raw or "extraenglish" in raw or "extra-math" in raw:
+        return SheetPrintOrder.SpineColor.RED
+    if "คณิต" in raw or "math" in raw:
+        return SheetPrintOrder.SpineColor.BLUE
+    if "อังกฤษ" in raw or "english" in raw:
+        return SheetPrintOrder.SpineColor.PINK
+    if "วิทย" in raw or "ชีว" in raw or "science" in raw or "bio" in raw or "biology" in raw:
+        return SheetPrintOrder.SpineColor.GREEN
+    if "เคมี" in raw or "ฟิสิก" in raw or "ไทย" in raw or "สังคม" in raw or "chem" in raw or "physics" in raw or "thai" in raw or "social" in raw:
+        return SheetPrintOrder.SpineColor.ORANGE
+    return ""
+
+
+def _print_color_choices() -> list[dict]:
+    return [
+        {"value": SheetPrintOrder.SpineColor.BLUE, "label": "สีฟ้า", "bg": "#dbeafe", "border": "#93c5fd"},
+        {"value": SheetPrintOrder.SpineColor.RED, "label": "สีแดง", "bg": "#fee2e2", "border": "#fca5a5"},
+        {"value": SheetPrintOrder.SpineColor.PINK, "label": "สีชมพู", "bg": "#fce7f3", "border": "#f9a8d4"},
+        {"value": SheetPrintOrder.SpineColor.GREEN, "label": "สีเขียว", "bg": "#dcfce7", "border": "#86efac"},
+        {"value": SheetPrintOrder.SpineColor.ORANGE, "label": "สีส้ม", "bg": "#ffedd5", "border": "#fdba74"},
+    ]
+
+
+def _spine_color_label(value: str | None) -> str:
+    labels = dict(SheetPrintOrder.SpineColor.choices)
+    return labels.get(value or "", "ไม่ระบุสี")
+
 def _parse_optional_date(value: str | None):
     raw = (value or "").strip()
     if not raw:
@@ -1177,7 +1208,7 @@ def _print_order_dashboard_rows() -> list[dict]:
         item["sheet_id"]: item["qty"] or 0
         for item in (
             SheetPrintOrder.objects
-            .filter(status=SheetPrintOrder.Status.PENDING)
+            .filter(status=SheetPrintOrder.Status.PENDING, sheet__isnull=False)
             .values("sheet_id")
             .annotate(qty=Sum("quantity"))
         )
@@ -1193,6 +1224,7 @@ def _print_order_dashboard_rows() -> list[dict]:
         pending_qty = int(pending_by_sheet.get(sheet.id, 0) or 0)
         shortage = max(target_stock - current_qty, 0)
         suggested_print_qty = max(target_stock - current_qty - pending_qty, 0)
+        default_color = _default_spine_color_for_subject(sheet.subject.name if sheet.subject_id else "")
         rows.append({
             "sheet": sheet,
             "inventory": inv,
@@ -1202,8 +1234,24 @@ def _print_order_dashboard_rows() -> list[dict]:
             "pending_print_qty": pending_qty,
             "shortage": shortage,
             "suggested_print_qty": suggested_print_qty,
+            "default_spine_color": default_color,
+            "default_spine_color_label": _spine_color_label(default_color),
         })
     return rows
+
+
+def _print_order_grade_groups(rows: list[dict]) -> list[dict]:
+    buckets = {g: [] for g in SHEET_GRADE_ORDER}
+    for row in rows:
+        grade = (getattr(row.get("sheet"), "grade_level", "") or "").lower()
+        if grade not in buckets:
+            buckets.setdefault(grade, [])
+        buckets[grade].append(row)
+    return [
+        {"grade": grade, "label": _sheet_grade_label(grade), "rows": buckets.get(grade, []), "count": len(buckets.get(grade, []))}
+        for grade in SHEET_GRADE_ORDER
+        if buckets.get(grade)
+    ]
 
 
 @login_required
@@ -1222,11 +1270,19 @@ def sheet_print_order_admin(request: HttpRequest) -> HttpResponse:
             return redirect("core:sheet_print_order_admin")
 
         if action == "create_print_order":
-            sheet = get_object_or_404(Sheet, id=request.POST.get("sheet_id"))
+            sheet = get_object_or_404(Sheet.objects.select_related("subject"), id=request.POST.get("sheet_id"))
             quantity = max(int(request.POST.get("quantity") or 0), 0)
             due_date = _parse_optional_date(request.POST.get("due_date"))
             onedrive_url = (request.POST.get("onedrive_url") or "").strip()
             note = (request.POST.get("note") or "").strip()
+            binding_type = (request.POST.get("binding_type") or SheetPrintOrder.BindingType.SIDE).strip()
+            if binding_type not in dict(SheetPrintOrder.BindingType.choices):
+                binding_type = SheetPrintOrder.BindingType.SIDE
+            spine_color = (request.POST.get("spine_color") or "").strip()
+            if binding_type == SheetPrintOrder.BindingType.CORNER:
+                spine_color = ""
+            elif spine_color not in dict(SheetPrintOrder.SpineColor.choices):
+                spine_color = _default_spine_color_for_subject(sheet.subject.name if sheet.subject_id else "")
 
             if quantity > 0:
                 inventory, _ = SheetInventory.objects.get_or_create(sheet=sheet, defaults={"quantity": 0})
@@ -1238,6 +1294,39 @@ def sheet_print_order_admin(request: HttpRequest) -> HttpResponse:
                     quantity=quantity,
                     due_date=due_date,
                     onedrive_url=onedrive_url,
+                    binding_type=binding_type,
+                    spine_color=spine_color,
+                    note=note,
+                    requested_by=request.user if getattr(request.user, "is_authenticated", False) else None,
+                )
+                return redirect("core:print_shop_order_list")
+
+            return redirect("core:sheet_print_order_admin")
+
+        if action == "create_custom_print_order":
+            custom_title = (request.POST.get("custom_title") or "").strip()
+            quantity = max(int(request.POST.get("quantity") or 0), 0)
+            due_date = _parse_optional_date(request.POST.get("due_date"))
+            onedrive_url = (request.POST.get("onedrive_url") or "").strip()
+            note = (request.POST.get("note") or "").strip()
+            binding_type = (request.POST.get("binding_type") or SheetPrintOrder.BindingType.SIDE).strip()
+            if binding_type not in dict(SheetPrintOrder.BindingType.choices):
+                binding_type = SheetPrintOrder.BindingType.SIDE
+            spine_color = (request.POST.get("spine_color") or "").strip()
+            if binding_type == SheetPrintOrder.BindingType.CORNER:
+                spine_color = ""
+            elif spine_color not in dict(SheetPrintOrder.SpineColor.choices):
+                spine_color = ""
+
+            if custom_title and quantity > 0 and onedrive_url:
+                SheetPrintOrder.objects.create(
+                    sheet=None,
+                    custom_title=custom_title,
+                    quantity=quantity,
+                    due_date=due_date,
+                    onedrive_url=onedrive_url,
+                    binding_type=binding_type,
+                    spine_color=spine_color,
                     note=note,
                     requested_by=request.user if getattr(request.user, "is_authenticated", False) else None,
                 )
@@ -1257,13 +1346,17 @@ def sheet_print_order_admin(request: HttpRequest) -> HttpResponse:
         .filter(status=SheetPrintOrder.Status.READY)
         .order_by("-completed_at", "-updated_at")[:80]
     )
+    rows = _print_order_dashboard_rows()
 
     return render(request, "core/sheet_print_order_admin.html", {
-        "rows": _print_order_dashboard_rows(),
+        "rows": rows,
+        "grade_groups": _print_order_grade_groups(rows),
         "pending_orders": pending_orders,
         "ready_orders": ready_orders,
         "default_due_date": timezone.localdate() + timedelta(days=3),
         "shop_url": request.build_absolute_uri("/print-shop/"),
+        "binding_type_choices": SheetPrintOrder.BindingType.choices,
+        "spine_color_choices": _print_color_choices(),
     })
 
 

@@ -44,6 +44,18 @@
   .col-toggle input{accent-color:#2563eb;}
   .mini-btn{border:1px solid #cbd5e1;background:#fff;border-radius:999px;padding:6px 10px;font-size:12px;font-weight:1000;color:#0f172a;cursor:pointer;}
   .hidden-col{display:none!important;}
+
+  .sort-tools{display:grid;grid-template-columns:minmax(220px,1fr) auto auto;gap:8px;align-items:end;background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:10px;}
+  .sort-field{display:flex;flex-direction:column;gap:4px;}
+  .sort-field label{font-size:10px;font-weight:1000;color:#334155;text-transform:uppercase;letter-spacing:.04em;}
+  .sort-field select{border:1px solid #cbd5e1;border-radius:12px;padding:9px 10px;font-weight:900;color:#0f172a;background:#fff;min-height:40px;}
+  .sort-direction{border:1px solid #cbd5e1;background:#f8fafc;border-radius:12px;padding:10px 12px;font-size:12px;font-weight:1000;color:#0f172a;cursor:pointer;min-height:40px;}
+  .sort-hint{font-size:11px;font-weight:800;color:#64748b;line-height:1.4;}
+  .sortable-th{cursor:pointer;user-select:none;white-space:nowrap;}
+  .sortable-th:hover{background:#eff6ff;color:#1d4ed8;}
+  .sortable-th::after{content:" ↕";font-size:10px;color:#94a3b8;}
+  .sortable-th.sort-active::after{content:" " attr(data-sort-mark);color:#2563eb;font-size:12px;}
+  @media(max-width:700px){.sort-tools{grid-template-columns:1fr}.sort-direction{width:100%;}}
   @media(max-width:900px){.metric-grid{grid-template-columns:1fr 1fr}.title{font-size:22px}.btnx{width:100%;}}
   @media(max-width:620px){.metric-grid{grid-template-columns:1fr}.hero{padding:18px}}
 </style>
@@ -100,41 +112,61 @@
         <label class="col-toggle"><input type="checkbox" data-col-toggle="note" checked> หมายเหตุ</label>
         <label class="col-toggle"><input type="checkbox" data-col-toggle="summary_total" checked> รวมทุกวิชา</label>
       </div>
+
+      <div class="sort-tools" id="sortTools">
+        <div class="sort-field">
+          <label for="scoreSortColumn">เรียงตารางรวมคะแนนตามคอลัมน์</label>
+          <select id="scoreSortColumn">
+            <option value="total_pct" selected>% รวม มากไปน้อย</option>
+            <option value="total_score">คะแนนรวม มากไปน้อย</option>
+            <option value="rank">อันดับรวม น้อยไปมาก</option>
+            <option value="nickname">ชื่อเล่น A-Z</option>
+            <option value="fullname">ชื่อจริง A-Z</option>
+            <option value="school">โรงเรียน A-Z</option>
+            {% for s in subjects %}
+              <option value="subject-{{ forloop.counter }}">{{ s.name }} (%) มากไปน้อย</option>
+            {% endfor %}
+          </select>
+          <div class="sort-hint">กดหัวตารางเพื่อเรียงคอลัมน์นั้นได้เช่นกัน โดยรายวิชาจะเรียงจาก % ของวิชานั้น</div>
+        </div>
+        <button type="button" class="sort-direction" id="scoreSortDirection" data-direction="desc">มาก → น้อย</button>
+        <button type="button" class="mini-btn" id="resetSortButton">กลับไปเรียง % รวม</button>
+      </div>
     </div>
 
     <div class="table-wrap">
       <table>
         <thead>
           <tr>
-            <th data-col="rank">อันดับรวม</th>
-            <th data-col="nickname">ชื่อเล่น</th>
-            <th data-col="fullname">ชื่อจริง นามสกุล</th>
-            <th data-col="school">โรงเรียน</th>
+            <th data-col="rank" data-sort-col="rank" class="sortable-th">อันดับรวม</th>
+            <th data-col="nickname" data-sort-col="nickname" class="sortable-th">ชื่อเล่น</th>
+            <th data-col="fullname" data-sort-col="fullname" class="sortable-th">ชื่อจริง นามสกุล</th>
+            <th data-col="school" data-sort-col="school" class="sortable-th">โรงเรียน</th>
             {% for s in subjects %}
-              <th data-col="subject-{{ forloop.counter }}">{{ s.name }}<br><span class="muted">เต็ม {{ s.full_score|floatformat:0 }}</span></th>
+              <th data-col="subject-{{ forloop.counter }}" data-sort-col="subject-{{ forloop.counter }}" class="sortable-th">{{ s.name }}<br><span class="muted">เต็ม {{ s.full_score|floatformat:0 }}</span></th>
             {% endfor %}
-            <th data-col="total_score">คะแนนรวม</th>
-            <th data-col="total_pct">% รวม</th>
-            <th data-col="note">หมายเหตุ</th>
+            <th data-col="total_score" data-sort-col="total_score" class="sortable-th">คะแนนรวม</th>
+            <th data-col="total_pct" data-sort-col="total_pct" class="sortable-th">% รวม</th>
+            <th data-col="note" data-sort-col="note" class="sortable-th">หมายเหตุ</th>
           </tr>
         </thead>
-        <tbody>
+        <tbody id="scoreSummaryBody">
           {% for row in score_rows %}
-            <tr class="{% if forloop.first %}top-row{% endif %}">
-              <td data-col="rank"><span class="rank-pill">#{{ row.total_rank }}</span></td>
-              <td data-col="nickname">{{ row.participant.nickname|default:"-" }}</td>
-              <td data-col="fullname">{{ row.participant.full_name|default:"-" }}</td>
-              <td data-col="school">{{ row.participant.school_name|default:"-" }}</td>
+            <tr class="{% if forloop.first %}top-row{% endif %}" data-original-index="{{ forloop.counter0 }}">
+              <td data-col="rank" data-sort-value="{{ row.total_rank|default:999999 }}"><span class="rank-pill">#{{ row.total_rank }}</span></td>
+              <td data-col="nickname" data-sort-value="{{ row.participant.nickname|default:'' }}">{{ row.participant.nickname|default:"-" }}</td>
+              <td data-col="fullname" data-sort-value="{{ row.participant.full_name|default:'' }}">{{ row.participant.full_name|default:"-" }}</td>
+              <td data-col="school" data-sort-value="{{ row.participant.school_name|default:'' }}">{{ row.participant.school_name|default:"-" }}</td>
               {% for c in row.subject_cells %}
-                <td class="subject-cell" data-col="subject-{{ forloop.counter }}">
+                <td class="subject-cell" data-col="subject-{{ forloop.counter }}" data-sort-value="{{ c.pct|default:0|floatformat:6 }}">
                   <span class="score-pill">{{ c.score|floatformat:0 }}</span>
                   <span class="pct-pill">{{ c.pct|floatformat:1 }}%</span>
                   <span class="rank-pill">#{{ c.rank }}</span>
                 </td>
               {% endfor %}
-              <td data-col="total_score"><span class="score-pill">{{ row.total_score|floatformat:0 }}</span></td>
-              <td data-col="total_pct"><span class="pct-pill">{{ row.total_pct|floatformat:1 }}%</span></td>
-              <td data-col="note">{{ row.participant.note|default:"-" }}</td>
+              <td data-col="total_score" data-sort-value="{{ row.total_score|default:0|floatformat:6 }}"><span class="score-pill">{{ row.total_score|floatformat:0 }}</span></td>
+              <td data-col="total_pct" data-sort-value="{{ row.total_pct|default:0|floatformat:6 }}"><span class="pct-pill">{{ row.total_pct|floatformat:1 }}%</span></td>
+              <td data-col="note" data-sort-value="{{ row.participant.note|default:'' }}">{{ row.participant.note|default:"-" }}</td>
             </tr>
           {% empty %}
             <tr><td colspan="8">ยังไม่มีผู้เข้าสอบในรอบนี้</td></tr>
@@ -242,6 +274,121 @@
     });
 
     applyState();
+
+    const sortSelect = document.getElementById("scoreSortColumn");
+    const sortDirectionButton = document.getElementById("scoreSortDirection");
+    const resetSortButton = document.getElementById("resetSortButton");
+    const tableBody = document.getElementById("scoreSummaryBody");
+    const sortableHeaders = Array.from(document.querySelectorAll("[data-sort-col]"));
+    let currentSortColumn = sortSelect ? sortSelect.value : "total_pct";
+    let currentSortDirection = "desc";
+
+    function isNumericColumn(col){
+      return col === "rank" || col === "total_score" || col === "total_pct" || col.indexOf("subject-") === 0;
+    }
+
+    function defaultDirectionFor(col){
+      if (col === "rank" || col === "nickname" || col === "fullname" || col === "school" || col === "note") {
+        return "asc";
+      }
+      return "desc";
+    }
+
+    function normalizeNumber(value){
+      const raw = String(value || "0").replace(/,/g, "").replace("%", "").trim();
+      const n = parseFloat(raw);
+      return Number.isFinite(n) ? n : 0;
+    }
+
+    function getSortValue(row, col){
+      const cell = row.querySelector('[data-col="' + col + '"]');
+      if (!cell) return isNumericColumn(col) ? 0 : "";
+      const raw = cell.dataset.sortValue || cell.textContent || "";
+      if (isNumericColumn(col)) return normalizeNumber(raw);
+      return String(raw).trim().toLocaleLowerCase("th-TH");
+    }
+
+    function updateSortUi(){
+      if (sortSelect && sortSelect.value !== currentSortColumn) {
+        sortSelect.value = currentSortColumn;
+      }
+      if (sortDirectionButton) {
+        sortDirectionButton.dataset.direction = currentSortDirection;
+        sortDirectionButton.textContent = currentSortDirection === "desc" ? "มาก → น้อย" : "น้อย → มาก";
+      }
+      sortableHeaders.forEach(function(th){
+        const active = th.dataset.sortCol === currentSortColumn;
+        th.classList.toggle("sort-active", active);
+        th.dataset.sortMark = active ? (currentSortDirection === "desc" ? "↓" : "↑") : "↕";
+      });
+    }
+
+    function sortScoreRows(col, direction){
+      if (!tableBody) return;
+      currentSortColumn = col || "total_pct";
+      currentSortDirection = direction || defaultDirectionFor(currentSortColumn);
+
+      const rows = Array.from(tableBody.querySelectorAll("tr")).filter(function(row){
+        return row.querySelector("[data-col]");
+      });
+
+      rows.sort(function(a, b){
+        const av = getSortValue(a, currentSortColumn);
+        const bv = getSortValue(b, currentSortColumn);
+        let result = 0;
+
+        if (isNumericColumn(currentSortColumn)) {
+          result = av - bv;
+        } else {
+          result = String(av).localeCompare(String(bv), "th-TH", {numeric:true, sensitivity:"base"});
+        }
+
+        if (currentSortDirection === "desc") result = result * -1;
+
+        if (result === 0 && currentSortColumn !== "total_pct") {
+          result = getSortValue(b, "total_pct") - getSortValue(a, "total_pct");
+        }
+        if (result === 0) {
+          result = normalizeNumber(a.dataset.originalIndex) - normalizeNumber(b.dataset.originalIndex);
+        }
+        return result;
+      });
+
+      rows.forEach(function(row){ row.classList.remove("top-row"); tableBody.appendChild(row); });
+      if (rows.length) rows[0].classList.add("top-row");
+      updateSortUi();
+    }
+
+    if (sortSelect) {
+      sortSelect.addEventListener("change", function(){
+        sortScoreRows(sortSelect.value, defaultDirectionFor(sortSelect.value));
+      });
+    }
+
+    if (sortDirectionButton) {
+      sortDirectionButton.addEventListener("click", function(){
+        const next = currentSortDirection === "desc" ? "asc" : "desc";
+        sortScoreRows(currentSortColumn, next);
+      });
+    }
+
+    if (resetSortButton) {
+      resetSortButton.addEventListener("click", function(){
+        sortScoreRows("total_pct", "desc");
+      });
+    }
+
+    sortableHeaders.forEach(function(th){
+      th.addEventListener("click", function(){
+        const col = th.dataset.sortCol;
+        const nextDirection = (currentSortColumn === col)
+          ? (currentSortDirection === "desc" ? "asc" : "desc")
+          : defaultDirectionFor(col);
+        sortScoreRows(col, nextDirection);
+      });
+    });
+
+    sortScoreRows("total_pct", "desc");
   })();
 </script>
 

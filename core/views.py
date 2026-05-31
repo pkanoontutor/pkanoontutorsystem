@@ -4242,31 +4242,45 @@ def _snapshot_from_admission(inquiry: AdmissionInquiry) -> dict:
     }
 
 
+
+
 def _build_test_score_context(test_round: TestRound, current_participant: TestParticipant | None = None) -> dict:
+    """
+    Build score rows for both parent result page and admin summary.
+
+    Important: overall percentage is weighted by each subject's full score:
+        total_pct = (sum(raw scores) / sum(full scores)) * 100
+    This is intentionally NOT an average of each subject percentage.
+    """
     subjects = list(test_round.subjects.filter(is_active=True).order_by("display_order", "id"))
     participants = list(
         test_round.participants.filter(is_active=True).order_by("full_name", "nickname", "id")
     )
-    score_objs = TestScore.objects.filter(participant__in=participants, subject__in=subjects).select_related("participant", "subject")
+    score_objs = TestScore.objects.filter(
+        participant__in=participants,
+        subject__in=subjects,
+    ).select_related("participant", "subject")
     score_map = {(s.participant_id, s.subject_id): s for s in score_objs}
 
     subject_pct_values: dict[int, dict[int, float]] = {s.id: {} for s in subjects}
     total_pct_values: dict[int, float] = {}
     rows = []
 
-    # คะแนนรวมต้องคิดแบบถ่วงน้ำหนักตามคะแนนเต็มของแต่ละวิชา
-    # เช่น Math เต็ม 100 และ English เต็ม 50 จะไม่เอา % สองวิชามาเฉลี่ยเท่ากัน
-    # แต่จะใช้: คะแนนดิบรวมที่ได้ / คะแนนเต็มรวมทุกวิชา * 100
     total_full_score = sum((s.full_score or Decimal("0")) for s in subjects)
 
     for p in participants:
         subject_cells = []
         total_score = Decimal("0")
+
         for s in subjects:
             score_obj = score_map.get((p.id, s.id))
             score = score_obj.score if score_obj else Decimal("0")
             score_pct = _pct(score, s.full_score)
+
+            # Raw scores are accumulated first, then divided by total full score.
+            # This makes the overall percentage weighted by subject full score.
             total_score += score
+
             subject_pct_values[s.id][p.id] = score_pct
             subject_cells.append({
                 "subject": s,
@@ -4276,15 +4290,15 @@ def _build_test_score_context(test_round: TestRound, current_participant: TestPa
                 "score_obj": score_obj,
             })
 
-        total_weighted_pct = _pct(total_score, total_full_score)
-        total_pct_values[p.id] = total_weighted_pct
+        total_pct = _pct(total_score, total_full_score)
+        total_pct_values[p.id] = total_pct
         rows.append({
             "participant": p,
             "subject_cells": subject_cells,
             "total_score": total_score,
             "total_full_score": total_full_score,
-            "total_pct": total_weighted_pct,
-            "total_weighted_pct": total_weighted_pct,
+            "total_pct": total_pct,
+            "weighted_total_pct": total_pct,
             "is_current": bool(current_participant and p.id == current_participant.id),
         })
 
@@ -4295,9 +4309,13 @@ def _build_test_score_context(test_round: TestRound, current_participant: TestPa
         subject_avg_pct[s.id] = round(sum(values.values()) / len(values), 2) if values else 0
         subject_ranks[s.id] = _shared_ranks(values)
 
-    total_score_sum = sum((row.get("total_score") or Decimal("0")) for row in rows) if rows else Decimal("0")
-    total_avg_score = (total_score_sum / Decimal(len(rows))) if rows else Decimal("0")
-    total_avg_pct = round(_pct(total_avg_score, total_full_score), 2) if rows else 0
+    # Overall average also follows the same weighted approach:
+    # average raw total score / total full score.
+    participant_count = len(rows)
+    total_score_sum = sum((row.get("total_score") or Decimal("0")) for row in rows)
+    total_avg_score = (total_score_sum / Decimal(participant_count)) if participant_count else Decimal("0")
+    total_avg_pct = _pct(total_avg_score, total_full_score)
+
     total_ranks = _shared_ranks(total_pct_values)
 
     for row in rows:
@@ -4309,10 +4327,10 @@ def _build_test_score_context(test_round: TestRound, current_participant: TestPa
             cell["avg_pct"] = subject_avg_pct.get(sid, 0)
             cell["rank"] = subject_ranks.get(sid, {}).get(p.id, "-")
 
-    rows_sorted_by_total_pct = sorted(
+    score_rows = sorted(
         rows,
         key=lambda r: (
-            -float(r.get("total_pct") or 0),
+            -float(r.get("weighted_total_pct") or r.get("total_pct") or 0),
             int(r.get("total_rank") or 999999) if str(r.get("total_rank") or "").isdigit() else 999999,
             (r["participant"].full_name or ""),
             (r["participant"].nickname or ""),
@@ -4337,11 +4355,11 @@ def _build_test_score_context(test_round: TestRound, current_participant: TestPa
             })
         chart_rows.append({
             "label": "คะแนนรวม",
-            "student_pct": round(current_row["total_pct"], 2),
+            "student_pct": round(current_row["weighted_total_pct"], 2),
             "avg_pct": round(total_avg_pct, 2),
         })
 
-        diff = round(current_row["total_pct"] - total_avg_pct, 2)
+        diff = round(current_row["weighted_total_pct"] - total_avg_pct, 2)
         best = max(current_row["subject_cells"], key=lambda c: c["pct"], default=None)
         focus = min(current_row["subject_cells"], key=lambda c: c["pct"], default=None)
         if diff >= 5:
@@ -4360,13 +4378,13 @@ def _build_test_score_context(test_round: TestRound, current_participant: TestPa
         "subjects": subjects,
         "participants": participants,
         "rows": rows,
-        "rows_sorted_by_total_pct": rows_sorted_by_total_pct,
+        "score_rows": score_rows,
         "current_row": current_row,
         "chart_rows": chart_rows,
         "subject_avg_pct": subject_avg_pct,
+        "total_avg_pct": total_avg_pct,
         "total_avg_score": total_avg_score,
         "total_full_score": total_full_score,
-        "total_avg_pct": total_avg_pct,
         "narrative": narrative,
     }
 
@@ -4600,6 +4618,56 @@ def test_score_round_manage(request: HttpRequest, round_id: int) -> HttpResponse
     context = _build_test_score_context(test_round, None)
     context.update({"result_message": result_message})
     return render(request, "core/test_score_round_manage.html", context)
+
+
+@login_required
+def test_score_round_summary(request: HttpRequest, round_id: int) -> HttpResponse:
+    test_round = get_object_or_404(TestRound, id=round_id)
+    context = _build_test_score_context(test_round, None)
+
+    rows = list(context.get("rows", []))
+    subjects = list(context.get("subjects", []))
+    participant_count = len(rows)
+
+    # Admin summary should show every participant and sort by weighted overall percentage descending.
+    score_rows = list(context.get("score_rows", [])) or sorted(
+        rows,
+        key=lambda r: (
+            -float(r.get("weighted_total_pct") or r.get("total_pct") or 0),
+            int(r.get("total_rank") or 999999) if str(r.get("total_rank") or "").isdigit() else 999999,
+            (r["participant"].full_name or ""),
+            (r["participant"].nickname or ""),
+            r["participant"].id,
+        ),
+    )
+
+    subject_summary_rows = []
+    for idx, subject in enumerate(subjects):
+        total_score = Decimal("0")
+        for row in rows:
+            try:
+                total_score += row["subject_cells"][idx]["score"] or Decimal("0")
+            except Exception:
+                total_score += Decimal("0")
+        avg_score = (total_score / Decimal(participant_count)) if participant_count else Decimal("0")
+        subject_summary_rows.append({
+            "subject": subject,
+            "avg_score": avg_score,
+            "avg_pct": context.get("subject_avg_pct", {}).get(subject.id, 0),
+            "full_score": subject.full_score,
+        })
+
+    total_score_sum = sum((row.get("total_score") or Decimal("0")) for row in rows) if rows else Decimal("0")
+    total_avg_score = (total_score_sum / Decimal(participant_count)) if participant_count else Decimal("0")
+
+    context.update({
+        "score_rows": score_rows,
+        "subject_summary_rows": subject_summary_rows,
+        "participant_count": participant_count,
+        "total_avg_score": total_avg_score,
+        "total_full_score": sum((s.full_score or Decimal("0")) for s in subjects),
+    })
+    return render(request, "core/test_score_summary.html", context)
 
 
 def _read_test_score_import_rows(uploaded_file) -> list[dict]:

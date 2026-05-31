@@ -4581,6 +4581,56 @@ def test_score_round_manage(request: HttpRequest, round_id: int) -> HttpResponse
     return render(request, "core/test_score_round_manage.html", context)
 
 
+@login_required
+def test_score_round_summary(request: HttpRequest, round_id: int) -> HttpResponse:
+    test_round = get_object_or_404(TestRound, id=round_id)
+    context = _build_test_score_context(test_round, None)
+
+    rows = list(context.get("rows", []))
+    subjects = list(context.get("subjects", []))
+    participant_count = len(rows)
+
+    # Admin summary should show every participant and sort by overall percentage descending.
+    score_rows = sorted(
+        rows,
+        key=lambda r: (
+            -float(r.get("total_pct") or 0),
+            int(r.get("total_rank") or 999999) if str(r.get("total_rank") or "").isdigit() else 999999,
+            (r["participant"].full_name or ""),
+            (r["participant"].nickname or ""),
+            r["participant"].id,
+        ),
+    )
+
+    subject_summary_rows = []
+    for idx, subject in enumerate(subjects):
+        total_score = Decimal("0")
+        for row in rows:
+            try:
+                total_score += row["subject_cells"][idx]["score"] or Decimal("0")
+            except Exception:
+                total_score += Decimal("0")
+        avg_score = (total_score / Decimal(participant_count)) if participant_count else Decimal("0")
+        subject_summary_rows.append({
+            "subject": subject,
+            "avg_score": avg_score,
+            "avg_pct": context.get("subject_avg_pct", {}).get(subject.id, 0),
+            "full_score": subject.full_score,
+        })
+
+    total_score_sum = sum((row.get("total_score") or Decimal("0")) for row in rows) if rows else Decimal("0")
+    total_avg_score = (total_score_sum / Decimal(participant_count)) if participant_count else Decimal("0")
+
+    context.update({
+        "score_rows": score_rows,
+        "subject_summary_rows": subject_summary_rows,
+        "participant_count": participant_count,
+        "total_avg_score": total_avg_score,
+        "total_full_score": sum((s.full_score or Decimal("0")) for s in subjects),
+    })
+    return render(request, "core/test_score_summary.html", context)
+
+
 def _read_test_score_import_rows(uploaded_file) -> list[dict]:
     filename = (getattr(uploaded_file, "name", "") or "").lower()
     if filename.endswith(".csv"):

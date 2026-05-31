@@ -417,18 +417,33 @@ class SheetClassMappingAdmin(admin.ModelAdmin):
 class SheetPrintOrderAdmin(admin.ModelAdmin):
     list_display = (
         "created_at",
-        "sheet",
+        "item_display",
         "quantity",
+        "binding_type",
+        "spine_color",
         "due_date",
         "status",
         "requested_by",
         "completed_at",
     )
-    list_filter = ("status", "due_date", "sheet__grade_level", "sheet__subject")
-    search_fields = ("sheet__code", "sheet__title", "note", "onedrive_url")
+    list_filter = (
+        "status",
+        "due_date",
+        "binding_type",
+        "spine_color",
+        "sheet__grade_level",
+        "sheet__subject",
+    )
+    search_fields = ("sheet__code", "sheet__title", "custom_title", "note", "onedrive_url")
     autocomplete_fields = ("sheet", "requested_by")
     readonly_fields = ("created_at", "updated_at", "completed_at")
     ordering = ("status", "due_date", "created_at")
+
+    @admin.display(description="รายการ")
+    def item_display(self, obj):
+        if obj.sheet_id:
+            return f"{obj.sheet.code} - {obj.sheet.title}"
+        return obj.custom_title or "เอกสารอื่น"
 
 
 # -----------------------

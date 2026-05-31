@@ -83,6 +83,7 @@ urlpatterns = [
     path("test-scores/round/<int:round_id>/logout/", views.test_score_logout, name="test_score_logout"),
     path("test-score-admin/", views.test_score_admin, name="test_score_admin"),
     path("test-score-admin/round/<int:round_id>/", views.test_score_round_manage, name="test_score_round_manage"),
+    path("test-score-admin/round/<int:round_id>/summary/", views.test_score_round_summary, name="test_score_round_summary"),
     path("test-score-admin/round/<int:round_id>/template/", views.test_score_import_template, name="test_score_import_template"),
     path("test-score-admin/student-search/", views.test_score_student_search, name="test_score_student_search"),
     path("test-score-admin/admission-search/", views.test_score_admission_search, name="test_score_admission_search"),

@@ -1,0 +1,154 @@
+{% extends "core/base.html" %}
+{% block title %}สรุปผลการสอบ {{ test_round.title }}{% endblock %}
+
+{% block head %}
+<style>
+  .wrap2{max-width:1320px;margin:0 auto;display:grid;gap:14px;}
+  .hero{background:linear-gradient(135deg,#0f172a,#2563eb,#7c3aed);color:#fff;border-radius:24px;padding:22px;box-shadow:0 12px 26px rgba(15,23,42,.20);}
+  .title{font-size:26px;font-weight:1000;letter-spacing:-.03em;}
+  .sub{font-size:13px;color:#dbeafe;margin-top:6px;line-height:1.5;}
+  .btnrow{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;}
+  .btnx{border:0;border-radius:14px;padding:10px 14px;font-weight:1000;text-decoration:none;display:inline-flex;justify-content:center;align-items:center;gap:7px;cursor:pointer;}
+  .soft{background:#fff;color:#0f172a;border:1px solid #e2e8f0;}
+  .dark{background:#0f172a;color:#fff;}
+  .panel{background:#fff;border-radius:20px;padding:16px;box-shadow:0 5px 14px rgba(15,23,42,.08);border:1px solid rgba(255,255,255,.9);}
+  .panel-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:12px;}
+  .panel-title{font-size:19px;font-weight:1000;color:#0f172a;margin:0;letter-spacing:-.02em;}
+  .muted{font-size:12px;color:#64748b;font-weight:800;line-height:1.45;}
+  .metric-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;}
+  .metric{background:#f8fafc;border:1px solid #e2e8f0;border-radius:18px;padding:14px;}
+  .metric .k{font-size:11px;color:#64748b;font-weight:1000;text-transform:uppercase;letter-spacing:.04em;}
+  .metric .v{font-size:26px;color:#0f172a;font-weight:1000;margin-top:4px;}
+  .metric.purple{background:#f5f3ff;border-color:#ddd6fe;}.metric.purple .v{color:#6d28d9;}
+  .metric.blue{background:#eff6ff;border-color:#bfdbfe;}.metric.blue .v{color:#1d4ed8;}
+  .metric.green{background:#f0fdf4;border-color:#bbf7d0;}.metric.green .v{color:#166534;}
+  .table-wrap{overflow:auto;border:1px solid #e2e8f0;border-radius:16px;background:#fff;}
+  table{width:100%;border-collapse:collapse;min-width:1050px;}
+  th,td{padding:10px 9px;border-bottom:1px solid #edf2f7;text-align:left;vertical-align:middle;}
+  th{background:#f8fafc;color:#334155;font-size:11px;font-weight:1000;text-transform:uppercase;letter-spacing:.03em;position:sticky;top:0;z-index:1;}
+  td{font-size:13px;font-weight:850;color:#334155;}
+  tr:last-child td{border-bottom:0;}
+  .rank-pill{display:inline-flex;align-items:center;justify-content:center;border-radius:999px;padding:5px 9px;font-size:12px;font-weight:1000;background:#fef3c7;color:#92400e;border:1px solid #fde68a;}
+  .pct-pill{display:inline-flex;align-items:center;justify-content:center;border-radius:999px;padding:5px 9px;font-size:12px;font-weight:1000;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;}
+  .score-pill{display:inline-flex;align-items:center;justify-content:center;border-radius:999px;padding:5px 9px;font-size:12px;font-weight:1000;background:#f8fafc;color:#334155;border:1px solid #e2e8f0;}
+  .summary-table{min-width:780px;}
+  .summary-table td:first-child{font-weight:1000;color:#0f172a;}
+  .top-row{background:#fefce8;}
+  .subject-cell{white-space:nowrap;}
+  @media(max-width:900px){.metric-grid{grid-template-columns:1fr 1fr}.title{font-size:22px}.btnx{width:100%;}}
+  @media(max-width:620px){.metric-grid{grid-template-columns:1fr}.hero{padding:18px}}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="wrap2">
+  <section class="hero">
+    <div class="title">📊 สรุปผลการสอบ</div>
+    <div class="sub">
+      {{ test_round.title }}{% if test_round.exam_date %} · วันที่สอบ {{ test_round.exam_date|date:"d/m/Y" }}{% endif %}
+    </div>
+    <div class="btnrow">
+      <a class="btnx soft" href="{% url 'core:test_score_round_manage' test_round.id %}">← กลับไปจัดการคะแนน</a>
+      <a class="btnx soft" href="{% url 'core:test_score_admin' %}">รอบสอบทั้งหมด</a>
+    </div>
+  </section>
+
+  <section class="metric-grid">
+    <div class="metric purple"><div class="k">ผู้เข้าสอบ</div><div class="v">{{ participant_count }}</div></div>
+    <div class="metric blue"><div class="k">จำนวนวิชา</div><div class="v">{{ subjects|length }}</div></div>
+    <div class="metric green"><div class="k">% เฉลี่ยรวม</div><div class="v">{{ total_avg_pct|floatformat:1 }}%</div></div>
+    <div class="metric"><div class="k">คะแนนเฉลี่ยรวม</div><div class="v">{{ total_avg_score|floatformat:1 }}</div></div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head">
+      <div>
+        <h3 class="panel-title">ตารางรวมคะแนนทุกคน</h3>
+        <div class="muted">เรียงจาก % คะแนนรวมมากไปน้อย และใช้อันดับร่วมเมื่อคะแนนเท่ากัน</div>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>อันดับรวม</th>
+            <th>ชื่อเล่น</th>
+            <th>ชื่อจริง นามสกุล</th>
+            <th>โรงเรียน</th>
+            {% for s in subjects %}
+              <th>{{ s.name }}<br><span class="muted">เต็ม {{ s.full_score|floatformat:0 }}</span></th>
+            {% endfor %}
+            <th>คะแนนรวม</th>
+            <th>% รวม</th>
+            <th>หมายเหตุ</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in score_rows %}
+            <tr class="{% if forloop.first %}top-row{% endif %}">
+              <td><span class="rank-pill">#{{ row.total_rank }}</span></td>
+              <td>{{ row.participant.nickname|default:"-" }}</td>
+              <td>{{ row.participant.full_name|default:"-" }}</td>
+              <td>{{ row.participant.school_name|default:"-" }}</td>
+              {% for c in row.subject_cells %}
+                <td class="subject-cell">
+                  <span class="score-pill">{{ c.score|floatformat:0 }}</span>
+                  <span class="pct-pill">{{ c.pct|floatformat:1 }}%</span>
+                  <span class="rank-pill">#{{ c.rank }}</span>
+                </td>
+              {% endfor %}
+              <td><span class="score-pill">{{ row.total_score|floatformat:0 }}</span></td>
+              <td><span class="pct-pill">{{ row.total_pct|floatformat:1 }}%</span></td>
+              <td>{{ row.participant.note|default:"-" }}</td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="8">ยังไม่มีผู้เข้าสอบในรอบนี้</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head">
+      <div>
+        <h3 class="panel-title">ตารางสรุปผลการสอบ</h3>
+        <div class="muted">คะแนนเฉลี่ยและ % เฉลี่ย แยกตามวิชา และรวมทุกวิชา</div>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table class="summary-table">
+        <thead>
+          <tr>
+            <th>รายการ</th>
+            {% for s in subjects %}<th>{{ s.name }}</th>{% endfor %}
+            <th>รวมทุกวิชา</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>คะแนนเต็ม</td>
+            {% for item in subject_summary_rows %}<td>{{ item.full_score|floatformat:0 }}</td>{% endfor %}
+            <td>{{ total_full_score|floatformat:0 }}</td>
+          </tr>
+          <tr>
+            <td>คะแนนเฉลี่ย</td>
+            {% for item in subject_summary_rows %}<td><span class="score-pill">{{ item.avg_score|floatformat:1 }}</span></td>{% endfor %}
+            <td><span class="score-pill">{{ total_avg_score|floatformat:1 }}</span></td>
+          </tr>
+          <tr>
+            <td>% เฉลี่ย</td>
+            {% for item in subject_summary_rows %}<td><span class="pct-pill">{{ item.avg_pct|floatformat:1 }}%</span></td>{% endfor %}
+            <td><span class="pct-pill">{{ total_avg_pct|floatformat:1 }}%</span></td>
+          </tr>
+          <tr>
+            <td>จำนวนผู้เข้าสอบ</td>
+            {% for item in subject_summary_rows %}<td>{{ participant_count }}</td>{% endfor %}
+            <td>{{ participant_count }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+{% endblock %}

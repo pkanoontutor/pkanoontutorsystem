@@ -35,6 +35,15 @@
   .summary-table td:first-child{font-weight:1000;color:#0f172a;}
   .top-row{background:#fefce8;}
   .subject-cell{white-space:nowrap;}
+
+  .column-tools{display:grid;gap:10px;background:linear-gradient(135deg,#f8fafc,#eff6ff);border:1px solid #dbeafe;border-radius:18px;padding:12px;margin-bottom:12px;}
+  .column-tools-head{display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap;}
+  .column-tools-title{font-size:14px;font-weight:1000;color:#0f172a;}
+  .column-toggles{display:flex;gap:7px;flex-wrap:wrap;}
+  .col-toggle{display:inline-flex;align-items:center;gap:6px;border:1px solid #e2e8f0;background:#fff;border-radius:999px;padding:6px 9px;font-size:12px;font-weight:900;color:#334155;cursor:pointer;user-select:none;}
+  .col-toggle input{accent-color:#2563eb;}
+  .mini-btn{border:1px solid #cbd5e1;background:#fff;border-radius:999px;padding:6px 10px;font-size:12px;font-weight:1000;color:#0f172a;cursor:pointer;}
+  .hidden-col{display:none!important;}
   @media(max-width:900px){.metric-grid{grid-template-columns:1fr 1fr}.title{font-size:22px}.btnx{width:100%;}}
   @media(max-width:620px){.metric-grid{grid-template-columns:1fr}.hero{padding:18px}}
 </style>
@@ -64,42 +73,68 @@
     <div class="panel-head">
       <div>
         <h3 class="panel-title">ตารางรวมคะแนนทุกคน</h3>
-        <div class="muted">เรียงจาก % คะแนนรวมมากไปน้อย โดย % รวมคำนวณแบบถ่วงน้ำหนักตามคะแนนเต็มของแต่ละวิชา และใช้อันดับร่วมเมื่อคะแนนเท่ากัน</div>
+        <div class="muted">เรียงจาก % คะแนนรวมมากไปน้อย โดย % รวมคำนวณจากคะแนนดิบรวม ÷ คะแนนเต็มรวมทุกวิชา และใช้อันดับร่วมเมื่อคะแนนเท่ากัน</div>
       </div>
     </div>
+    <div class="column-tools" id="columnTools">
+      <div class="column-tools-head">
+        <div>
+          <div class="column-tools-title">เลือกคอลัมน์ที่ต้องการแสดง / ซ่อน</div>
+          <div class="muted">ใช้สำหรับดูตารางบนจอเล็กหรือซ่อนข้อมูลที่ยังไม่ต้องการดู ระบบจะจำค่าที่เลือกไว้ในเครื่องนี้</div>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button type="button" class="mini-btn" data-column-action="show-all">แสดงทั้งหมด</button>
+          <button type="button" class="mini-btn" data-column-action="hide-detail">ซ่อนรายละเอียด</button>
+        </div>
+      </div>
+      <div class="column-toggles">
+        <label class="col-toggle"><input type="checkbox" data-col-toggle="rank" checked> อันดับรวม</label>
+        <label class="col-toggle"><input type="checkbox" data-col-toggle="nickname" checked> ชื่อเล่น</label>
+        <label class="col-toggle"><input type="checkbox" data-col-toggle="fullname" checked> ชื่อจริง</label>
+        <label class="col-toggle"><input type="checkbox" data-col-toggle="school" checked> โรงเรียน</label>
+        {% for s in subjects %}
+          <label class="col-toggle"><input type="checkbox" data-col-toggle="subject-{{ forloop.counter }}" checked> {{ s.name }}</label>
+        {% endfor %}
+        <label class="col-toggle"><input type="checkbox" data-col-toggle="total_score" checked> คะแนนรวม</label>
+        <label class="col-toggle"><input type="checkbox" data-col-toggle="total_pct" checked> % รวม</label>
+        <label class="col-toggle"><input type="checkbox" data-col-toggle="note" checked> หมายเหตุ</label>
+        <label class="col-toggle"><input type="checkbox" data-col-toggle="summary_total" checked> รวมทุกวิชา</label>
+      </div>
+    </div>
+
     <div class="table-wrap">
       <table>
         <thead>
           <tr>
-            <th>อันดับรวม</th>
-            <th>ชื่อเล่น</th>
-            <th>ชื่อจริง นามสกุล</th>
-            <th>โรงเรียน</th>
+            <th data-col="rank">อันดับรวม</th>
+            <th data-col="nickname">ชื่อเล่น</th>
+            <th data-col="fullname">ชื่อจริง นามสกุล</th>
+            <th data-col="school">โรงเรียน</th>
             {% for s in subjects %}
-              <th>{{ s.name }}<br><span class="muted">เต็ม {{ s.full_score|floatformat:0 }}</span></th>
+              <th data-col="subject-{{ forloop.counter }}">{{ s.name }}<br><span class="muted">เต็ม {{ s.full_score|floatformat:0 }}</span></th>
             {% endfor %}
-            <th>คะแนนรวม</th>
-            <th>% รวม</th>
-            <th>หมายเหตุ</th>
+            <th data-col="total_score">คะแนนรวม</th>
+            <th data-col="total_pct">% รวม</th>
+            <th data-col="note">หมายเหตุ</th>
           </tr>
         </thead>
         <tbody>
           {% for row in score_rows %}
             <tr class="{% if forloop.first %}top-row{% endif %}">
-              <td><span class="rank-pill">#{{ row.total_rank }}</span></td>
-              <td>{{ row.participant.nickname|default:"-" }}</td>
-              <td>{{ row.participant.full_name|default:"-" }}</td>
-              <td>{{ row.participant.school_name|default:"-" }}</td>
+              <td data-col="rank"><span class="rank-pill">#{{ row.total_rank }}</span></td>
+              <td data-col="nickname">{{ row.participant.nickname|default:"-" }}</td>
+              <td data-col="fullname">{{ row.participant.full_name|default:"-" }}</td>
+              <td data-col="school">{{ row.participant.school_name|default:"-" }}</td>
               {% for c in row.subject_cells %}
-                <td class="subject-cell">
+                <td class="subject-cell" data-col="subject-{{ forloop.counter }}">
                   <span class="score-pill">{{ c.score|floatformat:0 }}</span>
                   <span class="pct-pill">{{ c.pct|floatformat:1 }}%</span>
                   <span class="rank-pill">#{{ c.rank }}</span>
                 </td>
               {% endfor %}
-              <td><span class="score-pill">{{ row.total_score|floatformat:0 }}</span></td>
-              <td><span class="pct-pill">{{ row.total_pct|floatformat:1 }}%</span></td>
-              <td>{{ row.participant.note|default:"-" }}</td>
+              <td data-col="total_score"><span class="score-pill">{{ row.total_score|floatformat:0 }}</span></td>
+              <td data-col="total_pct"><span class="pct-pill">{{ row.total_pct|floatformat:1 }}%</span></td>
+              <td data-col="note">{{ row.participant.note|default:"-" }}</td>
             </tr>
           {% empty %}
             <tr><td colspan="8">ยังไม่มีผู้เข้าสอบในรอบนี้</td></tr>
@@ -113,7 +148,7 @@
     <div class="panel-head">
       <div>
         <h3 class="panel-title">ตารางสรุปผลการสอบ</h3>
-        <div class="muted">คะแนนเฉลี่ยและ % เฉลี่ย แยกตามวิชา และรวมทุกวิชา โดย % รวมใช้คะแนนดิบรวม / คะแนนเต็มรวม</div>
+        <div class="muted">คะแนนเฉลี่ยและ % เฉลี่ย แยกตามวิชา และรวมทุกวิชา โดย % รวมถ่วงน้ำหนักตามคะแนนเต็มของแต่ละวิชา</div>
       </div>
     </div>
     <div class="table-wrap">
@@ -121,34 +156,93 @@
         <thead>
           <tr>
             <th>รายการ</th>
-            {% for s in subjects %}<th>{{ s.name }}</th>{% endfor %}
-            <th>รวมทุกวิชา</th>
+            {% for s in subjects %}<th data-col="subject-{{ forloop.counter }}">{{ s.name }}</th>{% endfor %}
+            <th data-col="summary_total">รวมทุกวิชา</th>
           </tr>
         </thead>
         <tbody>
           <tr>
             <td>คะแนนเต็ม</td>
-            {% for item in subject_summary_rows %}<td>{{ item.full_score|floatformat:0 }}</td>{% endfor %}
-            <td>{{ total_full_score|floatformat:0 }}</td>
+            {% for item in subject_summary_rows %}<td data-col="subject-{{ forloop.counter }}">{{ item.full_score|floatformat:0 }}</td>{% endfor %}
+            <td data-col="summary_total">{{ total_full_score|floatformat:0 }}</td>
           </tr>
           <tr>
             <td>คะแนนเฉลี่ย</td>
-            {% for item in subject_summary_rows %}<td><span class="score-pill">{{ item.avg_score|floatformat:1 }}</span></td>{% endfor %}
-            <td><span class="score-pill">{{ total_avg_score|floatformat:1 }}</span></td>
+            {% for item in subject_summary_rows %}<td data-col="subject-{{ forloop.counter }}"><span class="score-pill">{{ item.avg_score|floatformat:1 }}</span></td>{% endfor %}
+            <td data-col="summary_total"><span class="score-pill">{{ total_avg_score|floatformat:1 }}</span></td>
           </tr>
           <tr>
             <td>% เฉลี่ย</td>
-            {% for item in subject_summary_rows %}<td><span class="pct-pill">{{ item.avg_pct|floatformat:1 }}%</span></td>{% endfor %}
-            <td><span class="pct-pill">{{ total_avg_pct|floatformat:1 }}%</span></td>
+            {% for item in subject_summary_rows %}<td data-col="subject-{{ forloop.counter }}"><span class="pct-pill">{{ item.avg_pct|floatformat:1 }}%</span></td>{% endfor %}
+            <td data-col="summary_total"><span class="pct-pill">{{ total_avg_pct|floatformat:1 }}%</span></td>
           </tr>
           <tr>
             <td>จำนวนผู้เข้าสอบ</td>
-            {% for item in subject_summary_rows %}<td>{{ participant_count }}</td>{% endfor %}
-            <td>{{ participant_count }}</td>
+            {% for item in subject_summary_rows %}<td data-col="subject-{{ forloop.counter }}">{{ participant_count }}</td>{% endfor %}
+            <td data-col="summary_total">{{ participant_count }}</td>
           </tr>
         </tbody>
       </table>
     </div>
   </section>
 </div>
+
+<script>
+  (function(){
+    const storageKey = "pkanoon_test_score_summary_columns_{{ test_round.id }}";
+    const checkboxes = Array.from(document.querySelectorAll("[data-col-toggle]"));
+
+    function setColumnVisible(col, visible){
+      document.querySelectorAll('[data-col="' + col + '"]').forEach(function(el){
+        el.classList.toggle("hidden-col", !visible);
+      });
+    }
+
+    function readState(){
+      try { return JSON.parse(localStorage.getItem(storageKey) || "{}"); }
+      catch(e){ return {}; }
+    }
+
+    function saveState(){
+      const state = {};
+      checkboxes.forEach(function(cb){ state[cb.dataset.colToggle] = cb.checked; });
+      localStorage.setItem(storageKey, JSON.stringify(state));
+    }
+
+    function applyState(){
+      const state = readState();
+      checkboxes.forEach(function(cb){
+        if (Object.prototype.hasOwnProperty.call(state, cb.dataset.colToggle)) {
+          cb.checked = !!state[cb.dataset.colToggle];
+        }
+        setColumnVisible(cb.dataset.colToggle, cb.checked);
+      });
+    }
+
+    checkboxes.forEach(function(cb){
+      cb.addEventListener("change", function(){
+        setColumnVisible(cb.dataset.colToggle, cb.checked);
+        saveState();
+      });
+    });
+
+    document.querySelectorAll("[data-column-action]").forEach(function(btn){
+      btn.addEventListener("click", function(){
+        const action = btn.dataset.columnAction;
+        checkboxes.forEach(function(cb){
+          if (action === "show-all") {
+            cb.checked = true;
+          } else if (action === "hide-detail") {
+            cb.checked = !["fullname", "school", "note"].includes(cb.dataset.colToggle);
+          }
+          setColumnVisible(cb.dataset.colToggle, cb.checked);
+        });
+        saveState();
+      });
+    });
+
+    applyState();
+  })();
+</script>
+
 {% endblock %}

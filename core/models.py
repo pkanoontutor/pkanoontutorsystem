@@ -956,15 +956,49 @@ class SheetPrintOrder(models.Model):
         PENDING = "pending", "รอปรินท์"
         READY = "ready", "ปรินท์เสร็จแล้วพร้อมส่ง"
 
+    class BindingType(models.TextChoices):
+        CORNER = "corner", "เย็บมุม"
+        SIDE = "side", "เย็บข้าง"
+
+    class SpineColor(models.TextChoices):
+        BLUE = "blue", "สีฟ้า"
+        RED = "red", "สีแดง"
+        PINK = "pink", "สีชมพู"
+        GREEN = "green", "สีเขียว"
+        ORANGE = "orange", "สีส้ม"
+
     sheet = models.ForeignKey(
         Sheet,
         verbose_name="ชีท",
         on_delete=models.PROTECT,
         related_name="print_orders",
+        null=True,
+        blank=True,
+        help_text="เว้นว่างได้สำหรับรายการเอกสารอื่นที่ไม่ใช่ชีทใน Sheet Inventory",
+    )
+    custom_title = models.CharField(
+        "ชื่อเอกสารอื่น",
+        max_length=255,
+        blank=True,
+        help_text="ใช้กรณีสั่งปรินท์เอกสารที่ไม่ได้อยู่ใน Sheet Inventory",
     )
     quantity = models.PositiveIntegerField("จำนวนที่สั่งปรินท์", default=1)
     due_date = models.DateField("วันที่ต้องส่ง", null=True, blank=True)
     onedrive_url = models.URLField("ลิงก์ไฟล์ OneDrive", max_length=1000, blank=True)
+    binding_type = models.CharField(
+        "ประเภทการเย็บ",
+        max_length=20,
+        choices=BindingType.choices,
+        default=BindingType.SIDE,
+    )
+    spine_color = models.CharField(
+        "สีสันรูด",
+        max_length=20,
+        choices=SpineColor.choices,
+        blank=True,
+        default="",
+        help_text="ใช้เฉพาะกรณีเย็บข้าง",
+    )
     note = models.TextField("หมายเหตุ", blank=True)
     status = models.CharField(
         "สถานะ",
@@ -990,7 +1024,61 @@ class SheetPrintOrder(models.Model):
         ordering = ("status", "due_date", "created_at")
 
     def __str__(self) -> str:
-        return f"{self.sheet.code} | {self.quantity} | {self.get_status_display()}"
+        return f"{self.display_code} | {self.quantity} | {self.get_status_display()}"
+
+    @property
+    def is_custom_document(self) -> bool:
+        return self.sheet_id is None
+
+    @property
+    def display_code(self) -> str:
+        return self.sheet.code if self.sheet_id else "DOC"
+
+    @property
+    def display_title(self) -> str:
+        if self.sheet_id:
+            return self.sheet.title
+        return self.custom_title or "เอกสารส่งปรินท์"
+
+    @property
+    def subject_name(self) -> str:
+        if self.sheet_id and self.sheet.subject_id:
+            return self.sheet.subject.name
+        return "เอกสารอื่น"
+
+    @property
+    def binding_label(self) -> str:
+        return self.get_binding_type_display()
+
+    @property
+    def spine_color_label(self) -> str:
+        if self.binding_type == self.BindingType.CORNER:
+            return "-"
+        return self.get_spine_color_display() if self.spine_color else "ไม่ระบุสี"
+
+    @property
+    def spine_color_bg(self) -> str:
+        if self.binding_type == self.BindingType.CORNER:
+            return "#ffffff"
+        return {
+            self.SpineColor.BLUE: "#dbeafe",
+            self.SpineColor.RED: "#fee2e2",
+            self.SpineColor.PINK: "#fce7f3",
+            self.SpineColor.GREEN: "#dcfce7",
+            self.SpineColor.ORANGE: "#ffedd5",
+        }.get(self.spine_color, "#ffffff")
+
+    @property
+    def spine_color_border(self) -> str:
+        if self.binding_type == self.BindingType.CORNER:
+            return "#e2e8f0"
+        return {
+            self.SpineColor.BLUE: "#93c5fd",
+            self.SpineColor.RED: "#fca5a5",
+            self.SpineColor.PINK: "#f9a8d4",
+            self.SpineColor.GREEN: "#86efac",
+            self.SpineColor.ORANGE: "#fdba74",
+        }.get(self.spine_color, "#e2e8f0")
 
     def mark_ready(self):
         self.status = self.Status.READY

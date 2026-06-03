@@ -2496,8 +2496,6 @@ def admission_thank_you(request: HttpRequest, pk: int) -> HttpResponse:
     })
 
 
-@login_required
-
 def _guess_class_for_inquiry(inquiry: AdmissionInquiry, classes=None):
     """Guess class from grade + preferred time slot. Persisted target_class wins."""
     if getattr(inquiry, "target_class_id", None):

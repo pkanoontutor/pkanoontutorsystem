@@ -1380,12 +1380,341 @@ def print_shop_order_list(request: HttpRequest) -> HttpResponse:
 
 
 @require_POST
+def print_shop_update_order(request: HttpRequest, pk: int) -> HttpResponse:
+    order = get_object_or_404(SheetPrintOrder, pk=pk)
+    action = (request.POST.get("action") or "update_progress").strip()
+
+    try:
+        printed_qty = int(request.POST.get("printed_quantity") or order.printed_quantity or 0)
+    except Exception:
+        printed_qty = int(order.printed_quantity or 0)
+    printed_qty = max(0, min(printed_qty, int(order.quantity or 0)))
+
+    if action == "fill_complete":
+        printed_qty = int(order.quantity or 0)
+
+    order.printed_quantity = printed_qty
+    order.print_done = (request.POST.get("print_done") == "yes") or printed_qty >= int(order.quantity or 0)
+    order.bound_done = request.POST.get("bound_done") == "yes"
+    order.spine_unavailable = request.POST.get("spine_unavailable") == "yes"
+    order.save(update_fields=["printed_quantity", "print_done", "bound_done", "spine_unavailable", "updated_at"])
+
+    return redirect("core:print_shop_order_list")
+
+
+@require_POST
 def print_shop_mark_ready(request: HttpRequest, pk: int) -> HttpResponse:
     order = get_object_or_404(SheetPrintOrder, pk=pk)
     if order.status == SheetPrintOrder.Status.PENDING:
         order.mark_ready()
     return redirect("core:print_shop_order_list")
 
+
+# =========================================================
+# ✅ Super Dashboard
+# =========================================================
+def _super_period(request: HttpRequest, prefix: str, default_mode: str = "month") -> tuple[date, date, str]:
+    today = timezone.localdate()
+    mode = (request.GET.get(f"{prefix}_period") or default_mode).strip()
+    if mode == "1m":
+        return today - timedelta(days=30), today, mode
+    if mode == "3m":
+        return today - timedelta(days=90), today, mode
+    if mode == "year":
+        return date(today.year, 1, 1), today, mode
+    if mode == "custom":
+        start = _parse_optional_date(request.GET.get(f"{prefix}_from")) or today - timedelta(days=90)
+        end = _parse_optional_date(request.GET.get(f"{prefix}_to")) or today
+        if end < start:
+            start, end = end, start
+        return start, end, mode
+    # month default
+    start = date(today.year, today.month, 1)
+    return start, today, "month"
+
+
+def _attendance_weekly_series(start: date, end: date) -> dict:
+    # School week = Sat-Sun, same logic as school overview.
+    start_week, _ = _school_week_range(start)
+    labels, total, present, excused, no_show = [], [], [], [], []
+    cur = start_week
+    while cur <= end:
+        ws, we = cur, cur + timedelta(days=1)
+        qs = Attendance.objects.filter(attendance_date__gte=ws, attendance_date__lte=we)
+        p = qs.filter(status=Attendance.Status.PRESENT).count()
+        e = qs.filter(status=Attendance.Status.EXCUSED).count()
+        n = qs.filter(status=Attendance.Status.NO_SHOW).count()
+        labels.append(f"{ws.strftime('%d/%m')}–{we.strftime('%d/%m')}")
+        present.append(p)
+        excused.append(e)
+        no_show.append(n)
+        total.append(p + e + n)
+        cur += timedelta(days=7)
+    return {"labels": labels, "total": total, "present": present, "excused": excused, "no_show": no_show}
+
+
+def _finance_summary_for_range(start: date, end: date) -> dict:
+    revenue_per_student = _finance_setting("revenue_per_student_per_week", Decimal("360"), "Revenue per deducted attendance")
+    deducted_count = Attendance.objects.filter(attendance_date__gte=start, attendance_date__lte=end, deducted=True).count()
+    estimated_revenue = Decimal(deducted_count) * revenue_per_student
+    cash_revenue = CoursePayment.objects.filter(
+        payment_date__gte=start,
+        payment_date__lte=end,
+        status=CoursePayment.ReceiptStatus.ISSUED,
+    ).aggregate(total=Sum("amount_paid"))["total"] or Decimal("0")
+    general_expense = SchoolExpense.objects.filter(
+        expense_date__gte=start,
+        expense_date__lte=end,
+    ).exclude(category__is_tutor_payroll=True).aggregate(total=Sum("amount"))["total"] or Decimal("0")
+    tutor_payroll = TutorPayrollEntry.objects.filter(
+        work_date__gte=start,
+        work_date__lte=end,
+    ).aggregate(total=Sum("total_amount"))["total"] or Decimal("0")
+    total_expense = Decimal(general_expense) + Decimal(tutor_payroll)
+    return {
+        "start": start,
+        "end": end,
+        "deducted_count": deducted_count,
+        "estimated_revenue": estimated_revenue,
+        "cash_revenue": cash_revenue,
+        "general_expense": general_expense,
+        "tutor_payroll": tutor_payroll,
+        "total_expense": total_expense,
+        "net_estimated": estimated_revenue - total_expense,
+        "net_cash": Decimal(cash_revenue) - total_expense,
+    }
+
+
+def _super_teaching_rows() -> dict:
+    week_start, week_end = _school_week_range(timezone.localdate())
+    _ensure_teaching_assignments(week_start, week_end)
+    assignments = list(
+        TeachingWeeklyAssignment.objects
+        .select_related("tutoring_class", "subject_template", "tutor")
+        .filter(week_start_date=week_start)
+    )
+    latest_updates = {}
+    for u in TeachingProgressUpdate.objects.filter(assignment__week_start_date=week_start).order_by("assignment_id", "-teaching_date", "-updated_at"):
+        latest_updates.setdefault(u.assignment_id, u)
+    rows = []
+    for a in assignments:
+        u = latest_updates.get(a.id)
+        status = "missing"
+        if u and u.no_teaching:
+            status = "no_teaching"
+        elif u:
+            status = "done"
+        rows.append({"assignment": a, "update": u, "status": status})
+    rank = {"missing": 0, "done": 1, "no_teaching": 2}
+    slot_rank = {slot: idx for idx, slot in enumerate(TIME_SLOT_ORDER)}
+    rows.sort(key=lambda r: (
+        rank.get(r["status"], 9),
+        slot_rank.get(r["assignment"].tutoring_class.time_slot, 99),
+        r["assignment"].tutoring_class.name,
+        r["assignment"].subject_template.display_order,
+    ))
+    return {
+        "week_start": week_start,
+        "week_end": week_end,
+        "rows": rows[:36],
+        "missing_count": sum(1 for r in rows if r["status"] == "missing"),
+        "done_count": sum(1 for r in rows if r["status"] == "done"),
+        "no_teaching_count": sum(1 for r in rows if r["status"] == "no_teaching"),
+    }
+
+
+def _admission_range_from_request(request: HttpRequest) -> tuple[date, date, str]:
+    today = timezone.localdate()
+    mode = (request.GET.get("admission_period") or "next_week").strip()
+    if mode == "last_week":
+        return today - timedelta(days=7), today - timedelta(days=1), mode
+    if mode == "custom":
+        start = _parse_optional_date(request.GET.get("admission_from")) or today
+        end = _parse_optional_date(request.GET.get("admission_to")) or today + timedelta(days=7)
+        if end < start:
+            start, end = end, start
+        return start, end, mode
+    return today, today + timedelta(days=7), "next_week"
+
+
+def _build_seat_rows(active_classes: list[TutoringClass], pending_inquiries: list[AdmissionInquiry]) -> list[dict]:
+    rows = []
+    active_enrollments = (
+        Enrollment.objects
+        .filter(is_active=True, student__is_active=True, tutoring_class__is_active=True)
+        .values("tutoring_class_id")
+        .annotate(c=Count("id"))
+    )
+    enrollment_map = {r["tutoring_class_id"]: r["c"] for r in active_enrollments}
+    for cls in active_classes:
+        matched = []
+        for inquiry in pending_inquiries:
+            target = getattr(inquiry, "target_class", None) or _guess_class_for_inquiry(inquiry, active_classes)
+            if target and target.id == cls.id:
+                matched.append(inquiry)
+        enrolled_count = int(enrollment_map.get(cls.id, 0) or 0)
+        total_seats = int(cls.total_seats or 0)
+        expected_count = len(matched)
+        rows.append({
+            "class": cls,
+            "total_seats": total_seats,
+            "enrolled_count": enrolled_count,
+            "available_seats": max(total_seats - enrolled_count, 0),
+            "expected_count": expected_count,
+            "expected_trial": sum(1 for i in matched if i.request_type == AdmissionInquiry.RequestType.TRIAL),
+            "expected_enroll": sum(1 for i in matched if i.request_type == AdmissionInquiry.RequestType.ENROLL),
+            "expected_queue": sum(1 for i in matched if i.request_type == AdmissionInquiry.RequestType.QUEUE),
+        })
+    return rows
+
+
+def _sheet_inventory_matrix() -> dict:
+    sheets = list(Sheet.objects.select_related("subject").filter(is_active=True).order_by("grade_level", "subject__name", "code"))
+    subjects = []
+    seen_subjects = set()
+    for s in sheets:
+        key = s.subject.name if s.subject_id else "ไม่ระบุวิชา"
+        if key not in seen_subjects:
+            seen_subjects.add(key)
+            subjects.append(key)
+    grades = []
+    by_grade_subject = defaultdict(lambda: defaultdict(list))
+    for s in sheets:
+        grade = getattr(s, "grade_level", "") or ""
+        if grade not in grades:
+            grades.append(grade)
+        inv = _inventory_for_sheet(s)
+        by_grade_subject[grade][s.subject.name if s.subject_id else "ไม่ระบุวิชา"].append({
+            "sheet": s,
+            "quantity": int(inv.quantity or 0) if inv else 0,
+        })
+    ordered_grades = [g for g in SHEET_GRADE_ORDER if g in grades] + [g for g in grades if g not in SHEET_GRADE_ORDER]
+    rows = []
+    for g in ordered_grades:
+        rows.append({
+            "grade": g,
+            "label": _sheet_grade_label(g),
+            "cells": [{"subject": subj, "items": by_grade_subject[g].get(subj, [])} for subj in subjects],
+        })
+    return {"subjects": subjects, "rows": rows}
+
+
+@login_required
+def super_dashboard(request: HttpRequest) -> HttpResponse:
+    if request.method == "POST":
+        action = (request.POST.get("action") or "").strip()
+        if action == "add_expense":
+            try:
+                category = ExpenseCategory.objects.get(id=request.POST.get("category"), is_active=True)
+                SchoolExpense.objects.create(
+                    expense_date=_parse_date(request.POST.get("expense_date")),
+                    category=category,
+                    vendor=(request.POST.get("vendor") or "").strip(),
+                    description=(request.POST.get("description") or "").strip(),
+                    amount=_money(request.POST.get("amount")),
+                    payment_method=(request.POST.get("payment_method") or SchoolExpense.PaymentMethod.TRANSFER),
+                    note=(request.POST.get("note") or "").strip(),
+                )
+            except Exception:
+                pass
+            return redirect(request.META.get("HTTP_REFERER", "core:super_dashboard"))
+
+        if action == "admission_quick_update":
+            inquiry = get_object_or_404(AdmissionInquiry, id=request.POST.get("inquiry_id"))
+            if request.POST.get("sheet_prepared") in {"yes", "no"}:
+                inquiry.sheet_prepared = request.POST.get("sheet_prepared") == "yes"
+            if request.POST.get("trial_attended") in {"yes", "no", "pending"}:
+                inquiry.trial_attended = request.POST.get("trial_attended")
+            if request.POST.get("is_completed") in {"yes", "no"}:
+                inquiry.is_completed = request.POST.get("is_completed") == "yes"
+                inquiry.completed_at = timezone.now() if inquiry.is_completed else None
+            inquiry.save()
+            return redirect(request.META.get("HTTP_REFERER", "core:super_dashboard"))
+
+    today = timezone.localdate()
+    attendance_start, attendance_end, attendance_mode = _super_period(request, "attendance", "3m")
+    finance_start, finance_end, finance_mode = _super_period(request, "finance", "month")
+    admission_start, admission_end, admission_mode = _admission_range_from_request(request)
+    admission_type = (request.GET.get("admission_type") or "all").strip()
+
+    attendance_series = _attendance_weekly_series(attendance_start, attendance_end)
+    month_finance = _finance_summary_for_range(date(today.year, today.month, 1), today)
+    ytd_finance = _finance_summary_for_range(date(today.year, 1, 1), today)
+    selected_finance = _finance_summary_for_range(finance_start, finance_end)
+
+    active_classes = list(TutoringClass.objects.filter(is_active=True).order_by("time_slot", "name"))
+    pending_inquiries = list(
+        AdmissionInquiry.objects.select_related("target_class")
+        .filter(is_completed=False)
+        .order_by("first_lesson_date", "created_at")
+    )
+    for inquiry in pending_inquiries:
+        inquiry.guessed_class = _guess_class_for_inquiry(inquiry, active_classes)
+        inquiry.display_target_class = inquiry.target_class or inquiry.guessed_class
+
+    admission_qs = AdmissionInquiry.objects.select_related("target_class").filter(
+        first_lesson_date__gte=admission_start,
+        first_lesson_date__lte=admission_end,
+        is_completed=False,
+    )
+    if admission_type in {AdmissionInquiry.RequestType.TRIAL, AdmissionInquiry.RequestType.ENROLL, AdmissionInquiry.RequestType.QUEUE}:
+        admission_qs = admission_qs.filter(request_type=admission_type)
+    admission_rows = list(admission_qs.order_by("first_lesson_date", "preferred_time_slot", "nickname")[:40])
+    for inquiry in admission_rows:
+        inquiry.guessed_class = _guess_class_for_inquiry(inquiry, active_classes)
+        inquiry.display_target_class = inquiry.target_class or inquiry.guessed_class
+
+    near_enrollments = list(
+        Enrollment.objects.select_related("student", "tutoring_class")
+        .filter(is_active=True, student__is_active=True, tutoring_class__is_active=True, sessions_total__lte=2)
+        .order_by("sessions_total", "tutoring_class__name", "student__nickname")[:40]
+    )
+    enrollment_ids = [e.id for e in near_enrollments]
+    notices_by_enrollment = {}
+    if enrollment_ids:
+        for notice in CourseRenewalNotice.objects.filter(enrollment_id__in=enrollment_ids).order_by("enrollment_id", "-created_at"):
+            notices_by_enrollment.setdefault(notice.enrollment_id, notice)
+    for e in near_enrollments:
+        e.latest_notice = notices_by_enrollment.get(e.id)
+
+    notice_unsent_count = CourseRenewalNotice.objects.filter(is_sent_to_parent=False, enrollment__is_active=True).count()
+    print_pending = SheetPrintOrder.objects.select_related("sheet", "sheet__subject").filter(status=SheetPrintOrder.Status.PENDING).order_by("due_date", "created_at")[:20]
+    print_ready = SheetPrintOrder.objects.select_related("sheet", "sheet__subject").filter(status=SheetPrintOrder.Status.READY).order_by("-completed_at", "-updated_at")[:12]
+
+    context = {
+        "today": today,
+        "attendance_start": attendance_start,
+        "attendance_end": attendance_end,
+        "attendance_mode": attendance_mode,
+        "attendance_series_json": json.dumps(attendance_series, ensure_ascii=False),
+        "attendance_latest_total": attendance_series["total"][-1] if attendance_series["total"] else 0,
+        "attendance_latest_present": attendance_series["present"][-1] if attendance_series["present"] else 0,
+        "attendance_latest_excused": attendance_series["excused"][-1] if attendance_series["excused"] else 0,
+        "attendance_latest_no_show": attendance_series["no_show"][-1] if attendance_series["no_show"] else 0,
+        "seat_rows": _build_seat_rows(active_classes, pending_inquiries),
+        "finance_mode": finance_mode,
+        "finance_start": finance_start,
+        "finance_end": finance_end,
+        "month_finance": month_finance,
+        "ytd_finance": ytd_finance,
+        "selected_finance": selected_finance,
+        "expense_categories": ExpenseCategory.objects.filter(is_active=True).order_by("sort_order", "name"),
+        "payment_method_choices": SchoolExpense.PaymentMethod.choices,
+        "teaching": _super_teaching_rows(),
+        "admission_rows": admission_rows,
+        "admission_type": admission_type,
+        "admission_mode": admission_mode,
+        "admission_start": admission_start,
+        "admission_end": admission_end,
+        "near_enrollments": near_enrollments,
+        "near_2_count": Enrollment.objects.filter(is_active=True, sessions_total=2).count(),
+        "near_1_count": Enrollment.objects.filter(is_active=True, sessions_total=1).count(),
+        "notice_unsent_count": notice_unsent_count,
+        "sheet_matrix": _sheet_inventory_matrix(),
+        "print_pending": print_pending,
+        "print_ready": print_ready,
+    }
+    return render(request, "core/super_dashboard.html", context)
 
 
 @login_required
@@ -2168,8 +2497,36 @@ def admission_thank_you(request: HttpRequest, pk: int) -> HttpResponse:
 
 
 @login_required
+
+def _guess_class_for_inquiry(inquiry: AdmissionInquiry, classes=None):
+    """Guess class from grade + preferred time slot. Persisted target_class wins."""
+    if getattr(inquiry, "target_class_id", None):
+        return inquiry.target_class
+    if classes is None:
+        classes = list(TutoringClass.objects.filter(is_active=True))
+    grade_label = ""
+    try:
+        grade_label = inquiry.get_grade_level_display()
+    except Exception:
+        grade_label = inquiry.grade_level or ""
+    grade_tokens = {
+        (inquiry.grade_level or "").lower(),
+        grade_label,
+        grade_label.replace(".", ""),
+        grade_label.replace(" ", ""),
+    }
+    grade_tokens = {t.lower() for t in grade_tokens if t}
+    for cls in classes:
+        if getattr(cls, "time_slot", "") != getattr(inquiry, "preferred_time_slot", ""):
+            continue
+        cls_name = (cls.name or "").lower().replace(" ", "")
+        if any(t.replace(" ", "") in cls_name for t in grade_tokens):
+            return cls
+    return None
+
+
 def admission_report(request: HttpRequest) -> HttpResponse:
-    qs = AdmissionInquiry.objects.all()
+    qs = AdmissionInquiry.objects.select_related("target_class").all()
 
     q = (request.GET.get("q") or "").strip()
     request_type = (request.GET.get("request_type") or "").strip()
@@ -2223,6 +2580,8 @@ def admission_report(request: HttpRequest) -> HttpResponse:
         except ValueError:
             pass
 
+    active_classes = list(TutoringClass.objects.filter(is_active=True).order_by("time_slot", "name"))
+
     stats_base = AdmissionInquiry.objects.all()
     open_base = stats_base.filter(is_completed=False)
     completed_base = stats_base.filter(is_completed=True)
@@ -2241,6 +2600,11 @@ def admission_report(request: HttpRequest) -> HttpResponse:
     inquiries = qs.order_by("is_completed", "first_lesson_date", "-created_at")
     active_qs = inquiries.filter(is_completed=False)
     completed_qs = inquiries.filter(is_completed=True).order_by("-completed_at", "-updated_at", "-created_at")
+
+    for inquiry in list(inquiries):
+        guessed = _guess_class_for_inquiry(inquiry, active_classes)
+        inquiry.guessed_class = guessed
+        inquiry.display_target_class = inquiry.target_class or guessed
 
     inquiry_groups = [
         {
@@ -2288,6 +2652,7 @@ def admission_report(request: HttpRequest) -> HttpResponse:
         "time_slot_choices": AdmissionInquiry.PreferredTimeSlot.choices,
         "trial_attended_choices": AdmissionInquiry.TrialAttended.choices,
         "trial_result_choices": AdmissionInquiry.TrialResult.choices,
+        "active_classes": active_classes,
     })
 
 
@@ -2302,8 +2667,11 @@ def admission_report_update(request: HttpRequest) -> HttpResponse:
     trial_result = request.POST.get("trial_result")
     internal_note = request.POST.get("internal_note")
     is_completed_raw = request.POST.get("is_completed")
+    target_class_id = (request.POST.get("target_class_id") or request.POST.get("target_class") or "").strip()
 
-    inquiry.sheet_prepared = sheet_prepared == "yes"
+    # Update only fields explicitly submitted so quick-action buttons do not reset other fields.
+    if sheet_prepared in {"yes", "no"}:
+        inquiry.sheet_prepared = sheet_prepared == "yes"
 
     valid_attended = {choice[0] for choice in AdmissionInquiry.TrialAttended.choices}
     valid_result = {choice[0] for choice in AdmissionInquiry.TrialResult.choices}
@@ -2315,17 +2683,24 @@ def admission_report_update(request: HttpRequest) -> HttpResponse:
     if internal_note is not None:
         inquiry.internal_note = internal_note.strip()
 
-    new_completed = is_completed_raw == "yes"
-    if new_completed and not inquiry.is_completed:
-        inquiry.completed_at = timezone.now()
-    elif not new_completed:
-        inquiry.completed_at = None
-    inquiry.is_completed = new_completed
+    if "target_class_id" in request.POST or "target_class" in request.POST:
+        if target_class_id:
+            cls = TutoringClass.objects.filter(id=target_class_id, is_active=True).first()
+            inquiry.target_class = cls
+        else:
+            inquiry.target_class = None
+
+    if is_completed_raw in {"yes", "no"}:
+        new_completed = is_completed_raw == "yes"
+        if new_completed and not inquiry.is_completed:
+            inquiry.completed_at = timezone.now()
+        elif not new_completed:
+            inquiry.completed_at = None
+        inquiry.is_completed = new_completed
 
     inquiry.save()
 
     return redirect(request.META.get("HTTP_REFERER", "core:admission_report"))
-
 
 # =========================================================
 # ✅ School Overview / Finance helpers

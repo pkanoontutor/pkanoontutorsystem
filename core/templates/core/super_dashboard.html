@@ -1,15 +1,254 @@
 {% extends "core/base.html" %}
 {% block title %}Super Dashboard{% endblock %}
-{% block head %}<script src="https://cdn.jsdelivr.net/npm/chart.js"></script><style>
-.sd-wrap{max-width:1500px;margin:0 auto;display:grid;gap:14px}.hero{background:linear-gradient(135deg,#0f172a,#2563eb,#7c3aed);color:#fff;border-radius:26px;padding:22px;box-shadow:0 14px 28px rgba(15,23,42,.20)}.title{font-size:28px;font-weight:1000;letter-spacing:-.04em}.sub{font-size:13px;color:#dbeafe;margin-top:6px}.grid{display:grid;grid-template-columns:repeat(12,1fr);gap:14px;align-items:start}.card{background:#fff;border-radius:22px;padding:15px;border:1px solid rgba(255,255,255,.9);box-shadow:0 6px 16px rgba(15,23,42,.08);min-height:100%}.span12{grid-column:span 12}.span8{grid-column:span 8}.span6{grid-column:span 6}.span4{grid-column:span 4}.card-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;flex-wrap:wrap;margin-bottom:10px}.card-title{font-size:18px;font-weight:1000;color:#0f172a}.muted{font-size:12px;color:#64748b;font-weight:800;line-height:1.45}.btnx{border:0;border-radius:12px;padding:8px 11px;font-weight:1000;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;font-size:12px}.soft{background:#f8fafc;color:#0f172a;border:1px solid #e2e8f0}.primary{background:#2563eb;color:#fff}.green{background:#16a34a;color:#fff}.orange{background:#f97316;color:#fff}.dark{background:#0f172a;color:#fff}.mini-metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px}.metric{border:1px solid #e2e8f0;background:#f8fafc;border-radius:16px;padding:10px}.metric .k{font-size:10px;color:#64748b;font-weight:1000;text-transform:uppercase}.metric .v{font-size:22px;font-weight:1000;color:#0f172a}.filters{display:flex;gap:8px;flex-wrap:wrap;align-items:end}.field{display:flex;flex-direction:column;gap:4px}.field label{font-size:10px;font-weight:1000;color:#475569;text-transform:uppercase}input,select,textarea{border:1px solid #e2e8f0;border-radius:11px;padding:8px;font-weight:800;background:#fff;font-size:12px}table{width:100%;border-collapse:collapse}th,td{padding:8px;border-bottom:1px solid #edf2f7;text-align:left;vertical-align:top}th{font-size:10px;color:#475569;background:#f8fafc;text-transform:uppercase}td{font-size:12px;font-weight:850;color:#334155}.table-wrap{overflow:auto;border:1px solid #e2e8f0;border-radius:14px}.pill{border-radius:999px;padding:4px 8px;font-size:11px;font-weight:1000;border:1px solid #e2e8f0;background:#f8fafc;color:#334155;display:inline-flex}.warn{background:#fee2e2;color:#991b1b;border-color:#fecaca}.ok{background:#dcfce7;color:#166534;border-color:#86efac}.blue{background:#eff6ff;color:#1d4ed8;border-color:#bfdbfe}.list{display:grid;gap:8px}.row-card{border:1px solid #e2e8f0;border-radius:14px;padding:9px;background:#fff;display:grid;gap:5px}.row-card.missing{background:#fff7ed;border-color:#fed7aa}.row-card.done{background:#f0fdf4;border-color:#bbf7d0}.row-card.no{background:#f1f5f9;border-color:#cbd5e1}.quick{display:flex;gap:5px;flex-wrap:wrap}.quick form{display:inline}.emoji{width:30px;height:28px;border-radius:999px;border:1px solid #e2e8f0;background:#fff;cursor:pointer}.money-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}.money{border-radius:16px;padding:10px;background:#f8fafc;border:1px solid #e2e8f0}.money .label{font-size:11px;color:#64748b;font-weight:900}.money .amount{font-size:20px;font-weight:1000}.sheet-chip{display:inline-grid;grid-template-columns:auto auto;gap:3px;align-items:center;margin:2px}.sheet-chip a{border-radius:999px;padding:4px 7px;background:#eff6ff;border:1px solid #bfdbfe;text-decoration:none;color:#1d4ed8;font-size:11px;font-weight:1000}.print-link{border-radius:999px;padding:4px 6px;background:#fef3c7;text-decoration:none}.modal{display:none;position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:100;align-items:center;justify-content:center;padding:18px}.modal:target{display:flex}.modal-box{background:#fff;border-radius:22px;padding:18px;width:min(520px,96vw);box-shadow:0 20px 50px rgba(0,0,0,.25)}@media(max-width:1000px){.span8,.span6,.span4{grid-column:span 12}.mini-metrics,.money-grid{grid-template-columns:repeat(2,1fr)}}@media(max-width:620px){.grid{grid-template-columns:1fr}.span12,.span8,.span6,.span4{grid-column:span 1}.mini-metrics,.money-grid{grid-template-columns:1fr}.title{font-size:23px}}
+
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+  *{box-sizing:border-box}
+  .sd-wrap{max-width:1480px;margin:0 auto;display:grid;gap:12px;}
+  .sd-hero{background:linear-gradient(135deg,#0f172a,#2563eb,#7c3aed);color:#fff;border-radius:22px;padding:18px 20px;box-shadow:0 12px 24px rgba(15,23,42,.18);display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap;}
+  .sd-title{font-size:25px;font-weight:1000;letter-spacing:-.04em;line-height:1.1}.sd-sub{font-size:12px;color:#dbeafe;margin-top:5px;font-weight:800;line-height:1.4}
+  .sd-grid{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:12px;align-items:stretch}.span12{grid-column:span 12}.span8{grid-column:span 8}.span6{grid-column:span 6}.span4{grid-column:span 4}
+  .sd-card{background:#fff;border-radius:20px;padding:13px;border:1px solid rgba(255,255,255,.9);box-shadow:0 4px 12px rgba(15,23,42,.07);min-width:0;overflow:hidden}.sd-card.compact{padding:12px}.sd-card.soft-blue{background:linear-gradient(180deg,#fff,#f8fbff)}
+  .card-head{display:flex;justify-content:space-between;gap:8px;align-items:flex-start;flex-wrap:wrap;margin-bottom:9px}.card-title{font-size:16px;font-weight:1000;color:#0f172a;letter-spacing:-.02em;line-height:1.2}.muted{font-size:11px;color:#64748b;font-weight:800;line-height:1.4}.tiny{font-size:10px;color:#64748b;font-weight:800;line-height:1.35}
+  .btnx{border:0;border-radius:12px;padding:7px 10px;font-weight:1000;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:5px;cursor:pointer;font-size:11px;line-height:1.1;white-space:nowrap}.soft{background:#f8fafc;color:#0f172a;border:1px solid #e2e8f0}.primary{background:#2563eb;color:#fff}.green{background:#16a34a;color:#fff}.orange{background:#f97316;color:#fff}.dark{background:#0f172a;color:#fff}.quick{display:flex;gap:5px;flex-wrap:wrap;align-items:center}.quick form{display:inline}
+  .filters{display:flex;gap:6px;flex-wrap:wrap;align-items:end;margin-bottom:8px}.field{display:flex;flex-direction:column;gap:3px;min-width:0}.field label{font-size:9px;font-weight:1000;color:#475569;text-transform:uppercase;letter-spacing:.04em}input,select,textarea{border:1px solid #e2e8f0;border-radius:10px;padding:7px 8px;font-weight:850;background:#fff;font-size:11px;min-width:0;max-width:100%}input[type="date"]{min-height:34px}textarea{resize:vertical;font-family:inherit}
+  .kpi-strip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px}.kpi{border:1px solid #e2e8f0;background:#f8fafc;border-radius:14px;padding:8px 9px;min-width:0}.kpi .k{font-size:9px;color:#64748b;font-weight:1000;text-transform:uppercase;letter-spacing:.04em}.kpi .v{font-size:20px;font-weight:1000;color:#0f172a;line-height:1.05;margin-top:2px}.kpi.blue{background:#eff6ff;border-color:#bfdbfe}.kpi.green{background:#f0fdf4;border-color:#bbf7d0}.kpi.amber{background:#fffbeb;border-color:#fde68a}.kpi.red{background:#fef2f2;border-color:#fecaca}
+  .attendance-body{display:grid;grid-template-columns:310px 1fr;gap:10px;align-items:stretch}.chart-box{height:165px;min-height:165px;position:relative;border:1px solid #e2e8f0;border-radius:16px;padding:8px;background:#fff}.chart-box canvas{width:100%!important;height:100%!important}.mini-note{margin-top:7px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:8px}
+  .money-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}.money{border-radius:15px;padding:9px;background:#f8fafc;border:1px solid #e2e8f0;min-width:0}.money .label{font-size:10px;color:#64748b;font-weight:900;line-height:1.25}.money .amount{font-size:19px;font-weight:1000;color:#0f172a;line-height:1.1;margin-top:3px}.money.positive{background:#f0fdf4;border-color:#bbf7d0}.money.negative{background:#fef2f2;border-color:#fecaca}.money.cash{background:#eff6ff;border-color:#bfdbfe}
+  .seat-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-bottom:8px}.seat-mini{border-radius:13px;background:#f8fafc;border:1px solid #e2e8f0;padding:7px}.seat-mini .num{font-size:18px;font-weight:1000;color:#0f172a}.seat-mini .label{font-size:9px;color:#64748b;font-weight:1000}.seat-list{display:grid;gap:6px;max-height:305px;overflow:auto;padding-right:2px}.seat-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;border:1px solid #e2e8f0;background:#fff;border-radius:14px;padding:8px}.seat-name{font-size:12px;font-weight:1000;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.seat-bars{display:flex;gap:4px;flex-wrap:wrap;margin-top:3px}.pill{border-radius:999px;padding:4px 7px;font-size:10px;font-weight:1000;border:1px solid #e2e8f0;background:#f8fafc;color:#334155;display:inline-flex;align-items:center;gap:3px}.warn{background:#fee2e2;color:#991b1b;border-color:#fecaca}.ok{background:#dcfce7;color:#166534;border-color:#86efac}.blue{background:#eff6ff;color:#1d4ed8;border-color:#bfdbfe}.amber{background:#fffbeb;color:#92400e;border-color:#fde68a}.count-big{font-size:20px;font-weight:1000;color:#0f172a;line-height:1}.count-label{font-size:9px;color:#64748b;font-weight:1000;text-align:right}
+  .list{display:grid;gap:7px}.list.scroll{max-height:315px;overflow:auto;padding-right:2px}.row-card{border:1px solid #e2e8f0;border-radius:14px;padding:8px;background:#fff;display:grid;gap:4px;min-width:0}.row-card.missing{background:#fff7ed;border-color:#fed7aa}.row-card.done{background:#f0fdf4;border-color:#bbf7d0}.row-card.no{background:#f1f5f9;border-color:#cbd5e1}.row-title{font-size:12px;font-weight:1000;color:#0f172a;line-height:1.35}.row-meta{font-size:11px;color:#64748b;font-weight:800;line-height:1.35}.emoji{width:29px;height:27px;border-radius:999px;border:1px solid #e2e8f0;background:#fff;cursor:pointer;font-size:13px}
+  .sheet-table-wrap{overflow:auto;border:1px solid #e2e8f0;border-radius:16px;background:#fff}.sheet-table{width:100%;border-collapse:separate;border-spacing:0;min-width:760px}.sheet-table th,.sheet-table td{padding:7px;border-bottom:1px solid #edf2f7;border-right:1px solid #edf2f7;vertical-align:top}.sheet-table th{background:#f8fafc;font-size:10px;color:#475569;font-weight:1000;text-transform:uppercase;position:sticky;top:0;z-index:1}.sheet-table th:first-child,.sheet-table td:first-child{position:sticky;left:0;background:#fff;z-index:2}.sheet-table th:first-child{background:#f8fafc;z-index:3}.sheet-cell-items{display:grid;gap:5px}.sheet-chip{display:grid;grid-template-columns:1fr auto;gap:4px;align-items:center}.stock-link{display:flex;justify-content:space-between;gap:5px;align-items:center;border-radius:12px;padding:6px 7px;background:#eff6ff;border:1px solid #bfdbfe;text-decoration:none;color:#1d4ed8;font-size:10px;font-weight:1000;min-width:92px}.stock-link .code{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.stock-link .qty{font-size:18px;line-height:1;color:#0f172a}.print-link{border-radius:999px;padding:5px 7px;background:#fef3c7;text-decoration:none;font-size:12px;line-height:1}.empty-cell{color:#cbd5e1;font-weight:900;text-align:center}
+  .print-columns{display:grid;grid-template-columns:1fr 1fr;gap:8px}.print-box{border:1px solid #e2e8f0;border-radius:15px;padding:9px;background:#fff;min-width:0}.print-box h4{margin:0 0 6px;font-size:13px;color:#0f172a}.print-item{border-radius:12px;background:#f8fafc;border:1px solid #e2e8f0;padding:7px;margin-bottom:6px}.print-item.done{background:#f0fdf4;border-color:#bbf7d0}.print-qty{font-size:17px;font-weight:1000;color:#991b1b}.section-divider{height:1px;background:#e2e8f0;margin:5px 0}
+  .teaching-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin-bottom:8px}.teaching-summary .kpi .v{font-size:24px}.teaching-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.teaching-col{border:1px solid #e2e8f0;border-radius:15px;background:#fff;padding:8px;min-width:0}.teaching-col h4{margin:0 0 6px;font-size:13px}.teaching-col .list{max-height:260px;overflow:auto}
+  .modal{display:none;position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:100;align-items:center;justify-content:center;padding:16px}.modal:target{display:flex}.modal-box{background:#fff;border-radius:20px;padding:16px;width:min(520px,96vw);box-shadow:0 20px 50px rgba(0,0,0,.25)}
+  @media(max-width:1100px){.span8,.span6,.span4{grid-column:span 12}.attendance-body{grid-template-columns:1fr}.chart-box{height:150px}.money-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.seat-list{max-height:260px}.teaching-grid{grid-template-columns:1fr}}
+  @media(max-width:700px){.sd-wrap{gap:10px}.sd-hero{padding:16px;border-radius:19px}.sd-title{font-size:22px}.sd-grid{grid-template-columns:1fr;gap:10px}.span12,.span8,.span6,.span4{grid-column:span 1}.sd-card{padding:11px;border-radius:18px}.card-title{font-size:15px}.filters{display:grid;grid-template-columns:1fr 1fr;gap:6px}.filters .btnx{width:100%}.kpi-strip,.seat-summary,.money-grid,.teaching-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.chart-box{height:135px}.seat-row{grid-template-columns:1fr}.count-label{text-align:left}.print-columns{grid-template-columns:1fr}.btnx{font-size:11px;padding:7px 9px}.quick .btnx{flex:1}.list.scroll{max-height:280px}.wrap{padding:12px!important}}
+  @media(max-width:430px){.filters,.kpi-strip,.seat-summary,.money-grid,.teaching-summary{grid-template-columns:1fr}.sd-title{font-size:20px}.chart-box{height:125px}.money .amount{font-size:18px}.stock-link .qty{font-size:16px}}
 </style>{% endblock %}
-{% block content %}<div class="sd-wrap"><section class="hero"><div class="title">🚀 Super Dashboard</div><div class="sub">Monitor ทุกเรื่องของโรงเรียนในหน้าเดียว · {{ today|date:"d/m/Y" }}</div></section><div class="grid">
-<section class="card span12"><div class="card-head"><div><div class="card-title">1) ภาพรวมจำนวนนักเรียนรายสัปดาห์</div><div class="muted">ย้อนหลังตามช่วงที่เลือก แสดงรวม / มา / ลา / ขาด</div></div><a class="btnx soft" href="/school-overview/">ไปหน้า School Overview</a></div><form class="filters" method="get"><div class="field"><label>ช่วงเวลา</label><select name="attendance_period"><option value="1m" {% if attendance_mode == '1m' %}selected{% endif %}>1 เดือน</option><option value="3m" {% if attendance_mode == '3m' %}selected{% endif %}>3 เดือน</option><option value="custom" {% if attendance_mode == 'custom' %}selected{% endif %}>เลือกเอง</option></select></div><div class="field"><label>จาก</label><input type="date" name="attendance_from" value="{{ attendance_start|date:'Y-m-d' }}"></div><div class="field"><label>ถึง</label><input type="date" name="attendance_to" value="{{ attendance_end|date:'Y-m-d' }}"></div><button class="btnx primary">Apply</button></form><div class="mini-metrics"><div class="metric"><div class="k">รวมล่าสุด</div><div class="v">{{ attendance_latest_total }}</div></div><div class="metric"><div class="k">มา</div><div class="v">{{ attendance_latest_present }}</div></div><div class="metric"><div class="k">ลา</div><div class="v">{{ attendance_latest_excused }}</div></div><div class="metric"><div class="k">ขาด</div><div class="v">{{ attendance_latest_no_show }}</div></div></div><canvas id="attendanceChart" height="90"></canvas></section>
-<section class="card span6"><div class="card-head"><div><div class="card-title">2) ที่นั่งเรียนและคิวสมัคร/ทดลอง</div><div class="muted">ใช้ Enrollment ปัจจุบัน + Admission ที่ assign class หรือระบบเดาจาก grade/time slot</div></div><a class="btnx soft" href="/admission-report/">Admission Report</a></div><div class="table-wrap"><table><thead><tr><th>Class</th><th>ที่นั่ง</th><th>เรียนอยู่</th><th>ว่าง</th><th>คาดว่าจะเข้า</th></tr></thead><tbody>{% for r in seat_rows %}<tr><td>{{ r.class.name }}</td><td>{{ r.total_seats }}</td><td>{{ r.enrolled_count }}</td><td><span class="pill {% if r.available_seats <= 0 %}warn{% else %}ok{% endif %}">{{ r.available_seats }}</span></td><td><span class="pill blue">รวม {{ r.expected_count }}</span> <span class="pill">ทดลอง {{ r.expected_trial }}</span> <span class="pill">สมัคร {{ r.expected_enroll }}</span></td></tr>{% endfor %}</tbody></table></div></section>
-<section class="card span6"><div class="card-head"><div><div class="card-title">3) รายรับรายจ่าย</div><div class="muted">เดือนนี้ / YTD / ช่วงที่เลือก</div></div><div class="quick"><a class="btnx soft" href="/school-finance/">School Finance</a><a class="btnx green" href="/course-payments/new/">สร้างใบเสร็จ</a><a class="btnx orange" href="#expenseModal">เพิ่มค่าใช้จ่าย</a></div></div><form class="filters" method="get"><select name="finance_period"><option value="month" {% if finance_mode == 'month' %}selected{% endif %}>เดือนนี้</option><option value="year" {% if finance_mode == 'year' %}selected{% endif %}>ปีนี้</option><option value="custom" {% if finance_mode == 'custom' %}selected{% endif %}>เลือกเอง</option></select><input type="date" name="finance_from" value="{{ finance_start|date:'Y-m-d' }}"><input type="date" name="finance_to" value="{{ finance_end|date:'Y-m-d' }}"><button class="btnx primary">Apply</button></form><div class="money-grid">{% for label,value in selected_finance.items %}{% if label in 'estimated_revenue cash_revenue general_expense tutor_payroll net_estimated net_cash' %}<div class="money"><div class="label">{{ label }}</div><div class="amount">{{ value|floatformat:0 }}</div></div>{% endif %}{% endfor %}</div><div class="muted" style="margin-top:8px">เดือนนี้ Cash {{ month_finance.cash_revenue|floatformat:0 }} · YTD Cash {{ ytd_finance.cash_revenue|floatformat:0 }}</div></section>
-<section class="card span12"><div class="card-head"><div><div class="card-title">4) สถานะการอัปเดตชีทของติวเตอร์</div><div class="muted">สัปดาห์ {{ teaching.week_start|date:'d/m/Y' }} - {{ teaching.week_end|date:'d/m/Y' }} · ยังไม่บันทึก {{ teaching.missing_count }} · บันทึกแล้ว {{ teaching.done_count }} · ไม่มีสอน {{ teaching.no_teaching_count }}</div></div><a class="btnx soft" href="/tutor-teaching-update/">ไปหน้าติวเตอร์</a></div><div class="list">{% for r in teaching.rows %}<div class="row-card {% if r.status == 'missing' %}missing{% elif r.status == 'done' %}done{% else %}no{% endif %}"><div><b>{{ r.assignment.tutoring_class.name }}</b> · {{ r.assignment.subject_template.subject_name }} · {{ r.assignment.tutor.name|default:'ยังไม่ assign' }}</div><div class="muted">{% if r.update %}{{ r.update.sheet_name|default:'-' }} · หน้า {{ r.update.page_to|default:'-' }} · ข้อ {{ r.update.question_to|default:'-' }} · {{ r.update.updated_by_name|default:'-' }}{% else %}ยังไม่มีการบันทึก{% endif %}</div></div>{% empty %}<div class="muted">ยังไม่มี assignment</div>{% endfor %}</div></section>
-<section class="card span6"><div class="card-head"><div><div class="card-title">5) นักเรียนทดลอง/สมัครที่จะมาถึง</div><div class="muted">กด emoji เพื่ออัปเดตเร็ว</div></div><a class="btnx soft" href="/admission-report/">ดูทั้งหมด</a></div><form class="filters" method="get"><select name="admission_type"><option value="all">ทั้งหมด</option><option value="trial" {% if admission_type == 'trial' %}selected{% endif %}>ทดลองเรียน</option><option value="enroll" {% if admission_type == 'enroll' %}selected{% endif %}>สมัครเรียน</option></select><select name="admission_period"><option value="next_week" {% if admission_mode == 'next_week' %}selected{% endif %}>สัปดาห์ที่จะมาถึง</option><option value="last_week" {% if admission_mode == 'last_week' %}selected{% endif %}>สัปดาห์ที่ผ่านมา</option><option value="custom" {% if admission_mode == 'custom' %}selected{% endif %}>เลือกเอง</option></select><input type="date" name="admission_from" value="{{ admission_start|date:'Y-m-d' }}"><input type="date" name="admission_to" value="{{ admission_end|date:'Y-m-d' }}"><button class="btnx primary">Apply</button></form><div class="list">{% for i in admission_rows %}<div class="row-card"><div><b>{{ i.nickname }}</b> · {{ i.full_name }} · {{ i.get_grade_level_display }} · {{ i.first_lesson_date|date:'d/m' }}</div><div class="muted">{{ i.display_target_class.name|default:'ยังไม่ assign class' }}</div><div class="quick"><form method="post">{% csrf_token %}<input type="hidden" name="action" value="admission_quick_update"><input type="hidden" name="inquiry_id" value="{{ i.id }}"><input type="hidden" name="sheet_prepared" value="yes"><button class="emoji" title="ชีทพร้อม">📄</button></form><form method="post">{% csrf_token %}<input type="hidden" name="action" value="admission_quick_update"><input type="hidden" name="inquiry_id" value="{{ i.id }}"><input type="hidden" name="trial_attended" value="yes"><button class="emoji" title="มาเรียนแล้ว">✅</button></form><form method="post">{% csrf_token %}<input type="hidden" name="action" value="admission_quick_update"><input type="hidden" name="inquiry_id" value="{{ i.id }}"><input type="hidden" name="is_completed" value="yes"><button class="emoji" title="เสร็จแล้ว">🏁</button></form></div></div>{% empty %}<div class="muted">ไม่มีรายการในช่วงนี้</div>{% endfor %}</div></section>
-<section class="card span6"><div class="card-head"><div><div class="card-title">6) Enrollment ใกล้ครบคอร์ส</div><div class="muted">เหลือ 2 ครั้ง: {{ near_2_count }} · เหลือ 1 ครั้ง: {{ near_1_count }} · ใบแจ้งยังไม่ส่ง: {{ notice_unsent_count }}</div></div><a class="btnx soft" href="/course-renewal-notices/">หน้าต่อคอร์ส</a></div><div class="list">{% for e in near_enrollments %}<div class="row-card"><div><b>{{ e.student.nickname }}</b> · {{ e.student.full_name }} · {{ e.tutoring_class.name }} <span class="pill warn">เหลือ {{ e.sessions_total }}</span></div><div class="quick"><a class="btnx soft" href="/course-renewal-notices/create/{{ e.id }}/">สร้างใบแจ้ง</a>{% if e.latest_notice and not e.latest_notice.is_sent_to_parent %}<form method="post" action="{% url 'core:course_renewal_notice_mark_sent' e.latest_notice.id %}">{% csrf_token %}<button class="btnx green">ส่งแล้ว</button></form>{% endif %}</div></div>{% empty %}<div class="muted">ไม่มี enrollment ใกล้ครบ</div>{% endfor %}</div></section>
-<section class="card span6"><div class="card-head"><div><div class="card-title">7) Sheet Inventory Summary</div><div class="muted">คลิกตัวเลขเพื่อไป profile และกด 🖨️ เพื่อสั่งปรินท์</div></div><a class="btnx soft" href="/sheet-inventory/">Sheet Inventory</a></div><div class="table-wrap"><table><thead><tr><th>ระดับชั้น</th>{% for s in sheet_matrix.subjects %}<th>{{ s }}</th>{% endfor %}</tr></thead><tbody>{% for g in sheet_matrix.rows %}<tr><td><b>{{ g.label }}</b></td>{% for cell in g.cells %}<td>{% for item in cell.items %}<span class="sheet-chip"><a href="/sheet-inventory/sheet/{{ item.sheet.id }}/">{{ item.sheet.code }}: {{ item.quantity }}</a><a class="print-link" href="/sheet-print-orders/">🖨️</a></span>{% empty %}-{% endfor %}</td>{% endfor %}</tr>{% endfor %}</tbody></table></div></section>
-<section class="card span6"><div class="card-head"><div><div class="card-title">8) รายการส่งปรินท์</div><div class="muted">แสดงรอปรินท์และเสร็จแล้วพร้อมกัน</div></div><a class="btnx soft" href="/sheet-print-orders/">ระบบส่งปรินท์</a></div><div class="list"><b>รอปรินท์</b>{% for o in print_pending %}<div class="row-card"><div><b>{{ o.display_code }}</b> · {{ o.display_title }} <span class="pill warn">{{ o.quantity }} เล่ม</span></div><div class="muted">เสร็จ {{ o.printed_quantity }}/{{ o.quantity }} · ส่ง {{ o.due_date|date:'d/m'|default:'-' }}</div></div>{% empty %}<div class="muted">ไม่มีรายการรอ</div>{% endfor %}<b>เสร็จแล้ว</b>{% for o in print_ready %}<div class="row-card done"><div><b>{{ o.display_code }}</b> · {{ o.display_title }} <span class="pill ok">{{ o.quantity }} เล่ม</span></div></div>{% empty %}<div class="muted">ยังไม่มีรายการเสร็จล่าสุด</div>{% endfor %}</div></section>
-</div></div><div class="modal" id="expenseModal"><div class="modal-box"><div class="card-head"><div class="card-title">เพิ่มค่าใช้จ่าย</div><a class="btnx soft" href="#">ปิด</a></div><form method="post" class="list">{% csrf_token %}<input type="hidden" name="action" value="add_expense"><div class="field"><label>วันที่</label><input type="date" name="expense_date" value="{{ today|date:'Y-m-d' }}"></div><div class="field"><label>ประเภท</label><select name="category">{% for c in expense_categories %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}</select></div><div class="field"><label>Vendor</label><input name="vendor"></div><div class="field"><label>รายละเอียด</label><input name="description"></div><div class="field"><label>ยอดเงิน</label><input name="amount" type="number" step="0.01" required></div><div class="field"><label>วิธีจ่าย</label><select name="payment_method">{% for v,l in payment_method_choices %}<option value="{{ v }}">{{ l }}</option>{% endfor %}</select></div><button class="btnx green">บันทึกค่าใช้จ่าย</button></form></div></div><script>const data={{ attendance_series_json|safe }};new Chart(document.getElementById('attendanceChart'),{type:'line',data:{labels:data.labels,datasets:[{label:'รวม',data:data.total},{label:'มา',data:data.present},{label:'ลา',data:data.excused},{label:'ขาด',data:data.no_show}]},options:{responsive:true,plugins:{legend:{position:'bottom'}},scales:{y:{beginAtZero:true,ticks:{precision:0}}}}});</script>{% endblock %}
+
+{% block content %}
+<div class="sd-wrap">
+  <section class="sd-hero">
+    <div>
+      <div class="sd-title">🚀 Super Dashboard</div>
+      <div class="sd-sub">Monitor ทุกเรื่องของโรงเรียนในหน้าเดียว · {{ today|date:"d/m/Y" }}</div>
+    </div>
+    <div class="quick">
+      <a class="btnx soft" href="/pkanoon-admin-tool/">Admin Tool</a>
+      <a class="btnx soft" href="/dashboard/">Dashboard</a>
+    </div>
+  </section>
+
+  <div class="sd-grid">
+    <section class="sd-card span12 soft-blue">
+      <div class="card-head">
+        <div>
+          <div class="card-title">1) ภาพรวมจำนวนนักเรียนรายสัปดาห์</div>
+          <div class="muted">กราฟขนาดย่อ แสดงรวม / มา / ลา / ขาด ตามช่วงที่เลือก</div>
+        </div>
+        <a class="btnx soft" href="/school-overview/">School Overview</a>
+      </div>
+      <form class="filters" method="get">
+        <div class="field"><label>ช่วงเวลา</label><select name="attendance_period"><option value="1m" {% if attendance_mode == '1m' %}selected{% endif %}>1 เดือน</option><option value="3m" {% if attendance_mode == '3m' %}selected{% endif %}>3 เดือน</option><option value="custom" {% if attendance_mode == 'custom' %}selected{% endif %}>เลือกเอง</option></select></div>
+        <div class="field"><label>จาก</label><input type="date" name="attendance_from" value="{{ attendance_start|date:'Y-m-d' }}"></div>
+        <div class="field"><label>ถึง</label><input type="date" name="attendance_to" value="{{ attendance_end|date:'Y-m-d' }}"></div>
+        <button class="btnx primary">Apply</button>
+      </form>
+      <div class="attendance-body">
+        <div>
+          <div class="kpi-strip">
+            <div class="kpi blue"><div class="k">รวมล่าสุด</div><div class="v">{{ attendance_latest_total }}</div></div>
+            <div class="kpi green"><div class="k">มา</div><div class="v">{{ attendance_latest_present }}</div></div>
+            <div class="kpi amber"><div class="k">ลา</div><div class="v">{{ attendance_latest_excused }}</div></div>
+            <div class="kpi red"><div class="k">ขาด</div><div class="v">{{ attendance_latest_no_show }}</div></div>
+          </div>
+          <div class="mini-note tiny">กราฟนี้ตั้งใจให้ดูเป็นภาพรวมเร็ว ๆ ถ้าต้องการ drill down ให้กดเข้า School Overview</div>
+        </div>
+        <div class="chart-box"><canvas id="attendanceChart"></canvas></div>
+      </div>
+    </section>
+
+    <section class="sd-card span6">
+      <div class="card-head">
+        <div><div class="card-title">2) ที่นั่งเรียนและคิวสมัคร/ทดลอง</div><div class="muted">สรุปแบบ compact จาก Enrollment + Admission ที่ assign/เดา class</div></div>
+        <a class="btnx soft" href="/admission-report/">Admission</a>
+      </div>
+      <div class="seat-summary">
+        <div class="seat-mini"><div class="num">{{ seat_rows|length }}</div><div class="label">จำนวน class</div></div>
+        <div class="seat-mini"><div class="num">{{ admission_rows|length }}</div><div class="label">รายการช่วงที่เลือก</div></div>
+        <div class="seat-mini"><div class="num">{{ near_1_count }}</div><div class="label">ใกล้ครบ 1 ครั้ง</div></div>
+        <div class="seat-mini"><div class="num">{{ notice_unsent_count }}</div><div class="label">ยังไม่แจ้ง</div></div>
+      </div>
+      <div class="seat-list">
+        {% for r in seat_rows %}
+          <div class="seat-row">
+            <div>
+              <div class="seat-name">{{ r.class.name }}</div>
+              <div class="seat-bars">
+                <span class="pill">เรียน {{ r.enrolled_count }}/{{ r.total_seats }}</span>
+                <span class="pill blue">คิว {{ r.expected_count }}</span>
+                <span class="pill">ทดลอง {{ r.expected_trial }}</span>
+                <span class="pill">สมัคร {{ r.expected_enroll }}</span>
+              </div>
+            </div>
+            <div>
+              <div class="count-big">{{ r.available_seats }}</div>
+              <div class="count-label">ที่นั่งว่าง</div>
+            </div>
+          </div>
+        {% empty %}
+          <div class="muted">ยังไม่มีข้อมูล class</div>
+        {% endfor %}
+      </div>
+    </section>
+
+    <section class="sd-card span6">
+      <div class="card-head">
+        <div><div class="card-title">3) รายรับรายจ่าย</div><div class="muted">ทำให้ขนาดสมดุลกับ card ที่นั่ง และเห็นตัวเลขหลักทันที</div></div>
+        <div class="quick"><a class="btnx soft" href="/school-finance/">Finance</a><a class="btnx green" href="/course-payments/new/">ใบเสร็จ</a><a class="btnx orange" href="#expenseModal">+ ค่าใช้จ่าย</a></div>
+      </div>
+      <form class="filters" method="get">
+        <select name="finance_period"><option value="month" {% if finance_mode == 'month' %}selected{% endif %}>เดือนนี้</option><option value="year" {% if finance_mode == 'year' %}selected{% endif %}>ปีนี้</option><option value="custom" {% if finance_mode == 'custom' %}selected{% endif %}>เลือกเอง</option></select>
+        <input type="date" name="finance_from" value="{{ finance_start|date:'Y-m-d' }}">
+        <input type="date" name="finance_to" value="{{ finance_end|date:'Y-m-d' }}">
+        <button class="btnx primary">Apply</button>
+      </form>
+      <div class="money-grid">
+        <div class="money cash"><div class="label">รายได้เงินสด</div><div class="amount">{{ selected_finance.cash_revenue|floatformat:0 }}</div></div>
+        <div class="money"><div class="label">รายได้ประมาณการ</div><div class="amount">{{ selected_finance.estimated_revenue|floatformat:0 }}</div></div>
+        <div class="money"><div class="label">ค่าใช้จ่ายทั่วไป</div><div class="amount">{{ selected_finance.general_expense|floatformat:0 }}</div></div>
+        <div class="money"><div class="label">ค่าจ้างติวเตอร์</div><div class="amount">{{ selected_finance.tutor_payroll|floatformat:0 }}</div></div>
+        <div class="money positive"><div class="label">กำไรประมาณการ</div><div class="amount">{{ selected_finance.net_estimated|floatformat:0 }}</div></div>
+        <div class="money cash"><div class="label">Cash Flow</div><div class="amount">{{ selected_finance.net_cash|floatformat:0 }}</div></div>
+      </div>
+      <div class="mini-note tiny">เดือนนี้ Cash {{ month_finance.cash_revenue|floatformat:0 }} · YTD Cash {{ ytd_finance.cash_revenue|floatformat:0 }}</div>
+    </section>
+
+    <section class="sd-card span6">
+      <div class="card-head"><div><div class="card-title">4) นักเรียนทดลอง/สมัครที่จะมาถึง</div><div class="muted">ปุ่ม emoji สำหรับอัปเดตเร็ว</div></div><a class="btnx soft" href="/admission-report/">ดูทั้งหมด</a></div>
+      <form class="filters" method="get">
+        <select name="admission_type"><option value="all">ทั้งหมด</option><option value="trial" {% if admission_type == 'trial' %}selected{% endif %}>ทดลองเรียน</option><option value="enroll" {% if admission_type == 'enroll' %}selected{% endif %}>สมัครเรียน</option></select>
+        <select name="admission_period"><option value="next_week" {% if admission_mode == 'next_week' %}selected{% endif %}>สัปดาห์ที่จะมาถึง</option><option value="last_week" {% if admission_mode == 'last_week' %}selected{% endif %}>สัปดาห์ที่ผ่านมา</option><option value="custom" {% if admission_mode == 'custom' %}selected{% endif %}>เลือกเอง</option></select>
+        <input type="date" name="admission_from" value="{{ admission_start|date:'Y-m-d' }}">
+        <input type="date" name="admission_to" value="{{ admission_end|date:'Y-m-d' }}">
+        <button class="btnx primary">Apply</button>
+      </form>
+      <div class="list scroll">
+        {% for i in admission_rows %}
+          <div class="row-card">
+            <div class="row-title">{{ i.nickname }} · {{ i.full_name }} · {{ i.get_grade_level_display }} · {{ i.first_lesson_date|date:'d/m' }}</div>
+            <div class="row-meta">{{ i.display_target_class.name|default:'ยังไม่ assign class' }}</div>
+            <div class="quick">
+              <form method="post">{% csrf_token %}<input type="hidden" name="action" value="admission_quick_update"><input type="hidden" name="inquiry_id" value="{{ i.id }}"><input type="hidden" name="sheet_prepared" value="yes"><button class="emoji" title="ชีทพร้อม">📄</button></form>
+              <form method="post">{% csrf_token %}<input type="hidden" name="action" value="admission_quick_update"><input type="hidden" name="inquiry_id" value="{{ i.id }}"><input type="hidden" name="trial_attended" value="yes"><button class="emoji" title="มาเรียนแล้ว">✅</button></form>
+              <form method="post">{% csrf_token %}<input type="hidden" name="action" value="admission_quick_update"><input type="hidden" name="inquiry_id" value="{{ i.id }}"><input type="hidden" name="is_completed" value="yes"><button class="emoji" title="เสร็จแล้ว">🏁</button></form>
+            </div>
+          </div>
+        {% empty %}<div class="muted">ไม่มีรายการในช่วงนี้</div>{% endfor %}
+      </div>
+    </section>
+
+    <section class="sd-card span6">
+      <div class="card-head"><div><div class="card-title">5) Enrollment ใกล้ครบคอร์ส</div><div class="muted">เหลือ 2: {{ near_2_count }} · เหลือ 1: {{ near_1_count }} · ยังไม่แจ้ง: {{ notice_unsent_count }}</div></div><a class="btnx soft" href="/course-renewal-notices/">ต่อคอร์ส</a></div>
+      <div class="list scroll">
+        {% for e in near_enrollments %}
+          <div class="row-card">
+            <div class="row-title">{{ e.student.nickname }} · {{ e.student.full_name }}</div>
+            <div class="row-meta">{{ e.tutoring_class.name }} <span class="pill warn">เหลือ {{ e.sessions_total }}</span></div>
+            <div class="quick"><a class="btnx soft" href="/course-renewal-notices/create/{{ e.id }}/">สร้างใบแจ้ง</a>{% if e.latest_notice and not e.latest_notice.is_sent_to_parent %}<form method="post" action="{% url 'core:course_renewal_notice_mark_sent' e.latest_notice.id %}">{% csrf_token %}<button class="btnx green">ส่งแล้ว</button></form>{% endif %}</div>
+          </div>
+        {% empty %}<div class="muted">ไม่มี enrollment ใกล้ครบ</div>{% endfor %}
+      </div>
+    </section>
+
+    <section class="sd-card span8">
+      <div class="card-head"><div><div class="card-title">6) Sheet Inventory Summary</div><div class="muted">ทำตัวเลข stock ให้เด่นขึ้น คลิกเลขเพื่อไป profile และกด 🖨️ เพื่อสั่งปรินท์</div></div><a class="btnx soft" href="/sheet-inventory/">Inventory</a></div>
+      <div class="sheet-table-wrap">
+        <table class="sheet-table">
+          <thead><tr><th>ระดับชั้น</th>{% for s in sheet_matrix.subjects %}<th>{{ s }}</th>{% endfor %}</tr></thead>
+          <tbody>
+            {% for g in sheet_matrix.rows %}
+              <tr>
+                <td><b>{{ g.label }}</b></td>
+                {% for cell in g.cells %}
+                  <td>
+                    <div class="sheet-cell-items">
+                      {% for item in cell.items %}
+                        <span class="sheet-chip"><a class="stock-link" href="/sheet-inventory/sheet/{{ item.sheet.id }}/"><span class="code">{{ item.sheet.code }}</span><span class="qty">{{ item.quantity }}</span></a><a class="print-link" href="/sheet-print-orders/">🖨️</a></span>
+                      {% empty %}<span class="empty-cell">-</span>{% endfor %}
+                    </div>
+                  </td>
+                {% endfor %}
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="sd-card span4">
+      <div class="card-head"><div><div class="card-title">7) รายการส่งปรินท์</div><div class="muted">รอปรินท์และเสร็จแล้วพร้อมกัน</div></div><a class="btnx soft" href="/sheet-print-orders/">ปรินท์</a></div>
+      <div class="print-columns">
+        <div class="print-box"><h4>รอปรินท์</h4>{% for o in print_pending %}<div class="print-item"><div class="row-title">{{ o.display_code }}</div><div class="row-meta">{{ o.display_title }}</div><div><span class="print-qty">{{ o.quantity }}</span> <span class="tiny">เล่ม · เสร็จ {{ o.printed_quantity }}/{{ o.quantity }}</span></div></div>{% empty %}<div class="muted">ไม่มีรายการรอ</div>{% endfor %}</div>
+        <div class="print-box"><h4>เสร็จแล้ว</h4>{% for o in print_ready %}<div class="print-item done"><div class="row-title">{{ o.display_code }}</div><div class="row-meta">{{ o.quantity }} เล่ม</div></div>{% empty %}<div class="muted">ยังไม่มีรายการเสร็จล่าสุด</div>{% endfor %}</div>
+      </div>
+    </section>
+
+    <section class="sd-card span12">
+      <div class="card-head"><div><div class="card-title">8) สถานะการอัปเดตชีทของติวเตอร์</div><div class="muted">ย้ายลงล่างสุดและสรุปให้สั้นลง · สัปดาห์ {{ teaching.week_start|date:'d/m/Y' }} - {{ teaching.week_end|date:'d/m/Y' }}</div></div><a class="btnx soft" href="/tutor-teaching-update/">ไปหน้าติวเตอร์</a></div>
+      <div class="teaching-summary">
+        <div class="kpi amber"><div class="k">ยังไม่บันทึก</div><div class="v">{{ teaching.missing_count }}</div></div>
+        <div class="kpi green"><div class="k">บันทึกแล้ว</div><div class="v">{{ teaching.done_count }}</div></div>
+        <div class="kpi"><div class="k">ไม่มีสอน</div><div class="v">{{ teaching.no_teaching_count }}</div></div>
+      </div>
+      <div class="teaching-grid">
+        <div class="teaching-col"><h4>🟠 ยังไม่บันทึก</h4><div class="list">{% for r in teaching.rows %}{% if r.status == 'missing' %}<div class="row-card missing"><div class="row-title">{{ r.assignment.tutoring_class.name }} · {{ r.assignment.subject_template.subject_name }}</div><div class="row-meta">{{ r.assignment.tutor.name|default:'ยังไม่ assign' }}</div></div>{% endif %}{% endfor %}</div></div>
+        <div class="teaching-col"><h4>🟢 บันทึกแล้ว</h4><div class="list">{% for r in teaching.rows %}{% if r.status == 'done' %}<div class="row-card done"><div class="row-title">{{ r.assignment.tutoring_class.name }} · {{ r.assignment.subject_template.subject_name }}</div><div class="row-meta">{{ r.update.sheet_name|default:'-' }} · หน้า {{ r.update.page_to|default:'-' }} · ข้อ {{ r.update.question_to|default:'-' }} · {{ r.update.updated_by_name|default:'-' }}</div></div>{% endif %}{% endfor %}</div></div>
+        <div class="teaching-col"><h4>⚪ ไม่มีสอน</h4><div class="list">{% for r in teaching.rows %}{% if r.status != 'missing' and r.status != 'done' %}<div class="row-card no"><div class="row-title">{{ r.assignment.tutoring_class.name }} · {{ r.assignment.subject_template.subject_name }}</div><div class="row-meta">{{ r.assignment.tutor.name|default:'-' }}</div></div>{% endif %}{% endfor %}</div></div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<div class="modal" id="expenseModal">
+  <div class="modal-box">
+    <div class="card-head"><div class="card-title">เพิ่มค่าใช้จ่าย</div><a class="btnx soft" href="#">ปิด</a></div>
+    <form method="post" class="list">{% csrf_token %}<input type="hidden" name="action" value="add_expense">
+      <div class="field"><label>วันที่</label><input type="date" name="expense_date" value="{{ today|date:'Y-m-d' }}"></div>
+      <div class="field"><label>ประเภท</label><select name="category">{% for c in expense_categories %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}</select></div>
+      <div class="field"><label>Vendor</label><input name="vendor"></div>
+      <div class="field"><label>รายละเอียด</label><input name="description"></div>
+      <div class="field"><label>ยอดเงิน</label><input name="amount" type="number" step="0.01" required></div>
+      <div class="field"><label>วิธีจ่าย</label><select name="payment_method">{% for v,l in payment_method_choices %}<option value="{{ v }}">{{ l }}</option>{% endfor %}</select></div>
+      <button class="btnx green">บันทึกค่าใช้จ่าย</button>
+    </form>
+  </div>
+</div>
+
+<script>
+  (function(){
+    const data = {{ attendance_series_json|safe }};
+    const el = document.getElementById('attendanceChart');
+    if (!el || !window.Chart || !data) return;
+    new Chart(el, {
+      type: 'line',
+      data: {
+        labels: data.labels,
+        datasets: [
+          {label:'รวม', data:data.total, tension:.3, pointRadius:2, borderWidth:2},
+          {label:'มา', data:data.present, tension:.3, pointRadius:2, borderWidth:2},
+          {label:'ลา', data:data.excused, tension:.3, pointRadius:2, borderWidth:2},
+          {label:'ขาด', data:data.no_show, tension:.3, pointRadius:2, borderWidth:2}
+        ]
+      },
+      options: {
+        responsive:true,
+        maintainAspectRatio:false,
+        plugins:{legend:{position:'bottom', labels:{boxWidth:10, boxHeight:10, font:{size:10}}}},
+        scales:{x:{ticks:{maxRotation:0, autoSkip:true, font:{size:10}}}, y:{beginAtZero:true, ticks:{precision:0, font:{size:10}}}}
+      }
+    });
+  })();
+</script>
+{% endblock %}

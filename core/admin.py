@@ -419,6 +419,10 @@ class SheetPrintOrderAdmin(admin.ModelAdmin):
         "created_at",
         "item_display",
         "quantity",
+        "printed_quantity",
+        "print_done",
+        "bound_done",
+        "spine_unavailable",
         "binding_type",
         "spine_color",
         "due_date",
@@ -428,6 +432,9 @@ class SheetPrintOrderAdmin(admin.ModelAdmin):
     )
     list_filter = (
         "status",
+        "print_done",
+        "bound_done",
+        "spine_unavailable",
         "due_date",
         "binding_type",
         "spine_color",
@@ -458,6 +465,7 @@ class AdmissionInquiryAdmin(admin.ModelAdmin):
         "full_name_display",
         "grade_level",
         "preferred_time_slot",
+        "target_class",
         "first_lesson_date",
         "contact_phone",
         "sheet_prepared",
@@ -470,6 +478,7 @@ class AdmissionInquiryAdmin(admin.ModelAdmin):
         "request_type",
         "grade_level",
         "preferred_time_slot",
+        "target_class",
         "first_lesson_date",
         "sheet_prepared",
         "trial_attended",
@@ -486,6 +495,7 @@ class AdmissionInquiryAdmin(admin.ModelAdmin):
     readonly_fields = ("created_at", "updated_at", "completed_at")
     ordering = ("-created_at",)
     list_per_page = 50
+    autocomplete_fields = ("target_class",)
 
     fieldsets = (
         ("ข้อมูลจากผู้ปกครอง", {
@@ -499,6 +509,7 @@ class AdmissionInquiryAdmin(admin.ModelAdmin):
                 "latest_gpa",
                 "grade_level",
                 "preferred_time_slot",
+                "target_class",
                 "first_lesson_date",
             )
         }),

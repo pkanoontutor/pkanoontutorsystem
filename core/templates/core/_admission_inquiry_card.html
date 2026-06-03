@@ -8,47 +8,33 @@
       <div class="summary-status">
         {% if i.request_type == 'trial' %}<span class="badge2 b-trial">จองทดลองเรียน</span>{% elif i.request_type == 'enroll' %}<span class="badge2 b-enroll">สมัครเรียน</span>{% else %}<span class="badge2 b-queue">จองที่นั่ง</span>{% endif %}
         {% if i.sheet_prepared %}<span class="badge2 b-ready">ชีทพร้อม</span>{% else %}<span class="badge2 b-notready">ชีทยังไม่พร้อม</span>{% endif %}
-        {% if i.request_type == 'trial' %}<span class="badge2 b-pending">{{ i.get_trial_attended_display }}</span><span class="badge2 b-warn">{{ i.get_trial_result_display }}</span>{% endif %}
+        {% if i.display_target_class %}<span class="badge2 b-ready">{{ i.display_target_class.name }}</span>{% endif %}
         {% if i.is_completed %}<span class="badge2 b-done">เสร็จแล้ว</span>{% endif %}
       </div>
     </div>
-
     <div class="summary-main">
-      <div class="date-box">
-        <div class="date-label">วันที่นัดหมาย / เริ่มเรียน</div>
-        <div class="date-value">{{ i.first_lesson_date|date:"d/m/Y" }}</div>
-        <div class="slot">{{ i.get_preferred_time_slot_display }}</div>
-      </div>
-      <div class="summary-actions">
-        <span class="soon-chip">ใกล้ถึงใน 7 วัน</span>
-        <span class="overdue-chip">เลยวันนัดแล้ว</span>
-        <span class="expand-btn">กดเพื่ออัปเดต</span>
-      </div>
+      <div class="date-box"><div class="date-label">วันที่นัดหมาย / เริ่มเรียน</div><div class="date-value">{{ i.first_lesson_date|date:"d/m/Y" }}</div><div class="slot">{{ i.get_preferred_time_slot_display }}</div></div>
+      <div class="summary-actions"><span class="soon-chip">ใกล้ถึงใน 7 วัน</span><span class="overdue-chip">เลยวันนัดแล้ว</span><span class="expand-btn">กดเพื่อแก้ละเอียด</span></div>
     </div>
   </summary>
-
   <div class="card-body">
-    <div class="detail-grid">
-      <div><b>วันเรียน:</b> {{ i.first_lesson_date|date:"d/m/Y" }}</div>
-      <div><b>รอบ:</b> {{ i.get_preferred_time_slot_display }}</div>
-      <div><b>GPA:</b> {{ i.latest_gpa|default:"-" }}</div>
-      <div><b>ลงทะเบียน:</b> {{ i.created_at|date:"d/m/Y H:i" }}</div>
+    <div class="quick-actions">
+      <form method="post" action="{% url 'core:admission_report_update' %}">{% csrf_token %}<input type="hidden" name="inquiry_id" value="{{ i.id }}"><input type="hidden" name="sheet_prepared" value="{% if i.sheet_prepared %}no{% else %}yes{% endif %}"><button type="submit" class="quick-btn">📄</button></form>
+      {% if i.request_type == 'trial' %}<form method="post" action="{% url 'core:admission_report_update' %}">{% csrf_token %}<input type="hidden" name="inquiry_id" value="{{ i.id }}"><input type="hidden" name="trial_attended" value="yes"><button type="submit" class="quick-btn">✅</button></form>{% endif %}
+      <form method="post" action="{% url 'core:admission_report_update' %}">{% csrf_token %}<input type="hidden" name="inquiry_id" value="{{ i.id }}"><input type="hidden" name="is_completed" value="{% if i.is_completed %}no{% else %}yes{% endif %}"><button type="submit" class="quick-btn">🏁</button></form>
     </div>
-
+    <div class="detail-grid">
+      <div><b>วันเรียน:</b> {{ i.first_lesson_date|date:"d/m/Y" }}</div><div><b>รอบ:</b> {{ i.get_preferred_time_slot_display }}</div><div><b>GPA:</b> {{ i.latest_gpa|default:"-" }}</div><div><b>ลงทะเบียน:</b> {{ i.created_at|date:"d/m/Y H:i" }}</div>
+    </div>
     <form method="post" action="{% url 'core:admission_report_update' %}" class="inline-form">
-      {% csrf_token %}
-      <input type="hidden" name="inquiry_id" value="{{ i.id }}">
+      {% csrf_token %}<input type="hidden" name="inquiry_id" value="{{ i.id }}">
+      <div class="inline-form-row"><label>Class</label><select name="target_class_id"><option value="">ให้ระบบเดา / ยังไม่ assign</option>{% for cls in active_classes %}<option value="{{ cls.id }}" {% if i.target_class_id == cls.id %}selected{% elif not i.target_class_id and i.guessed_class and i.guessed_class.id == cls.id %}selected{% endif %}>{{ cls.name }}</option>{% endfor %}</select><span class="mini">ระบบเดา: {% if i.guessed_class %}{{ i.guessed_class.name }}{% else %}-{% endif %}</span></div>
       <div class="inline-form-row"><label>ชีท</label><select name="sheet_prepared"><option value="no" {% if not i.sheet_prepared %}selected{% endif %}>ยังไม่พร้อม</option><option value="yes" {% if i.sheet_prepared %}selected{% endif %}>พร้อมแล้ว</option></select></div>
-      {% if i.request_type == 'trial' %}
-        <div class="inline-form-row"><label>มาเรียนจริง</label><select name="trial_attended">{% for value,label in trial_attended_choices %}<option value="{{ value }}" {% if i.trial_attended == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
-        <div class="inline-form-row"><label>ผลทดลอง</label><select name="trial_result">{% for value,label in trial_result_choices %}<option value="{{ value }}" {% if i.trial_result == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
-      {% else %}
-        <input type="hidden" name="trial_attended" value="{{ i.trial_attended }}"><input type="hidden" name="trial_result" value="{{ i.trial_result }}">
-      {% endif %}
+      {% if i.request_type == 'trial' %}<div class="inline-form-row"><label>มาเรียนจริง</label><select name="trial_attended">{% for value,label in trial_attended_choices %}<option value="{{ value }}" {% if i.trial_attended == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div><div class="inline-form-row"><label>ผลทดลอง</label><select name="trial_result">{% for value,label in trial_result_choices %}<option value="{{ value }}" {% if i.trial_result == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>{% endif %}
       <div class="inline-form-row"><label>สถานะงาน</label><select name="is_completed"><option value="no" {% if not i.is_completed %}selected{% endif %}>ยังไม่เสร็จ</option><option value="yes" {% if i.is_completed %}selected{% endif %}>ดำเนินการเสร็จแล้ว</option></select></div>
       <div class="inline-form-row"><label>หมายเหตุ</label><textarea name="internal_note" placeholder="หมายเหตุภายใน">{{ i.internal_note }}</textarea></div>
       {% if i.is_completed and i.completed_at %}<div class="mini">เสร็จเมื่อ {{ i.completed_at|date:"d/m/Y H:i" }}</div>{% endif %}
-      <button class="btn-save {% if not i.is_completed %}done-save{% endif %}" type="submit">{% if i.is_completed %}บันทึก / ย้ายกลับงานค้าง{% else %}บันทึกสถานะ{% endif %}</button>
+      <button class="btn-save {% if not i.is_completed %}done-save{% endif %}" type="submit">บันทึกสถานะ / Class</button>
     </form>
   </div>
 </details>

@@ -983,6 +983,10 @@ class SheetPrintOrder(models.Model):
         help_text="ใช้กรณีสั่งปรินท์เอกสารที่ไม่ได้อยู่ใน Sheet Inventory",
     )
     quantity = models.PositiveIntegerField("จำนวนที่สั่งปรินท์", default=1)
+    printed_quantity = models.PositiveIntegerField("จำนวนที่ร้านปรินท์เสร็จแล้ว", default=0)
+    print_done = models.BooleanField("ปรินท์แล้ว", default=False)
+    bound_done = models.BooleanField("เย็บแล้ว", default=False)
+    spine_unavailable = models.BooleanField("สันรูดหมด / รอสันรูด", default=False)
     due_date = models.DateField("วันที่ต้องส่ง", null=True, blank=True)
     onedrive_url = models.URLField("ลิงก์ไฟล์ OneDrive", max_length=1000, blank=True)
     binding_type = models.CharField(
@@ -1080,10 +1084,35 @@ class SheetPrintOrder(models.Model):
             self.SpineColor.ORANGE: "#fdba74",
         }.get(self.spine_color, "#e2e8f0")
 
+    @property
+    def printed_remaining(self) -> int:
+        return max(int(self.quantity or 0) - int(self.printed_quantity or 0), 0)
+
+    @property
+    def print_progress_percent(self) -> int:
+        qty = int(self.quantity or 0)
+        if qty <= 0:
+            return 0
+        return min(int((int(self.printed_quantity or 0) / qty) * 100), 100)
+
+    @property
+    def can_mark_ready(self) -> bool:
+        return (
+            self.status == self.Status.PENDING
+            and int(self.printed_quantity or 0) >= int(self.quantity or 0)
+            and bool(self.bound_done)
+            and not bool(self.spine_unavailable)
+        )
+
     def mark_ready(self):
+        if not self.can_mark_ready:
+            return False
         self.status = self.Status.READY
         self.completed_at = timezone.now()
-        self.save(update_fields=["status", "completed_at", "updated_at"])
+        self.print_done = True
+        self.bound_done = True
+        self.save(update_fields=["status", "completed_at", "print_done", "bound_done", "updated_at"])
+        return True
 
 
 class SheetClassMapping(models.Model):
@@ -1189,6 +1218,15 @@ class AdmissionInquiry(models.Model):
         "รอบเวลาเรียน",
         max_length=30,
         choices=PreferredTimeSlot.choices,
+    )
+    target_class = models.ForeignKey(
+        TutoringClass,
+        verbose_name="Class ที่คาดว่าจะเข้าเรียน",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="admission_inquiries",
+        help_text="ใช้สำหรับประมาณที่นั่งว่างและติดตามเด็กสมัคร/ทดลองเรียน",
     )
 
     sheet_prepared = models.BooleanField("เตรียมชีทพร้อมแล้ว", default=False)

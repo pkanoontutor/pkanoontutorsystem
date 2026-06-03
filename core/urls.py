@@ -12,6 +12,7 @@ urlpatterns = [
 
     # Dashboard
     path("dashboard/", views.dashboard, name="dashboard"),
+    path("super-dashboard/", views.super_dashboard, name="super_dashboard"),
     path("pkanoon-admin-tool/", views.pkanoon_admin_tool, name="pkanoon_admin_tool"),
 
     # Attendance
@@ -48,6 +49,7 @@ urlpatterns = [
     path("sheet-print-orders/", views.sheet_print_order_admin, name="sheet_print_order_admin"),
     path("print-shop/", views.print_shop_order_list, name="print_shop_order_list"),
     path("print-shop/order/<int:pk>/ready/", views.print_shop_mark_ready, name="print_shop_mark_ready"),
+    path("print-shop/order/<int:pk>/update/", views.print_shop_update_order, name="print_shop_update_order"),
 
 
 

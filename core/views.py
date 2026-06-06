@@ -132,6 +132,32 @@ def _sheet_grade_label(value: str | None) -> str:
     return labels.get((value or "").strip().lower(), value or "ไม่ระบุระดับชั้น")
 
 
+def _sheet_subject_style(subject_name: str | None) -> dict:
+    """Pastel color mapping for sheet cards by subject."""
+    raw = (subject_name or "").strip().lower().replace(" ", "")
+
+    # Specific subjects first
+    if "อังกฤษเสริม" in raw or "คณิตเสริม" in raw or "extraenglish" in raw or "extramath" in raw:
+        return {"key": "red", "label": "สีแดง", "bg": "#fee2e2", "border": "#fca5a5", "accent": "#dc2626"}
+    if "คณิตหลัก" in raw or "คณิต" in raw or "math" in raw:
+        return {"key": "blue", "label": "สีฟ้า", "bg": "#dbeafe", "border": "#93c5fd", "accent": "#2563eb"}
+    if "วิทย" in raw or "ชีว" in raw or "science" in raw or "bio" in raw or "biology" in raw:
+        return {"key": "green", "label": "สีเขียว", "bg": "#dcfce7", "border": "#86efac", "accent": "#16a34a"}
+    if "อังกฤษ" in raw or "english" in raw:
+        return {"key": "pink", "label": "สีชมพู", "bg": "#fce7f3", "border": "#f9a8d4", "accent": "#db2777"}
+    if "เคมี" in raw or "ฟิสิก" in raw or "ไทย" in raw or "สังคม" in raw or "chem" in raw or "physics" in raw or "thai" in raw or "social" in raw:
+        return {"key": "yellow", "label": "สีเหลือง", "bg": "#fef9c3", "border": "#fde047", "accent": "#ca8a04"}
+    return {"key": "gray", "label": "ทั่วไป", "bg": "#f8fafc", "border": "#cbd5e1", "accent": "#64748b"}
+
+
+def _sheet_subject_style_attr(sheet: Sheet | None) -> str:
+    subject_name = ""
+    if sheet and getattr(sheet, "subject_id", None):
+        subject_name = sheet.subject.name
+    style = _sheet_subject_style(subject_name)
+    return f"--subject-bg:{style['bg']};--subject-border:{style['border']};--subject-accent:{style['accent']};"
+
+
 def _normalize_sheet_grade_level(value: str | None) -> str:
     raw = (value or "").strip().lower().replace(" ", "")
     if not raw:
@@ -483,6 +509,8 @@ def _sheet_row(sheet: Sheet) -> dict:
     inv = _inventory_for_sheet(sheet)
     qty = int(inv.quantity or 0) if inv else 0
     minimum = int(getattr(inv, "minimum_stock", 0) or 0) if inv else 0
+    last_updated_at = getattr(inv, "updated_at", None) if inv else None
+    subject_style = _sheet_subject_style(sheet.subject.name if getattr(sheet, "subject_id", None) else "")
     return {
         "sheet": sheet,
         "inventory": inv,
@@ -491,7 +519,11 @@ def _sheet_row(sheet: Sheet) -> dict:
         "grade_level": getattr(sheet, "grade_level", "") or "",
         "grade_label": _sheet_grade_label(getattr(sheet, "grade_level", "") or ""),
         "is_low": minimum > 0 and qty <= minimum,
+        "last_updated_at": last_updated_at,
+        "subject_style": f"--subject-bg:{subject_style['bg']};--subject-border:{subject_style['border']};--subject-accent:{subject_style['accent']};",
+        "subject_color_label": subject_style["label"],
     }
+
 
 
 def _build_class_sheet_rows() -> list[dict]:
@@ -876,6 +908,98 @@ def _import_sheet_rows_from_upload(rows: list[dict], *, user=None, stock_mode: s
 
 
 
+
+def _save_inventory_set_from_post(
+    request: HttpRequest,
+    *,
+    sheet_id: str | int,
+    qty_prefix: str,
+    note_prefix: str,
+    movement_type: str,
+    default_note: str,
+) -> tuple[bool, str]:
+    sheet = Sheet.objects.filter(id=sheet_id).first()
+    if not sheet:
+        return False, "ไม่พบชีท"
+
+    raw_qty = (request.POST.get(f"{qty_prefix}{sheet.id}") or "").strip()
+    if raw_qty == "":
+        return False, "ยังไม่ได้กรอกจำนวน"
+    try:
+        qty = int(raw_qty)
+    except Exception:
+        return False, "จำนวนไม่ถูกต้อง"
+
+    note = (request.POST.get(f"{note_prefix}{sheet.id}") or default_note).strip()
+    ok, message, inventory, movement = _apply_sheet_inventory_movement(
+        sheet=sheet,
+        movement_type=movement_type,
+        quantity=qty,
+        note=note,
+        user=request.user,
+    )
+    return ok, message
+
+
+def _save_inventory_adjust_from_post(
+    request: HttpRequest,
+    *,
+    sheet_id: str | int,
+    qty_prefix: str,
+    note_prefix: str,
+    movement_type: str,
+    default_note: str,
+) -> tuple[bool, str]:
+    sheet = Sheet.objects.filter(id=sheet_id).first()
+    if not sheet:
+        return False, "ไม่พบชีท"
+
+    raw_qty = (request.POST.get(f"{qty_prefix}{sheet.id}") or "").strip()
+    if raw_qty == "":
+        return False, "ยังไม่ได้กรอกจำนวน"
+    try:
+        qty = int(raw_qty)
+    except Exception:
+        return False, "จำนวนไม่ถูกต้อง"
+
+    note = (request.POST.get(f"{note_prefix}{sheet.id}") or default_note).strip()
+    ok, message, inventory, movement = _apply_sheet_inventory_movement(
+        sheet=sheet,
+        movement_type=movement_type,
+        quantity=qty,
+        note=note,
+        user=request.user,
+    )
+    return ok, message
+
+
+def _save_inventory_bulk_from_post(
+    request: HttpRequest,
+    *,
+    qty_prefix: str,
+    note_prefix: str,
+    movement_type: str,
+    default_note: str,
+) -> int:
+    saved_count = 0
+    for key, raw_qty in request.POST.items():
+        if not key.startswith(qty_prefix):
+            continue
+        sheet_id = key.replace(qty_prefix, "", 1)
+        if (raw_qty or "").strip() == "":
+            continue
+        ok, _msg = _save_inventory_set_from_post(
+            request,
+            sheet_id=sheet_id,
+            qty_prefix=qty_prefix,
+            note_prefix=note_prefix,
+            movement_type=movement_type,
+            default_note=default_note,
+        )
+        if ok:
+            saved_count += 1
+    return saved_count
+
 @login_required
 def sheet_inventory_dashboard(request: HttpRequest) -> HttpResponse:
     if request.method == "POST":
@@ -925,6 +1049,53 @@ def sheet_inventory_dashboard(request: HttpRequest) -> HttpResponse:
                         )
                 return redirect("core:sheet_inventory_profile", pk=sheet.pk)
 
+        elif action.startswith("set_stock_single:"):
+            sheet_id = action.split(":", 1)[1]
+            _save_inventory_set_from_post(
+                request,
+                sheet_id=sheet_id,
+                qty_prefix="set_qty_",
+                note_prefix="set_note_",
+                movement_type=SheetInventoryMovement.MovementType.SET,
+                default_note="Manual balance update from Sheet Inventory",
+            )
+            return redirect("core:sheet_inventory_dashboard")
+
+        elif action.startswith("add_stock_single:"):
+            sheet_id = action.split(":", 1)[1]
+            _save_inventory_adjust_from_post(
+                request,
+                sheet_id=sheet_id,
+                qty_prefix="adjust_qty_",
+                note_prefix="set_note_",
+                movement_type=SheetInventoryMovement.MovementType.ADD,
+                default_note="Manual add from Sheet Inventory",
+            )
+            return redirect("core:sheet_inventory_dashboard")
+
+        elif action.startswith("deduct_stock_single:"):
+            sheet_id = action.split(":", 1)[1]
+            _save_inventory_adjust_from_post(
+                request,
+                sheet_id=sheet_id,
+                qty_prefix="adjust_qty_",
+                note_prefix="set_note_",
+                movement_type=SheetInventoryMovement.MovementType.DEDUCT,
+                default_note="Manual deduct from Sheet Inventory",
+            )
+            return redirect("core:sheet_inventory_dashboard")
+
+        elif action == "set_stock_bulk":
+            _save_inventory_bulk_from_post(
+                request,
+                qty_prefix="set_qty_",
+                note_prefix="set_note_",
+                movement_type=SheetInventoryMovement.MovementType.SET,
+                default_note="Bulk balance update from Sheet Inventory",
+            )
+            return redirect("core:sheet_inventory_dashboard")
+
+        # Keep legacy actions for compatibility with older forms/links.
         elif action == "stock_single":
             sheet = get_object_or_404(Sheet, id=request.POST.get("sheet_id"))
             mode = request.POST.get("movement_type") or SheetInventoryMovement.MovementType.ADD
@@ -977,18 +1148,101 @@ def sheet_inventory_dashboard(request: HttpRequest) -> HttpResponse:
             return redirect("core:sheet_inventory_dashboard")
 
     q = (request.GET.get("q") or "").strip()
-    sheets_qs = Sheet.objects.select_related("subject").all()
-    if q:
-        sheets_qs = sheets_qs.filter(
-            Q(code__icontains=q) |
-            Q(title__icontains=q) |
-            Q(subject__name__icontains=q)
-        )
-    sheets = list(sheets_qs.order_by("grade_level", "subject__name", "code"))
-    sheet_rows = [_sheet_row(s) for s in sheets]
-
     return render(request, "core/sheet_inventory.html", _sheet_inventory_context(q=q))
 
+
+@login_required
+def sheet_inventory_count(request: HttpRequest) -> HttpResponse:
+    """Dedicated stock count page. It records the actual counted balance only."""
+    if request.method == "POST":
+        action = (request.POST.get("action") or "").strip()
+
+        if action.startswith("count_stock_single:"):
+            sheet_id = action.split(":", 1)[1]
+            _save_inventory_set_from_post(
+                request,
+                sheet_id=sheet_id,
+                qty_prefix="count_qty_",
+                note_prefix="count_note_",
+                movement_type=SheetInventoryMovement.MovementType.COUNT,
+                default_note="Stock count adjustment",
+            )
+            return redirect("core:sheet_inventory_count")
+
+        if action == "count_stock_bulk":
+            _save_inventory_bulk_from_post(
+                request,
+                qty_prefix="count_qty_",
+                note_prefix="count_note_",
+                movement_type=SheetInventoryMovement.MovementType.COUNT,
+                default_note="Bulk stock count adjustment",
+            )
+            return redirect("core:sheet_inventory_count")
+
+    q = (request.GET.get("q") or "").strip()
+    return render(request, "core/sheet_inventory_count.html", _sheet_inventory_context(q=q))
+
+
+@login_required
+def sheet_inventory_movements(request: HttpRequest) -> HttpResponse:
+    q = (request.GET.get("q") or "").strip()
+    movement_type = (request.GET.get("movement_type") or "").strip()
+    grade = _normalize_sheet_grade_level(request.GET.get("grade"))
+    date_from_raw = (request.GET.get("date_from") or "").strip()
+    date_to_raw = (request.GET.get("date_to") or "").strip()
+
+    movements_qs = SheetInventoryMovement.objects.select_related("sheet", "sheet__subject", "created_by").order_by("-created_at", "-id")
+
+    if q:
+        movements_qs = movements_qs.filter(
+            Q(sheet__code__icontains=q) |
+            Q(sheet__title__icontains=q) |
+            Q(sheet__subject__name__icontains=q) |
+            Q(note__icontains=q)
+        )
+    if movement_type in dict(SheetInventoryMovement.MovementType.choices):
+        movements_qs = movements_qs.filter(movement_type=movement_type)
+    if grade:
+        movements_qs = movements_qs.filter(sheet__grade_level=grade)
+
+    parsed_from = None
+    parsed_to = None
+    try:
+        if date_from_raw:
+            parsed_from = date.fromisoformat(date_from_raw)
+            movements_qs = movements_qs.filter(created_at__date__gte=parsed_from)
+    except ValueError:
+        parsed_from = None
+    try:
+        if date_to_raw:
+            parsed_to = date.fromisoformat(date_to_raw)
+            movements_qs = movements_qs.filter(created_at__date__lte=parsed_to)
+    except ValueError:
+        parsed_to = None
+
+    movement_rows = []
+    for m in movements_qs[:500]:
+        before = int(m.balance_before or 0)
+        after = int(m.balance_after or 0)
+        delta = after - before
+        movement_rows.append({
+            "movement": m,
+            "delta": delta,
+            "delta_label": f"+{delta}" if delta > 0 else str(delta),
+            "subject_style": _sheet_subject_style_attr(m.sheet),
+        })
+
+    return render(request, "core/sheet_inventory_movements.html", {
+        "q": q,
+        "movement_type": movement_type,
+        "selected_grade": grade,
+        "date_from": date_from_raw,
+        "date_to": date_to_raw,
+        "movement_type_choices": SheetInventoryMovement.MovementType.choices,
+        "sheet_grade_choices": Sheet.GradeLevel.choices,
+        "movement_rows": movement_rows,
+        "movement_count": movements_qs.count(),
+    })
 
 @require_POST
 @login_required

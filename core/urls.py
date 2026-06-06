@@ -40,6 +40,8 @@ urlpatterns = [
 
     # Sheet Inventory
     path("sheet-inventory/", views.sheet_inventory_dashboard, name="sheet_inventory_dashboard"),
+    path("sheet-inventory/count/", views.sheet_inventory_count, name="sheet_inventory_count"),
+    path("sheet-inventory/movements/", views.sheet_inventory_movements, name="sheet_inventory_movements"),
     path("sheet-inventory/scan/", views.sheet_inventory_scan, name="sheet_inventory_scan"),
     path("sheet-inventory/bulk-upload/", views.sheet_inventory_bulk_upload, name="sheet_inventory_bulk_upload"),
     path("sheet-inventory/export/", views.sheet_inventory_export, name="sheet_inventory_export"),

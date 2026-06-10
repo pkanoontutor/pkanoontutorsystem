@@ -1588,6 +1588,13 @@ class WeeklyTest(models.Model):
         "สัปดาห์ที่เริ่มวันเสาร์",
         help_text="ระบบใช้สัปดาห์เดียวกับ Dashboard: เสาร์-อาทิตย์",
     )
+    grade_level = models.CharField(
+        "ระดับชั้น",
+        max_length=20,
+        choices=Sheet.GradeLevel.choices,
+        default=Sheet.GradeLevel.P4,
+        help_text="แยกหัวข้อ Test เป็นรายระดับชั้น เช่น ป.4 / ป.5 / ม.1",
+    )
     test_date = models.DateField("วันที่แสดงบนใบประกาศ", default=timezone.localdate)
     subject = models.ForeignKey(
         Subject,
@@ -1627,12 +1634,19 @@ class WeeklyTest(models.Model):
         verbose_name = "Weekly Small Test"
         verbose_name_plural = "Weekly Small Tests"
         constraints = [
-            models.UniqueConstraint(fields=["week_start"], name="uniq_weekly_test_per_week")
+            models.UniqueConstraint(fields=["week_start", "grade_level"], name="uniq_weekly_test_per_week_grade")
         ]
-        ordering = ("-week_start", "-created_at")
+        ordering = ("-week_start", "grade_level", "-created_at")
 
     def __str__(self) -> str:
-        return f"Test ย่อย {self.week_start} - {self.subject_display}"
+        return f"Test ย่อย {self.week_start} [{self.grade_display}] - {self.subject_display}"
+
+    @property
+    def grade_display(self) -> str:
+        try:
+            return self.get_grade_level_display()
+        except Exception:
+            return self.grade_level or "-"
 
     @property
     def subject_display(self) -> str:

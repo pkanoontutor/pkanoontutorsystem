@@ -3931,6 +3931,16 @@ WEEKLY_TEST_ATTENDANCE_META = {
     WeeklyTestScore.AttendanceStatus.NOT_CHECKED: {"label": "ยังไม่เช็คชื่อ", "rank": 8, "class": "score-notchecked"},
 }
 
+WEEKLY_TEST_INPUT_ATTENDANCE_ORDER = {
+    WeeklyTestScore.AttendanceStatus.PRESENT: 0,
+    WeeklyTestScore.AttendanceStatus.NOT_CHECKED: 1,
+    WeeklyTestScore.AttendanceStatus.EXCUSED: 2,
+    WeeklyTestScore.AttendanceStatus.NO_SHOW: 3,
+}
+
+THAI_SORT_ORDER = "กขฃคฅฆงจฉชซฌญฎฏฐฑฒณดตถทธนบปผฝพฟภมยรลวศษสหฬอฮะัาำิีึืุูเแโใไ่้๊๋์ๆabcdefghijklmnopqrstuvwxyz0123456789"
+THAI_SORT_INDEX = {ch: i for i, ch in enumerate(THAI_SORT_ORDER)}
+
 
 def _school_week_start(d: date) -> date:
     """Dashboard week = Sat-Sun. Return the Saturday for any selected date."""
@@ -3966,19 +3976,39 @@ def _weekly_test_result_label(result: str) -> str:
     return WEEKLY_TEST_RESULT_META.get(result, {}).get("label", "")
 
 
-def _weekly_test_student_grade_key(student: Student) -> str:
-    return _normalize_sheet_grade_level(getattr(student, "grade_level", ""))
-
-
 def _weekly_test_grade_label(grade_key: str) -> str:
     return _sheet_grade_label(grade_key or "")
+
+
+def _weekly_test_valid_grade_keys() -> list[str]:
+    return [g for g in SHEET_GRADE_ORDER if g]
+
+
+def _weekly_test_is_valid_grade(grade_key: str) -> bool:
+    return grade_key in set(_weekly_test_valid_grade_keys())
+
+
+def _weekly_test_class_grade_key(tutoring_class: TutoringClass | None) -> str:
+    return _class_grade_level(tutoring_class)
+
+
+def _weekly_test_thai_sort_key(text: str) -> tuple:
+    raw = (text or "").strip().lower()
+    # Remove leading Thai vowels for more natural nickname sorting in most cases.
+    normalized = raw
+    return tuple(THAI_SORT_INDEX.get(ch, 999 + ord(ch)) for ch in normalized)
 
 
 def _weekly_test_name_key(row: dict) -> tuple:
     student = row.get("student")
     nickname = (getattr(student, "nickname", "") or "").strip()
     full_name = (getattr(student, "full_name", "") or "").strip()
-    return (nickname or full_name, full_name, int(getattr(student, "id", 0) or 0))
+    primary = nickname or full_name
+    return (_weekly_test_thai_sort_key(primary), _weekly_test_thai_sort_key(full_name), int(getattr(student, "id", 0) or 0))
+
+
+def _weekly_test_input_row_sort_key(row: dict) -> tuple:
+    return (WEEKLY_TEST_INPUT_ATTENDANCE_ORDER.get(row.get("attendance_status"), 9), *_weekly_test_name_key(row))
 
 
 def _weekly_test_row_sort_key(row: dict) -> tuple:
@@ -3999,9 +4029,7 @@ def _weekly_test_filter_subject(qs, subject_filter: str):
 
 
 def _weekly_test_history_subject_choices() -> list[str]:
-    names = set(
-        Subject.objects.filter(is_active=True).values_list("name", flat=True)
-    )
+    names = set(Subject.objects.filter(is_active=True).values_list("name", flat=True))
     for name in WeeklyTest.objects.exclude(subject_name="").values_list("subject_name", flat=True):
         if name:
             names.add(name)
@@ -4011,24 +4039,32 @@ def _weekly_test_history_subject_choices() -> list[str]:
     return sorted(names)
 
 
+def _weekly_test_grade_tests_map(week_start: date, grade_keys: list[str] | None = None) -> dict[str, WeeklyTest]:
+    qs = WeeklyTest.objects.select_related("subject").filter(week_start=week_start)
+    if grade_keys is not None:
+        qs = qs.filter(grade_level__in=grade_keys)
+    return {t.grade_level: t for t in qs}
+
+
 def _weekly_test_saved_or_current_row(
     *,
+    week_start: date,
     weekly_test: WeeklyTest | None,
     enrollment: Enrollment,
     attendance: Attendance | None,
     score: WeeklyTestScore | None,
+    class_grade_key: str,
     use_saved_status: bool = False,
 ) -> dict:
     student = enrollment.student
     tutoring_class = enrollment.tutoring_class
-    att_date = _weekly_test_class_date(weekly_test.week_start, tutoring_class) if weekly_test else None
+    att_date = _weekly_test_class_date(week_start, tutoring_class)
     current_status = _weekly_test_attendance_status(attendance)
     attendance_status = (score.attendance_status if (use_saved_status and score) else current_status) or current_status
     result = (score.result if score else "") or ""
 
     can_edit = current_status == WeeklyTestScore.AttendanceStatus.PRESENT
     if current_status != WeeklyTestScore.AttendanceStatus.PRESENT:
-        # ถ้าไม่ได้มาเรียนจริง ให้ไม่แสดงผลคะแนน ถึงแม้เคยมีข้อมูลเก่าค้างอยู่
         can_edit = False
         if not use_saved_status:
             result = ""
@@ -4045,13 +4081,15 @@ def _weekly_test_saved_or_current_row(
         display_class = meta["class"]
 
     return {
+        "weekly_test": weekly_test,
         "enrollment": enrollment,
         "student": student,
         "class": tutoring_class,
         "attendance": attendance,
         "attendance_date": att_date,
         "attendance_status": attendance_status,
-        "attendance_label": _weekly_test_status_label(attendance_status),
+        "attendance_label": "มา" if attendance_status == WeeklyTestScore.AttendanceStatus.PRESENT else _weekly_test_status_label(attendance_status),
+        "attendance_class": f"att-{attendance_status.replace('_', '-')}",
         "score": score,
         "result": result,
         "result_label": _weekly_test_result_label(result),
@@ -4059,29 +4097,44 @@ def _weekly_test_saved_or_current_row(
         "display_rank": display_rank,
         "display_class": display_class,
         "can_edit": can_edit,
-        "grade_key": _weekly_test_student_grade_key(student),
-        "grade_label": _weekly_test_grade_label(_weekly_test_student_grade_key(student)),
+        "grade_key": class_grade_key,
+        "grade_label": _weekly_test_grade_label(class_grade_key),
     }
 
 
 def _weekly_test_build_week_context(
     *,
     week_start: date,
-    weekly_test: WeeklyTest | None = None,
     grade_filter: str = "all",
     class_filter: str | int | None = None,
     use_saved_status: bool = False,
 ) -> dict:
-    if weekly_test is None:
-        weekly_test = WeeklyTest.objects.filter(week_start=week_start).first()
+    grade_filter = (grade_filter or "").strip()
+    valid_grades = _weekly_test_valid_grade_keys()
 
-    classes = TutoringClass.objects.filter(is_active=True).order_by("time_slot", "name")
+    all_classes = list(TutoringClass.objects.filter(is_active=True).order_by("time_slot", "name"))
     if class_filter:
         try:
-            classes = classes.filter(id=int(class_filter))
+            class_id = int(class_filter)
+            all_classes = [c for c in all_classes if c.id == class_id]
         except Exception:
             pass
-    class_ids = list(classes.values_list("id", flat=True))
+
+    class_grade_map = {c.id: _weekly_test_class_grade_key(c) for c in all_classes}
+
+    if grade_filter == "all":
+        visible_classes = [c for c in all_classes if class_grade_map.get(c.id) in valid_grades]
+        visible_grade_keys = valid_grades
+    elif _weekly_test_is_valid_grade(grade_filter):
+        visible_classes = [c for c in all_classes if class_grade_map.get(c.id) == grade_filter]
+        visible_grade_keys = [grade_filter]
+    else:
+        visible_classes = []
+        visible_grade_keys = []
+
+    class_ids = [c.id for c in visible_classes]
+    tests_by_grade = _weekly_test_grade_tests_map(week_start, visible_grade_keys) if visible_grade_keys else {}
+    test_ids = [t.id for t in tests_by_grade.values()]
 
     enrollments = list(
         Enrollment.objects
@@ -4104,12 +4157,12 @@ def _weekly_test_build_week_context(
     att_map = {(a.enrollment_id, a.attendance_date): a for a in atts}
 
     score_map = {}
-    if weekly_test:
+    if test_ids:
         score_map = {
-            s.enrollment_id: s
+            (s.weekly_test_id, s.enrollment_id): s
             for s in WeeklyTestScore.objects
-            .select_related("student", "tutoring_class", "enrollment")
-            .filter(weekly_test=weekly_test, enrollment_id__in=enrollment_ids)
+            .select_related("student", "tutoring_class", "enrollment", "weekly_test")
+            .filter(weekly_test_id__in=test_ids, enrollment_id__in=enrollment_ids)
         }
 
     rows_by_class: dict[int, list[dict]] = defaultdict(list)
@@ -4117,29 +4170,35 @@ def _weekly_test_build_week_context(
     all_rows: list[dict] = []
 
     for e in enrollments:
+        grade_key = class_grade_map.get(e.tutoring_class_id, "")
+        weekly_test = tests_by_grade.get(grade_key)
         att_date = _weekly_test_class_date(week_start, e.tutoring_class)
+        score = score_map.get((weekly_test.id, e.id)) if weekly_test else None
         row = _weekly_test_saved_or_current_row(
+            week_start=week_start,
             weekly_test=weekly_test,
             enrollment=e,
             attendance=att_map.get((e.id, att_date)),
-            score=score_map.get(e.id),
+            score=score,
+            class_grade_key=grade_key,
             use_saved_status=use_saved_status,
         )
-        if grade_filter and grade_filter != "all" and row["grade_key"] != grade_filter:
-            continue
         rows_by_class[e.tutoring_class_id].append(row)
-        rows_by_grade[row["grade_key"]].append(row)
+        rows_by_grade[grade_key].append(row)
         all_rows.append(row)
 
     class_blocks = []
-    class_lookup = {c.id: c for c in classes}
-    for cls in classes:
+    class_lookup = {c.id: c for c in visible_classes}
+    for cls in visible_classes:
         rows = rows_by_class.get(cls.id, [])
         if not rows:
             continue
-        rows = sorted(rows, key=_weekly_test_name_key)
+        rows = sorted(rows, key=_weekly_test_input_row_sort_key)
         class_blocks.append({
             "class": cls,
+            "grade_key": class_grade_map.get(cls.id, ""),
+            "grade_label": _weekly_test_grade_label(class_grade_map.get(cls.id, "")),
+            "weekly_test": tests_by_grade.get(class_grade_map.get(cls.id, "")),
             "attendance_date": _weekly_test_class_date(week_start, cls),
             "rows": rows,
             "count": len(rows),
@@ -4150,30 +4209,41 @@ def _weekly_test_build_week_context(
         })
 
     grade_sections = []
-    known_grade_order = [g for g in SHEET_GRADE_ORDER if g]
-    for grade_key in known_grade_order + sorted([g for g in rows_by_grade.keys() if g not in known_grade_order]):
+    for grade_key in valid_grades:
         rows = rows_by_grade.get(grade_key, [])
         if not rows:
             continue
         blocks = []
-        cls_ids_for_grade = sorted({r["class"].id for r in rows}, key=lambda cid: (class_lookup.get(cid).time_slot if class_lookup.get(cid) else "", class_lookup.get(cid).name if class_lookup.get(cid) else ""))
+        cls_ids_for_grade = sorted(
+            {r["class"].id for r in rows},
+            key=lambda cid: (
+                getattr(class_lookup.get(cid), "time_slot", ""),
+                getattr(class_lookup.get(cid), "name", ""),
+            ),
+        )
         for cid in cls_ids_for_grade:
             cls_rows = [r for r in rows if r["class"].id == cid]
             blocks.append({
                 "class": class_lookup.get(cid) or cls_rows[0]["class"],
                 "rows": sorted(cls_rows, key=_weekly_test_row_sort_key),
                 "count": len(cls_rows),
+                "present_count": sum(1 for r in cls_rows if r["attendance_status"] == WeeklyTestScore.AttendanceStatus.PRESENT),
+                "excused_count": sum(1 for r in cls_rows if r["attendance_status"] == WeeklyTestScore.AttendanceStatus.EXCUSED),
+                "no_show_count": sum(1 for r in cls_rows if r["attendance_status"] == WeeklyTestScore.AttendanceStatus.NO_SHOW),
+                "not_checked_count": sum(1 for r in cls_rows if r["attendance_status"] == WeeklyTestScore.AttendanceStatus.NOT_CHECKED),
             })
         grade_sections.append({
             "grade_key": grade_key,
             "grade_label": _weekly_test_grade_label(grade_key),
+            "weekly_test": tests_by_grade.get(grade_key),
             "rows": sorted(rows, key=_weekly_test_row_sort_key),
             "class_blocks": blocks,
             "count": len(rows),
         })
 
     return {
-        "weekly_test": weekly_test,
+        "weekly_test": tests_by_grade.get(grade_filter) if _weekly_test_is_valid_grade(grade_filter) else None,
+        "tests_by_grade": tests_by_grade,
         "week_start": week_start,
         "week_end": week_start + timedelta(days=1),
         "class_blocks": class_blocks,
@@ -4182,7 +4252,10 @@ def _weekly_test_build_week_context(
     }
 
 
-def _weekly_test_get_or_create_from_request(request: HttpRequest, week_start: date) -> WeeklyTest:
+def _weekly_test_get_or_create_from_request(request: HttpRequest, week_start: date, grade_key: str) -> WeeklyTest:
+    if not _weekly_test_is_valid_grade(grade_key):
+        raise ValueError("กรุณาเลือกระดับชั้นก่อนบันทึก")
+
     subject_id = request.POST.get("subject_id") or None
     subject = Subject.objects.filter(id=subject_id, is_active=True).first() if subject_id else None
     subject_name = (request.POST.get("subject_name") or "").strip()
@@ -4196,6 +4269,7 @@ def _weekly_test_get_or_create_from_request(request: HttpRequest, week_start: da
 
     weekly_test, created = WeeklyTest.objects.get_or_create(
         week_start=week_start,
+        grade_level=grade_key,
         defaults={
             "test_date": test_date,
             "subject": subject,
@@ -4215,9 +4289,19 @@ def _weekly_test_get_or_create_from_request(request: HttpRequest, week_start: da
     return weekly_test
 
 
+def _weekly_test_class_ids_for_grade(grade_key: str) -> list[int]:
+    if not _weekly_test_is_valid_grade(grade_key):
+        return []
+    ids = []
+    for cls in TutoringClass.objects.filter(is_active=True).only("id", "name", "time_slot"):
+        if _weekly_test_class_grade_key(cls) == grade_key:
+            ids.append(cls.id)
+    return ids
+
+
 def _weekly_test_save_scores(request: HttpRequest, weekly_test: WeeklyTest, week_start: date, class_ids: list[int]) -> int:
     valid_results = set(WEEKLY_TEST_RESULT_ORDER)
-    classes = TutoringClass.objects.filter(id__in=class_ids, is_active=True)
+    classes = list(TutoringClass.objects.filter(id__in=class_ids, is_active=True))
     class_map = {c.id: c for c in classes}
     enrollments = list(
         Enrollment.objects
@@ -4267,7 +4351,7 @@ def _weekly_test_save_scores(request: HttpRequest, weekly_test: WeeklyTest, week
 def weekly_test_admin(request: HttpRequest) -> HttpResponse:
     selected_date = _parse_date(request.POST.get("week") or request.GET.get("week"))
     week_start = _school_week_start(selected_date)
-    grade_filter = (request.POST.get("grade") or request.GET.get("grade") or "all").strip() or "all"
+    grade_filter = (request.POST.get("grade") or request.GET.get("grade") or "").strip()
     mode = (request.GET.get("mode") or "weekly").strip()
     selected_class_id = (request.GET.get("class_id") or "").strip()
     selected_student_id = (request.GET.get("student_id") or "").strip()
@@ -4275,28 +4359,31 @@ def weekly_test_admin(request: HttpRequest) -> HttpResponse:
     saved_message = ""
 
     if request.method == "POST":
-        weekly_test = _weekly_test_get_or_create_from_request(request, week_start)
+        try:
+            weekly_test = _weekly_test_get_or_create_from_request(request, week_start, grade_filter)
+        except ValueError:
+            return redirect(f"{request.path}?mode=weekly&week={week_start.isoformat()}&grade=")
+
         save_scope = request.POST.get("save_scope") or "all"
         if save_scope == "meta_only":
             saved = 0
         elif save_scope.startswith("class:"):
             try:
-                class_ids = [int(save_scope.split(":", 1)[1])]
+                class_id = int(save_scope.split(":", 1)[1])
             except Exception:
-                class_ids = []
-            saved = _weekly_test_save_scores(request, weekly_test, week_start, class_ids)
+                class_id = 0
+            saved = _weekly_test_save_scores(request, weekly_test, week_start, [class_id] if class_id else [])
         else:
-            class_ids = list(TutoringClass.objects.filter(is_active=True).values_list("id", flat=True))
+            class_ids = _weekly_test_class_ids_for_grade(grade_filter)
             saved = _weekly_test_save_scores(request, weekly_test, week_start, class_ids)
-        redirect_url = f"{request.path}?week={week_start.isoformat()}&grade={grade_filter}&saved={saved}"
+        redirect_url = f"{request.path}?mode=weekly&week={week_start.isoformat()}&grade={grade_filter}&saved={saved}#capture-summary"
         return redirect(redirect_url)
 
-    weekly_test = WeeklyTest.objects.filter(week_start=week_start).select_related("subject").first()
     week_data = _weekly_test_build_week_context(
         week_start=week_start,
-        weekly_test=weekly_test,
         grade_filter=grade_filter,
     )
+    weekly_test = week_data.get("weekly_test")
     if request.GET.get("saved") is not None:
         saved_count = request.GET.get("saved")
         saved_message = "บันทึกหัวข้อแล้ว" if saved_count == "0" else f"บันทึกข้อมูลแล้ว {saved_count} รายการ"
@@ -4307,7 +4394,7 @@ def weekly_test_admin(request: HttpRequest) -> HttpResponse:
     if selected_class_id:
         selected_class = TutoringClass.objects.filter(id=selected_class_id, is_active=True).first()
     if mode == "class" and selected_class:
-        tests_qs = _weekly_test_filter_subject(WeeklyTest.objects.select_related("subject").all(), subject_filter).order_by("-week_start")[:30]
+        tests_qs = _weekly_test_filter_subject(WeeklyTest.objects.select_related("subject").all(), subject_filter).order_by("-week_start", "grade_level")[:40]
         for t in tests_qs:
             scores = list(
                 WeeklyTestScore.objects
@@ -4326,11 +4413,12 @@ def weekly_test_admin(request: HttpRequest) -> HttpResponse:
                     "display_rank": WEEKLY_TEST_RESULT_META.get(s.result, WEEKLY_TEST_ATTENDANCE_META.get(s.attendance_status, WEEKLY_TEST_ATTENDANCE_META[WeeklyTestScore.AttendanceStatus.NOT_CHECKED]))["rank"],
                 }
                 rows.append(fake_row)
-            class_history_rows.append({
-                "weekly_test": t,
-                "rows": sorted(rows, key=_weekly_test_row_sort_key),
-                "count": len(rows),
-            })
+            if rows:
+                class_history_rows.append({
+                    "weekly_test": t,
+                    "rows": sorted(rows, key=_weekly_test_row_sort_key),
+                    "count": len(rows),
+                })
 
     # Student history
     student_history_rows = []
@@ -4338,10 +4426,10 @@ def weekly_test_admin(request: HttpRequest) -> HttpResponse:
     if selected_student_id:
         selected_student = Student.objects.filter(id=selected_student_id, is_active=True).first()
     if mode == "student" and selected_student:
-        scores_qs = WeeklyTestScore.objects.select_related("weekly_test", "weekly_test__subject", "tutoring_class").filter(student=selected_student).order_by("-weekly_test__week_start")
+        scores_qs = WeeklyTestScore.objects.select_related("weekly_test", "weekly_test__subject", "tutoring_class").filter(student=selected_student).order_by("-weekly_test__week_start", "weekly_test__grade_level")
         if subject_filter:
             scores_qs = scores_qs.filter(Q(weekly_test__subject__name__icontains=subject_filter) | Q(weekly_test__subject_name__icontains=subject_filter))
-        for s in scores_qs[:80]:
+        for s in scores_qs[:100]:
             student_history_rows.append({
                 "score": s,
                 "weekly_test": s.weekly_test,
@@ -4350,9 +4438,12 @@ def weekly_test_admin(request: HttpRequest) -> HttpResponse:
             })
 
     grade_choices = [
-        {"key": "all", "label": "ทุกระดับชั้น"},
-        *[{"key": g, "label": _weekly_test_grade_label(g)} for g in SHEET_GRADE_ORDER if g],
+        {"key": "", "label": "— เลือกระดับชั้นเพื่อกรอก —"},
+        *[{"key": g, "label": _weekly_test_grade_label(g)} for g in _weekly_test_valid_grade_keys()],
+        {"key": "all", "label": "ทุกระดับชั้น (หน้าสรุป)"},
     ]
+    selected_grade_label = "ทุกระดับชั้น" if grade_filter == "all" else (_weekly_test_grade_label(grade_filter) if grade_filter else "ยังไม่ได้เลือกระดับชั้น")
+    can_edit_weekly = _weekly_test_is_valid_grade(grade_filter)
 
     context = {
         **week_data,
@@ -4360,6 +4451,8 @@ def weekly_test_admin(request: HttpRequest) -> HttpResponse:
         "week_start": week_start,
         "week_end": week_start + timedelta(days=1),
         "grade_filter": grade_filter,
+        "selected_grade_label": selected_grade_label,
+        "can_edit_weekly": can_edit_weekly,
         "grade_choices": grade_choices,
         "subjects": Subject.objects.filter(is_active=True).order_by("name"),
         "difficulty_choices": [1, 2, 3, 4, 5],
@@ -4400,13 +4493,14 @@ def weekly_test_export(request: HttpRequest) -> HttpResponse:
     if mode == "class" and class_id:
         cls = TutoringClass.objects.filter(id=class_id).first()
         ws.append(["Class History", cls.name if cls else class_id])
-        ws.append(["Week Start", "Test Date", "Subject", "Topic", "Difficulty", "Nickname", "Full Name", "Status/Result", "Class"])
-        tests_qs = _weekly_test_filter_subject(WeeklyTest.objects.select_related("subject").all(), subject_filter).order_by("-week_start")
+        ws.append(["Week Start", "Grade", "Test Date", "Subject", "Topic", "Difficulty", "Nickname", "Full Name", "Status/Result", "Class"])
+        tests_qs = _weekly_test_filter_subject(WeeklyTest.objects.select_related("subject").all(), subject_filter).order_by("-week_start", "grade_level")
         for t in tests_qs:
             scores = WeeklyTestScore.objects.select_related("student", "tutoring_class").filter(weekly_test=t, tutoring_class_id=class_id)
             for s in scores.order_by("student__nickname", "student__full_name"):
                 ws.append([
                     t.week_start.isoformat(),
+                    t.grade_display,
                     t.test_date.isoformat() if t.test_date else "",
                     t.subject_display,
                     t.topic,
@@ -4419,14 +4513,15 @@ def weekly_test_export(request: HttpRequest) -> HttpResponse:
     elif mode == "student" and student_id:
         student = Student.objects.filter(id=student_id).first()
         ws.append(["Student History", student.display_name if student else student_id])
-        ws.append(["Week Start", "Test Date", "Subject", "Topic", "Difficulty", "Class", "Status/Result"])
-        scores = WeeklyTestScore.objects.select_related("weekly_test", "weekly_test__subject", "tutoring_class").filter(student_id=student_id).order_by("-weekly_test__week_start")
+        ws.append(["Week Start", "Grade", "Test Date", "Subject", "Topic", "Difficulty", "Class", "Status/Result"])
+        scores = WeeklyTestScore.objects.select_related("weekly_test", "weekly_test__subject", "tutoring_class").filter(student_id=student_id).order_by("-weekly_test__week_start", "weekly_test__grade_level")
         if subject_filter:
             scores = scores.filter(Q(weekly_test__subject__name__icontains=subject_filter) | Q(weekly_test__subject_name__icontains=subject_filter))
         for s in scores:
             t = s.weekly_test
             ws.append([
                 t.week_start.isoformat(),
+                t.grade_display,
                 t.test_date.isoformat() if t.test_date else "",
                 t.subject_display,
                 t.topic,
@@ -4435,20 +4530,21 @@ def weekly_test_export(request: HttpRequest) -> HttpResponse:
                 _weekly_test_result_label(s.result) if s.result else _weekly_test_status_label(s.attendance_status),
             ])
     else:
-        test = WeeklyTest.objects.filter(week_start=week_start).select_related("subject").first()
-        data = _weekly_test_build_week_context(week_start=week_start, weekly_test=test, grade_filter=grade_filter)
+        export_grade = grade_filter if grade_filter else "all"
+        data = _weekly_test_build_week_context(week_start=week_start, grade_filter=export_grade)
         ws.append(["Weekly View", f"{week_start.isoformat()} to {(week_start + timedelta(days=1)).isoformat()}"])
-        ws.append(["Test Date", test.test_date.isoformat() if test and test.test_date else ""])
-        ws.append(["Subject", test.subject_display if test else ""])
-        ws.append(["Topic", test.topic if test else ""])
-        ws.append(["Difficulty", test.difficulty_stars if test else ""])
         ws.append([])
-        ws.append(["Grade", "Class", "Nickname", "Full Name", "Attendance Date", "Status/Result"])
+        ws.append(["Grade", "Test Date", "Subject", "Topic", "Difficulty", "Class", "Nickname", "Full Name", "Attendance Date", "Status/Result"])
         for section in data["grade_sections"]:
+            test = section.get("weekly_test")
             for block in section["class_blocks"]:
                 for row in block["rows"]:
                     ws.append([
                         section["grade_label"],
+                        test.test_date.isoformat() if test and test.test_date else "",
+                        test.subject_display if test else "",
+                        test.topic if test else "",
+                        test.difficulty_stars if test else "",
                         block["class"].name,
                         row["student"].nickname,
                         row["student"].full_name,

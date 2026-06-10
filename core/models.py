@@ -1574,6 +1574,119 @@ class TeachingProgressUpdate(models.Model):
 # =========================================================
 # ✅ Test Score Announcement Module
 # =========================================================
+
+
+# -----------------------
+# Weekly Small Test (Test ย่อยรายสัปดาห์)
+# -----------------------
+class WeeklyTest(models.Model):
+    """รอบ Test ย่อยรายสัปดาห์ ผูกกับสัปดาห์แบบ Sat-Sun ของ Dashboard"""
+
+    DIFFICULTY_CHOICES = [(i, "⭐" * i) for i in range(1, 6)]
+
+    week_start = models.DateField(
+        "สัปดาห์ที่เริ่มวันเสาร์",
+        help_text="ระบบใช้สัปดาห์เดียวกับ Dashboard: เสาร์-อาทิตย์",
+    )
+    test_date = models.DateField("วันที่แสดงบนใบประกาศ", default=timezone.localdate)
+    subject = models.ForeignKey(
+        Subject,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="weekly_tests",
+        verbose_name="วิชาในระบบ",
+    )
+    subject_name = models.CharField(
+        "วิชา / ชื่อวิชาแบบกรอกเอง",
+        max_length=120,
+        blank=True,
+        help_text="ใช้กรณีอยากกรอกชื่อวิชาเอง หรือไม่มีใน Subject",
+    )
+    topic = models.CharField("เรื่อง", max_length=255, blank=True)
+    difficulty = models.PositiveSmallIntegerField("ระดับความยาก", choices=DIFFICULTY_CHOICES, default=3)
+    note = models.TextField("หมายเหตุ", blank=True)
+    created_by = models.ForeignKey(
+        "auth.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="weekly_tests_created",
+    )
+    updated_by = models.ForeignKey(
+        "auth.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="weekly_tests_updated",
+    )
+    created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Weekly Small Test"
+        verbose_name_plural = "Weekly Small Tests"
+        constraints = [
+            models.UniqueConstraint(fields=["week_start"], name="uniq_weekly_test_per_week")
+        ]
+        ordering = ("-week_start", "-created_at")
+
+    def __str__(self) -> str:
+        return f"Test ย่อย {self.week_start} - {self.subject_display}"
+
+    @property
+    def subject_display(self) -> str:
+        if self.subject_id and self.subject:
+            return self.subject.name
+        return self.subject_name or "-"
+
+    @property
+    def difficulty_stars(self) -> str:
+        return "⭐" * int(self.difficulty or 0)
+
+
+class WeeklyTestScore(models.Model):
+    class Result(models.TextChoices):
+        FAIL = "fail", "ไม่ผ่าน"
+        MEDIUM = "medium", "ปานกลาง"
+        GOOD = "good", "ดี"
+        GREAT = "great", "ดีมาก"
+        FULL = "full", "เต็ม"
+
+    class AttendanceStatus(models.TextChoices):
+        PRESENT = Attendance.Status.PRESENT, "มา"
+        EXCUSED = Attendance.Status.EXCUSED, "ลา"
+        NO_SHOW = Attendance.Status.NO_SHOW, "ขาด"
+        NOT_CHECKED = "not_checked", "ยังไม่เช็คชื่อ"
+
+    weekly_test = models.ForeignKey(WeeklyTest, on_delete=models.CASCADE, related_name="scores")
+    enrollment = models.ForeignKey(Enrollment, on_delete=models.PROTECT, related_name="weekly_test_scores")
+    student = models.ForeignKey(Student, on_delete=models.PROTECT, related_name="weekly_test_scores")
+    tutoring_class = models.ForeignKey(TutoringClass, on_delete=models.PROTECT, related_name="weekly_test_scores")
+    attendance_date = models.DateField("วันที่อ้างอิงจาก Dashboard", null=True, blank=True)
+    attendance_status = models.CharField(
+        "สถานะจาก Dashboard",
+        max_length=20,
+        choices=AttendanceStatus.choices,
+        default=AttendanceStatus.NOT_CHECKED,
+    )
+    result = models.CharField("ผล Test", max_length=20, choices=Result.choices, blank=True, default="")
+    note = models.CharField("หมายเหตุ", max_length=255, blank=True)
+    updated_by = models.ForeignKey("auth.User", on_delete=models.SET_NULL, null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Weekly Small Test Score"
+        verbose_name_plural = "Weekly Small Test Scores"
+        constraints = [
+            models.UniqueConstraint(fields=["weekly_test", "enrollment"], name="uniq_weekly_test_score_per_enrollment")
+        ]
+        ordering = ("weekly_test", "tutoring_class__name", "student__nickname", "student__full_name")
+
+    def __str__(self) -> str:
+        return f"{self.weekly_test} | {self.student} | {self.get_result_display() if self.result else self.get_attendance_status_display()}"
+
+
 class TestRound(models.Model):
     title = models.CharField("ชื่อรอบสอบ", max_length=255)
     exam_date = models.DateField("วันที่สอบ", null=True, blank=True)

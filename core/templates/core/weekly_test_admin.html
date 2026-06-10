@@ -1,0 +1,249 @@
+{% extends "core/base.html" %}
+{% block title %}Test ย่อยรายสัปดาห์{% endblock %}
+
+{% block head %}
+<style>
+  *{box-sizing:border-box}
+  .wt-wrap{max-width:1280px;margin:0 auto;display:grid;gap:16px;color:#0f172a}
+  .wt-hero{background:linear-gradient(135deg,#3158d4,#6d5bd0);color:#fff;border-radius:26px;padding:22px 24px;box-shadow:0 16px 34px rgba(37,99,235,.22)}
+  .wt-title{font-size:28px;font-weight:1000;letter-spacing:-.03em;line-height:1.15}
+  .wt-sub{font-size:13px;color:#e0e7ff;margin-top:7px;line-height:1.65}
+  .wt-card{background:#fff;border:1px solid #e5e7eb;border-radius:22px;padding:16px;box-shadow:0 8px 20px rgba(15,23,42,.08)}
+  .toolbar{display:flex;gap:10px;align-items:end;flex-wrap:wrap}
+  .field{display:grid;gap:5px;min-width:150px}.field.grow{flex:1;min-width:220px}
+  .field label{font-size:11px;font-weight:1000;color:#64748b;text-transform:uppercase;letter-spacing:.04em}
+  .field input,.field select{border:1px solid #cbd5e1;border-radius:12px;padding:9px 11px;font-size:14px;font-weight:800;background:#fff;min-height:40px}
+  .btn{border:none;border-radius:13px;padding:10px 15px;font-weight:1000;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:6px;white-space:nowrap;transition:.12s}
+  .btn:hover{transform:translateY(-1px);box-shadow:0 8px 18px rgba(15,23,42,.16)}
+  .btn-primary{background:#2563eb;color:#fff}.btn-dark{background:#0f172a;color:#fff}.btn-green{background:#16a34a;color:#fff}.btn-soft{background:#f1f5f9;color:#0f172a;border:1px solid #e2e8f0}.btn-amber{background:#f59e0b;color:#111827}
+  .tabs{display:flex;gap:8px;flex-wrap:wrap}.tab{padding:9px 13px;border-radius:999px;text-decoration:none;font-weight:1000;font-size:13px;background:#f8fafc;color:#334155;border:1px solid #e2e8f0}.tab.active{background:#0f172a;color:#fff;border-color:#0f172a}
+  .savebar{position:sticky;top:0;z-index:9;background:rgba(255,255,255,.92);backdrop-filter:blur(10px);border:1px solid #e2e8f0;border-radius:18px;padding:12px;display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap;box-shadow:0 8px 22px rgba(15,23,42,.08)}
+  .saved-msg{background:#dcfce7;color:#166534;border:1px solid #86efac;border-radius:999px;padding:7px 12px;font-weight:1000;font-size:13px}
+  .star-picker{display:flex;gap:6px;flex-wrap:wrap}.star-picker label{cursor:pointer}.star-picker input{display:none}.star-pill{display:inline-flex;align-items:center;justify-content:center;border:1px solid #e2e8f0;background:#fff;border-radius:999px;padding:8px 11px;font-weight:1000;min-width:54px}.star-picker input:checked+.star-pill{background:#fef3c7;border-color:#f59e0b;box-shadow:0 0 0 3px rgba(245,158,11,.16)}
+  .section-title{font-size:18px;font-weight:1000;margin:4px 0 10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}.section-title small{font-size:12px;color:#64748b;font-weight:800}
+  .class-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.class-card{border:1px solid #e2e8f0;border-radius:20px;overflow:hidden;background:#fff}.class-head{padding:13px 14px;background:linear-gradient(135deg,#f8fafc,#eef2ff);border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;gap:10px;align-items:flex-start}.class-name{font-weight:1000;font-size:16px}.class-meta{font-size:12px;color:#64748b;margin-top:4px;font-weight:800}.chips{display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end}.chip{border-radius:999px;padding:4px 8px;font-size:11px;font-weight:1000;background:#f1f5f9;color:#334155}.chip.present{background:#dcfce7;color:#166534}.chip.excused{background:#f1f5f9;color:#64748b}.chip.noshow{background:#fee2e2;color:#991b1b}
+  .score-table{width:100%;border-collapse:collapse}.score-table td{border-bottom:1px solid #f1f5f9;padding:10px;vertical-align:middle}.score-table tr:last-child td{border-bottom:none}.student-name{font-weight:1000}.student-full{font-size:12px;color:#64748b;margin-top:2px;font-weight:700}.status-mini{font-size:11px;font-weight:1000;color:#64748b;background:#f8fafc;border:1px solid #e2e8f0;border-radius:999px;padding:3px 8px;display:inline-flex;margin-top:5px}
+  .pill-row{display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end}.result-pill{cursor:pointer}.result-pill input{display:none}.pill-label{display:inline-flex;align-items:center;justify-content:center;border-radius:999px;padding:7px 10px;font-weight:1000;font-size:12px;border:1px solid #e2e8f0;background:#fff;color:#334155;transition:.1s}.result-pill input:checked+.pill-label{box-shadow:0 0 0 3px rgba(15,23,42,.10);border-color:#0f172a}.result-pill input:disabled+.pill-label{opacity:.45;cursor:not-allowed;background:#f8fafc}.clear-pill{opacity:.72}
+  .score-full{background:#6da153!important;color:#fff!important}.score-great{background:#9bd77e!important;color:#0f3b17!important}.score-good{background:#bfe8a8!important;color:#173b12!important}.score-medium{background:#fde082!important;color:#4b3100!important}.score-fail{background:#dfa0a0!important;color:#5f1111!important}.score-empty{background:#f1f5f9!important;color:#64748b!important}.score-excused{background:#e5e7eb!important;color:#475569!important}.score-noshow{background:#fee2e2!important;color:#991b1b!important}.score-notchecked{background:#f8fafc!important;color:#94a3b8!important}
+  .class-save{padding:12px 14px;background:#f8fafc;text-align:right;border-top:1px solid #e2e8f0}
+  .announce-wrap{background:#f8fafc;border-radius:24px;padding:14px;display:grid;gap:14px}.announce-sheet{background:#fff;border:2px solid #111827;border-radius:4px;padding:16px;max-width:980px;margin:0 auto;box-shadow:0 10px 24px rgba(15,23,42,.10)}.announce-title{background:#5b84dd;color:#fff;text-align:center;font-size:24px;font-weight:1000;padding:10px;border:2px solid #111827;margin-bottom:14px}.announce-info{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid #111827;margin-bottom:14px}.announce-info div{border:1px solid #111827;padding:8px 10px;font-weight:1000;text-align:center}.announce-info .label{background:#e5e7eb;color:#111827}.announce-grade{font-size:22px;font-weight:1000;margin:12px 0 10px;text-align:center}.announce-class-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.announce-class{border:2px solid #111827}.announce-class-head{background:#937fc3;color:#fff;text-align:center;padding:8px;font-weight:1000;border-bottom:2px solid #111827}.announce-row{display:grid;grid-template-columns:1.2fr .8fr;border-bottom:1px solid #111827}.announce-row:last-child{border-bottom:none}.announce-row div{padding:8px 9px;font-weight:1000}.announce-row .result{text-align:center;border-left:1px solid #111827}.announce-student small{font-size:11px;color:#64748b;font-weight:800;display:block;margin-top:1px}
+  .history-table-wrap{overflow-x:auto}.history-table{width:100%;border-collapse:collapse;font-size:13px}.history-table th{background:#f8fafc;color:#64748b;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.04em;padding:9px;border-bottom:1px solid #e2e8f0}.history-table td{padding:10px 9px;border-bottom:1px solid #f1f5f9;vertical-align:top}.badge{display:inline-flex;border-radius:999px;padding:5px 10px;font-weight:1000;font-size:12px}.empty{padding:30px;text-align:center;color:#64748b;font-weight:900;background:#f8fafc;border-radius:18px;border:1px dashed #cbd5e1}
+  @media(max-width:980px){.class-grid,.announce-class-grid{grid-template-columns:1fr}.announce-info{grid-template-columns:1fr 1fr}.wt-title{font-size:23px}}
+  @media(max-width:620px){.toolbar{display:grid}.field{min-width:0}.announce-title{font-size:18px}.announce-sheet{padding:10px}.pill-row{justify-content:flex-start}.score-table td{display:block}.savebar{position:static}}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="wt-wrap">
+  <div class="wt-hero">
+    <div class="wt-title">⭐ Test ย่อยรายสัปดาห์</div>
+    <div class="wt-sub">บันทึกผล Test ย่อยโดยอ้างอิงนักเรียนและสถานะ มา / ลา / ขาด จาก Dashboard ตามสัปดาห์เสาร์-อาทิตย์ และสร้างหน้าสรุปสำหรับแคปส่งผู้ปกครองแยกตามระดับชั้น</div>
+  </div>
+
+  <div class="wt-card">
+    <div class="tabs">
+      <a class="tab {% if mode == 'weekly' %}active{% endif %}" href="?mode=weekly&week={{ week_start|date:'Y-m-d' }}&grade={{ grade_filter }}">Weekly View</a>
+      <a class="tab {% if mode == 'class' %}active{% endif %}" href="?mode=class&week={{ week_start|date:'Y-m-d' }}">Class History</a>
+      <a class="tab {% if mode == 'student' %}active{% endif %}" href="?mode=student&week={{ week_start|date:'Y-m-d' }}">Student History</a>
+      <a class="tab" href="{{ export_url }}">Export Excel</a>
+    </div>
+  </div>
+
+  {% if mode == 'weekly' %}
+  <form method="post">
+    {% csrf_token %}
+    <input type="hidden" name="grade" value="{{ grade_filter }}">
+
+    <div class="wt-card">
+      <div class="toolbar">
+        <div class="field">
+          <label>เลือกสัปดาห์</label>
+          <input type="date" name="week" value="{{ week_start|date:'Y-m-d' }}">
+        </div>
+        <div class="field">
+          <label>วันที่บนใบประกาศ</label>
+          <input type="date" name="test_date" value="{% if weekly_test %}{{ weekly_test.test_date|date:'Y-m-d' }}{% else %}{{ week_start|date:'Y-m-d' }}{% endif %}">
+        </div>
+        <div class="field">
+          <label>วิชาในระบบ</label>
+          <select name="subject_id">
+            <option value="">— เลือกวิชา —</option>
+            {% for subj in subjects %}
+              <option value="{{ subj.id }}" {% if weekly_test and weekly_test.subject_id == subj.id %}selected{% endif %}>{{ subj.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="field">
+          <label>หรือกรอกวิชาเอง</label>
+          <input type="text" name="subject_name" value="{% if weekly_test %}{{ weekly_test.subject_name }}{% endif %}" placeholder="เช่น ภาษาอังกฤษเสริม">
+        </div>
+        <div class="field grow">
+          <label>เรื่อง</label>
+          <input type="text" name="topic" value="{% if weekly_test %}{{ weekly_test.topic }}{% endif %}" placeholder="เช่น Conversation">
+        </div>
+        <div class="field">
+          <label>ระดับความยาก</label>
+          <div class="star-picker">
+            {% for d in difficulty_choices %}
+            <label>
+              <input type="radio" name="difficulty" value="{{ d }}" {% if weekly_test and weekly_test.difficulty == d %}checked{% elif not weekly_test and d == 3 %}checked{% endif %}>
+              <span class="star-pill">{% for _ in ''|center:d %}⭐{% endfor %}</span>
+            </label>
+            {% endfor %}
+          </div>
+        </div>
+        <button class="btn btn-dark" type="submit" name="save_scope" value="meta_only">บันทึกหัวข้อ</button>
+      </div>
+    </div>
+
+    <div class="savebar">
+      <div>
+        <strong>สัปดาห์:</strong> {{ week_start|date:'d/m/Y' }} - {{ week_end|date:'d/m/Y' }}
+        {% if saved_message %}<span class="saved-msg">{{ saved_message }}</span>{% endif %}
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+        <select onchange="location.href='?mode=weekly&week={{ week_start|date:'Y-m-d' }}&grade='+this.value" style="border:1px solid #cbd5e1;border-radius:12px;padding:9px 11px;font-weight:900;">
+          {% for g in grade_choices %}
+            <option value="{{ g.key }}" {% if grade_filter == g.key %}selected{% endif %}>{{ g.label }}</option>
+          {% endfor %}
+        </select>
+        <button class="btn btn-primary" type="submit" name="save_scope" value="all">บันทึกทั้งหมด</button>
+      </div>
+    </div>
+
+    <div class="wt-card">
+      <div class="section-title">📝 หน้าบันทึกคะแนน <small>คนที่ยังไม่เช็คชื่อ / ลา / ขาด จะเลือกคะแนนไม่ได้</small></div>
+      {% if class_blocks %}
+      <div class="class-grid">
+        {% for block in class_blocks %}
+        <div class="class-card">
+          <div class="class-head">
+            <div>
+              <div class="class-name">{{ block.class.name }}</div>
+              <div class="class-meta">วันที่อ้างอิง: {{ block.attendance_date|date:'d/m/Y' }}</div>
+            </div>
+            <div class="chips">
+              <span class="chip present">มา {{ block.present_count }}</span>
+              <span class="chip excused">ลา {{ block.excused_count }}</span>
+              <span class="chip noshow">ขาด {{ block.no_show_count }}</span>
+              {% if block.not_checked_count %}<span class="chip">ยังไม่เช็ค {{ block.not_checked_count }}</span>{% endif %}
+            </div>
+          </div>
+          <table class="score-table">
+            <tbody>
+              {% for row in block.rows %}
+              <tr>
+                <td>
+                  <div class="student-name">{{ row.student.nickname|default:row.student.full_name }}</div>
+                  <div class="student-full">{{ row.student.full_name }}</div>
+                  <span class="status-mini">{{ row.attendance_label }}</span>
+                </td>
+                <td style="width:58%;">
+                  <div class="pill-row">
+                    {% for choice in result_choices %}
+                    <label class="result-pill">
+                      <input type="radio" name="result_{{ row.enrollment.id }}" value="{{ choice.value }}" {% if row.result == choice.value %}checked{% endif %} {% if not row.can_edit %}disabled{% endif %}>
+                      <span class="pill-label {{ choice.class }}">{{ choice.label }}</span>
+                    </label>
+                    {% endfor %}
+                    <label class="result-pill">
+                      <input type="radio" name="result_{{ row.enrollment.id }}" value="" {% if not row.result %}checked{% endif %} {% if not row.can_edit %}disabled{% endif %}>
+                      <span class="pill-label clear-pill">ล้าง</span>
+                    </label>
+                  </div>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          <div class="class-save"><button class="btn btn-soft" type="submit" name="save_scope" value="class:{{ block.class.id }}">บันทึกเฉพาะห้องนี้</button></div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="empty">ไม่พบรายชื่อนักเรียน active ในตัวกรองนี้</div>
+      {% endif %}
+    </div>
+  </form>
+
+  <div class="wt-card">
+    <div class="section-title">📸 หน้าสรุปสำหรับแคปส่งผู้ปกครอง <small>เลือกดูทุกระดับชั้น หรือเลือกทีละระดับชั้นจาก dropdown ด้านบน</small></div>
+    <div class="announce-wrap">
+      {% if grade_sections %}
+        {% for section in grade_sections %}
+        <div class="announce-sheet">
+          <div class="announce-title">Test ย่อยประจำสัปดาห์ {{ section.grade_label }}</div>
+          <div class="announce-info">
+            <div class="label">วันที่</div><div>{% if weekly_test %}{{ weekly_test.test_date|date:'d/m/Y' }}{% else %}{{ week_start|date:'d/m/Y' }}{% endif %}</div>
+            <div class="label">วิชา</div><div>{% if weekly_test %}{{ weekly_test.subject_display }}{% else %}-{% endif %}</div>
+            <div class="label">เรื่อง</div><div>{% if weekly_test %}{{ weekly_test.topic|default:'-' }}{% else %}-{% endif %}</div>
+            <div class="label">ระดับความยาก</div><div>{% if weekly_test %}{{ weekly_test.difficulty_stars }}{% else %}⭐⭐⭐{% endif %}</div>
+          </div>
+          <div class="announce-grade">{{ section.grade_label }}</div>
+          <div class="announce-class-grid">
+            {% for block in section.class_blocks %}
+            <div class="announce-class">
+              <div class="announce-class-head">{{ block.class.name }}</div>
+              {% for row in block.rows %}
+              <div class="announce-row">
+                <div class="announce-student">{{ row.student.nickname|default:row.student.full_name }} <small>{{ row.student.full_name }}</small></div>
+                <div class="result {{ row.display_class }}">{{ row.display_label }}</div>
+              </div>
+              {% endfor %}
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+        {% endfor %}
+      {% else %}
+        <div class="empty">ยังไม่มีข้อมูลสำหรับแสดงผลสรุป</div>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+  {% if mode == 'class' %}
+  <div class="wt-card">
+    <form method="get" class="toolbar">
+      <input type="hidden" name="mode" value="class">
+      <div class="field"><label>เลือก Class</label><select name="class_id">{% for cls in classes %}<option value="{{ cls.id }}" {% if selected_class_id == cls.id|stringformat:'s' %}selected{% endif %}>{{ cls.name }}</option>{% endfor %}</select></div>
+      <div class="field"><label>กรองวิชา</label><select name="subject"><option value="">ทุกวิชา</option>{% for s in history_subjects %}<option value="{{ s }}" {% if subject_filter == s %}selected{% endif %}>{{ s }}</option>{% endfor %}</select></div>
+      <button class="btn btn-dark" type="submit">ดูย้อนหลัง</button>
+      <a class="btn btn-soft" href="{{ export_url }}">Export Excel</a>
+    </form>
+  </div>
+  <div class="wt-card">
+    <div class="section-title">🏫 Class History {% if selected_class %}<small>{{ selected_class.name }}</small>{% endif %}</div>
+    {% if class_history_rows %}
+    <div class="history-table-wrap"><table class="history-table"><thead><tr><th>สัปดาห์</th><th>รายละเอียด Test</th><th>ผลคะแนน</th></tr></thead><tbody>
+      {% for item in class_history_rows %}
+      <tr><td>{{ item.weekly_test.week_start|date:'d/m/Y' }}</td><td><strong>{{ item.weekly_test.subject_display }}</strong><br>{{ item.weekly_test.topic|default:'-' }}<br>{{ item.weekly_test.difficulty_stars }}</td><td>{% for row in item.rows %}<span class="badge {{ row.display_class }}" style="margin:2px;">{{ row.student.nickname|default:row.student.full_name }}: {{ row.display_label }}</span>{% endfor %}</td></tr>
+      {% endfor %}
+    </tbody></table></div>
+    {% else %}<div class="empty">เลือก class แล้วกดดูย้อนหลัง หรือยังไม่มีข้อมูลของ class นี้</div>{% endif %}
+  </div>
+  {% endif %}
+
+  {% if mode == 'student' %}
+  <div class="wt-card">
+    <form method="get" class="toolbar">
+      <input type="hidden" name="mode" value="student">
+      <div class="field grow"><label>เลือกนักเรียน</label><select name="student_id"><option value="">— เลือกนักเรียน —</option>{% for stu in students %}<option value="{{ stu.id }}" {% if selected_student_id == stu.id|stringformat:'s' %}selected{% endif %}>{{ stu.nickname }} - {{ stu.full_name }} ({{ stu.grade_level }})</option>{% endfor %}</select></div>
+      <div class="field"><label>กรองวิชา</label><select name="subject"><option value="">ทุกวิชา</option>{% for s in history_subjects %}<option value="{{ s }}" {% if subject_filter == s %}selected{% endif %}>{{ s }}</option>{% endfor %}</select></div>
+      <button class="btn btn-dark" type="submit">ดูย้อนหลัง</button>
+      <a class="btn btn-soft" href="{{ export_url }}">Export Excel</a>
+    </form>
+  </div>
+  <div class="wt-card">
+    <div class="section-title">👦 Student History {% if selected_student %}<small>{{ selected_student.nickname }} - {{ selected_student.full_name }}</small>{% endif %}</div>
+    {% if student_history_rows %}
+    <div class="history-table-wrap"><table class="history-table"><thead><tr><th>สัปดาห์</th><th>Class</th><th>วิชา / เรื่อง</th><th>ผล</th></tr></thead><tbody>
+      {% for item in student_history_rows %}
+      <tr><td>{{ item.weekly_test.week_start|date:'d/m/Y' }}</td><td>{{ item.score.tutoring_class.name }}</td><td><strong>{{ item.weekly_test.subject_display }}</strong><br>{{ item.weekly_test.topic|default:'-' }} / {{ item.weekly_test.difficulty_stars }}</td><td><span class="badge {{ item.display_class }}">{{ item.display_label }}</span></td></tr>
+      {% endfor %}
+    </tbody></table></div>
+    {% else %}<div class="empty">เลือกนักเรียนแล้วกดดูย้อนหลัง หรือยังไม่มีข้อมูลของนักเรียนคนนี้</div>{% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

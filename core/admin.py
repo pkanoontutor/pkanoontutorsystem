@@ -833,8 +833,8 @@ class WeeklyTestScoreInline(admin.TabularInline):
 
 @admin.register(WeeklyTest)
 class WeeklyTestAdmin(admin.ModelAdmin):
-    list_display = ("week_start", "test_date", "subject_display", "topic", "difficulty", "updated_at")
-    list_filter = ("week_start", "subject", "difficulty")
+    list_display = ("week_start", "grade_level", "test_date", "subject_display", "topic", "difficulty", "updated_at")
+    list_filter = ("week_start", "grade_level", "subject", "difficulty")
     search_fields = ("subject_name", "subject__name", "topic")
     autocomplete_fields = ("subject",)
     readonly_fields = ("created_at", "updated_at")

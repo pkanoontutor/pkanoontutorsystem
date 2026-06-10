@@ -28,6 +28,8 @@ from .models import (
     TeachingClassSubjectTemplate,
     TeachingWeeklyAssignment,
     TeachingProgressUpdate,
+    WeeklyTest,
+    WeeklyTestScore,
     TestRound,
     TestSubject,
     TestParticipant,
@@ -813,6 +815,50 @@ class TestScoreInline(admin.TabularInline):
     extra = 0
     autocomplete_fields = ("subject",)
     fields = ("subject", "score", "note", "updated_at")
+    readonly_fields = ("updated_at",)
+
+
+
+
+# -----------------------
+# Weekly Small Test
+# -----------------------
+class WeeklyTestScoreInline(admin.TabularInline):
+    model = WeeklyTestScore
+    extra = 0
+    autocomplete_fields = ("enrollment", "student", "tutoring_class")
+    fields = ("student", "tutoring_class", "attendance_date", "attendance_status", "result", "note", "updated_by", "updated_at")
+    readonly_fields = ("updated_at",)
+
+
+@admin.register(WeeklyTest)
+class WeeklyTestAdmin(admin.ModelAdmin):
+    list_display = ("week_start", "test_date", "subject_display", "topic", "difficulty", "updated_at")
+    list_filter = ("week_start", "subject", "difficulty")
+    search_fields = ("subject_name", "subject__name", "topic")
+    autocomplete_fields = ("subject",)
+    readonly_fields = ("created_at", "updated_at")
+    inlines = (WeeklyTestScoreInline,)
+
+    @admin.display(description="วิชา")
+    def subject_display(self, obj):
+        return obj.subject_display
+
+
+@admin.register(WeeklyTestScore)
+class WeeklyTestScoreAdmin(admin.ModelAdmin):
+    list_display = ("weekly_test", "student", "tutoring_class", "attendance_status", "result", "updated_at")
+    list_filter = ("weekly_test", "tutoring_class", "attendance_status", "result")
+    search_fields = (
+        "student__student_code",
+        "student__nickname",
+        "student__full_name",
+        "tutoring_class__name",
+        "weekly_test__topic",
+        "weekly_test__subject_name",
+        "weekly_test__subject__name",
+    )
+    autocomplete_fields = ("weekly_test", "enrollment", "student", "tutoring_class")
     readonly_fields = ("updated_at",)
 
 

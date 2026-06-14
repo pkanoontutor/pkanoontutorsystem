@@ -1051,6 +1051,37 @@ def sheet_inventory_dashboard(request: HttpRequest) -> HttpResponse:
                         )
                 return redirect("core:sheet_inventory_profile", pk=sheet.pk)
 
+        elif action.startswith("create_print_order_inline:"):
+            sheet_id = action.split(":", 1)[1]
+            sheet = get_object_or_404(Sheet.objects.select_related("subject"), id=sheet_id)
+            raw_qty = (request.POST.get(f"print_qty_{sheet.id}") or "").strip()
+            try:
+                quantity = max(int(raw_qty), 0)
+            except Exception:
+                quantity = 0
+
+            onedrive_url = (request.POST.get(f"print_url_{sheet.id}") or "").strip()
+            note = (request.POST.get(f"print_note_{sheet.id}") or "สั่งปรินท์จากหน้า Sheet Inventory").strip()
+
+            if quantity > 0:
+                inventory, _ = SheetInventory.objects.get_or_create(sheet=sheet, defaults={"quantity": 0})
+                if onedrive_url:
+                    inventory.onedrive_url = onedrive_url
+                    inventory.save()
+                elif getattr(inventory, "onedrive_url", ""):
+                    onedrive_url = inventory.onedrive_url
+
+                SheetPrintOrder.objects.create(
+                    sheet=sheet,
+                    quantity=quantity,
+                    onedrive_url=onedrive_url,
+                    binding_type=SheetPrintOrder.BindingType.SIDE,
+                    spine_color=_default_spine_color_for_subject(sheet.subject.name if sheet.subject_id else ""),
+                    note=note,
+                    requested_by=request.user if getattr(request.user, "is_authenticated", False) else None,
+                )
+            return redirect("core:sheet_inventory_dashboard")
+
         elif action.startswith("set_stock_single:"):
             sheet_id = action.split(":", 1)[1]
             _save_inventory_set_from_post(

@@ -1060,6 +1060,7 @@ def sheet_inventory_dashboard(request: HttpRequest) -> HttpResponse:
             except Exception:
                 quantity = 0
 
+            due_date = _parse_optional_date(request.POST.get(f"print_due_date_{sheet.id}"))
             onedrive_url = (request.POST.get(f"print_url_{sheet.id}") or "").strip()
             note = (request.POST.get(f"print_note_{sheet.id}") or "สั่งปรินท์จากหน้า Sheet Inventory").strip()
 
@@ -1074,6 +1075,7 @@ def sheet_inventory_dashboard(request: HttpRequest) -> HttpResponse:
                 SheetPrintOrder.objects.create(
                     sheet=sheet,
                     quantity=quantity,
+                    due_date=due_date,
                     onedrive_url=onedrive_url,
                     binding_type=SheetPrintOrder.BindingType.SIDE,
                     spine_color=_default_spine_color_for_subject(sheet.subject.name if sheet.subject_id else ""),

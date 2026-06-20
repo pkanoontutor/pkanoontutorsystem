@@ -955,6 +955,7 @@ class SheetPrintOrder(models.Model):
     class Status(models.TextChoices):
         PENDING = "pending", "รอปรินท์"
         READY = "ready", "ปรินท์เสร็จแล้วพร้อมส่ง"
+        RECEIVED = "received", "ตรวจรับเข้าคลังแล้ว"
 
     class BindingType(models.TextChoices):
         CORNER = "corner", "เย็บมุม"
@@ -1021,6 +1022,15 @@ class SheetPrintOrder(models.Model):
     created_at = models.DateTimeField("วันที่สั่ง", default=timezone.now)
     updated_at = models.DateTimeField("อัปเดตล่าสุด", auto_now=True)
     completed_at = models.DateTimeField("วันที่ร้านกดเสร็จแล้ว", null=True, blank=True)
+    received_at = models.DateTimeField("วันที่ตรวจรับเข้าคลัง", null=True, blank=True)
+    received_by = models.ForeignKey(
+        "auth.User",
+        verbose_name="ผู้ตรวจรับ",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="received_sheet_print_orders",
+    )
 
     class Meta:
         verbose_name = "Sheet Print Order"

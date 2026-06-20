@@ -1061,6 +1061,7 @@ def sheet_inventory_dashboard(request: HttpRequest) -> HttpResponse:
             action.startswith("receive_print_order:")
             or action.startswith("receive_print_order_full:")
             or action.startswith("receive_print_order_custom:")
+            or action.startswith("receive_print_order_zero:")
         ):
             action_name, order_id = action.split(":", 1)
             is_ajax = request.headers.get("x-requested-with") == "XMLHttpRequest"
@@ -1085,6 +1086,8 @@ def sheet_inventory_dashboard(request: HttpRequest) -> HttpResponse:
 
                     if action_name == "receive_print_order_full":
                         receive_qty = int(order.quantity or 0)
+                    elif action_name == "receive_print_order_zero":
+                        receive_qty = 0
                     else:
                         raw_qty = (request.POST.get(f"receive_qty_{order.id}") or "").strip()
                         try:
@@ -1092,35 +1095,47 @@ def sheet_inventory_dashboard(request: HttpRequest) -> HttpResponse:
                         except Exception:
                             return _receive_response(False, "จำนวนตรวจรับไม่ถูกต้อง", 400)
 
-                    receive_qty = max(receive_qty, 0)
-                    if receive_qty <= 0:
-                        return _receive_response(False, "กรุณาระบุจำนวนตรวจรับมากกว่า 0", 400)
+                    if receive_qty < 0:
+                        return _receive_response(False, "จำนวนตรวจรับต้องไม่ติดลบ", 400)
 
                     note = (request.POST.get(f"receive_note_{order.id}") or "").strip()
                     if not note:
                         if action_name == "receive_print_order_full":
                             note = f"ตรวจรับจากร้านปรินท์ Order #{order.id}"
+                        elif action_name == "receive_print_order_zero":
+                            note = f"ตรวจรับจากร้านปรินท์ Order #{order.id} (รับจริง 0 เล่ม / ไม่เพิ่ม stock)"
                         else:
                             note = f"ตรวจรับจากร้านปรินท์ Order #{order.id} (แก้จำนวนรับจริง)"
 
-                    ok, message, inventory, _movement = _apply_sheet_inventory_movement(
+                    inventory, _ = SheetInventory.objects.select_for_update().get_or_create(
                         sheet=order.sheet,
-                        movement_type=SheetInventoryMovement.MovementType.ADD,
-                        quantity=receive_qty,
-                        note=note,
-                        user=request.user,
+                        defaults={"quantity": 0},
                     )
-                    if not ok:
-                        return _receive_response(False, message or "บันทึกตรวจรับไม่สำเร็จ", 400)
+
+                    if receive_qty > 0:
+                        ok, message, inventory, _movement = _apply_sheet_inventory_movement(
+                            sheet=order.sheet,
+                            movement_type=SheetInventoryMovement.MovementType.ADD,
+                            quantity=receive_qty,
+                            note=note,
+                            user=request.user,
+                        )
+                        if not ok:
+                            return _receive_response(False, message or "บันทึกตรวจรับไม่สำเร็จ", 400)
 
                     order.status = SheetPrintOrder.Status.RECEIVED
                     order.received_at = timezone.now()
                     order.received_by = request.user if getattr(request.user, "is_authenticated", False) else None
                     order.save(update_fields=["status", "received_at", "received_by", "updated_at"])
 
+                    if receive_qty > 0:
+                        msg = f"ตรวจรับ {order.display_code} จำนวน {receive_qty} เล่ม และเพิ่มเข้า stock แล้ว"
+                    else:
+                        msg = f"ตรวจรับ {order.display_code} จำนวน 0 เล่มแล้ว โดยไม่เพิ่ม stock"
+
                     return _receive_response(
                         True,
-                        f"ตรวจรับ {order.display_code} จำนวน {receive_qty} เล่ม และเพิ่มเข้า stock แล้ว",
+                        msg,
                         order_id=order.id,
                         sheet_id=order.sheet_id,
                         received_qty=receive_qty,

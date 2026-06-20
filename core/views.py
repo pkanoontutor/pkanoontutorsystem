@@ -5199,6 +5199,7 @@ def _ensure_teaching_assignments(week_start: date, week_end: date) -> None:
                     "week_end_date": week_end,
                     "tutoring_class": tmpl.tutoring_class,
                     "tutor": _latest_tutor_for_template(tmpl, week_start),
+                    "is_teaching": True,
                 },
             )
             changed = False
@@ -5215,6 +5216,52 @@ def _ensure_teaching_assignments(week_start: date, week_end: date) -> None:
                     changed = True
             if changed:
                 assignment.save()
+
+
+def _latest_real_progress_for_assignment(assignment: TeachingWeeklyAssignment, week_start: date) -> TeachingProgressUpdate | None:
+    return (
+        TeachingProgressUpdate.objects
+        .filter(
+            assignment__subject_template_id=assignment.subject_template_id,
+            assignment__week_start_date__lt=week_start,
+            no_teaching=False,
+        )
+        .order_by("-teaching_date", "-updated_at")
+        .first()
+    )
+
+
+def _sync_no_teaching_update_for_assignment(assignment: TeachingWeeklyAssignment, week_start: date, *, updated_by_name: str = "Admin") -> None:
+    """Create/update the no-teaching record used by the tutor update page/report."""
+    prev = _latest_real_progress_for_assignment(assignment, week_start)
+    teaching_date = week_start
+    if getattr(assignment.tutoring_class, "time_slot", "") in {
+        TutoringClass.TimeSlot.SUN_MORNING,
+        TutoringClass.TimeSlot.SUN_AFTERNOON,
+    }:
+        teaching_date = week_start + timedelta(days=1)
+
+    sheet_name = prev.sheet_name if prev else (assignment.subject_template.default_sheet_name or "")
+    page_to = prev.page_to if prev else ""
+    question_to = prev.question_to if prev else ""
+
+    TeachingProgressUpdate.objects.update_or_create(
+        assignment=assignment,
+        teaching_date=teaching_date,
+        defaults={
+            "sheet_name": sheet_name,
+            "page_to": page_to,
+            "question_to": question_to,
+            "no_teaching": True,
+            "sheet_near_end": False,
+            "updated_by_name": updated_by_name,
+        },
+    )
+
+
+def _clear_auto_no_teaching_updates(assignment: TeachingWeeklyAssignment) -> None:
+    TeachingProgressUpdate.objects.filter(assignment=assignment, no_teaching=True).delete()
+
 
 
 @login_required
@@ -5317,14 +5364,29 @@ def teaching_weekly_setup(request: HttpRequest) -> HttpResponse:
 
         _ensure_teaching_assignments(week_start, week_end)
 
-        if action == "save_assignments":
-            for aid in request.POST.getlist("assignment_ids"):
-                assignment = TeachingWeeklyAssignment.objects.filter(id=aid).first()
-                if not assignment:
-                    continue
+        if action == "save_assignments" or action.startswith("save_class_assignments"):
+            target_class_id = ""
+            if action.startswith("save_class_assignments:"):
+                target_class_id = action.split(":", 1)[1]
+
+            assignment_ids = request.POST.getlist("assignment_ids")
+            qs = TeachingWeeklyAssignment.objects.filter(id__in=assignment_ids, week_start_date=week_start)
+            if target_class_id:
+                qs = qs.filter(tutoring_class_id=target_class_id)
+
+            for assignment in qs.select_related("subject_template", "tutoring_class", "tutor"):
+                aid = str(assignment.id)
                 tutor_id = (request.POST.get(f"tutor_{aid}") or "").strip()
+                is_teaching_raw = (request.POST.get(f"is_teaching_{aid}") or "yes").strip()
                 assignment.tutor = TeachingTutor.objects.filter(id=tutor_id, is_active=True).first() if tutor_id else None
+                assignment.is_teaching = is_teaching_raw != "no"
                 assignment.save()
+
+                if assignment.is_teaching:
+                    _clear_auto_no_teaching_updates(assignment)
+                else:
+                    _sync_no_teaching_update_for_assignment(assignment, week_start, updated_by_name="Admin")
+
             return redirect(f"/teaching/weekly-setup/?week_start={week_start.isoformat()}")
 
     _ensure_teaching_assignments(week_start, week_end)
@@ -5437,22 +5499,17 @@ def tutor_teaching_update(request: HttpRequest) -> HttpResponse:
 
         # If no teaching, preserve the latest real teaching progress as the visible sheet/page/question.
         if no_teaching:
-            prev = (
-                TeachingProgressUpdate.objects
-                .filter(
-                    assignment__subject_template_id=assignment.subject_template_id,
-                    assignment__week_start_date__lt=week_start,
-                    no_teaching=False,
-                )
-                .order_by("-teaching_date", "-updated_at")
-                .first()
-            )
+            prev = _latest_real_progress_for_assignment(assignment, week_start)
             if prev:
                 sheet_name = prev.sheet_name
                 page_to = prev.page_to
                 question_to = prev.question_to
             elif not sheet_name:
                 sheet_name = assignment.subject_template.default_sheet_name or ""
+
+        sheet_near_end = (request.POST.get("sheet_status") or "normal") == "near_end"
+        if no_teaching:
+            sheet_near_end = False
 
         updated_by_name = (request.POST.get("updated_by_name") or "").strip()
         if not updated_by_name and assignment.tutor_id:
@@ -5466,21 +5523,31 @@ def tutor_teaching_update(request: HttpRequest) -> HttpResponse:
                 "page_to": page_to,
                 "question_to": question_to,
                 "no_teaching": no_teaching,
+                "sheet_near_end": sheet_near_end,
                 "updated_by_name": updated_by_name,
             },
         )
         return redirect(f"/tutor-teaching-update/?{qs}#assignment-{assignment.id}")
 
-    assignments = (
+    all_week_assignments = list(
         TeachingWeeklyAssignment.objects
         .select_related("tutoring_class", "subject_template", "tutor")
         .prefetch_related("progress_updates")
         .filter(week_start_date=week_start)
     )
-    if selected_tutor_id:
-        assignments = assignments.filter(tutor_id=selected_tutor_id)
 
-    all_assignments = list(assignments)
+    # Make sure assignments marked as no teaching in weekly setup also appear as completed/no-teaching.
+    for assignment in all_week_assignments:
+        if not getattr(assignment, "is_teaching", True):
+            has_no_teaching_update = TeachingProgressUpdate.objects.filter(assignment=assignment, no_teaching=True).exists()
+            if not has_no_teaching_update:
+                _sync_no_teaching_update_for_assignment(assignment, week_start, updated_by_name="Admin")
+
+    display_assignments = all_week_assignments
+    if selected_tutor_id:
+        display_assignments = [a for a in all_week_assignments if str(a.tutor_id or "") == selected_tutor_id]
+
+    all_assignments = display_assignments
     for a in all_assignments:
         a.class_grade_level = _class_grade_level(a.tutoring_class)
     template_ids = [a.subject_template_id for a in all_assignments]
@@ -5510,7 +5577,31 @@ def tutor_teaching_update(request: HttpRequest) -> HttpResponse:
         for upd in curr_qs:
             current_updates.setdefault(upd.assignment_id, upd)
 
-    tutor_choices = TeachingTutor.objects.filter(is_active=True).order_by("name")
+    tutor_choices = list(TeachingTutor.objects.filter(is_active=True).order_by("name"))
+
+    all_current_updates = {}
+    if all_week_assignments:
+        for upd in TeachingProgressUpdate.objects.filter(assignment_id__in=[a.id for a in all_week_assignments]).order_by("assignment_id", "-teaching_date", "-updated_at"):
+            all_current_updates.setdefault(upd.assignment_id, upd)
+
+    tutor_summary_rows = []
+    for tutor in tutor_choices:
+        assigned_items = [a for a in all_week_assignments if a.tutor_id == tutor.id and getattr(a, "is_teaching", True)]
+        done_items = [a for a in assigned_items if a.id in all_current_updates]
+        assigned_count = len(assigned_items)
+        done_count = len(done_items)
+        tutor_summary_rows.append({
+            "tutor": tutor,
+            "assigned_count": assigned_count,
+            "done_count": done_count,
+            "pending_count": max(assigned_count - done_count, 0),
+            "percent": int((done_count / assigned_count) * 100) if assigned_count else 0,
+            "is_empty": assigned_count == 0,
+            "is_selected": selected_tutor_id == str(tutor.id),
+        })
+
+    unassigned_count = sum(1 for a in all_week_assignments if not a.tutor_id and getattr(a, "is_teaching", True))
+
     sheet_choices = Sheet.objects.select_related("subject").filter(is_active=True).order_by("grade_level", "subject__name", "code")
     grouped_slots = _teaching_slot_groups_from_assignments(all_assignments, previous_updates, current_updates)
 
@@ -5519,6 +5610,8 @@ def tutor_teaching_update(request: HttpRequest) -> HttpResponse:
         "week_end": week_end,
         "today": timezone.localdate(),
         "tutors": tutor_choices,
+        "tutor_summary_rows": tutor_summary_rows,
+        "unassigned_count": unassigned_count,
         "selected_tutor_id": selected_tutor_id,
         "grouped_slots": grouped_slots,
         "error_code": (request.GET.get("error") or "").strip(),
@@ -5550,6 +5643,7 @@ def teaching_update_report(request: HttpRequest) -> HttpResponse:
             "update": u,
             "is_done": bool(u),
             "is_no_teaching": bool(u and u.no_teaching),
+            "is_near_end": bool(u and getattr(u, "sheet_near_end", False)),
         })
 
     slot_rank = {slot: idx for idx, slot in enumerate(TIME_SLOT_ORDER)}

@@ -33,6 +33,7 @@ from .models import (
     SheetInventoryMovement,
     SheetClassMapping,
     SheetPrintOrder,
+    SheetAllocation,
     AdmissionInquiry,
     FinanceSetting,
     ExpenseCategory,
@@ -1453,6 +1454,311 @@ def sheet_inventory_scan(request: HttpRequest) -> JsonResponse:
         "quantity": int(inventory.quantity or 0) if inventory else 0,
         "movement_type": movement.get_movement_type_display() if movement else "",
         "movement_at": _fmt_dt_th(movement.created_at) if movement else "",
+    })
+
+
+def _allocation_recipient_payload(source: str, raw: dict) -> dict:
+    source = (source or "unassigned").strip()
+    payload = {
+        "recipient_type": SheetAllocation.RecipientType.UNASSIGNED,
+        "student": None,
+        "admission_inquiry": None,
+        "manual_nickname": "",
+        "manual_grade_level": "",
+    }
+
+    if source == SheetAllocation.RecipientType.STUDENT:
+        student = Student.objects.filter(id=raw.get("student_id"), is_active=True).first()
+        if student:
+            payload["recipient_type"] = SheetAllocation.RecipientType.STUDENT
+            payload["student"] = student
+            return payload
+    elif source == SheetAllocation.RecipientType.ADMISSION:
+        inquiry = AdmissionInquiry.objects.filter(id=raw.get("admission_id")).first()
+        if inquiry:
+            payload["recipient_type"] = SheetAllocation.RecipientType.ADMISSION
+            payload["admission_inquiry"] = inquiry
+            return payload
+    elif source == SheetAllocation.RecipientType.MANUAL:
+        nickname = (raw.get("manual_nickname") or "").strip()
+        grade = (raw.get("manual_grade_level") or "").strip()
+        if nickname or grade:
+            payload["recipient_type"] = SheetAllocation.RecipientType.MANUAL
+            payload["manual_nickname"] = nickname
+            payload["manual_grade_level"] = grade
+            return payload
+
+    return payload
+
+
+def _allocation_students_json() -> list[dict]:
+    students = Student.objects.filter(is_active=True).order_by("grade_level", "student_code", "nickname")
+    return [
+        {
+            "id": s.id,
+            "student_code": s.student_code or "",
+            "nickname": s.nickname or "",
+            "full_name": s.full_name or "",
+            "grade_level": s.grade_level or "",
+            "label": f"{s.student_code or '-'} | {s.nickname or '-'} | {s.full_name or '-'} | {s.grade_level or '-'}",
+        }
+        for s in students
+    ]
+
+
+def _allocation_admissions_json() -> list[dict]:
+    inquiries = AdmissionInquiry.objects.filter(is_completed=False).order_by("first_lesson_date", "nickname")[:300]
+    rows = []
+    for a in inquiries:
+        rows.append({
+            "id": a.id,
+            "nickname": a.nickname or "",
+            "full_name": a.full_name or "",
+            "grade_level": a.grade_level or "",
+            "grade_label": a.get_grade_level_display() if hasattr(a, "get_grade_level_display") else (a.grade_level or ""),
+            "first_lesson_date": a.first_lesson_date.isoformat() if a.first_lesson_date else "",
+            "label": f"{a.nickname or '-'} | {a.full_name or '-'} | {a.get_grade_level_display() if hasattr(a, 'get_grade_level_display') else a.grade_level} | {a.first_lesson_date.strftime('%d/%m/%Y') if a.first_lesson_date else '-'}",
+        })
+    return rows
+
+
+def _allocation_class_students_json() -> list[dict]:
+    classes = TutoringClass.objects.filter(is_active=True).order_by("time_slot", "name")
+    rows = []
+    for cls in classes:
+        enrollments = (
+            Enrollment.objects
+            .select_related("student")
+            .filter(is_active=True, student__is_active=True, tutoring_class=cls)
+            .order_by("student__grade_level", "student__student_code", "student__nickname")
+        )
+        rows.append({
+            "id": cls.id,
+            "name": cls.name,
+            "time_slot": cls.get_time_slot_display() if hasattr(cls, "get_time_slot_display") else cls.time_slot,
+            "students": [
+                {
+                    "id": e.student.id,
+                    "student_code": e.student.student_code or "",
+                    "nickname": e.student.nickname or "",
+                    "full_name": e.student.full_name or "",
+                    "grade_level": e.student.grade_level or "",
+                    "label": f"{e.student.nickname or '-'} | {e.student.full_name or '-'} | {e.student.grade_level or '-'}",
+                }
+                for e in enrollments
+            ],
+        })
+    return rows
+
+
+@login_required
+def sheet_allocation_scan(request: HttpRequest) -> HttpResponse:
+    sheets = Sheet.objects.select_related("subject").filter(is_active=True).order_by("grade_level", "subject__name", "code")
+    sheet_rows = []
+    for sheet in sheets:
+        inv = _inventory_for_sheet(sheet)
+        sheet_rows.append({
+            "id": sheet.id,
+            "code": sheet.code,
+            "title": sheet.title,
+            "subject": sheet.subject.name if sheet.subject_id else "",
+            "grade_level": getattr(sheet, "grade_level", "") or "",
+            "grade_label": sheet.get_grade_level_display() if getattr(sheet, "grade_level", "") else "",
+            "quantity": int(inv.quantity or 0) if inv else 0,
+        })
+
+    return render(request, "core/sheet_allocation_scan.html", {
+        "today": timezone.localdate(),
+        "sheets_json": json.dumps(sheet_rows, ensure_ascii=False),
+        "students_json": json.dumps(_allocation_students_json(), ensure_ascii=False),
+        "admissions_json": json.dumps(_allocation_admissions_json(), ensure_ascii=False),
+        "class_students_json": json.dumps(_allocation_class_students_json(), ensure_ascii=False),
+        "grade_choices": Sheet.GradeLevel.choices,
+    })
+
+
+@require_POST
+@login_required
+def sheet_allocation_save(request: HttpRequest) -> JsonResponse:
+    try:
+        payload = json.loads(request.body.decode("utf-8"))
+    except Exception:
+        return JsonResponse({"ok": False, "message": "รูปแบบข้อมูลไม่ถูกต้อง"}, status=400)
+
+    items = payload.get("items") or []
+    allocation_date = _parse_optional_date(payload.get("allocation_date")) or timezone.localdate()
+    if not items:
+        return JsonResponse({"ok": False, "message": "ยังไม่มีรายการรอตัด"}, status=400)
+
+    if len(items) > 500:
+        return JsonResponse({"ok": False, "message": "รายการเยอะเกินไป กรุณาบันทึกไม่เกิน 500 รายการต่อครั้ง"}, status=400)
+
+    batch_key = timezone.now().strftime("SA%Y%m%d%H%M%S")
+    prepared = []
+    qty_by_sheet: dict[int, int] = defaultdict(int)
+    sheet_by_id: dict[int, Sheet] = {}
+
+    for idx, item in enumerate(items, start=1):
+        code = (item.get("sheet_code") or "").strip().upper()
+        if not code:
+            return JsonResponse({"ok": False, "message": f"รายการที่ {idx}: ไม่มีรหัสชีท"}, status=400)
+        sheet = Sheet.objects.select_related("subject").filter(code__iexact=code, is_active=True).first()
+        if not sheet:
+            return JsonResponse({"ok": False, "message": f"ไม่พบรหัสชีท {code}"}, status=400)
+        qty_by_sheet[sheet.id] += 1
+        sheet_by_id[sheet.id] = sheet
+        prepared.append((sheet, item))
+
+    with transaction.atomic():
+        movements_by_sheet = {}
+        new_balances = {}
+        for sheet_id, qty in qty_by_sheet.items():
+            sheet = sheet_by_id[sheet_id]
+            inv, _ = SheetInventory.objects.select_for_update().get_or_create(sheet=sheet, defaults={"quantity": 0})
+            if int(inv.quantity or 0) < qty:
+                return JsonResponse({
+                    "ok": False,
+                    "message": f"{sheet.code} คงเหลือ {int(inv.quantity or 0)} เล่ม แต่กำลังจะตัด {qty} เล่ม",
+                }, status=400)
+            ok, message, inventory, movement = _apply_sheet_inventory_movement(
+                sheet=sheet,
+                movement_type=SheetInventoryMovement.MovementType.DEDUCT,
+                quantity=qty,
+                note=f"แจกชีทผ่าน QR batch {batch_key}",
+                user=request.user,
+            )
+            if not ok:
+                return JsonResponse({"ok": False, "message": message}, status=400)
+            movements_by_sheet[sheet_id] = movement
+            new_balances[sheet.code] = int(inventory.quantity or 0) if inventory else 0
+
+        created = 0
+        for sheet, item in prepared:
+            recipient_source = item.get("recipient_source") or "unassigned"
+            recipient_payload = _allocation_recipient_payload(recipient_source, item)
+            class_id = item.get("class_id") or None
+            cls = None
+            if class_id:
+                cls = TutoringClass.objects.filter(id=class_id, is_active=True).first()
+            elif recipient_payload.get("student"):
+                active_enroll = (
+                    Enrollment.objects
+                    .filter(student=recipient_payload["student"], is_active=True, tutoring_class__is_active=True)
+                    .order_by("-created_at")
+                    .select_related("tutoring_class")
+                    .first()
+                )
+                cls = active_enroll.tutoring_class if active_enroll else None
+
+            SheetAllocation.objects.create(
+                sheet=sheet,
+                quantity=1,
+                allocation_date=allocation_date,
+                recipient_type=recipient_payload["recipient_type"],
+                student=recipient_payload["student"],
+                admission_inquiry=recipient_payload["admission_inquiry"],
+                manual_nickname=recipient_payload["manual_nickname"],
+                manual_grade_level=recipient_payload["manual_grade_level"],
+                tutoring_class=cls,
+                scan_code=(item.get("sheet_code") or "").strip().upper(),
+                batch_key=batch_key,
+                note=(item.get("note") or "").strip(),
+                movement=movements_by_sheet.get(sheet.id),
+                created_by=request.user if getattr(request.user, "is_authenticated", False) else None,
+            )
+            created += 1
+
+    return JsonResponse({
+        "ok": True,
+        "message": f"บันทึกแจกชีท {created} รายการแล้ว",
+        "created": created,
+        "batch_key": batch_key,
+        "new_balances": new_balances,
+    })
+
+
+def _class_report_sheets(cls: TutoringClass, student_ids: list[int]) -> list[Sheet]:
+    sheet_map: dict[int, Sheet] = {}
+    mappings = SheetClassMapping.objects.select_related("sheet", "sheet__subject").filter(tutoring_class=cls, is_active=True)
+    for m in mappings:
+        sheet_map[m.sheet_id] = m.sheet
+
+    class_subjects = ClassSubject.objects.select_related("current_sheet", "current_sheet__subject").filter(
+        tutoring_class=cls,
+        is_active=True,
+        current_sheet__isnull=False,
+    )
+    for cs in class_subjects:
+        sheet_map[cs.current_sheet_id] = cs.current_sheet
+
+    allocated = SheetAllocation.objects.select_related("sheet", "sheet__subject").filter(student_id__in=student_ids)
+    for a in allocated:
+        sheet_map[a.sheet_id] = a.sheet
+
+    return sorted(sheet_map.values(), key=lambda s: (getattr(s, "grade_level", "") or "", s.subject.name if s.subject_id else "", s.code))
+
+
+@login_required
+def sheet_allocation_report(request: HttpRequest) -> HttpResponse:
+    selected_student_id = (request.GET.get("student_id") or "").strip()
+    selected_class_id = (request.GET.get("class_id") or "").strip()
+
+    students = Student.objects.filter(is_active=True).order_by("grade_level", "student_code", "nickname")
+    classes = TutoringClass.objects.filter(is_active=True).order_by("time_slot", "name")
+
+    selected_student = None
+    student_allocations = []
+    if selected_student_id:
+        selected_student = Student.objects.filter(id=selected_student_id, is_active=True).first()
+        if selected_student:
+            student_allocations = list(
+                SheetAllocation.objects
+                .select_related("sheet", "sheet__subject", "tutoring_class", "created_by")
+                .filter(student=selected_student)
+                .order_by("-allocation_date", "-created_at", "sheet__code")
+            )
+
+    selected_class = None
+    class_rows = []
+    class_sheets = []
+    if selected_class_id:
+        selected_class = TutoringClass.objects.filter(id=selected_class_id, is_active=True).first()
+        if selected_class:
+            enrollments = list(
+                Enrollment.objects
+                .select_related("student")
+                .filter(is_active=True, student__is_active=True, tutoring_class=selected_class)
+                .order_by("student__grade_level", "student__student_code", "student__nickname")
+            )
+            student_ids = [e.student_id for e in enrollments]
+            class_sheets = _class_report_sheets(selected_class, student_ids)
+            alloc_qs = SheetAllocation.objects.filter(student_id__in=student_ids, sheet__in=class_sheets).order_by("allocation_date", "created_at")
+            alloc_map: dict[tuple[int, int], list[SheetAllocation]] = defaultdict(list)
+            for a in alloc_qs:
+                alloc_map[(a.student_id, a.sheet_id)].append(a)
+
+            for e in enrollments:
+                cells = []
+                for sheet in class_sheets:
+                    hits = alloc_map.get((e.student_id, sheet.id), [])
+                    cells.append({
+                        "sheet": sheet,
+                        "allocations": hits,
+                        "date_text": ", ".join(a.allocation_date.strftime("%d/%m/%y") for a in hits[-3:]),
+                        "count": len(hits),
+                    })
+                class_rows.append({"student": e.student, "cells": cells})
+
+    return render(request, "core/sheet_allocation_report.html", {
+        "students": students,
+        "classes": classes,
+        "selected_student_id": selected_student_id,
+        "selected_student": selected_student,
+        "student_allocations": student_allocations,
+        "selected_class_id": selected_class_id,
+        "selected_class": selected_class,
+        "class_sheets": class_sheets,
+        "class_rows": class_rows,
     })
 
 

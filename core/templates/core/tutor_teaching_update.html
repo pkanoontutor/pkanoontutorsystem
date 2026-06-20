@@ -121,9 +121,9 @@
       {% for row in tutor_summary_rows %}
         <a class="tutor-summary {% if row.is_empty %}empty{% endif %} {% if row.is_selected %}selected{% endif %}" href="/tutor-teaching-update/?week_start={{ week_start|date:'Y-m-d' }}&tutor_id={{ row.tutor.id }}">
           <div class="tutor-name">{{ row.tutor.name }}</div>
-          <div class="tutor-count"><b>{{ row.done_count }}</b> / {{ row.assigned_count }} อัน</div>
+          <div class="tutor-count"><b>{{ row.done_count }}</b> / {{ row.assigned_count }} Class</div>
           <div class="bar"><span style="width:{{ row.percent }}%;"></span></div>
-          {% if row.is_empty %}<div class="muted">ยังไม่ได้ถูก assign</div>{% else %}<div class="muted">ค้าง {{ row.pending_count }} อัน</div>{% endif %}
+          {% if row.is_empty %}<div class="muted">ยังไม่ได้ถูก assign</div>{% else %}<div class="muted">ค้าง {{ row.pending_count }} Class</div>{% endif %}
         </a>
       {% empty %}
         <div class="muted">ยังไม่มีรายชื่อติวเตอร์</div>

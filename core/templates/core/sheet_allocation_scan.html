@@ -10,6 +10,9 @@
   .grid2{display:grid;grid-template-columns:.92fr 1.08fr;gap:12px}.section-title{font-size:17px;font-weight:1000;color:#0f172a}.hint{font-size:12px;color:#64748b;font-weight:800;line-height:1.45;margin-top:3px}
   .scan-box{display:grid;gap:10px}.scan-input{font-size:30px;font-weight:1000;border:2px solid #0ea5e9;border-radius:20px;padding:15px 16px;text-transform:uppercase;letter-spacing:.04em;width:100%;box-sizing:border-box}.scan-input:focus{outline:none;box-shadow:0 0 0 4px rgba(14,165,233,.18)}
   input,select{border:1px solid #e2e8f0;border-radius:12px;padding:9px 10px;font-weight:850;background:#fff;width:100%;box-sizing:border-box}.field{display:flex;flex-direction:column;gap:5px}.field label{font-size:11px;font-weight:1000;color:#334155;text-transform:uppercase;letter-spacing:.04em}.row{display:grid;grid-template-columns:1fr 1fr;gap:8px}.mode-row{display:grid;grid-template-columns:1fr 1fr;gap:8px}.mode-btn{border:2px solid #e2e8f0;background:#f8fafc;color:#334155;border-radius:16px;padding:11px;font-weight:1000;cursor:pointer}.mode-btn.active{border-color:#16a34a;background:#dcfce7;color:#166534}.recipient-tabs{display:flex;gap:7px;flex-wrap:wrap}.tab{border:1px solid #e2e8f0;background:#f8fafc;color:#334155;border-radius:999px;padding:7px 10px;font-size:12px;font-weight:1000;cursor:pointer}.tab.active{background:#0f172a;color:#fff;border-color:#0f172a}.hidden{display:none!important}.class-students{max-height:210px;overflow:auto;border:1px solid #e2e8f0;border-radius:14px;padding:8px;display:grid;gap:6px;background:#f8fafc}.student-check{display:flex;gap:8px;align-items:center;background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:8px;font-size:12px;font-weight:850}.student-check input{width:auto}.queue-head{display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap}.queue-list{display:grid;gap:8px;max-height:520px;overflow:auto;padding-right:2px}.queue-item{display:grid;grid-template-columns:auto 1fr auto;gap:9px;align-items:center;border:1px solid #e2e8f0;border-left:6px solid #0ea5e9;border-radius:16px;padding:9px;background:#fff}.queue-no{font-weight:1000;color:#64748b}.sheet-line{font-size:14px;font-weight:1000;color:#0f172a}.who-line{font-size:12px;color:#475569;font-weight:850;margin-top:2px}.pill{border-radius:999px;padding:4px 8px;font-size:11px;font-weight:1000;background:#f1f5f9;border:1px solid #e2e8f0;color:#334155}.empty{color:#64748b;font-weight:850;text-align:center;padding:20px;border:1px dashed #cbd5e1;border-radius:16px;background:#f8fafc}.summary{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.metric{background:#f8fafc;border:1px solid #e2e8f0;border-radius:16px;padding:10px}.metric .k{font-size:10px;color:#64748b;font-weight:1000}.metric .v{font-size:24px;color:#0f172a;font-weight:1000}.toast{position:fixed;right:18px;bottom:18px;z-index:9999;border-radius:16px;padding:12px 14px;font-size:13px;font-weight:1000;box-shadow:0 16px 34px rgba(15,23,42,.22);max-width:min(380px,calc(100vw - 28px));background:#dcfce7;color:#166534;border:1px solid #86efac}.toast.err{background:#fee2e2;color:#991b1b;border-color:#fecaca}
+
+  .student-search-field{position:relative}.student-search-wrap{position:relative}.student-search-input{height:44px;border:2px solid #bfdbfe;background:#fff;font-size:15px;font-weight:950}.student-search-input:focus{border-color:#2563eb;box-shadow:0 0 0 4px rgba(37,99,235,.12)}.student-search-results{position:absolute;left:0;right:0;top:calc(100% + 6px);z-index:80;background:#fff;border:1px solid #cbd5e1;border-radius:15px;box-shadow:0 16px 34px rgba(15,23,42,.18);overflow:hidden;max-height:270px;overflow-y:auto}.student-result-item{width:100%;border:0;background:#fff;text-align:left;padding:11px 12px;cursor:pointer;font-family:inherit;font-size:13px;font-weight:900;color:#0f172a;border-bottom:1px solid #eef2f7;line-height:1.35}.student-result-item:last-child{border-bottom:0}.student-result-item:hover,.student-result-item:focus{background:#eff6ff;outline:none}.student-result-empty{padding:12px;font-size:12px;font-weight:900;color:#64748b;background:#f8fafc}.picked-text{margin-top:7px;font-size:12px;font-weight:900;color:#64748b;line-height:1.45}.picked-text.selected{color:#166534;background:#dcfce7;border:1px solid #bbf7d0;padding:8px 10px;border-radius:12px}.quick-clear{position:absolute;right:8px;top:50%;transform:translateY(-50%);border:0;background:#e2e8f0;color:#334155;border-radius:999px;width:26px;height:26px;font-weight:1000;cursor:pointer}.class-filter{margin-top:8px}.selected-count{font-size:11px;font-weight:1000;color:#166534;background:#dcfce7;border:1px solid #bbf7d0;border-radius:999px;padding:4px 8px;display:inline-flex;width:max-content}
+
   @media(max-width:860px){.grid2,.row,.mode-row,.summary{grid-template-columns:1fr}.hero .btn,.actions .btn{width:100%}.scan-input{font-size:24px}.queue-item{grid-template-columns:1fr}.btn{width:100%}}
 </style>
 {% endblock %}
@@ -32,8 +35,30 @@
       <div id="recipientPanel">
         <div class="section-title" style="margin-bottom:8px">2) ผู้รับชีท</div>
         <div class="recipient-tabs"><button type="button" class="tab active" data-recipient="student">Student</button><button type="button" class="tab" data-recipient="admission">สมัคร/ทดลองเรียน</button><button type="button" class="tab" data-recipient="manual">Manual</button><button type="button" class="tab" data-recipient="unassigned">ไม่ระบุ</button></div>
-        <div id="studentBox" style="margin-top:8px"><div class="field"><label>เลือกนักเรียน</label><select id="studentSelect"></select></div></div>
-        <div id="admissionBox" class="hidden" style="margin-top:8px"><div class="field"><label>เลือกรายการสมัคร/ทดลองเรียน</label><select id="admissionSelect"></select></div></div>
+        <div id="studentBox" style="margin-top:8px">
+          <div class="field student-search-field" data-search-root="student">
+            <label>ค้นหานักเรียน</label>
+            <input type="hidden" id="studentSelect">
+            <div class="student-search-wrap">
+              <input id="studentSearchInput" class="student-search-input" placeholder="พิมพ์ชื่อเล่น / ชื่อจริง / รหัสนักเรียน" autocomplete="off" inputmode="search">
+              <button type="button" class="quick-clear" id="studentClearBtn" title="ล้างชื่อที่เลือก">×</button>
+              <div id="studentSearchResults" class="student-search-results" hidden></div>
+            </div>
+            <div id="studentPickedText" class="picked-text">พิมพ์ค้นหา แล้วกดเลือกชื่อน้องจากรายการ</div>
+          </div>
+        </div>
+        <div id="admissionBox" class="hidden" style="margin-top:8px">
+          <div class="field student-search-field" data-search-root="admission">
+            <label>ค้นหารายการสมัคร/ทดลองเรียน</label>
+            <input type="hidden" id="admissionSelect">
+            <div class="student-search-wrap">
+              <input id="admissionSearchInput" class="student-search-input" placeholder="พิมพ์ชื่อเล่น / ชื่อจริง / ระดับชั้น" autocomplete="off" inputmode="search">
+              <button type="button" class="quick-clear" id="admissionClearBtn" title="ล้างรายการที่เลือก">×</button>
+              <div id="admissionSearchResults" class="student-search-results" hidden></div>
+            </div>
+            <div id="admissionPickedText" class="picked-text">พิมพ์ค้นหา แล้วกดเลือกรายการสมัคร/ทดลองเรียน</div>
+          </div>
+        </div>
         <div id="manualBox" class="hidden" style="margin-top:8px"><div class="row"><div class="field"><label>ชื่อเล่น</label><input id="manualNickname" placeholder="เช่น น้องข้าว"></div><div class="field"><label>ระดับชั้น</label><input id="manualGrade" placeholder="เช่น ป.6"></div></div></div>
       </div>
 
@@ -41,6 +66,8 @@
         <div class="section-title" style="margin-bottom:8px">2) เลือก Class และนักเรียนที่จะได้รับชีท</div>
         <div class="field"><label>Class</label><select id="classSelect"></select></div>
         <div class="hint">กดเลือกได้หลายคน ระบบจะสร้างรายการรอตัดให้คนละ 1 รายการต่อ 1 การสแกน</div>
+        <input id="classStudentFilter" class="class-filter" placeholder="ค้นหาชื่อนักเรียนใน class นี้" autocomplete="off" inputmode="search">
+        <div id="classSelectedCount" class="selected-count">เลือกแล้ว 0 คน</div>
         <div id="classStudents" class="class-students"></div>
       </div>
 
@@ -67,6 +94,8 @@
   let recipientSource = 'student';
   let queue = [];
   let scanTimer = null;
+  const selectedClassStudentIds = new Set();
+
   const scanInput = document.getElementById('scanInput');
   const queueList = document.getElementById('queueList');
   const hint = document.getElementById('scanHint');
@@ -76,24 +105,159 @@
   const admissionSelect = document.getElementById('admissionSelect');
   const classSelect = document.getElementById('classSelect');
   const classStudents = document.getElementById('classStudents');
+  const classStudentFilter = document.getElementById('classStudentFilter');
+  const classSelectedCount = document.getElementById('classSelectedCount');
 
-  function toast(msg, err){ const old=document.querySelector('.toast'); if(old) old.remove(); const b=document.createElement('div'); b.className='toast'+(err?' err':''); b.textContent=msg; document.body.appendChild(b); setTimeout(()=>b.remove(),2600); }
-  function fillSelect(sel, rows, empty){ sel.innerHTML = '<option value="">'+empty+'</option>' + rows.map(r => '<option value="'+r.id+'">'+escapeHtml(r.label || r.name)+'</option>').join(''); }
-  function escapeHtml(s){ return String(s||'').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c])); }
-  fillSelect(studentSelect, STUDENTS, 'เลือกนักเรียน / หรือเว้นว่าง');
-  fillSelect(admissionSelect, ADMISSIONS, 'เลือกรายการสมัคร/ทดลองเรียน');
+  function toast(msg, err){
+    const old=document.querySelector('.toast');
+    if(old) old.remove();
+    const b=document.createElement('div');
+    b.className='toast'+(err?' err':'');
+    b.textContent=msg;
+    document.body.appendChild(b);
+    setTimeout(()=>b.remove(),2600);
+  }
+  function escapeHtml(s){
+    return String(s||'').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+  }
+  function normalize(s){ return String(s||'').toLowerCase().replace(/\s+/g,''); }
+  function fillSelect(sel, rows, empty){
+    sel.innerHTML = '<option value="">'+empty+'</option>' + rows.map(r => '<option value="'+r.id+'">'+escapeHtml(r.label || r.name)+'</option>').join('');
+  }
+
+  function setupQuickSearch(cfg){
+    const input = document.getElementById(cfg.inputId);
+    const hidden = document.getElementById(cfg.hiddenId);
+    const results = document.getElementById(cfg.resultsId);
+    const picked = document.getElementById(cfg.pickedId);
+    const clearBtn = document.getElementById(cfg.clearId);
+    let timer = null;
+
+    function hideResults(){ results.hidden = true; results.innerHTML = ''; }
+    function showMessage(msg){ results.innerHTML = '<div class="student-result-empty">'+escapeHtml(msg)+'</div>'; results.hidden = false; }
+    function clearPicked(){
+      hidden.value = '';
+      picked.classList.remove('selected');
+      picked.textContent = cfg.emptyText;
+    }
+    function choose(row){
+      hidden.value = row.id;
+      input.value = row.label || row.name || '';
+      picked.classList.add('selected');
+      picked.textContent = 'เลือกแล้ว: ' + (row.label || row.name || '');
+      hideResults();
+      setTimeout(()=>scanInput.focus(),60);
+    }
+    function rowText(row){
+      return normalize([
+        row.label, row.student_code, row.nickname, row.full_name, row.grade_level, row.grade_label, row.first_lesson_date
+      ].join(' '));
+    }
+    function render(term){
+      const needle = normalize(term);
+      if(!needle){ hideResults(); return; }
+      const rows = cfg.rows.filter(r => rowText(r).includes(needle)).slice(0, 14);
+      if(!rows.length){ showMessage('ไม่พบชื่อที่ตรงกับคำค้นหา'); return; }
+      results.innerHTML = '';
+      rows.forEach(row => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'student-result-item';
+        btn.textContent = row.label || row.name || '';
+        btn.addEventListener('click', () => choose(row));
+        results.appendChild(btn);
+      });
+      results.hidden = false;
+    }
+    input.addEventListener('input', function(){
+      clearPicked();
+      clearTimeout(timer);
+      const term = input.value.trim();
+      if(term.length < 1){ hideResults(); return; }
+      timer = setTimeout(()=>render(term), 120);
+    });
+    input.addEventListener('focus', function(){
+      const term = input.value.trim();
+      if(term.length >= 1) render(term);
+    });
+    clearBtn.addEventListener('click', function(){
+      input.value = '';
+      clearPicked();
+      hideResults();
+      input.focus();
+    });
+    document.addEventListener('click', function(event){
+      if(!event.target.closest('[data-search-root="'+cfg.root+'"]')) hideResults();
+    });
+    clearPicked();
+  }
+
+  setupQuickSearch({
+    root:'student', inputId:'studentSearchInput', hiddenId:'studentSelect', resultsId:'studentSearchResults', pickedId:'studentPickedText', clearId:'studentClearBtn',
+    rows:STUDENTS, emptyText:'พิมพ์ค้นหา แล้วกดเลือกชื่อน้องจากรายการ'
+  });
+  setupQuickSearch({
+    root:'admission', inputId:'admissionSearchInput', hiddenId:'admissionSelect', resultsId:'admissionSearchResults', pickedId:'admissionPickedText', clearId:'admissionClearBtn',
+    rows:ADMISSIONS, emptyText:'พิมพ์ค้นหา แล้วกดเลือกรายการสมัคร/ทดลองเรียน'
+  });
+
   fillSelect(classSelect, CLASSES.map(c => ({id:c.id, label:c.name+' · '+(c.students||[]).length+' คน'})), 'เลือก Class');
 
-  function renderClassStudents(){ const cls = CLASSES.find(c => String(c.id) === String(classSelect.value)); if(!cls){ classStudents.innerHTML='<div class="hint">เลือก Class ก่อน</div>'; return; } if(!cls.students.length){ classStudents.innerHTML='<div class="hint">Class นี้ยังไม่มี active enrollment</div>'; return; } classStudents.innerHTML = '<label class="student-check"><input type="checkbox" id="selectAllClassStudents"> เลือกทุกคน</label>' + cls.students.map(s => '<label class="student-check"><input type="checkbox" class="class-student" value="'+s.id+'"> '+escapeHtml(s.label)+'</label>').join(''); const all=document.getElementById('selectAllClassStudents'); all.addEventListener('change',()=>document.querySelectorAll('.class-student').forEach(x=>x.checked=all.checked)); }
-  classSelect.addEventListener('change', renderClassStudents); renderClassStudents();
+  function updateClassSelectedCount(){
+    classSelectedCount.textContent = 'เลือกแล้ว ' + selectedClassStudentIds.size + ' คน';
+  }
+  function renderClassStudents(){
+    const cls = CLASSES.find(c => String(c.id) === String(classSelect.value));
+    const term = normalize(classStudentFilter.value);
+    updateClassSelectedCount();
+    if(!cls){ classStudents.innerHTML='<div class="hint">เลือก Class ก่อน</div>'; return; }
+    if(!cls.students.length){ classStudents.innerHTML='<div class="hint">Class นี้ยังไม่มี active enrollment</div>'; return; }
+    const visible = cls.students.filter(s => !term || normalize(s.label + ' ' + s.nickname + ' ' + s.full_name + ' ' + s.student_code + ' ' + s.grade_level).includes(term));
+    if(!visible.length){ classStudents.innerHTML='<div class="hint">ไม่พบนักเรียนที่ตรงกับคำค้นหา</div>'; return; }
+    classStudents.innerHTML = '<label class="student-check"><input type="checkbox" id="selectAllClassStudents"> เลือกทุกคนที่แสดง</label>' + visible.map(s => '<label class="student-check"><input type="checkbox" class="class-student" value="'+s.id+'" '+(selectedClassStudentIds.has(String(s.id))?'checked':'')+'> '+escapeHtml(s.label)+'</label>').join('');
+    const all=document.getElementById('selectAllClassStudents');
+    all.addEventListener('change',()=>{
+      document.querySelectorAll('.class-student').forEach(x=>{
+        x.checked=all.checked;
+        if(all.checked) selectedClassStudentIds.add(String(x.value));
+        else selectedClassStudentIds.delete(String(x.value));
+      });
+      updateClassSelectedCount();
+    });
+    document.querySelectorAll('.class-student').forEach(x=>x.addEventListener('change',()=>{
+      if(x.checked) selectedClassStudentIds.add(String(x.value));
+      else selectedClassStudentIds.delete(String(x.value));
+      updateClassSelectedCount();
+    }));
+  }
+  classSelect.addEventListener('change', function(){ selectedClassStudentIds.clear(); classStudentFilter.value=''; renderClassStudents(); });
+  classStudentFilter.addEventListener('input', renderClassStudents);
+  renderClassStudents();
 
-  document.querySelectorAll('.mode-btn').forEach(btn => btn.addEventListener('click', () => { document.querySelectorAll('.mode-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); mode=btn.dataset.mode; document.getElementById('recipientPanel').classList.toggle('hidden', mode !== 'one_person_many_sheets'); document.getElementById('classPanel').classList.toggle('hidden', mode !== 'one_sheet_many_people'); scanInput.focus(); }));
-  document.querySelectorAll('.tab').forEach(tab => tab.addEventListener('click', () => { document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active')); tab.classList.add('active'); recipientSource = tab.dataset.recipient; document.getElementById('studentBox').classList.toggle('hidden', recipientSource !== 'student'); document.getElementById('admissionBox').classList.toggle('hidden', recipientSource !== 'admission'); document.getElementById('manualBox').classList.toggle('hidden', recipientSource !== 'manual'); scanInput.focus(); }));
+  document.querySelectorAll('.mode-btn').forEach(btn => btn.addEventListener('click', () => {
+    document.querySelectorAll('.mode-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    mode=btn.dataset.mode;
+    document.getElementById('recipientPanel').classList.toggle('hidden', mode !== 'one_person_many_sheets');
+    document.getElementById('classPanel').classList.toggle('hidden', mode !== 'one_sheet_many_people');
+    scanInput.focus();
+  }));
+  document.querySelectorAll('.tab').forEach(tab => tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+    tab.classList.add('active');
+    recipientSource = tab.dataset.recipient;
+    document.getElementById('studentBox').classList.toggle('hidden', recipientSource !== 'student');
+    document.getElementById('admissionBox').classList.toggle('hidden', recipientSource !== 'admission');
+    document.getElementById('manualBox').classList.toggle('hidden', recipientSource !== 'manual');
+    if(recipientSource === 'student') document.getElementById('studentSearchInput').focus();
+    else if(recipientSource === 'admission') document.getElementById('admissionSearchInput').focus();
+    else scanInput.focus();
+  }));
 
   function currentRecipients(){
     if(mode === 'one_sheet_many_people'){
       const cls = CLASSES.find(c => String(c.id) === String(classSelect.value));
-      const picked = Array.from(document.querySelectorAll('.class-student:checked')).map(x=>String(x.value));
+      const picked = Array.from(selectedClassStudentIds);
       if(!cls || picked.length === 0) return [{recipient_source:'unassigned', label:'ไม่ระบุชื่อ', class_id: classSelect.value || ''}];
       return cls.students.filter(s => picked.includes(String(s.id))).map(s => ({recipient_source:'student', student_id:s.id, class_id:cls.id, label:s.label}));
     }
@@ -106,7 +270,8 @@
       return [{recipient_source: a ? 'admission' : 'unassigned', admission_id: a ? a.id : '', label: a ? a.label : 'ไม่ระบุชื่อ'}];
     }
     if(recipientSource === 'manual'){
-      const nick = document.getElementById('manualNickname').value.trim(); const grade = document.getElementById('manualGrade').value.trim();
+      const nick = document.getElementById('manualNickname').value.trim();
+      const grade = document.getElementById('manualGrade').value.trim();
       return [{recipient_source: (nick||grade) ? 'manual' : 'unassigned', manual_nickname:nick, manual_grade_level:grade, label:(nick || 'ไม่ระบุชื่อ') + (grade ? ' · '+grade : '')}];
     }
     return [{recipient_source:'unassigned', label:'ไม่ระบุชื่อ'}];
@@ -122,28 +287,54 @@
     hint.textContent = 'เพิ่ม '+code+' แล้ว ('+recipients.length+' รายการ)';
     renderQueue();
   }
-  scanInput.addEventListener('input', function(){ clearTimeout(scanTimer); scanTimer = setTimeout(() => { const raw=scanInput.value.trim(); if(raw.length >= 3){ addScanned(raw); scanInput.value=''; } }, 140); });
-  scanInput.addEventListener('keydown', function(e){ if(e.key === 'Enter'){ e.preventDefault(); const raw=scanInput.value.trim(); addScanned(raw); scanInput.value=''; }});
+  scanInput.addEventListener('input', function(){
+    clearTimeout(scanTimer);
+    scanTimer = setTimeout(() => {
+      const raw=scanInput.value.trim();
+      if(raw.length >= 3){ addScanned(raw); scanInput.value=''; }
+    }, 140);
+  });
+  scanInput.addEventListener('keydown', function(e){
+    if(e.key === 'Enter'){
+      e.preventDefault();
+      const raw=scanInput.value.trim();
+      addScanned(raw);
+      scanInput.value='';
+    }
+  });
 
   function renderQueue(){
     metricCount.textContent = queue.length;
     metricSheetCount.textContent = new Set(queue.map(x=>x.sheet_code)).size;
     if(!queue.length){ queueList.innerHTML = '<div class="empty">ยังไม่มีรายการรอตัด</div>'; return; }
     queueList.innerHTML = queue.map((it, idx) => '<div class="queue-item"><div class="queue-no">#'+(idx+1)+'</div><div><div class="sheet-line">'+escapeHtml(it.sheet_code)+' · '+escapeHtml(it.sheet_title)+'</div><div class="who-line">ผู้รับ: '+escapeHtml(it.label || 'ไม่ระบุชื่อ')+'</div></div><button type="button" class="btn red remove-item" data-id="'+it.id+'">ลบ</button></div>').join('');
-    document.querySelectorAll('.remove-item').forEach(btn => btn.addEventListener('click', () => { queue = queue.filter(x => x.id !== btn.dataset.id); renderQueue(); scanInput.focus(); }));
+    document.querySelectorAll('.remove-item').forEach(btn => btn.addEventListener('click', () => {
+      queue = queue.filter(x => x.id !== btn.dataset.id);
+      renderQueue();
+      scanInput.focus();
+    }));
   }
-  document.getElementById('clearQueue').addEventListener('click', ()=>{ if(confirm('ล้างรายการรอตัดทั้งหมด?')){ queue=[]; renderQueue(); scanInput.focus(); }});
+  document.getElementById('clearQueue').addEventListener('click', ()=>{
+    if(confirm('ล้างรายการรอตัดทั้งหมด?')){ queue=[]; renderQueue(); scanInput.focus(); }
+  });
   document.getElementById('saveQueue').addEventListener('click', function(){
     if(!queue.length){ toast('ยังไม่มีรายการรอตัด', true); return; }
     if(!confirm('บันทึกและตัด stock '+queue.length+' รายการใช่ไหม?')) return;
-    const btn=this; btn.disabled=true; btn.textContent='กำลังบันทึก...';
-    fetch('{% url "core:sheet_allocation_save" %}', {method:'POST', headers:{'Content-Type':'application/json','X-CSRFToken':'{{ csrf_token }}'}, body:JSON.stringify({allocation_date:document.getElementById('allocationDate').value, items:queue})})
+    const btn=this;
+    btn.disabled=true;
+    btn.textContent='กำลังบันทึก...';
+    fetch('{% url "core:sheet_allocation_save" %}', {
+      method:'POST',
+      headers:{'Content-Type':'application/json','X-CSRFToken':'{{ csrf_token }}'},
+      body:JSON.stringify({allocation_date:document.getElementById('allocationDate').value, items:queue})
+    })
     .then(resp => resp.json().then(data => { if(!resp.ok || !data.ok) throw new Error(data.message || 'บันทึกไม่สำเร็จ'); return data; }))
     .then(data => { toast(data.message || 'บันทึกสำเร็จ'); queue=[]; renderQueue(); })
     .catch(err => toast(err.message || 'บันทึกไม่สำเร็จ', true))
     .finally(()=>{ btn.disabled=false; btn.textContent='💾 บันทึกตัด stock'; scanInput.focus(); });
   });
-  renderQueue(); setTimeout(()=>scanInput.focus(),80);
+  renderQueue();
+  setTimeout(()=>document.getElementById('studentSearchInput').focus(),80);
 })();
 </script>
 {% endblock %}

@@ -16,6 +16,7 @@ from .models import (
     SheetInventoryMovement,
     SheetClassMapping,
     SheetPrintOrder,
+    SheetAllocation,
     AdmissionInquiry,
     FinanceSetting,
     ExpenseCategory,
@@ -453,6 +454,39 @@ class SheetPrintOrderAdmin(admin.ModelAdmin):
         if obj.sheet_id:
             return f"{obj.sheet.code} - {obj.sheet.title}"
         return obj.custom_title or "เอกสารอื่น"
+
+
+
+@admin.register(SheetAllocation)
+class SheetAllocationAdmin(admin.ModelAdmin):
+    list_display = (
+        "allocation_date",
+        "sheet",
+        "quantity",
+        "recipient_type",
+        "recipient_display_admin",
+        "tutoring_class",
+        "created_by",
+        "created_at",
+    )
+    list_filter = ("recipient_type", "allocation_date", "sheet__grade_level", "sheet__subject", "tutoring_class")
+    search_fields = (
+        "sheet__code",
+        "sheet__title",
+        "student__student_code",
+        "student__nickname",
+        "student__full_name",
+        "admission_inquiry__nickname",
+        "manual_nickname",
+        "note",
+    )
+    autocomplete_fields = ("sheet", "student", "admission_inquiry", "tutoring_class", "movement", "created_by")
+    readonly_fields = ("created_at",)
+    ordering = ("-allocation_date", "-created_at")
+
+    @admin.display(description="ผู้รับ")
+    def recipient_display_admin(self, obj):
+        return obj.recipient_display
 
 
 # -----------------------

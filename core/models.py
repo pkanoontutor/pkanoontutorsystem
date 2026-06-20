@@ -1163,6 +1163,102 @@ class SheetClassMapping(models.Model):
         return f"{self.tutoring_class} | {self.sheet.code}"
 
 
+
+
+class SheetAllocation(models.Model):
+    class RecipientType(models.TextChoices):
+        STUDENT = "student", "Student ในระบบ"
+        ADMISSION = "admission", "สมัครเรียน/ทดลองเรียน"
+        MANUAL = "manual", "กรอกเอง"
+        UNASSIGNED = "unassigned", "ไม่ระบุชื่อ"
+
+    sheet = models.ForeignKey(
+        Sheet,
+        verbose_name="ชีท",
+        on_delete=models.PROTECT,
+        related_name="allocations",
+    )
+    quantity = models.PositiveIntegerField("จำนวนที่แจก", default=1)
+    allocation_date = models.DateField("วันที่แจก", default=timezone.localdate)
+
+    recipient_type = models.CharField(
+        "ประเภทผู้รับ",
+        max_length=20,
+        choices=RecipientType.choices,
+        default=RecipientType.UNASSIGNED,
+    )
+    student = models.ForeignKey(
+        Student,
+        verbose_name="นักเรียนในระบบ",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="sheet_allocations",
+    )
+    admission_inquiry = models.ForeignKey(
+        "AdmissionInquiry",
+        verbose_name="รายการสมัคร/ทดลองเรียน",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="sheet_allocations",
+    )
+    manual_nickname = models.CharField("ชื่อเล่นที่กรอกเอง", max_length=100, blank=True)
+    manual_grade_level = models.CharField("ระดับชั้นที่กรอกเอง", max_length=50, blank=True)
+    tutoring_class = models.ForeignKey(
+        TutoringClass,
+        verbose_name="Class ที่เกี่ยวข้อง",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="sheet_allocations",
+    )
+    scan_code = models.CharField("รหัสที่สแกน", max_length=80, blank=True)
+    batch_key = models.CharField("Batch", max_length=40, blank=True)
+    note = models.CharField("หมายเหตุ", max_length=255, blank=True)
+    movement = models.ForeignKey(
+        SheetInventoryMovement,
+        verbose_name="Movement ที่ตัด stock",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="allocations",
+    )
+    created_by = models.ForeignKey(
+        "auth.User",
+        verbose_name="ผู้บันทึก",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="sheet_allocations",
+    )
+    created_at = models.DateTimeField("วันที่บันทึก", default=timezone.now)
+
+    class Meta:
+        verbose_name = "Sheet Allocation"
+        verbose_name_plural = "Sheet Allocations"
+        ordering = ("-allocation_date", "-created_at", "sheet__code")
+        indexes = [
+            models.Index(fields=["allocation_date", "recipient_type"]),
+            models.Index(fields=["sheet", "allocation_date"]),
+            models.Index(fields=["student", "allocation_date"]),
+            models.Index(fields=["tutoring_class", "allocation_date"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.allocation_date} | {self.sheet.code} | {self.recipient_display}"
+
+    @property
+    def recipient_display(self) -> str:
+        if self.student_id:
+            return self.student.display_name
+        if self.admission_inquiry_id:
+            return f"{self.admission_inquiry.nickname} | {self.admission_inquiry.full_name}"
+        if self.manual_nickname:
+            return f"{self.manual_nickname} {self.manual_grade_level}".strip()
+        return "ไม่ระบุชื่อ"
+
+
 # -----------------------
 # ✅ Admission Inquiry (สมัครเรียน / จองทดลองเรียน)
 # -----------------------

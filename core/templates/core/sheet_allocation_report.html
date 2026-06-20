@@ -1,0 +1,39 @@
+{% extends "core/base.html" %}
+{% block title %}Sheet Allocation{% endblock %}
+
+{% block head %}
+<style>
+  .wrap{max-width:1320px;margin:0 auto;display:grid;gap:12px}.hero{background:linear-gradient(135deg,#0f172a,#7c3aed,#0ea5e9);color:#fff;border-radius:24px;padding:18px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;box-shadow:0 12px 24px rgba(15,23,42,.18)}.title{font-size:26px;font-weight:1000}.sub{font-size:12px;color:#e0f2fe;margin-top:4px}.actions{display:flex;gap:7px;flex-wrap:wrap}.btn{border:0;border-radius:13px;padding:9px 12px;font-weight:1000;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;font-size:13px}.soft{background:#fff;color:#0f172a;border:1px solid #e2e8f0}.primary{background:#2563eb;color:#fff}.panel{background:#fff;border-radius:20px;padding:14px;box-shadow:0 5px 14px rgba(15,23,42,.08);border:1px solid rgba(255,255,255,.88)}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}.field{display:flex;flex-direction:column;gap:5px}.field label{font-size:11px;font-weight:1000;color:#334155;text-transform:uppercase}select,input{border:1px solid #e2e8f0;border-radius:12px;padding:9px 10px;font-weight:850;background:#fff;width:100%;box-sizing:border-box}.form-row{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:end}.section-title{font-size:17px;font-weight:1000;color:#0f172a}.hint{font-size:12px;color:#64748b;font-weight:800;line-height:1.45;margin-top:3px}.list{display:grid;gap:8px}.alloc-card{border:1px solid #e2e8f0;border-radius:16px;padding:10px;background:#f8fafc}.alloc-title{font-size:14px;font-weight:1000;color:#0f172a}.alloc-meta{font-size:12px;color:#475569;font-weight:850;margin-top:4px}.table-wrap{overflow:auto;border:1px solid #e2e8f0;border-radius:16px}table{width:100%;border-collapse:collapse;background:#fff;min-width:760px}th,td{border-bottom:1px solid #edf2f7;padding:9px;text-align:center;font-size:12px}th{background:#f8fafc;color:#334155;font-weight:1000;position:sticky;top:0;z-index:1}td:first-child,th:first-child{text-align:left;position:sticky;left:0;background:#fff;z-index:2}.check{font-weight:1000;color:#166534}.blank{color:#cbd5e1}.date{font-size:10px;color:#166534;font-weight:900}.empty{color:#64748b;font-weight:850;text-align:center;padding:16px;border:1px dashed #cbd5e1;border-radius:16px;background:#f8fafc}@media(max-width:820px){.grid2,.form-row{grid-template-columns:1fr}.hero .btn,.btn{width:100%}}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="wrap">
+  <section class="hero"><div><div class="title">📊 Sheet Allocation</div><div class="sub">เช็คประวัติการแจกชีทตามเด็ก หรือดูเป็นตารางราย class</div></div><div class="actions"><a class="btn soft" href="{% url 'core:sheet_allocation_scan' %}">📤 แจกชีท / สแกน QR</a><a class="btn soft" href="{% url 'core:sheet_inventory_dashboard' %}">Sheet Inventory</a></div></section>
+
+  <div class="grid2">
+    <section class="panel">
+      <div class="section-title">ดูตามชื่อนักเรียน</div><div class="hint">เลือกเด็กเพื่อดูว่าได้รับชีทอะไรไปบ้างในวันไหน</div>
+      <form method="get" class="form-row" style="margin-top:10px"><div class="field"><label>นักเรียน</label><select name="student_id"><option value="">เลือกนักเรียน</option>{% for s in students %}<option value="{{ s.id }}" {% if selected_student_id == s.id|stringformat:'s' %}selected{% endif %}>{{ s.student_code }} | {{ s.nickname|default:'-' }} | {{ s.full_name }} | {{ s.grade_level }}</option>{% endfor %}</select></div><button class="btn primary">ค้นหา</button></form>
+      <div class="list" style="margin-top:12px">
+        {% if selected_student %}<div class="hint">ผลลัพธ์ของ <b>{{ selected_student.display_name }}</b></div>{% endif %}
+        {% for a in student_allocations %}<div class="alloc-card"><div class="alloc-title">{{ a.sheet.code }} · {{ a.sheet.title }}</div><div class="alloc-meta">วันที่ได้รับ {{ a.allocation_date|date:'d/m/Y' }} · {{ a.sheet.subject.name }}{% if a.tutoring_class %} · {{ a.tutoring_class.name }}{% endif %}</div></div>{% empty %}<div class="empty">ยังไม่มีประวัติ / หรือยังไม่ได้เลือกนักเรียน</div>{% endfor %}
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="section-title">เลือก Class</div><div class="hint">ระบบจะแสดง active enrollment ใน class นั้นเป็นแถว และชีทเป็นคอลัมน์</div>
+      <form method="get" class="form-row" style="margin-top:10px"><div class="field"><label>Class</label><select name="class_id"><option value="">เลือก class</option>{% for c in classes %}<option value="{{ c.id }}" {% if selected_class_id == c.id|stringformat:'s' %}selected{% endif %}>{{ c.name }}</option>{% endfor %}</select></div><button class="btn primary">ดูตาราง</button></form>
+      {% if selected_class %}<div class="hint" style="margin-top:10px">Class: <b>{{ selected_class.name }}</b> · {{ class_rows|length }} คน · {{ class_sheets|length }} ชีท</div>{% endif %}
+    </section>
+  </div>
+
+  <section class="panel">
+    <div class="section-title">ตารางแจกชีทตาม Class</div>
+    <div class="hint">✓ = ได้รับแล้ว ตัวเลขคือจำนวนครั้ง / วันที่ล่าสุดที่เคยได้รับ</div>
+    {% if selected_class and class_sheets %}
+      <div class="table-wrap" style="margin-top:10px"><table><thead><tr><th>นักเรียน</th>{% for s in class_sheets %}<th>{{ s.code }}<br><span style="font-size:10px;color:#64748b">{{ s.title|truncatechars:24 }}</span></th>{% endfor %}</tr></thead><tbody>{% for row in class_rows %}<tr><td><b>{{ row.student.nickname|default:'-' }}</b><br><span style="font-size:10px;color:#64748b">{{ row.student.full_name }} · {{ row.student.grade_level }}</span></td>{% for cell in row.cells %}<td>{% if cell.count %}<div class="check">✓{% if cell.count > 1 %} x{{ cell.count }}{% endif %}</div><div class="date">{{ cell.date_text }}</div>{% else %}<span class="blank">-</span>{% endif %}</td>{% endfor %}</tr>{% endfor %}</tbody></table></div>
+    {% elif selected_class %}<div class="empty" style="margin-top:10px">ยังไม่มีชีทที่ผูกกับ class นี้ หรือยังไม่มีประวัติแจกชีท</div>{% else %}<div class="empty" style="margin-top:10px">เลือก Class ก่อนเพื่อดูตาราง</div>{% endif %}
+  </section>
+</div>
+{% endblock %}

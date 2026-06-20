@@ -4,11 +4,11 @@
 {% block head %}
 <style>
   body{background:#eef6ff!important;}
-  .public-wrap{max-width:1040px;margin:0 auto;display:grid;gap:12px;}
+  .public-wrap{max-width:1060px;margin:0 auto;display:grid;gap:12px;}
   .hero{background:linear-gradient(135deg,#0f172a,#16a34a);color:#fff;border-radius:24px;padding:18px;box-shadow:0 12px 24px rgba(15,23,42,.20);}
   .title{font-size:24px;font-weight:1000;letter-spacing:-.03em;}
   .sub{font-size:13px;color:#dcfce7;line-height:1.5;margin-top:5px;}
-  .filter-card,.class-card,.update-card{background:#fff;border-radius:20px;padding:14px;box-shadow:0 5px 14px rgba(15,23,42,.08);border:1px solid rgba(255,255,255,.9);}
+  .filter-card,.class-card,.update-card,.summary-card{background:#fff;border-radius:20px;padding:14px;box-shadow:0 5px 14px rgba(15,23,42,.08);border:1px solid rgba(255,255,255,.9);}
   .filter-grid{display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:end;}
   .field{display:flex;flex-direction:column;gap:5px;min-width:0;}
   .field label{font-size:11px;font-weight:1000;color:#334155;text-transform:uppercase;letter-spacing:.04em;}
@@ -16,6 +16,15 @@
   input:focus,select:focus{outline:none;border-color:#16a34a;box-shadow:0 0 0 3px rgba(22,163,74,.12);}
   .btnx{border:0;border-radius:14px;padding:10px 14px;font-weight:1000;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:7px;cursor:pointer;white-space:nowrap;}
   .primary{background:#16a34a;color:#fff}.dark{background:#0f172a;color:#fff}.soft{background:#f8fafc;color:#0f172a;border:1px solid #e2e8f0}.gray{background:#64748b;color:#fff;}
+  .summary-title{font-size:15px;font-weight:1000;color:#0f172a;margin-bottom:8px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;}
+  .tutor-summary-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;}
+  .tutor-summary{display:grid;gap:6px;text-decoration:none;color:#0f172a;border:1px solid #e2e8f0;border-radius:16px;padding:10px;background:#f8fafc;transition:.15s ease;}
+  .tutor-summary:hover{transform:translateY(-1px);box-shadow:0 8px 18px rgba(15,23,42,.10);}
+  .tutor-summary.selected{background:#dcfce7;border-color:#86efac;}
+  .tutor-summary.empty{background:#f1f5f9;color:#94a3b8;border-color:#e2e8f0;}
+  .tutor-name{font-size:14px;font-weight:1000;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .tutor-count{font-size:12px;font-weight:1000;}.tutor-count b{font-size:20px;}
+  .bar{height:7px;background:#e2e8f0;border-radius:999px;overflow:hidden;}.bar span{display:block;height:100%;background:#16a34a;border-radius:999px;}
   .slot-section{display:grid;gap:10px;}
   .slot-header{border-radius:22px;padding:14px 16px;color:#0f172a;box-shadow:0 5px 14px rgba(15,23,42,.08);border:1px solid rgba(255,255,255,.9);display:flex;justify-content:space-between;gap:10px;align-items:center;}
   .slot-header .slot-name{font-size:19px;font-weight:1000;letter-spacing:-.02em;}
@@ -28,9 +37,9 @@
   .class-card{padding:14px;}
   .class-title{font-size:18px;font-weight:1000;color:#0f172a;margin-bottom:10px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;}
   .assignment-list{display:grid;gap:10px;}
-
   .update-card{display:block;border:1px solid #fde68a;box-shadow:none;background:linear-gradient(180deg,#fffbeb,#ffffff);padding:0;overflow:hidden;transition:background .18s ease,border-color .18s ease,box-shadow .18s ease;}
   .update-card.saved{border-color:#86efac;background:linear-gradient(180deg,#f0fdf4,#ffffff);}
+  .update-card.saved.near-end{border-color:#ef4444;background:linear-gradient(180deg,#f0fdf4,#ffffff);box-shadow:0 0 0 2px rgba(239,68,68,.13);}
   .update-card.no-teaching{border-color:#cbd5e1;background:linear-gradient(180deg,#f1f5f9,#ffffff);}
   .update-card[open]{box-shadow:0 8px 18px rgba(15,23,42,.08);}
   .update-card summary{list-style:none;cursor:pointer;padding:14px;user-select:none;}
@@ -41,10 +50,12 @@
   .subject{font-size:16px;font-weight:1000;color:#0f172a;}
   .tutor{font-size:12px;color:#64748b;font-weight:900;margin-top:3px;}
   .saved-mini-line{font-size:12px;color:#166534;font-weight:900;margin-top:5px;line-height:1.45;}
+  .near-end .saved-mini-line{color:#991b1b;}
   .no-teaching .saved-mini-line{color:#475569;}
   .status-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;}
   .status{display:inline-flex;border-radius:999px;padding:5px 10px;font-size:12px;font-weight:1000;border:1px solid #fde68a;background:#fef3c7;color:#92400e;}
   .status.done{background:#dcfce7;border-color:#86efac;color:#166534;}
+  .status.near{background:#fee2e2;border-color:#fca5a5;color:#991b1b;}
   .status.no-class{background:#e2e8f0;border-color:#cbd5e1;color:#334155;}
   .chev{width:24px;height:24px;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;background:#fff;border:1px solid #e2e8f0;color:#64748b;font-size:13px;font-weight:1000;transition:.15s ease;}
   .update-card[open] .chev{transform:rotate(90deg);}
@@ -53,14 +64,21 @@
   .prev-text{font-size:13px;font-weight:900;color:#0f172a;line-height:1.45;}
   .no-teaching-row{display:flex;align-items:center;gap:10px;padding:10px;border:1px solid #cbd5e1;border-radius:14px;background:#f8fafc;color:#334155;font-size:13px;font-weight:1000;margin-bottom:10px;}
   .no-teaching-row input{width:18px;height:18px;min-width:18px;accent-color:#64748b;}
+  .sheet-status-toggle{display:grid;grid-template-columns:1fr 1fr;gap:7px;}
+  .sheet-status-toggle input{display:none;}
+  .sheet-status-toggle span{border:1px solid #e2e8f0;border-radius:999px;padding:9px 10px;font-size:12px;font-weight:1000;text-align:center;background:#f8fafc;color:#334155;cursor:pointer;}
+  .sheet-status-toggle input:checked + span.normal{background:#dcfce7;border-color:#86efac;color:#166534;}
+  .sheet-status-toggle input:checked + span.near{background:#fee2e2;border-color:#fca5a5;color:#991b1b;}
   .form-grid{display:grid;grid-template-columns:1.4fr .7fr .7fr .9fr auto;gap:8px;align-items:end;}
+  .status-field{grid-column:1/-1;}
   .muted{color:#64748b;font-size:12px;line-height:1.45;}
   .mini{font-size:11px;color:#64748b;font-weight:800;margin-top:4px;}
   .error-box{background:#fef2f2;border:1px solid #fecaca;color:#991b1b;border-radius:16px;padding:12px;font-size:13px;font-weight:1000;line-height:1.55;}
   .field-error input{border-color:#ef4444!important;box-shadow:0 0 0 3px rgba(239,68,68,.12)!important;}
   .flash-saved{animation:flashSaved 1s ease;}
   @keyframes flashSaved{0%{box-shadow:0 0 0 0 rgba(34,197,94,.55);}45%{box-shadow:0 0 0 8px rgba(34,197,94,.18);}100%{box-shadow:none;}}
-  @media(max-width:760px){.filter-grid,.form-grid{grid-template-columns:1fr;}.btnx{width:100%;}.title{font-size:21px;}.hero{padding:16px;border-radius:20px;}.card-head{display:grid;}.status-row{justify-content:flex-start;}.slot-header{display:grid;}.slot-header .slot-name{font-size:18px;}}
+  @media(max-width:900px){.tutor-summary-grid{grid-template-columns:repeat(2,minmax(0,1fr));}}
+  @media(max-width:760px){.filter-grid,.form-grid{grid-template-columns:1fr;}.btnx{width:100%;}.title{font-size:21px;}.hero{padding:16px;border-radius:20px;}.card-head{display:grid;}.status-row{justify-content:flex-start;}.slot-header{display:grid;}.slot-header .slot-name{font-size:18px;}.tutor-summary-grid{grid-template-columns:1fr 1fr;}.status-field{grid-column:auto;}}
 </style>
 {% endblock %}
 
@@ -68,7 +86,7 @@
 <div class="public-wrap">
   <div class="hero">
     <div class="title">👩‍🏫 อัปเดตการสอนติวเตอร์</div>
-    <div class="sub">สัปดาห์เรียน {{ week_start|date:"d/m/Y" }} - {{ week_end|date:"d/m/Y" }} · ไม่ต้อง login · เลือกชื่อตัวเองเพื่อ filter ได้</div>
+    <div class="sub">สัปดาห์เรียน {{ week_start|date:"d/m/Y" }} - {{ week_end|date:"d/m/Y" }} · กดชื่อของตัวเองด้านล่างเพื่อ filter ได้เลย</div>
   </div>
 
   {% if error_code == "missing_progress" %}
@@ -94,6 +112,26 @@
     </form>
   </div>
 
+  <div class="summary-card">
+    <div class="summary-title">
+      <span>📊 Summary การอัปเดตของติวเตอร์</span>
+      <a class="btnx soft" href="/tutor-teaching-update/?week_start={{ week_start|date:'Y-m-d' }}">ดูทั้งหมด</a>
+    </div>
+    <div class="tutor-summary-grid">
+      {% for row in tutor_summary_rows %}
+        <a class="tutor-summary {% if row.is_empty %}empty{% endif %} {% if row.is_selected %}selected{% endif %}" href="/tutor-teaching-update/?week_start={{ week_start|date:'Y-m-d' }}&tutor_id={{ row.tutor.id }}">
+          <div class="tutor-name">{{ row.tutor.name }}</div>
+          <div class="tutor-count"><b>{{ row.done_count }}</b> / {{ row.assigned_count }} อัน</div>
+          <div class="bar"><span style="width:{{ row.percent }}%;"></span></div>
+          {% if row.is_empty %}<div class="muted">ยังไม่ได้ถูก assign</div>{% else %}<div class="muted">ค้าง {{ row.pending_count }} อัน</div>{% endif %}
+        </a>
+      {% empty %}
+        <div class="muted">ยังไม่มีรายชื่อติวเตอร์</div>
+      {% endfor %}
+    </div>
+    {% if unassigned_count %}<div class="muted" style="margin-top:8px;">ยังไม่ assign ติวเตอร์ {{ unassigned_count }} รายการ</div>{% endif %}
+  </div>
+
   {% for slot_key, slot in grouped_slots.items %}
     <section class="slot-section">
       <div class="slot-header {{ slot.tone }}">
@@ -111,7 +149,7 @@
           <div class="assignment-list">
             {% for item in group.assignments %}
               {% with a=item.assignment prev=item.previous_update curr=item.current_update %}
-              <details class="update-card {% if curr %}{% if curr.no_teaching %}no-teaching{% else %}saved{% endif %}{% endif %}" id="assignment-{{ a.id }}" {% if not curr %}open{% endif %}>
+              <details class="update-card {% if curr %}{% if curr.no_teaching %}no-teaching{% else %}saved{% if curr.sheet_near_end %} near-end{% endif %}{% endif %}{% endif %}" id="assignment-{{ a.id }}" {% if not curr %}open{% endif %}>
                 <summary>
                   <div class="card-head">
                     <div class="head-left">
@@ -124,6 +162,7 @@
                             <br>ข้อมูลล่าสุด: {{ curr.sheet_name|default:"-" }} · หน้า {{ curr.page_to|default:"-" }} · ข้อ {{ curr.question_to|default:"-" }}
                           {% else %}
                             ล่าสุด: {{ curr.sheet_name|default:"-" }} · หน้า {{ curr.page_to|default:"-" }} · ข้อ {{ curr.question_to|default:"-" }}
+                            {% if curr.sheet_near_end %}<br>⚠️ ใกล้จบชีท{% endif %}
                           {% endif %}
                           <br>บันทึก {{ curr.teaching_date|date:"d/m/Y" }} · อัปเดต {{ curr.updated_at|date:"d/m/Y H:i" }}
                         </div>
@@ -131,7 +170,7 @@
                     </div>
                     <div class="status-row">
                       {% if curr %}
-                        {% if curr.no_teaching %}<span class="status no-class">พักสอนสัปดาห์นี้</span>{% else %}<span class="status done">✓ บันทึกแล้ว</span>{% endif %}
+                        {% if curr.no_teaching %}<span class="status no-class">พักสอนสัปดาห์นี้</span>{% else %}<span class="status done">✓ บันทึกแล้ว</span>{% if curr.sheet_near_end %}<span class="status near">ใกล้จบชีท</span>{% endif %}{% endif %}
                       {% else %}
                         <span class="status">ยังไม่บันทึก</span>
                       {% endif %}
@@ -164,6 +203,20 @@
                       </label>
                     </div>
 
+                    <div class="field status-field">
+                      <label>สถานะชีท</label>
+                      <div class="sheet-status-toggle">
+                        <label>
+                          <input type="radio" name="sheet_status" value="normal" {% if not curr or not curr.sheet_near_end %}checked{% endif %}>
+                          <span class="normal">ชีทเหลือปกติ</span>
+                        </label>
+                        <label>
+                          <input type="radio" name="sheet_status" value="near_end" {% if curr and curr.sheet_near_end %}checked{% endif %}>
+                          <span class="near">ใกล้จบชีท</span>
+                        </label>
+                      </div>
+                    </div>
+
                     <div class="field">
                       <label>ชื่อชีท/เอกสาร</label>
                       <input id="sheetInput{{ a.id }}" type="text" name="sheet_name" value="{% if curr %}{{ curr.sheet_name }}{% elif prev %}{{ prev.sheet_name }}{% else %}{{ a.subject_template.default_sheet_name }}{% endif %}" placeholder="ชื่อชีท/เอกสาร">
@@ -192,7 +245,7 @@
 
                   {% if curr %}
                     <div class="mini">
-                      {% if curr.no_teaching %}สถานะ: สัปดาห์นี้ไม่มีสอน · {% else %}บันทึกล่าสุด: {% endif %}
+                      {% if curr.no_teaching %}สถานะ: สัปดาห์นี้ไม่มีสอน · {% elif curr.sheet_near_end %}สถานะ: ใกล้จบชีท · {% else %}บันทึกล่าสุด: {% endif %}
                       {{ curr.teaching_date|date:"d/m/Y" }} · อัปเดต {{ curr.updated_at|date:"d/m/Y H:i" }}
                     </div>
                   {% endif %}
@@ -238,7 +291,6 @@
       if (noTeaching) noTeaching.addEventListener("change", () => markRequiredState(form));
 
       form.addEventListener("submit", function(e){
-        const card = form.closest(".update-card");
         const btn = form.querySelector("button[type='submit']");
         const pageInput = form.querySelector("input[name='page_to']");
         const questionInput = form.querySelector("input[name='question_to']");
@@ -253,18 +305,7 @@
           questionField.classList.toggle("field-error", missingQuestion);
           if (missingPage || missingQuestion) {
             e.preventDefault();
-            alert("กรุณากรอกทั้งเลขหน้าและเลขข้อก่อนบันทึก ถ้าไม่ต้องการใส่ตัวเลขให้กรอกเครื่องหมาย - ครับ");
             return;
-          }
-        }
-
-        if (card) {
-          if (checkedNoTeaching) {
-            card.classList.remove("saved");
-            card.classList.add("no-teaching");
-          } else {
-            card.classList.remove("no-teaching");
-            card.classList.add("saved");
           }
         }
         if (btn) {
@@ -273,26 +314,19 @@
         }
       });
     });
-  });
-</script>
 
-<script>
-(function(){
-  function filterPicker(picker){
-    const grade = picker.dataset.grade || "";
-    Array.from(picker.options).forEach(opt => {
-      if(!opt.value){ opt.hidden = false; return; }
-      const optGrade = opt.dataset.grade || "";
-      opt.hidden = !!(grade && optGrade && optGrade !== grade);
-    });
-  }
-  document.querySelectorAll(".sheet-update-picker").forEach(picker => {
-    filterPicker(picker);
-    picker.addEventListener("change", function(){
-      const target = document.querySelector(picker.dataset.target || "");
-      if(target && picker.value) target.value = picker.value;
+    document.querySelectorAll(".sheet-update-picker").forEach(picker => {
+      const grade = picker.dataset.grade || "";
+      Array.from(picker.options).forEach(opt => {
+        if(!opt.value){ opt.hidden = false; return; }
+        const optGrade = opt.dataset.grade || "";
+        opt.hidden = !!(grade && optGrade && optGrade !== grade);
+      });
+      picker.addEventListener("change", function(){
+        const target = document.querySelector(picker.dataset.target || "");
+        if(target && picker.value) target.value = picker.value;
+      });
     });
   });
-})();
 </script>
 {% endblock %}

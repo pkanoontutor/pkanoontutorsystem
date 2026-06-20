@@ -1508,6 +1508,11 @@ class TeachingWeeklyAssignment(models.Model):
         blank=True,
         related_name="weekly_assignments",
     )
+    is_teaching = models.BooleanField(
+        "สัปดาห์นี้มีสอน",
+        default=True,
+        help_text="ใช้ปิดรายการที่สัปดาห์นี้ไม่มีสอน โดยยังเก็บ assignment ไว้ในระบบ",
+    )
     created_at = models.DateTimeField("วันที่สร้าง", default=timezone.now)
     updated_at = models.DateTimeField("อัปเดตล่าสุด", auto_now=True)
 
@@ -1539,6 +1544,11 @@ class TeachingProgressUpdate(models.Model):
     page_to = models.CharField("สอนถึงหน้า", max_length=50, blank=True)
     question_to = models.CharField("สอนถึงข้อ", max_length=50, blank=True)
     no_teaching = models.BooleanField("สัปดาห์นี้ไม่มีสอน", default=False)
+    sheet_near_end = models.BooleanField(
+        "ใกล้จบชีท",
+        default=False,
+        help_text="ติ๊กเมื่อชีทใกล้จบ เพื่อให้แสดงกรอบเตือนสีแดงในหน้าติวเตอร์",
+    )
     updated_by_name = models.CharField("ผู้บันทึก", max_length=120, blank=True)
     updated_at = models.DateTimeField("อัปเดตล่าสุด", auto_now=True)
     created_at = models.DateTimeField("วันที่สร้าง", default=timezone.now)
@@ -1569,6 +1579,8 @@ class TeachingProgressUpdate(models.Model):
         text = " / ".join(parts) if parts else "-"
         if self.no_teaching:
             return f"สัปดาห์นี้ไม่มีสอน · ข้อมูลล่าสุด: {text}"
+        if self.sheet_near_end:
+            return f"{text} · ใกล้จบชีท"
         return text
 
 # =========================================================

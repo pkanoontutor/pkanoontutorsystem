@@ -686,6 +686,12 @@ def _sheet_inventory_context(*, q: str = "", extra: dict | None = None) -> dict:
             .order_by("-created_at")[:30]
         ),
         "movement_type_choices": SheetInventoryMovement.MovementType.choices,
+        "ready_to_receive_orders": (
+            SheetPrintOrder.objects
+            .select_related("sheet", "sheet__subject", "requested_by")
+            .filter(status=SheetPrintOrder.Status.READY, sheet__isnull=False)
+            .order_by("completed_at", "due_date", "created_at")
+        ),
     }
     if extra:
         context.update(extra)
@@ -1050,6 +1056,39 @@ def sheet_inventory_dashboard(request: HttpRequest) -> HttpResponse:
                             user=request.user,
                         )
                 return redirect("core:sheet_inventory_profile", pk=sheet.pk)
+
+        elif action.startswith("receive_print_order:"):
+            order_id = action.split(":", 1)[1]
+            order = get_object_or_404(
+                SheetPrintOrder.objects.select_related("sheet", "sheet__subject"),
+                id=order_id,
+                status=SheetPrintOrder.Status.READY,
+                sheet__isnull=False,
+            )
+            raw_qty = (request.POST.get(f"receive_qty_{order.id}") or "").strip()
+            try:
+                receive_qty = int(raw_qty) if raw_qty else int(order.quantity or 0)
+            except Exception:
+                receive_qty = int(order.quantity or 0)
+            receive_qty = max(receive_qty, 0)
+            note = (request.POST.get(f"receive_note_{order.id}") or "").strip()
+            if not note:
+                note = f"ตรวจรับจากร้านปรินท์ Order #{order.id}"
+
+            if receive_qty > 0:
+                ok, _message, _inventory, _movement = _apply_sheet_inventory_movement(
+                    sheet=order.sheet,
+                    movement_type=SheetInventoryMovement.MovementType.ADD,
+                    quantity=receive_qty,
+                    note=note,
+                    user=request.user,
+                )
+                if ok:
+                    order.status = SheetPrintOrder.Status.RECEIVED
+                    order.received_at = timezone.now()
+                    order.received_by = request.user if getattr(request.user, "is_authenticated", False) else None
+                    order.save(update_fields=["status", "received_at", "received_by", "updated_at"])
+            return redirect("core:sheet_inventory_dashboard")
 
         elif action.startswith("create_print_order_inline:"):
             sheet_id = action.split(":", 1)[1]

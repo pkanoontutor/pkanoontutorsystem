@@ -51,6 +51,9 @@ urlpatterns = [
     path("sheet-inventory/bulk-upload/", views.sheet_inventory_bulk_upload, name="sheet_inventory_bulk_upload"),
     path("sheet-inventory/export/", views.sheet_inventory_export, name="sheet_inventory_export"),
     path("sheet-inventory/sheet/<int:pk>/", views.sheet_inventory_profile, name="sheet_inventory_profile"),
+    path("sheet-allocation/", views.sheet_allocation_scan, name="sheet_allocation_scan"),
+    path("sheet-allocation/save/", views.sheet_allocation_save, name="sheet_allocation_save"),
+    path("sheet-allocation/report/", views.sheet_allocation_report, name="sheet_allocation_report"),
 
     # Sheet print orders
     path("sheet-print-orders/", views.sheet_print_order_admin, name="sheet_print_order_admin"),

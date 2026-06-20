@@ -1057,38 +1057,77 @@ def sheet_inventory_dashboard(request: HttpRequest) -> HttpResponse:
                         )
                 return redirect("core:sheet_inventory_profile", pk=sheet.pk)
 
-        elif action.startswith("receive_print_order:"):
-            order_id = action.split(":", 1)[1]
-            order = get_object_or_404(
-                SheetPrintOrder.objects.select_related("sheet", "sheet__subject"),
-                id=order_id,
-                status=SheetPrintOrder.Status.READY,
-                sheet__isnull=False,
-            )
-            raw_qty = (request.POST.get(f"receive_qty_{order.id}") or "").strip()
-            try:
-                receive_qty = int(raw_qty) if raw_qty else int(order.quantity or 0)
-            except Exception:
-                receive_qty = int(order.quantity or 0)
-            receive_qty = max(receive_qty, 0)
-            note = (request.POST.get(f"receive_note_{order.id}") or "").strip()
-            if not note:
-                note = f"ตรวจรับจากร้านปรินท์ Order #{order.id}"
+        elif (
+            action.startswith("receive_print_order:")
+            or action.startswith("receive_print_order_full:")
+            or action.startswith("receive_print_order_custom:")
+        ):
+            action_name, order_id = action.split(":", 1)
+            is_ajax = request.headers.get("x-requested-with") == "XMLHttpRequest"
 
-            if receive_qty > 0:
-                ok, _message, _inventory, _movement = _apply_sheet_inventory_movement(
-                    sheet=order.sheet,
-                    movement_type=SheetInventoryMovement.MovementType.ADD,
-                    quantity=receive_qty,
-                    note=note,
-                    user=request.user,
-                )
-                if ok:
+            def _receive_response(ok: bool, message: str, status_code: int = 200, **payload):
+                if is_ajax:
+                    data = {"ok": ok, "message": message}
+                    data.update(payload)
+                    return JsonResponse(data, status=status_code)
+                return redirect("core:sheet_inventory_dashboard")
+
+            try:
+                with transaction.atomic():
+                    order = get_object_or_404(
+                        SheetPrintOrder.objects.select_for_update().select_related("sheet", "sheet__subject"),
+                        id=order_id,
+                        sheet__isnull=False,
+                    )
+
+                    if order.status != SheetPrintOrder.Status.READY:
+                        return _receive_response(False, "รายการนี้ถูกตรวจรับไปแล้ว หรือยังไม่พร้อมตรวจรับ", 400)
+
+                    if action_name == "receive_print_order_full":
+                        receive_qty = int(order.quantity or 0)
+                    else:
+                        raw_qty = (request.POST.get(f"receive_qty_{order.id}") or "").strip()
+                        try:
+                            receive_qty = int(raw_qty) if raw_qty else int(order.quantity or 0)
+                        except Exception:
+                            return _receive_response(False, "จำนวนตรวจรับไม่ถูกต้อง", 400)
+
+                    receive_qty = max(receive_qty, 0)
+                    if receive_qty <= 0:
+                        return _receive_response(False, "กรุณาระบุจำนวนตรวจรับมากกว่า 0", 400)
+
+                    note = (request.POST.get(f"receive_note_{order.id}") or "").strip()
+                    if not note:
+                        if action_name == "receive_print_order_full":
+                            note = f"ตรวจรับจากร้านปรินท์ Order #{order.id}"
+                        else:
+                            note = f"ตรวจรับจากร้านปรินท์ Order #{order.id} (แก้จำนวนรับจริง)"
+
+                    ok, message, inventory, _movement = _apply_sheet_inventory_movement(
+                        sheet=order.sheet,
+                        movement_type=SheetInventoryMovement.MovementType.ADD,
+                        quantity=receive_qty,
+                        note=note,
+                        user=request.user,
+                    )
+                    if not ok:
+                        return _receive_response(False, message or "บันทึกตรวจรับไม่สำเร็จ", 400)
+
                     order.status = SheetPrintOrder.Status.RECEIVED
                     order.received_at = timezone.now()
                     order.received_by = request.user if getattr(request.user, "is_authenticated", False) else None
                     order.save(update_fields=["status", "received_at", "received_by", "updated_at"])
-            return redirect("core:sheet_inventory_dashboard")
+
+                    return _receive_response(
+                        True,
+                        f"ตรวจรับ {order.display_code} จำนวน {receive_qty} เล่ม และเพิ่มเข้า stock แล้ว",
+                        order_id=order.id,
+                        sheet_id=order.sheet_id,
+                        received_qty=receive_qty,
+                        new_balance=int(inventory.quantity or 0) if inventory else 0,
+                    )
+            except Exception as exc:
+                return _receive_response(False, f"ตรวจรับไม่สำเร็จ: {exc}", 400)
 
         elif action.startswith("create_print_order_inline:"):
             sheet_id = action.split(":", 1)[1]

@@ -1,5 +1,84 @@
 {% extends "core/base.html" %}
-{% block title %}Sheet Inventory{% endblock %}
+{% block title %}Sheet Inventory
+<script>
+(function(){
+  const modal = document.getElementById('printOrderModal');
+  const form = document.getElementById('printOrderForm');
+  if(!modal || !form) return;
+
+  const closeBtn = document.getElementById('printModalClose');
+  const cancelBtn = document.getElementById('printCancelBtn');
+  const actionInput = document.getElementById('printActionInput');
+  const urlInput = document.getElementById('printUrlInput');
+  const qtyInput = document.getElementById('printQtyInput');
+  const subjectText = document.getElementById('printSubjectText');
+  const currentQty = document.getElementById('printCurrentQty');
+  const title = document.getElementById('printModalTitle');
+  const sub = document.getElementById('printModalSub');
+  const colorPanel = document.getElementById('printColorPanel');
+
+  function closeModal(){ modal.hidden = true; }
+
+  function setColor(value){
+    const target = value || 'blue';
+    const radios = form.querySelectorAll("input[name='print_spine_color']");
+    let found = false;
+    radios.forEach(function(r){
+      if(r.value === target){ r.checked = true; found = true; }
+    });
+    if(!found && radios.length){ radios[0].checked = true; }
+  }
+
+  function syncBindingColor(){
+    const binding = form.querySelector("input[name='print_binding_type']:checked");
+    if(!binding || !colorPanel) return;
+    if(binding.value === 'corner'){
+      colorPanel.style.opacity = '.45';
+      colorPanel.style.pointerEvents = 'none';
+    }else{
+      colorPanel.style.opacity = '1';
+      colorPanel.style.pointerEvents = 'auto';
+    }
+  }
+
+  document.querySelectorAll('[data-print-open]').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      const sheetId = btn.dataset.sheetId || '';
+      const code = btn.dataset.sheetCode || '';
+      const sheetTitle = btn.dataset.sheetTitle || '';
+      const subject = btn.dataset.subjectName || '';
+      const qty = btn.dataset.currentQty || '0';
+      const defaultColor = btn.dataset.defaultColor || 'blue';
+
+      actionInput.value = 'create_print_order_inline:' + sheetId;
+      urlInput.value = btn.dataset.onedriveUrl || '';
+      qtyInput.value = '';
+      title.textContent = '🖨️ ส่งปรินท์ ' + code;
+      sub.textContent = sheetTitle;
+      subjectText.textContent = subject ? ('วิชา: ' + subject) : '-';
+      currentQty.textContent = qty;
+      setColor(defaultColor);
+
+      const sideRadio = form.querySelector("input[name='print_binding_type'][value='side']");
+      if(sideRadio){ sideRadio.checked = true; }
+      syncBindingColor();
+
+      modal.hidden = false;
+      setTimeout(function(){ qtyInput.focus(); }, 80);
+    });
+  });
+
+  form.querySelectorAll("input[name='print_binding_type']").forEach(function(r){
+    r.addEventListener('change', syncBindingColor);
+  });
+
+  closeBtn && closeBtn.addEventListener('click', closeModal);
+  cancelBtn && cancelBtn.addEventListener('click', closeModal);
+  modal.addEventListener('click', function(e){ if(e.target === modal){ closeModal(); } });
+  document.addEventListener('keydown', function(e){ if(e.key === 'Escape' && !modal.hidden){ closeModal(); } });
+})();
+</script>
+{% endblock %}
 
 {% block head %}
 <style>
@@ -18,6 +97,8 @@
   .receive-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin-top:10px}
   .receive-card{background:#fff;border:1px solid #86efac;border-radius:17px;padding:11px;display:grid;gap:8px;box-shadow:0 4px 10px rgba(22,163,74,.08)}
   .receive-card.receiving{opacity:.55;pointer-events:none}.receive-title{font-size:14px;font-weight:1000;color:#0f172a;line-height:1.3}.receive-meta{display:flex;gap:6px;flex-wrap:wrap}.receive-actions{display:grid;gap:7px}.receive-custom{display:grid;grid-template-columns:90px 1fr 74px;gap:6px;align-items:center}.receive-qty{font-size:28px;font-weight:1000;color:#16a34a;line-height:1}.receive-toast{position:fixed;right:18px;bottom:18px;z-index:9999;border-radius:16px;padding:12px 14px;font-size:13px;font-weight:1000;box-shadow:0 16px 34px rgba(15,23,42,.22);max-width:min(360px,calc(100vw - 28px));background:#dcfce7;color:#166534;border:1px solid #86efac}.receive-toast.err{background:#fee2e2;color:#991b1b;border-color:#fecaca}
+
+  .print-icon-btn{border:0;cursor:pointer;font-family:inherit}.print-modal-backdrop{position:fixed;inset:0;background:rgba(15,23,42,.58);z-index:9998;display:flex;align-items:center;justify-content:center;padding:16px}.print-modal-backdrop[hidden]{display:none!important}.print-modal-card{width:min(560px,100%);background:#fff;border-radius:24px;box-shadow:0 24px 70px rgba(15,23,42,.34);border:1px solid #e2e8f0;overflow:hidden}.print-modal-head{background:linear-gradient(135deg,#0f172a,#0ea5e9);color:#fff;padding:16px 18px;display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.print-modal-title{font-size:20px;font-weight:1000}.print-modal-sub{font-size:12px;color:#e0f2fe;line-height:1.45;margin-top:3px}.print-modal-close{border:0;background:rgba(255,255,255,.15);color:#fff;border-radius:999px;width:36px;height:36px;font-size:20px;font-weight:1000;cursor:pointer}.print-modal-body{padding:14px;display:grid;gap:10px}.print-field{display:grid;gap:5px}.print-field label{font-size:11px;font-weight:1000;color:#334155;text-transform:uppercase;letter-spacing:.04em}.print-stock-box{display:flex;justify-content:space-between;align-items:center;gap:10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:16px;padding:10px 12px}.print-stock-num{font-size:34px;line-height:1;font-weight:1000;color:#0ea5e9}.print-grid2{display:grid;grid-template-columns:1fr 1fr;gap:9px}.print-choice-row{display:flex;gap:8px;flex-wrap:wrap}.print-radio-card{border:1px solid #e2e8f0;background:#f8fafc;border-radius:14px;padding:9px 11px;font-size:12px;font-weight:1000;cursor:pointer;display:flex;gap:6px;align-items:center}.print-radio-card:has(input:checked){border-color:#0ea5e9!important;background:#e0f2fe!important;color:#0369a1}.color-card{min-width:78px;justify-content:center}.print-actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;border-top:1px solid #e2e8f0;padding:12px 14px;background:#f8fafc}@media(max-width:560px){.print-grid2{grid-template-columns:1fr}.print-actions .btnx{width:100%}.print-modal-card{border-radius:18px}}
 
   .tools-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.tool-box{border:1px solid #e2e8f0;border-radius:16px;background:#f8fafc;padding:11px;display:grid;gap:8px}.tool-title{font-size:14px;font-weight:1000;color:#0f172a}.form-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.class-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.class-card{border:1px solid #e2e8f0;border-radius:17px;padding:11px;background:#fff;display:grid;gap:8px}.class-card.short{border-color:#fecaca;background:#fff7f7}.class-title{font-size:15px;font-weight:1000;color:#0f172a;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}.sheet-need{border-radius:13px;background:#f8fafc;border:1px solid #e2e8f0;padding:8px;display:grid;gap:5px}.pill{border-radius:999px;padding:4px 8px;font-size:11px;font-weight:1000;border:1px solid #e2e8f0;background:#f8fafc;color:#334155}.low{background:#fee2e2;color:#991b1b;border-color:#fecaca}.ok{background:#dcfce7;color:#166534;border-color:#86efac}.blue{background:#eff6ff;color:#1d4ed8;border-color:#bfdbfe}.orange{background:#ffedd5;color:#9a3412;border-color:#fed7aa}.bulk-result{border-radius:15px;padding:10px;border:1px solid #bae6fd;background:#f0f9ff;color:#0c4a6e;font-weight:900;display:grid;gap:6px}.error-list{margin:0;padding-left:18px;font-size:11px;line-height:1.4}
   @media(max-width:1200px){.sheet-card-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.receive-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.tools-grid,.class-grid{grid-template-columns:1fr}.form-grid{grid-template-columns:1fr 1fr}}
@@ -237,6 +318,19 @@
               </div>
 
               <div class="link-row">
+                <button
+                  class="mini-link print-icon-btn"
+                  type="button"
+                  title="ส่งปรินท์ชีทนี้"
+                  data-print-open
+                  data-sheet-id="{{ row.sheet.id }}"
+                  data-sheet-code="{{ row.sheet.code }}"
+                  data-sheet-title="{{ row.sheet.title }}"
+                  data-subject-name="{{ row.sheet.subject.name }}"
+                  data-current-qty="{{ row.quantity }}"
+                  data-default-color="{{ row.default_spine_color }}"
+                  data-onedrive-url="{{ row.onedrive_url }}"
+                >🖨️ ส่งปรินท์</button>
                 <a class="mini-link" href="{% url 'core:sheet_inventory_profile' row.sheet.id %}">Profile</a>
                 <a class="mini-link" href="{% url 'core:sheet_inventory_movements' %}?q={{ row.sheet.code }}">Movement</a>
               </div>
@@ -252,6 +346,78 @@
       <button class="btnx green" type="submit" name="action" value="set_stock_bulk">💾 บันทึกยอดจริงทุกเล่มที่กรอก</button>
     </div>
   </form>
+
+
+
+  <div id="printOrderModal" class="print-modal-backdrop" hidden>
+    <div class="print-modal-card" role="dialog" aria-modal="true" aria-labelledby="printModalTitle">
+      <div class="print-modal-head">
+        <div>
+          <div class="print-modal-title" id="printModalTitle">🖨️ ส่งปรินท์ชีท</div>
+          <div class="print-modal-sub" id="printModalSub">เลือกจำนวน รูปแบบการเย็บ สี และวันที่ต้องทำเสร็จ</div>
+        </div>
+        <button type="button" class="print-modal-close" id="printModalClose" aria-label="Close">×</button>
+      </div>
+
+      <form method="post" id="printOrderForm">
+        {% csrf_token %}
+        <input type="hidden" name="action" id="printActionInput" value="">
+        <input type="hidden" name="print_url" id="printUrlInput" value="">
+        <input type="hidden" name="print_note" id="printNoteInput" value="สั่งปรินท์จาก popup หน้า Sheet Inventory">
+
+        <div class="print-modal-body">
+          <div class="print-stock-box">
+            <div>
+              <div class="qty-label">จำนวนชีทที่มีในระบบตอนนี้</div>
+              <div class="last-updated" id="printSubjectText">-</div>
+            </div>
+            <div class="print-stock-num" id="printCurrentQty">0</div>
+          </div>
+
+          <div class="print-grid2">
+            <div class="print-field">
+              <label>จำนวนชีทที่จะส่งปรินท์</label>
+              <input id="printQtyInput" type="number" min="1" name="print_qty" placeholder="เช่น 30" required>
+            </div>
+            <div class="print-field">
+              <label>วันที่ต้องทำเสร็จ</label>
+              <input id="printDueDateInput" type="date" name="print_due_date" value="{{ default_print_due_date|date:'Y-m-d' }}">
+            </div>
+          </div>
+
+          <div class="print-field">
+            <label>รูปแบบการเย็บ</label>
+            <div class="print-choice-row">
+              {% for value,label in binding_type_choices %}
+                <label class="print-radio-card">
+                  <input type="radio" name="print_binding_type" value="{{ value }}" {% if value == "side" %}checked{% endif %}>
+                  {{ label }}
+                </label>
+              {% endfor %}
+            </div>
+          </div>
+
+          <div class="print-field" id="printColorPanel">
+            <label>สีชีท / สีสันรูด</label>
+            <div class="hint">ระบบเลือกสีเริ่มต้นตามวิชาให้แล้ว แต่สามารถเปลี่ยนเองได้ก่อนบันทึก</div>
+            <div class="print-choice-row" style="margin-top:4px">
+              {% for c in spine_color_choices %}
+                <label class="print-radio-card color-card" style="background:{{ c.bg }};border-color:{{ c.border }};">
+                  <input type="radio" name="print_spine_color" value="{{ c.value }}">
+                  {{ c.label }}
+                </label>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+
+        <div class="print-actions">
+          <button type="button" class="btnx soft" id="printCancelBtn">ยกเลิก</button>
+          <button type="submit" class="btnx green">ส่งปรินท์</button>
+        </div>
+      </form>
+    </div>
+  </div>
 
   <details class="panel">
     <summary class="tool-title" style="cursor:pointer;">เครื่องมือเพิ่มเติม: สร้างชีท / Bulk Upload / ผูกชีทกับ class</summary>

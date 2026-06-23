@@ -507,7 +507,6 @@ def _class_matches_inquiry(tutoring_class: TutoringClass, inquiry: AdmissionInqu
 def _demand_count_for_class(tutoring_class: TutoringClass, pending_inquiries: list[AdmissionInquiry]) -> int:
     return sum(1 for i in pending_inquiries if _class_matches_inquiry(tutoring_class, i))
 
-
 def _sheet_row(sheet: Sheet) -> dict:
     inv = _inventory_for_sheet(sheet)
     qty = int(inv.quantity or 0) if inv else 0
@@ -525,8 +524,10 @@ def _sheet_row(sheet: Sheet) -> dict:
         "last_updated_at": last_updated_at,
         "subject_style": f"--subject-bg:{subject_style['bg']};--subject-border:{subject_style['border']};--subject-accent:{subject_style['accent']};",
         "subject_color_label": subject_style["label"],
+        "default_spine_color": _default_spine_color_for_subject(sheet.subject.name if getattr(sheet, "subject_id", None) else ""),
+        "default_spine_color_label": _spine_color_label(_default_spine_color_for_subject(sheet.subject.name if getattr(sheet, "subject_id", None) else "")),
+        "onedrive_url": (getattr(inv, "onedrive_url", "") or "") if inv else "",
     }
-
 
 
 def _build_class_sheet_rows() -> list[dict]:
@@ -653,7 +654,6 @@ def _build_class_sheet_rows() -> list[dict]:
     return rows
 
 
-
 def _sheet_inventory_context(*, q: str = "", extra: dict | None = None) -> dict:
     sheets_qs = Sheet.objects.select_related("subject").all()
     if q:
@@ -687,6 +687,9 @@ def _sheet_inventory_context(*, q: str = "", extra: dict | None = None) -> dict:
             .order_by("-created_at")[:30]
         ),
         "movement_type_choices": SheetInventoryMovement.MovementType.choices,
+        "binding_type_choices": SheetPrintOrder.BindingType.choices,
+        "spine_color_choices": _print_color_choices(),
+        "default_print_due_date": timezone.localdate() + timedelta(days=3),
         "ready_to_receive_orders": (
             SheetPrintOrder.objects
             .select_related("sheet", "sheet__subject", "requested_by")
@@ -697,7 +700,6 @@ def _sheet_inventory_context(*, q: str = "", extra: dict | None = None) -> dict:
     if extra:
         context.update(extra)
     return context
-
 
 def _clean_cell(value) -> str:
     if value is None:
@@ -1148,15 +1150,51 @@ def sheet_inventory_dashboard(request: HttpRequest) -> HttpResponse:
         elif action.startswith("create_print_order_inline:"):
             sheet_id = action.split(":", 1)[1]
             sheet = get_object_or_404(Sheet.objects.select_related("subject"), id=sheet_id)
-            raw_qty = (request.POST.get(f"print_qty_{sheet.id}") or "").strip()
+            raw_qty = (
+                request.POST.get(f"print_qty_{sheet.id}")
+                or request.POST.get("print_qty")
+                or ""
+            ).strip()
             try:
                 quantity = max(int(raw_qty), 0)
             except Exception:
                 quantity = 0
 
-            due_date = _parse_optional_date(request.POST.get(f"print_due_date_{sheet.id}"))
-            onedrive_url = (request.POST.get(f"print_url_{sheet.id}") or "").strip()
-            note = (request.POST.get(f"print_note_{sheet.id}") or "สั่งปรินท์จากหน้า Sheet Inventory").strip()
+            due_date = _parse_optional_date(
+                request.POST.get(f"print_due_date_{sheet.id}")
+                or request.POST.get("print_due_date")
+            )
+            onedrive_url = (
+                request.POST.get(f"print_url_{sheet.id}")
+                or request.POST.get("print_url")
+                or ""
+            ).strip()
+            note = (
+                request.POST.get(f"print_note_{sheet.id}")
+                or request.POST.get("print_note")
+                or "สั่งปรินท์จาก popup หน้า Sheet Inventory"
+            ).strip()
+
+            binding_type = (
+                request.POST.get(f"print_binding_type_{sheet.id}")
+                or request.POST.get("print_binding_type")
+                or SheetPrintOrder.BindingType.SIDE
+            ).strip()
+            if binding_type not in dict(SheetPrintOrder.BindingType.choices):
+                binding_type = SheetPrintOrder.BindingType.SIDE
+
+            default_spine_color = _default_spine_color_for_subject(sheet.subject.name if sheet.subject_id else "")
+            spine_color = (
+                request.POST.get(f"print_spine_color_{sheet.id}")
+                or request.POST.get("print_spine_color")
+                or default_spine_color
+                or ""
+            ).strip()
+
+            if binding_type == SheetPrintOrder.BindingType.CORNER:
+                spine_color = ""
+            elif spine_color not in dict(SheetPrintOrder.SpineColor.choices):
+                spine_color = default_spine_color
 
             if quantity > 0:
                 inventory, _ = SheetInventory.objects.get_or_create(sheet=sheet, defaults={"quantity": 0})
@@ -1171,8 +1209,8 @@ def sheet_inventory_dashboard(request: HttpRequest) -> HttpResponse:
                     quantity=quantity,
                     due_date=due_date,
                     onedrive_url=onedrive_url,
-                    binding_type=SheetPrintOrder.BindingType.SIDE,
-                    spine_color=_default_spine_color_for_subject(sheet.subject.name if sheet.subject_id else ""),
+                    binding_type=binding_type,
+                    spine_color=spine_color,
                     note=note,
                     requested_by=request.user if getattr(request.user, "is_authenticated", False) else None,
                 )
@@ -6700,4 +6738,3 @@ def test_score_import_template(request: HttpRequest, round_id: int) -> HttpRespo
     response = HttpResponse(buffer.getvalue(), content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
     response["Content-Disposition"] = f'attachment; filename="test_score_import_template_{test_round.id}.xlsx"'
     return response
-

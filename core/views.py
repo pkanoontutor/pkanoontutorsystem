@@ -3580,8 +3580,10 @@ def _money(x) -> Decimal:
 
 
 COURSE_SESSION_CHOICES = [
+    ("5", "5 ครั้ง", 5),
+    ("6", "6 ครั้ง", 6),
     ("10", "10 ครั้ง", 10),
-    ("12", "10 แถม 2 = 12 ครั้ง", 12),
+    ("12", "12 ครั้ง", 12),
     ("20", "20 ครั้ง", 20),
     ("30", "30 ครั้ง", 30),
     ("custom", "กรอกเอง", 10),
@@ -3652,9 +3654,12 @@ def _default_payment_form_context(request: HttpRequest, errors: list[str] | None
             "student_label": f"{e.student.nickname or '-'} | {e.student.full_name or '-'} | {e.student.student_code or '-'}",
             "label": f"{e.student.nickname or '-'} | {e.student.full_name or '-'} | {e.tutoring_class.name} | {e.sale_run_no or e.id} | คงเหลือ {e.remaining_sessions}",
             "class_name": e.tutoring_class.name,
+            "time_slot": e.tutoring_class.get_time_slot_display() if hasattr(e.tutoring_class, "get_time_slot_display") else e.tutoring_class.time_slot,
             "sale_run_no": e.sale_run_no or str(e.id),
             "remaining_sessions": e.remaining_sessions,
+            "sessions_total": int(e.sessions_total or 0),
             "course_price": str(e.course_price or e.tutoring_class.course_price or 0),
+            "created_at": e.created_at.strftime("%d/%m/%Y") if e.created_at else "",
         }
         for e in enrollments
     ]

@@ -1148,6 +1148,15 @@ def sheet_inventory_dashboard(request: HttpRequest) -> HttpResponse:
                 return _receive_response(False, f"ตรวจรับไม่สำเร็จ: {exc}", 400)
 
         elif action.startswith("create_print_order_inline:"):
+            is_ajax = request.headers.get("x-requested-with") == "XMLHttpRequest"
+
+            def _print_response(ok: bool, message: str, status_code: int = 200, **payload):
+                if is_ajax:
+                    data = {"ok": ok, "message": message}
+                    data.update(payload)
+                    return JsonResponse(data, status=status_code)
+                return redirect("core:sheet_inventory_dashboard")
+
             sheet_id = action.split(":", 1)[1]
             sheet = get_object_or_404(Sheet.objects.select_related("subject"), id=sheet_id)
             raw_qty = (
@@ -1159,6 +1168,9 @@ def sheet_inventory_dashboard(request: HttpRequest) -> HttpResponse:
                 quantity = max(int(raw_qty), 0)
             except Exception:
                 quantity = 0
+
+            if quantity <= 0:
+                return _print_response(False, "กรุณากรอกจำนวนชีทที่จะส่งปรินท์", 400, sheet_id=sheet.id)
 
             due_date = _parse_optional_date(
                 request.POST.get(f"print_due_date_{sheet.id}")
@@ -1196,7 +1208,7 @@ def sheet_inventory_dashboard(request: HttpRequest) -> HttpResponse:
             elif spine_color not in dict(SheetPrintOrder.SpineColor.choices):
                 spine_color = default_spine_color
 
-            if quantity > 0:
+            try:
                 inventory, _ = SheetInventory.objects.get_or_create(sheet=sheet, defaults={"quantity": 0})
                 if onedrive_url:
                     inventory.onedrive_url = onedrive_url
@@ -1204,7 +1216,7 @@ def sheet_inventory_dashboard(request: HttpRequest) -> HttpResponse:
                 elif getattr(inventory, "onedrive_url", ""):
                     onedrive_url = inventory.onedrive_url
 
-                SheetPrintOrder.objects.create(
+                order = SheetPrintOrder.objects.create(
                     sheet=sheet,
                     quantity=quantity,
                     due_date=due_date,
@@ -1214,7 +1226,17 @@ def sheet_inventory_dashboard(request: HttpRequest) -> HttpResponse:
                     note=note,
                     requested_by=request.user if getattr(request.user, "is_authenticated", False) else None,
                 )
-            return redirect("core:sheet_inventory_dashboard")
+            except Exception as exc:
+                return _print_response(False, f"ส่งปรินท์ไม่สำเร็จ: {exc}", 400, sheet_id=sheet.id)
+
+            return _print_response(
+                True,
+                "ส่งปรินท์เรียบร้อยแล้ว",
+                order_id=order.id,
+                sheet_id=sheet.id,
+                sheet_code=sheet.code,
+                quantity=quantity,
+            )
 
         elif action.startswith("set_stock_single:"):
             sheet_id = action.split(":", 1)[1]

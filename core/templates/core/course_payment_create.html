@@ -17,6 +17,7 @@
   .primary{background:#2563eb;color:#fff}.dark{background:#0f172a;color:#fff}.soft{background:#fff;color:#0f172a;border:1px solid #e2e8f0}.green{background:#16a34a;color:#fff;}
   .toggle{display:flex;gap:8px;flex-wrap:wrap}.radio-card{border:1px solid #e2e8f0;background:#f8fafc;border-radius:16px;padding:10px 12px;font-weight:1000;display:flex;gap:8px;align-items:center;cursor:pointer;}
   .radio-card:has(input:checked){background:#eff6ff;border-color:#93c5fd;color:#1d4ed8;}
+  .radio-card:has(input:disabled){opacity:.45;cursor:not-allowed;}
   .errors{background:#fee2e2;color:#991b1b;border:1px solid #fecaca;border-radius:16px;padding:12px;font-weight:800}.hint{font-size:12px;color:#64748b;line-height:1.45}.hidden{display:none!important;}
   .summary{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:16px;padding:12px;color:#166534;font-weight:1000;min-height:42px;display:flex;align-items:center;}
   .actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;}
@@ -26,8 +27,15 @@
   .payment-method-toggle{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;}
   .payment-method-card{justify-content:center;text-align:center;background:#fff;}
   .payment-method-card:has(input:checked){background:#ecfdf5;border-color:#86efac;color:#166534;box-shadow:0 0 0 3px rgba(22,163,74,.10);}
-  @media(max-width:800px){.payment-method-toggle{grid-template-columns:1fr 1fr;}}
-  @media(max-width:520px){.payment-method-toggle{grid-template-columns:1fr;}}
+  .enrollment-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;}
+  .enrollment-card{border:1px solid #e2e8f0;background:#fff;border-radius:16px;padding:11px;display:flex;gap:9px;align-items:flex-start;cursor:pointer;box-shadow:0 3px 8px rgba(15,23,42,.04);}
+  .enrollment-card:hover{border-color:#93c5fd;background:#eff6ff;}.enrollment-card.selected{border-color:#2563eb;background:#eff6ff;box-shadow:0 0 0 3px rgba(37,99,235,.10);}
+  .enroll-title{font-size:13px;font-weight:1000;color:#0f172a;}.enroll-meta{font-size:11px;font-weight:850;color:#475569;line-height:1.45;margin-top:3px;}
+  .empty-box{border:1px dashed #cbd5e1;background:#f8fafc;border-radius:16px;padding:12px;color:#64748b;font-size:12px;font-weight:900;line-height:1.5;}
+  .session-choice-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;}
+  .session-card{justify-content:center;text-align:center;background:#fff;min-height:44px;}.session-card:has(input:checked){background:#fffbeb;border-color:#fbbf24;color:#92400e;box-shadow:0 0 0 3px rgba(245,158,11,.10);}
+  @media(max-width:900px){.session-choice-grid,.payment-method-toggle,.enrollment-list{grid-template-columns:1fr 1fr;}}
+  @media(max-width:520px){.session-choice-grid,.payment-method-toggle,.enrollment-list{grid-template-columns:1fr;}}
   @media(max-width:800px){.grid{grid-template-columns:1fr}.span2{grid-column:auto}.btnx{width:100%}.hero .btnx{width:auto}.title{font-size:23px;}}
 </style>
 {% endblock %}
@@ -41,7 +49,7 @@
   <section class="hero">
     <div>
       <div class="title">+ ออกใบเสร็จ / รับชำระค่าคอร์ส</div>
-      <div class="sub">ค้นหานักเรียนจากชื่อเล่น เลือกจากใบสมัคร หรือเพิ่มจำนวนครั้งเข้า Enrollment เดิมได้ในหน้าเดียว</div>
+      <div class="sub">ค้นหานักเรียนจากชื่อเล่น เลือก Enrollment เดิมแบบกดจิ้ม หรือสร้าง Enrollment ใหม่ได้ในหน้าเดียว</div>
     </div>
     <div class="actions"><a class="btnx soft" href="/course-payments/">← รายการใบเสร็จ</a></div>
   </section>
@@ -73,7 +81,7 @@
           <label>สถานะการเลือก</label>
           <div class="mini-card" id="studentPickedBox">ยังไม่ได้เลือกนักเรียน</div>
         </div>
-        <div class="search-note full">เลือกจากรายการที่ระบบแนะนำ เพื่อให้ระบบจับคู่กับ Student ในฐานข้อมูลได้ถูกต้อง</div>
+        <div class="search-note full">เลือกจากรายการที่ระบบแนะนำ แล้ว section 2 จะดึง Enrollment ที่ยัง Active ของเด็กคนนั้นขึ้นมาให้กดเลือกอัตโนมัติ</div>
       </div>
 
       <div id="newStudentBox" class="grid hidden" style="margin-top:10px;">
@@ -95,9 +103,9 @@
 
     <section class="cardx">
       <div class="section-title">2) Enrollment / Class</div>
-      <div class="toggle">
+      <div class="toggle" id="enrollmentActionToggle">
         <label class="radio-card"><input type="radio" name="enrollment_action" value="new" checked onchange="toggleEnrollmentMode()"> สร้าง Enrollment ใหม่</label>
-        <label class="radio-card"><input type="radio" name="enrollment_action" value="add_existing" onchange="toggleEnrollmentMode()"> เพิ่มจำนวนครั้งเข้า Enrollment เดิม</label>
+        <label class="radio-card"><input type="radio" name="enrollment_action" value="add_existing" onchange="toggleEnrollmentMode()" id="addExistingActionRadio"> เพิ่มจำนวนครั้งเข้า Enrollment เดิม</label>
       </div>
 
       <div id="newEnrollmentBox" class="grid" style="margin-top:10px;">
@@ -108,22 +116,16 @@
             {% for c in classes %}<option value="{{ c.id }}" data-price="{{ c.course_price }}">{{ c.name }} | {{ c.get_time_slot_display }} | ราคา {{ c.course_price|floatformat:"0g" }}</option>{% endfor %}
           </select>
         </div>
+        <div class="hint full">ใช้กรณีนักเรียนใหม่ / ดึงจากใบสมัคร / หรืออยากสร้าง Enrollment ใหม่ให้เด็กเดิม</div>
       </div>
 
-      <div id="existingEnrollmentBox" class="grid hidden" style="margin-top:10px;">
+      <div id="existingEnrollmentBox" class="hidden" style="margin-top:10px;">
         <input type="hidden" name="existing_enrollment_id" id="existingEnrollmentId">
-        <div class="field span2">
-          <label>ค้นหา Enrollment เดิมที่ Active</label>
-          <input id="enrollmentSearch" list="enrollmentList" placeholder="พิมพ์ชื่อเล่นนักเรียน แล้วเลือก Enrollment ที่ต้องการเพิ่มจำนวนครั้ง" autocomplete="off" oninput="selectEnrollmentFromSearch()">
-          <datalist id="enrollmentList">
-            {% for e in enrollments_lookup_json %}<option value="{{ e.label }}"></option>{% endfor %}
-          </datalist>
+        <div class="hint" style="margin-bottom:8px;">Enrollment ที่ยัง Active ของนักเรียนที่เลือก กดเลือกได้ครั้งละ 1 รายการ</div>
+        <div class="enrollment-list" id="studentEnrollmentResults">
+          <div class="empty-box">เลือกนักเรียนเดิมด้านบนก่อน ระบบจะแสดง Enrollment ที่ยัง Active ให้เลือกตรงนี้</div>
         </div>
-        <div class="field">
-          <label>Enrollment ที่เลือก</label>
-          <div class="mini-card" id="enrollmentPickedBox">ยังไม่ได้เลือก Enrollment</div>
-        </div>
-        <div class="hint full">ใช้สำหรับแบ่งชำระงวดถัดไป: ออกใบเสร็จใหม่ แล้วระบบจะเพิ่มจำนวนครั้งเข้า Enrollment เดิมที่ยัง Active เท่านั้น</div>
+        <div class="mini-card" id="enrollmentPickedBox" style="margin-top:9px;">ยังไม่ได้เลือก Enrollment</div>
       </div>
     </section>
 
@@ -131,7 +133,7 @@
       <div class="section-title">3) รายละเอียดการรับเงิน</div>
       <div class="grid">
         <div class="field"><label>วันที่รับเงิน</label><input type="date" name="payment_date" value="{{ today|date:'Y-m-d' }}" required></div>
-        <div class="field"><label>รูปแบบการชำระ</label><select name="payment_type">{% for value,label in payment_type_choices %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</select></div>
+        <div class="field"><label>รูปแบบการชำระ</label><select name="payment_type" id="paymentType" onchange="applyPaymentTypeDefault()">{% for value,label in payment_type_choices %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</select></div>
         <div class="field span2">
           <label>วิธีชำระเงิน</label>
           <div class="toggle payment-method-toggle">
@@ -144,8 +146,19 @@
           </div>
         </div>
 
-        <div class="field"><label>จำนวนครั้ง</label><select name="session_package" id="sessionPackage" onchange="applySessionPackage()"><option value="10" data-sessions="10" selected>10 ครั้ง</option><option value="12" data-sessions="12">10 แถม 2 = 12 ครั้ง</option><option value="20" data-sessions="20">20 ครั้ง</option><option value="30" data-sessions="30">30 ครั้ง</option><option value="custom" data-sessions="10">กรอกเอง</option></select></div>
-        <div class="field"><label>กรอกจำนวนครั้งเอง</label><input type="number" name="custom_sessions" id="customSessions" min="1" value="10" oninput="updateSummary(true)"></div>
+        <div class="field full">
+          <label>จำนวนครั้ง</label>
+          <div class="session-choice-grid" id="sessionChoiceGrid">
+            {% for value,label,sessions in session_choices %}
+              <label class="radio-card session-card">
+                <input type="radio" name="session_package" value="{{ value }}" data-sessions="{{ sessions }}" {% if value == "10" %}checked{% endif %} onchange="applySessionPackage(true)">
+                {{ label }}
+              </label>
+            {% endfor %}
+          </div>
+          <div class="hint">ชำระเต็ม default = 10 ครั้ง / แบ่งชำระ default = 5 ครั้ง</div>
+        </div>
+        <div class="field hidden" id="customSessionField"><label>กรอกจำนวนครั้งเอง</label><input type="number" name="custom_sessions" id="customSessions" min="1" value="10" oninput="updateSummary(true)"></div>
         <div class="field"><label>ราคาคอร์ส</label><input type="number" name="course_price" id="coursePrice" step="0.01" value="0" oninput="updateSummary(true)"></div>
         <div class="field"><label>ส่วนลด</label><input type="number" name="discount_amount" id="discountAmount" step="0.01" value="0" oninput="updateSummary(true)"></div>
         <div class="field"><label>ยอดรับชำระ</label><input type="number" name="amount_paid" id="amountPaid" step="0.01" value="0" readonly></div>
@@ -167,11 +180,29 @@ const ENROLLMENTS = JSON.parse(document.getElementById('enrollments-data').textC
 const ADMISSIONS = JSON.parse(document.getElementById('admissions-data').textContent || '[]');
 
 function exactFind(list, value){ return list.find(x => String(x.label) === String(value)); }
+function getStudentEnrollments(studentId){ return ENROLLMENTS.filter(e => Number(e.student_id) === Number(studentId)); }
 
+function setEnrollmentAction(value){
+  const radio = document.querySelector(`input[name="enrollment_action"][value="${value}"]`);
+  if(radio && !radio.disabled){ radio.checked = true; }
+  toggleEnrollmentMode();
+}
 function toggleStudentMode(){
   const mode=document.querySelector('input[name="student_mode"]:checked').value;
-  document.getElementById('existingStudentBox').classList.toggle('hidden',mode!=='existing');
-  document.getElementById('newStudentBox').classList.toggle('hidden',mode!=='new');
+  const isNew = mode === 'new';
+  document.getElementById('existingStudentBox').classList.toggle('hidden',isNew);
+  document.getElementById('newStudentBox').classList.toggle('hidden',!isNew);
+  document.getElementById('addExistingActionRadio').disabled = isNew;
+  if(isNew){
+    document.getElementById('studentId').value='';
+    document.getElementById('existingEnrollmentId').value='';
+    document.getElementById('studentEnrollmentResults').innerHTML='<div class="empty-box">นักเรียนใหม่จะสร้าง Enrollment ใหม่ กรุณาเลือก Class</div>';
+    document.getElementById('enrollmentPickedBox').textContent='นักเรียนใหม่ / ใบสมัคร จะสร้าง Enrollment ใหม่';
+    setEnrollmentAction('new');
+  }else{
+    document.getElementById('addExistingActionRadio').disabled = false;
+    renderEnrollmentsForStudent(document.getElementById('studentId').value, true);
+  }
 }
 function toggleEnrollmentMode(){
   const mode=document.querySelector('input[name="enrollment_action"]:checked').value;
@@ -183,6 +214,7 @@ function selectStudentFromSearch(){
   const s=exactFind(STUDENTS, txt);
   document.getElementById('studentId').value=s ? s.id : '';
   document.getElementById('studentPickedBox').innerHTML=s ? `<b>${s.nickname || '-'}</b><br>${s.full_name || '-'}<br>${s.grade_level || '-'} · ${s.school_name || '-'}` : 'ยังไม่ได้เลือกนักเรียน';
+  renderEnrollmentsForStudent(s ? s.id : '', true);
 }
 function fillFromAdmission(){
   const txt=document.getElementById('admissionSearch').value;
@@ -193,11 +225,47 @@ function fillFromAdmission(){
   document.getElementById('newGradeLevel').value = a.grade_level || '';
   document.getElementById('newSchoolName').value = a.school_name || '';
   document.getElementById('newParentPhone').value = a.parent_phone || '';
+  setEnrollmentAction('new');
 }
-function selectEnrollmentFromSearch(){
-  const txt=document.getElementById('enrollmentSearch').value;
-  const e=exactFind(ENROLLMENTS, txt);
+function renderEnrollmentsForStudent(studentId, autoSwitch){
+  const box = document.getElementById('studentEnrollmentResults');
+  const picked = document.getElementById('enrollmentPickedBox');
+  document.getElementById('existingEnrollmentId').value='';
+
+  if(!studentId){
+    box.innerHTML='<div class="empty-box">เลือกนักเรียนเดิมด้านบนก่อน ระบบจะแสดง Enrollment ที่ยัง Active ให้เลือกตรงนี้</div>';
+    picked.textContent='ยังไม่ได้เลือก Enrollment';
+    if(autoSwitch){ setEnrollmentAction('new'); }
+    return;
+  }
+
+  const list = getStudentEnrollments(studentId);
+  if(!list.length){
+    box.innerHTML='<div class="empty-box">เด็กคนนี้ยังไม่มี Enrollment ที่ Active ถ้าจะออกใบเสร็จให้เลือก Class และสร้าง Enrollment ใหม่</div>';
+    picked.textContent='ยังไม่มี Enrollment Active';
+    if(autoSwitch){ setEnrollmentAction('new'); }
+    return;
+  }
+
+  box.innerHTML = list.map(e => `
+    <label class="enrollment-card" data-enrollment-card="${e.id}">
+      <input type="radio" name="existing_enrollment_card" value="${e.id}" onchange="selectEnrollmentCard('${e.id}')">
+      <div>
+        <div class="enroll-title">${e.class_name || '-'}</div>
+        <div class="enroll-meta">เลขรายการ: ${e.sale_run_no || '-'} · คงเหลือ ${e.remaining_sessions ?? '-'} ครั้ง<br>ซื้อไว้ ${e.sessions_total ?? '-'} ครั้ง · ${e.time_slot || '-'}${e.created_at ? ' · สร้าง ' + e.created_at : ''}</div>
+      </div>
+    </label>
+  `).join('');
+  picked.textContent = list.length === 1 ? 'พบ 1 Enrollment กดเลือกหรือระบบจะเลือกให้' : `พบ ${list.length} Enrollment กรุณากดเลือก 1 รายการ`;
+  if(autoSwitch){ setEnrollmentAction('add_existing'); }
+  if(list.length === 1){ selectEnrollmentCard(String(list[0].id)); }
+}
+function selectEnrollmentCard(id){
+  const e = ENROLLMENTS.find(x => Number(x.id) === Number(id));
   document.getElementById('existingEnrollmentId').value=e ? e.id : '';
+  document.querySelectorAll('[data-enrollment-card]').forEach(card => card.classList.toggle('selected', card.dataset.enrollmentCard === String(id)));
+  const radio = document.querySelector(`input[name="existing_enrollment_card"][value="${id}"]`);
+  if(radio){ radio.checked = true; }
   document.getElementById('enrollmentPickedBox').innerHTML=e ? `<b>${e.student_label}</b><br>${e.class_name} · ${e.sale_run_no}<br>คงเหลือ ${e.remaining_sessions} ครั้ง` : 'ยังไม่ได้เลือก Enrollment';
   if(e){
     const s = STUDENTS.find(x => Number(x.id) === Number(e.student_id));
@@ -217,21 +285,36 @@ function applyClassPrice(){
     updateSummary(true);
   }
 }
+function selectedSessionRadio(){ return document.querySelector('input[name="session_package"]:checked'); }
+function setSessionPackage(value){
+  const radio = document.querySelector(`input[name="session_package"][value="${value}"]`);
+  if(radio){ radio.checked = true; }
+  applySessionPackage(false);
+}
+function applyPaymentTypeDefault(){
+  const type=document.getElementById('paymentType').value;
+  setSessionPackage(type === 'installment' ? '5' : '10');
+}
 function applySessionPackage(){
-  const p=document.getElementById('sessionPackage');
+  const radio=selectedSessionRadio();
   const custom=document.getElementById('customSessions');
-  if(p.value!=='custom') custom.value=p.selectedOptions[0].dataset.sessions||10;
+  const customField=document.getElementById('customSessionField');
+  if(!radio) return;
+  const isCustom = radio.value === 'custom';
+  customField.classList.toggle('hidden', !isCustom);
+  if(!isCustom){ custom.value=radio.dataset.sessions || 10; }
   updateSummary(true);
 }
 function updateSummary(forceAmount){
   const price=Number(document.getElementById('coursePrice').value||0);
   const disc=Number(document.getElementById('discountAmount').value||0);
   const net=Math.max(price-disc,0);
-  const pack=document.getElementById('sessionPackage').value;
-  const sessions=pack==='custom'?Number(document.getElementById('customSessions').value||0):Number(document.getElementById('sessionPackage').selectedOptions[0].dataset.sessions||10);
+  const radio=selectedSessionRadio();
+  const pack=radio ? radio.value : '10';
+  const sessions=pack==='custom'?Number(document.getElementById('customSessions').value||0):Number((radio && radio.dataset.sessions)||10);
   document.getElementById('netSummary').textContent=net.toLocaleString('en-US',{maximumFractionDigits:2})+' บาท / '+sessions+' ครั้ง';
   document.getElementById('amountPaid').value=net.toFixed(2);
 }
-document.addEventListener('DOMContentLoaded',()=>{toggleStudentMode();toggleEnrollmentMode();applySessionPackage();updateSummary(true);});
+document.addEventListener('DOMContentLoaded',()=>{toggleStudentMode();applyPaymentTypeDefault();updateSummary(true);});
 </script>
 {% endblock %}

@@ -2714,12 +2714,10 @@ def attendance_submit(request: HttpRequest) -> JsonResponse:
         total=Count("id"),
     )
 
-    refreshed = (
-        Enrollment.objects
-        .filter(id__in=list(enroll_map.keys()))
-        .only("id", "remaining_sessions")
-    )
-    remaining_map = {e.id: e.remaining_sessions for e in refreshed}
+    # remaining_sessions is a Python property, not a database field.
+    # Do not use .only("remaining_sessions") because it can make the AJAX response fail with FieldError.
+    refreshed = Enrollment.objects.filter(id__in=list(enroll_map.keys()))
+    remaining_map = {e.id: int(e.remaining_sessions or 0) for e in refreshed}
 
     submitted_eids = [it["enrollment_id"] for it in normalized_items]
     checked_at_qs = Attendance.objects.filter(

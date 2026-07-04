@@ -1611,6 +1611,33 @@ def _allocation_class_students_json() -> list[dict]:
     return rows
 
 
+
+def _allocation_history_payload(limit: int = 20) -> list[dict]:
+    """Latest Sheet Allocation rows for the scan page history panel."""
+    rows = []
+    qs = (
+        SheetAllocation.objects
+        .select_related("sheet", "student", "admission_inquiry", "tutoring_class", "created_by")
+        .order_by("-created_at", "-id")[:limit]
+    )
+    for a in qs:
+        try:
+            created_text = timezone.localtime(a.created_at).strftime("%d/%m/%Y %H:%M") if a.created_at else "-"
+        except Exception:
+            created_text = "-"
+        rows.append({
+            "id": a.id,
+            "sheet_code": a.sheet.code if a.sheet_id else "-",
+            "sheet_title": a.sheet.title if a.sheet_id else "-",
+            "recipient": a.recipient_display,
+            "class_name": a.tutoring_class.name if a.tutoring_class_id else "-",
+            "allocation_date": a.allocation_date.strftime("%d/%m/%Y") if a.allocation_date else "-",
+            "created_text": created_text,
+            "quantity": int(a.quantity or 1),
+        })
+    return rows
+
+
 @login_required
 def sheet_allocation_scan(request: HttpRequest) -> HttpResponse:
     sheets = Sheet.objects.select_related("subject").filter(is_active=True).order_by("grade_level", "subject__name", "code")
@@ -1633,6 +1660,7 @@ def sheet_allocation_scan(request: HttpRequest) -> HttpResponse:
         "students_json": json.dumps(_allocation_students_json(), ensure_ascii=False),
         "admissions_json": json.dumps(_allocation_admissions_json(), ensure_ascii=False),
         "class_students_json": json.dumps(_allocation_class_students_json(), ensure_ascii=False),
+        "recent_allocations_json": json.dumps(_allocation_history_payload(20), ensure_ascii=False),
         "grade_choices": Sheet.GradeLevel.choices,
     })
 
@@ -1734,6 +1762,7 @@ def sheet_allocation_save(request: HttpRequest) -> JsonResponse:
         "created": created,
         "batch_key": batch_key,
         "new_balances": new_balances,
+        "latest_allocations": _allocation_history_payload(20),
     })
 
 
@@ -5056,6 +5085,156 @@ def weekly_test_export(request: HttpRequest) -> HttpResponse:
     resp["Content-Disposition"] = f'attachment; filename="{filename}"'
     return resp
 
+
+
+
+@login_required
+def learning_record(request: HttpRequest) -> HttpResponse:
+    """Learning record summary by class, based on tutor teaching update records."""
+    selected_class_id = (request.GET.get("class_id") or "").strip()
+    q = (request.GET.get("q") or "").strip()
+
+    classes = list(TutoringClass.objects.filter(is_active=True).order_by("time_slot", "name"))
+    class_map = {c.id: c for c in classes}
+
+    templates_qs = (
+        TeachingClassSubjectTemplate.objects
+        .select_related("tutoring_class")
+        .filter(is_active=True, tutoring_class__is_active=True)
+        .order_by("tutoring_class__time_slot", "tutoring_class__name", "display_order", "subject_name")
+    )
+    if selected_class_id:
+        templates_qs = templates_qs.filter(tutoring_class_id=selected_class_id)
+    if q:
+        templates_qs = templates_qs.filter(
+            Q(tutoring_class__name__icontains=q) |
+            Q(subject_name__icontains=q) |
+            Q(default_sheet_name__icontains=q)
+        )
+    templates = list(templates_qs)
+    template_ids = [t.id for t in templates]
+
+    stats_by_template: dict[int, dict] = {
+        t.id: {
+            "taught_count": 0,
+            "no_teaching_count": 0,
+            "latest_taught": None,
+            "latest_any": None,
+        }
+        for t in templates
+    }
+
+    if template_ids:
+        updates = (
+            TeachingProgressUpdate.objects
+            .select_related(
+                "assignment",
+                "assignment__tutoring_class",
+                "assignment__subject_template",
+                "assignment__tutor",
+            )
+            .filter(assignment__subject_template_id__in=template_ids)
+            .order_by("assignment__subject_template_id", "-teaching_date", "-updated_at")
+        )
+        for u in updates:
+            tid = u.assignment.subject_template_id
+            st = stats_by_template.get(tid)
+            if st is None:
+                continue
+            if st["latest_any"] is None:
+                st["latest_any"] = u
+            if u.no_teaching:
+                st["no_teaching_count"] += 1
+            else:
+                st["taught_count"] += 1
+                if st["latest_taught"] is None:
+                    st["latest_taught"] = u
+
+    def _teacher_name(update: TeachingProgressUpdate | None) -> str:
+        if not update:
+            return "-"
+        name = (getattr(update, "updated_by_name", "") or "").strip()
+        if name:
+            return name
+        assignment = getattr(update, "assignment", None)
+        if assignment and getattr(assignment, "tutor_id", None):
+            return assignment.tutor.name
+        return "-"
+
+    def _progress_text(update: TeachingProgressUpdate | None) -> str:
+        if not update:
+            return "-"
+        parts = []
+        if update.sheet_name:
+            parts.append(update.sheet_name)
+        if update.page_to:
+            parts.append(f"หน้า {update.page_to}")
+        if update.question_to:
+            parts.append(f"ข้อ {update.question_to}")
+        return " / ".join(parts) if parts else "-"
+
+    class_cards_map: dict[int, dict] = {}
+    slot_rank = {slot: idx for idx, slot in enumerate(TIME_SLOT_ORDER)}
+    for tmpl in templates:
+        cls = tmpl.tutoring_class
+        card = class_cards_map.setdefault(cls.id, {
+            "class": cls,
+            "slot_label": cls.get_time_slot_display() if hasattr(cls, "get_time_slot_display") else cls.time_slot,
+            "subjects": [],
+            "subject_count": 0,
+            "total_taught": 0,
+            "total_no_teaching": 0,
+            "latest_date": None,
+            "latest_teacher": "-",
+        })
+        st = stats_by_template.get(tmpl.id, {})
+        latest = st.get("latest_taught")
+        latest_any = st.get("latest_any")
+        latest_date = latest.teaching_date if latest else None
+        taught_count = int(st.get("taught_count") or 0)
+        no_teaching_count = int(st.get("no_teaching_count") or 0)
+        row = {
+            "template": tmpl,
+            "subject_name": tmpl.subject_name,
+            "default_sheet_name": tmpl.default_sheet_name,
+            "taught_count": taught_count,
+            "no_teaching_count": no_teaching_count,
+            "latest_date": latest_date,
+            "latest_date_text": latest_date.strftime("%d/%m/%Y") if latest_date else "-",
+            "latest_teacher": _teacher_name(latest),
+            "latest_progress": _progress_text(latest),
+            "latest_any_is_no_teaching": bool(latest_any and latest_any.no_teaching),
+            "latest_any_date_text": latest_any.teaching_date.strftime("%d/%m/%Y") if latest_any else "-",
+        }
+        card["subjects"].append(row)
+        card["subject_count"] += 1
+        card["total_taught"] += taught_count
+        card["total_no_teaching"] += no_teaching_count
+        if latest_date and (card["latest_date"] is None or latest_date > card["latest_date"]):
+            card["latest_date"] = latest_date
+            card["latest_teacher"] = row["latest_teacher"]
+
+    class_cards = sorted(
+        class_cards_map.values(),
+        key=lambda x: (slot_rank.get(x["class"].time_slot, 99), x["class"].name),
+    )
+    for card in class_cards:
+        card["latest_date_text"] = card["latest_date"].strftime("%d/%m/%Y") if card["latest_date"] else "-"
+
+    totals = {
+        "class_count": len(class_cards),
+        "subject_count": sum(c["subject_count"] for c in class_cards),
+        "total_taught": sum(c["total_taught"] for c in class_cards),
+        "total_no_teaching": sum(c["total_no_teaching"] for c in class_cards),
+    }
+
+    return render(request, "core/learning_record.html", {
+        "classes": classes,
+        "selected_class_id": selected_class_id,
+        "q": q,
+        "class_cards": class_cards,
+        "totals": totals,
+    })
 
 
 def pkanoon_admin_tool(request: HttpRequest) -> HttpResponse:

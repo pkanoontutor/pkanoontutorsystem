@@ -1,0 +1,84 @@
+{% extends "core/base.html" %}
+{% block title %}Learning Record{% endblock %}
+{% block head %}
+<style>
+  .lr-wrap{max-width:1280px;margin:0 auto;display:grid;gap:14px;}
+  .lr-hero{background:linear-gradient(135deg,#0f172a,#2563eb,#0ea5e9);color:#fff;border-radius:26px;padding:22px;box-shadow:0 14px 30px rgba(15,23,42,.22);display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:flex-start;}
+  .lr-title{font-size:28px;font-weight:1000;letter-spacing:-.04em}.lr-sub{font-size:13px;color:#dbeafe;margin-top:5px;line-height:1.6}.lr-actions{display:flex;gap:8px;flex-wrap:wrap}.lr-btn{border:0;border-radius:14px;padding:10px 14px;font-weight:1000;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:7px;cursor:pointer}.soft{background:#fff;color:#0f172a;border:1px solid #e2e8f0}.primary{background:#2563eb;color:#fff}.dark{background:#0f172a;color:#fff}.card{background:#fff;border-radius:20px;padding:16px;box-shadow:0 6px 16px rgba(15,23,42,.08);border:1px solid rgba(255,255,255,.88)}
+  .filters{display:grid;grid-template-columns:1.5fr 1fr auto;gap:10px;align-items:end}.field{display:flex;flex-direction:column;gap:5px}.field label{font-size:11px;font-weight:1000;color:#334155;text-transform:uppercase;letter-spacing:.04em}input,select{border:1px solid #e2e8f0;border-radius:12px;padding:10px;font-weight:850;background:#fff;width:100%;box-sizing:border-box}
+  .metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.metric{background:linear-gradient(180deg,#fff,#f8fafc);border:1px solid #e2e8f0;border-radius:18px;padding:14px}.metric .k{font-size:11px;color:#64748b;font-weight:1000;text-transform:uppercase}.metric .v{font-size:26px;color:#0f172a;font-weight:1000;margin-top:3px}.metric.green .v{color:#15803d}.metric.amber .v{color:#b45309}.class-grid{display:grid;gap:14px}.class-card{background:#fff;border:1px solid #e2e8f0;border-radius:24px;box-shadow:0 8px 22px rgba(15,23,42,.08);overflow:hidden}.class-head{padding:15px 16px;background:linear-gradient(135deg,#eff6ff,#ffffff);border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:flex-start}.class-name{font-size:20px;font-weight:1000;color:#0f172a}.slot{font-size:12px;color:#1d4ed8;background:#dbeafe;border:1px solid #bfdbfe;border-radius:999px;padding:4px 9px;font-weight:1000;display:inline-flex;width:max-content;margin-top:5px}.class-stats{display:flex;gap:7px;flex-wrap:wrap}.pill{border-radius:999px;padding:5px 9px;font-size:12px;font-weight:1000;border:1px solid #e2e8f0;background:#f8fafc;color:#334155}.pill.green{background:#dcfce7;color:#166534;border-color:#bbf7d0}.pill.amber{background:#fffbeb;color:#92400e;border-color:#fde68a}.pill.blue{background:#eff6ff;color:#1d4ed8;border-color:#bfdbfe}.subject-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;padding:14px}.subject-card{border:1px solid #e2e8f0;border-radius:18px;padding:12px;background:linear-gradient(180deg,#ffffff,#f8fafc);display:grid;gap:9px}.subject-top{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}.subject-name{font-size:16px;font-weight:1000;color:#0f172a}.subject-sub{font-size:11px;color:#64748b;font-weight:850;margin-top:2px;line-height:1.4}.count-big{text-align:right;min-width:74px}.count-big b{font-size:28px;line-height:1;color:#15803d}.count-big span{display:block;font-size:10px;color:#64748b;font-weight:1000;text-transform:uppercase}.detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px}.detail{background:#fff;border:1px solid #edf2f7;border-radius:13px;padding:8px}.detail .k{font-size:10px;color:#64748b;font-weight:1000;text-transform:uppercase}.detail .v{font-size:12px;color:#0f172a;font-weight:950;margin-top:2px;line-height:1.35}.progress-box{border-radius:14px;background:#0f172a;color:#fff;padding:9px 10px;font-size:12px;font-weight:900;line-height:1.45}.empty{padding:22px;text-align:center;background:#fff;border:1px dashed #cbd5e1;border-radius:18px;color:#64748b;font-weight:900}.muted{color:#64748b}
+  @media(max-width:920px){.filters{grid-template-columns:1fr}.metrics{grid-template-columns:1fr 1fr}.subject-grid{grid-template-columns:1fr}.lr-btn{width:100%}.lr-hero .lr-btn{width:auto}}
+  @media(max-width:560px){.metrics{grid-template-columns:1fr}.class-head{display:grid}.detail-grid{grid-template-columns:1fr}.lr-title{font-size:24px}}
+</style>
+{% endblock %}
+{% block content %}
+<div class="lr-wrap">
+  <section class="lr-hero">
+    <div>
+      <div class="lr-title">📚 Learning Record</div>
+      <div class="lr-sub">ดูประวัติการเรียนจากระบบอัปเดตติวเตอร์: แต่ละ Class เรียนวิชาอะไรไปแล้วกี่ครั้ง ล่าสุดเรียนวันไหน ใครสอน และถึงชีทหน้า/ข้อไหน</div>
+    </div>
+    <div class="lr-actions">
+      <a class="lr-btn soft" href="/pkanoon-admin-tool/">← Admin Tool</a>
+      <a class="lr-btn soft" href="/teaching/weekly-setup/">👩‍🏫 Weekly Setup</a>
+      <a class="lr-btn soft" href="/tutor-teaching-update/">อัปเดตติวเตอร์</a>
+    </div>
+  </section>
+
+  <section class="card">
+    <form method="get" class="filters">
+      <div class="field"><label>ค้นหา</label><input name="q" value="{{ q }}" placeholder="ชื่อ class / วิชา / ชื่อชีท"></div>
+      <div class="field"><label>Class</label><select name="class_id"><option value="">ทุก Class</option>{% for c in classes %}<option value="{{ c.id }}" {% if selected_class_id == c.id|stringformat:'s' %}selected{% endif %}>{{ c.name }} | {{ c.get_time_slot_display }}</option>{% endfor %}</select></div>
+      <div class="lr-actions"><button class="lr-btn primary" type="submit">Filter</button><a class="lr-btn soft" href="/learning-record/">Reset</a></div>
+    </form>
+  </section>
+
+  <section class="metrics">
+    <div class="metric"><div class="k">Class ที่แสดง</div><div class="v">{{ totals.class_count }}</div></div>
+    <div class="metric"><div class="k">วิชาทั้งหมด</div><div class="v">{{ totals.subject_count }}</div></div>
+    <div class="metric green"><div class="k">จำนวนครั้งที่เรียนแล้ว</div><div class="v">{{ totals.total_taught }}</div></div>
+    <div class="metric amber"><div class="k">จำนวนครั้งที่ไม่เรียน</div><div class="v">{{ totals.total_no_teaching }}</div></div>
+  </section>
+
+  <section class="class-grid">
+    {% for card in class_cards %}
+      <article class="class-card">
+        <div class="class-head">
+          <div>
+            <div class="class-name">{{ card.class.name }}</div>
+            <div class="slot">{{ card.slot_label }}</div>
+          </div>
+          <div class="class-stats">
+            <span class="pill blue">วิชา {{ card.subject_count }}</span>
+            <span class="pill green">เรียนแล้ว {{ card.total_taught }}</span>
+            <span class="pill amber">ไม่เรียน {{ card.total_no_teaching }}</span>
+            <span class="pill">ล่าสุด {{ card.latest_date_text }}</span>
+          </div>
+        </div>
+        <div class="subject-grid">
+          {% for s in card.subjects %}
+            <div class="subject-card">
+              <div class="subject-top">
+                <div>
+                  <div class="subject-name">{{ s.subject_name }}</div>
+                  <div class="subject-sub">ตั้งต้น: {{ s.default_sheet_name|default:"-" }}</div>
+                </div>
+                <div class="count-big"><b>{{ s.taught_count }}</b><span>ครั้ง</span></div>
+              </div>
+              <div class="detail-grid">
+                <div class="detail"><div class="k">เรียนล่าสุด</div><div class="v">{{ s.latest_date_text }}</div></div>
+                <div class="detail"><div class="k">สอนล่าสุดโดย</div><div class="v">{{ s.latest_teacher }}</div></div>
+                <div class="detail"><div class="k">ไม่เรียน</div><div class="v">{{ s.no_teaching_count }} ครั้ง{% if s.latest_any_is_no_teaching %}<br><span class="muted">ล่าสุด: ไม่เรียน {{ s.latest_any_date_text }}</span>{% endif %}</div></div>
+                <div class="detail"><div class="k">สถานะ</div><div class="v">{% if s.taught_count > 0 %}มีประวัติเรียนแล้ว{% else %}ยังไม่มีประวัติเรียน{% endif %}</div></div>
+              </div>
+              <div class="progress-box">ล่าสุดถึง: {{ s.latest_progress }}</div>
+            </div>
+          {% endfor %}
+        </div>
+      </article>
+    {% empty %}
+      <div class="empty">ยังไม่มีข้อมูล Learning Record ตามเงื่อนไขที่เลือก</div>
+    {% endfor %}
+  </section>
+</div>
+{% endblock %}

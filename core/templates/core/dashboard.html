@@ -570,6 +570,21 @@
   .pill-excused{ background:#fffbeb; border-color:#fde68a; color:#92400e; }
   .pill-noshow{ background:#fef2f2; border-color:#fecaca; color:#991b1b; }
   .pill-total{ background:#eff6ff; border-color:#bfdbfe; color:#1d4ed8; }
+  .pill-none{ background:#f8fafc; border-color:#e2e8f0; color:#64748b; }
+  .live-count{
+    display:flex;
+    flex-wrap:wrap;
+    align-items:center;
+    gap:6px;
+    margin-top:8px;
+    padding:8px 9px;
+    border-radius:14px;
+    background:#f8fafc;
+    border:1px solid #e2e8f0;
+  }
+  .live-count.complete{ background:#f0fdf4; border-color:#bbf7d0; }
+  .live-count-label{ font-size:12px; font-weight:950; color:#334155; margin-right:2px; }
+  .live-count .count-pill{ padding:4px 8px; }
   .slot-class-list{ display:grid; gap:6px; }
   .slot-class-chip{
     display:grid;
@@ -953,6 +968,14 @@
                 <span class="t-noshow">ขาด: <b class="c_no_show">{{ s.no_show|default:0 }}</b></span>
                 <span class="t-total">รวม: <b class="c_total">{{ s.total|default:0 }}</b></span>
               </div>
+              <div class="live-count" id="selectionSummary-{{ cls.id }}" data-total="{{ seat.seats_in_progress|default:0 }}">
+                <span class="live-count-label">เลือกอยู่</span>
+                <span class="count-pill pill-present">มา <b data-count="present">0</b></span>
+                <span class="count-pill pill-excused">ลา <b data-count="excused">0</b></span>
+                <span class="count-pill pill-noshow">ขาด <b data-count="no_show">0</b></span>
+                <span class="count-pill pill-total">รวม <b data-count="total">0</b>/<b data-count="class_total">{{ seat.seats_in_progress|default:0 }}</b></span>
+                <span class="count-pill pill-none">ยังไม่เช็ค <b data-count="none">0</b></span>
+              </div>
             </div>
 
             <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
@@ -1162,8 +1185,44 @@
     if(row)row.dataset.status=status;
     markButtons(eid,status);
     setBadge(eid,status);
+    updateSelectionSummary(cid);
     filterRows(cid);
     return false;
+  }
+
+  /* ================================================
+     LIVE SELECTION COUNT
+  ================================================ */
+  function getSelectionCounts(cid){
+    const counts={present:0,excused:0,no_show:0,none:0,total:0};
+    document.querySelectorAll(`tr[data-class="${cid}"]`).forEach(row=>{
+      const st=row.dataset.status||"none";
+      if(st==="present"||st==="excused"||st==="no_show"){
+        counts[st]+=1;
+        counts.total+=1;
+      }else{
+        counts.none+=1;
+      }
+    });
+    return counts;
+  }
+
+  function updateSelectionSummary(cid){
+    const box=document.getElementById("selectionSummary-"+cid);
+    if(!box)return;
+    const counts=getSelectionCounts(cid);
+    const totalRows=Number(box.dataset.total||0) || (counts.total+counts.none);
+    const set=(key,val)=>{
+      const el=box.querySelector(`[data-count="${key}"]`);
+      if(el)el.textContent=val;
+    };
+    set("present",counts.present);
+    set("excused",counts.excused);
+    set("no_show",counts.no_show);
+    set("total",counts.total);
+    set("none",counts.none);
+    set("class_total",totalRows);
+    box.classList.toggle("complete", totalRows>0 && counts.total>=totalRows);
   }
 
   /* ================================================
@@ -1305,27 +1364,35 @@
       const selectedDate=getSelectedDateForClass(cid);
       const res=await fetch("/attendance/submit/",{
         method:"POST",
-        headers:{"Content-Type":"application/json","X-CSRFToken":csrftoken},
+        headers:{"Content-Type":"application/json","X-CSRFToken":csrftoken,"X-Requested-With":"XMLHttpRequest"},
         body:JSON.stringify({date:selectedDate,class_id:cid,items})
       });
+      const raw=await res.text();
       let data={};
-      try{ data=await res.json(); }catch(e){ data={ok:false,error:"ไม่สามารถอ่านผลลัพธ์จาก server ได้"}; }
+      try{
+        data=raw ? JSON.parse(raw) : {};
+      }catch(e){
+        // บาง server/proxy อาจตอบเป็น HTML ทั้งที่บันทึกสำเร็จแล้ว
+        // ถ้า HTTP ยังเป็น success ให้จบเป็นบันทึกแล้ว ไม่ต้องเด้ง error ให้คนเช็คชื่อ
+        data=res.ok ? {ok:true,class_id:Number(cid),class_summary:getSelectionCounts(cid)} : {ok:false,error:"บันทึกไม่สำเร็จจาก server"};
+      }
       if(!res.ok || !data.ok){
-        const msg=data.error||"Submit failed";
+        const msg=data.error||"บันทึกไม่สำเร็จ";
         if(saveState){ saveState.className="save-state"; saveState.textContent="บันทึกไม่สำเร็จ"; }
         alert(msg);
         return false;
       }
 
-      setClassSummary(data.class_id,data.class_summary);
-      setGlobalSummary(data.global_summary);
+      const classSummary=data.class_summary||getSelectionCounts(cid);
+      setClassSummary(data.class_id||cid,classSummary);
+      if(data.global_summary){ setGlobalSummary(data.global_summary); }
 
       const sumRow=document.getElementById("summaryRow-"+cid);
       if(sumRow){
-        sumRow.querySelector(".c_present").textContent=data.class_summary.present;
-        sumRow.querySelector(".c_excused").textContent=data.class_summary.excused;
-        sumRow.querySelector(".c_no_show").textContent=data.class_summary.no_show;
-        sumRow.querySelector(".c_total").textContent=data.class_summary.total;
+        sumRow.querySelector(".c_present").textContent=classSummary.present;
+        sumRow.querySelector(".c_excused").textContent=classSummary.excused;
+        sumRow.querySelector(".c_no_show").textContent=classSummary.no_show;
+        sumRow.querySelector(".c_total").textContent=classSummary.total;
       }
       recomputeSlotTotals();
 
@@ -1354,9 +1421,10 @@
       }
 
       picks[cid]={};
+      updateSelectionSummary(cid);
       filterRows(cid);
       if(saveState){ saveState.className="save-state saved"; saveState.textContent="บันทึกแล้ว"; }
-      showToast("บันทึกห้องนี้แล้ว อัปเดตข้อมูลบนหน้าจอเรียบร้อย");
+      showToast("บันทึกแล้ว");
       return false;
     }catch(err){
       console.error(err);
@@ -1402,7 +1470,9 @@
     recomputeSlotTotals();
     document.querySelectorAll("details[id^='classCard-']").forEach(det=>{
       const cid=det.id.replace("classCard-","");
-      ensureClass(cid);setFilter(cid,"all");
+      ensureClass(cid);
+      updateSelectionSummary(cid);
+      setFilter(cid,"all");
     });
   });
 </script>

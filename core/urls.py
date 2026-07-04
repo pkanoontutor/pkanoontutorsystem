@@ -14,6 +14,7 @@ urlpatterns = [
     path("dashboard/", views.dashboard, name="dashboard"),
     path("super-dashboard/", views.super_dashboard, name="super_dashboard"),
     path("pkanoon-admin-tool/", views.pkanoon_admin_tool, name="pkanoon_admin_tool"),
+    path("learning-record/", views.learning_record, name="learning_record"),
 
     # Attendance
     path("attendance/submit/", views.attendance_submit, name="attendance_submit"),

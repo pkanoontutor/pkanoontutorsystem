@@ -13,6 +13,9 @@
 
   .student-search-field{position:relative}.student-search-wrap{position:relative}.student-search-input{height:44px;border:2px solid #bfdbfe;background:#fff;font-size:15px;font-weight:950}.student-search-input:focus{border-color:#2563eb;box-shadow:0 0 0 4px rgba(37,99,235,.12)}.student-search-results{position:absolute;left:0;right:0;top:calc(100% + 6px);z-index:80;background:#fff;border:1px solid #cbd5e1;border-radius:15px;box-shadow:0 16px 34px rgba(15,23,42,.18);overflow:hidden;max-height:270px;overflow-y:auto}.student-result-item{width:100%;border:0;background:#fff;text-align:left;padding:11px 12px;cursor:pointer;font-family:inherit;font-size:13px;font-weight:900;color:#0f172a;border-bottom:1px solid #eef2f7;line-height:1.35}.student-result-item:last-child{border-bottom:0}.student-result-item:hover,.student-result-item:focus{background:#eff6ff;outline:none}.student-result-empty{padding:12px;font-size:12px;font-weight:900;color:#64748b;background:#f8fafc}.picked-text{margin-top:7px;font-size:12px;font-weight:900;color:#64748b;line-height:1.45}.picked-text.selected{color:#166534;background:#dcfce7;border:1px solid #bbf7d0;padding:8px 10px;border-radius:12px}.quick-clear{position:absolute;right:8px;top:50%;transform:translateY(-50%);border:0;background:#e2e8f0;color:#334155;border-radius:999px;width:26px;height:26px;font-weight:1000;cursor:pointer}.class-filter{margin-top:8px}.selected-count{font-size:11px;font-weight:1000;color:#166534;background:#dcfce7;border:1px solid #bbf7d0;border-radius:999px;padding:4px 8px;display:inline-flex;width:max-content}
 
+
+  .scan-tool-wrap{display:grid;gap:8px}.scan-mode-toggle{display:flex;gap:6px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:999px;padding:5px;width:max-content;max-width:100%}.scan-mode-btn{border:0;border-radius:999px;background:transparent;color:#334155;font-size:12px;font-weight:1000;padding:7px 11px;cursor:pointer}.scan-mode-btn.active{background:#0f172a;color:#fff;box-shadow:0 4px 10px rgba(15,23,42,.15)}.scan-input-wrap{position:relative}.sheet-search-results{position:absolute;left:0;right:0;top:calc(100% + 7px);z-index:75;background:#fff;border:1px solid #cbd5e1;border-radius:16px;box-shadow:0 18px 40px rgba(15,23,42,.18);max-height:280px;overflow:auto}.sheet-result-item{width:100%;border:0;background:#fff;text-align:left;padding:11px 12px;cursor:pointer;border-bottom:1px solid #eef2f7;font-family:inherit}.sheet-result-item:last-child{border-bottom:0}.sheet-result-item:hover{background:#eff6ff}.sheet-result-code{font-size:13px;font-weight:1000;color:#0f172a}.sheet-result-meta{font-size:11px;color:#64748b;font-weight:850;margin-top:2px;line-height:1.35}.recent-panel{display:grid;gap:10px}.recent-list{display:grid;gap:8px;max-height:360px;overflow:auto}.recent-item{display:grid;grid-template-columns:auto 1fr auto;gap:9px;align-items:center;border:1px solid #e2e8f0;border-left:6px solid #16a34a;border-radius:16px;padding:9px;background:#fff}.recent-no{font-size:12px;font-weight:1000;color:#64748b}.recent-main{min-width:0}.recent-title{font-size:13px;font-weight:1000;color:#0f172a}.recent-meta{font-size:11px;color:#64748b;font-weight:850;margin-top:2px;line-height:1.4}.recent-date{font-size:11px;font-weight:1000;color:#166534;background:#dcfce7;border:1px solid #bbf7d0;border-radius:999px;padding:4px 8px;white-space:nowrap}
+
   @media(max-width:860px){.grid2,.row,.mode-row,.summary{grid-template-columns:1fr}.hero .btn,.actions .btn{width:100%}.scan-input{font-size:24px}.queue-item{grid-template-columns:1fr}.btn{width:100%}}
 </style>
 {% endblock %}
@@ -71,9 +74,21 @@
         <div id="classStudents" class="class-students"></div>
       </div>
 
-      <div><div class="section-title">3) สแกน QR / Barcode</div><div class="hint">คลิกช่องนี้ไว้ แล้วสแกนได้เลย ไม่ต้องกด Enter</div></div>
-      <input id="scanInput" class="scan-input" placeholder="SCAN CODE" autocomplete="off" autofocus>
-      <div class="hint" id="scanHint">พร้อมสแกน</div>
+      <div class="scan-tool-wrap">
+        <div>
+          <div class="section-title">3) ค้นหา / สแกนรหัสชีท</div>
+          <div class="hint">ค่าเริ่มต้นเป็นโหมดค้นหา กด 🔍 เพื่อค้นหา หรือกด QR เพื่อสแกนแบบ instant upload</div>
+        </div>
+        <div class="scan-mode-toggle" aria-label="เลือกโหมดช่องรหัสชีท">
+          <button type="button" class="scan-mode-btn active" id="sheetSearchModeBtn" data-input-mode="search">🔍 Search</button>
+          <button type="button" class="scan-mode-btn" id="sheetScanModeBtn" data-input-mode="scan">▦ QR</button>
+        </div>
+        <div class="scan-input-wrap">
+          <input id="scanInput" class="scan-input" placeholder="ค้นหารหัสชีท" autocomplete="off" autofocus>
+          <div id="sheetSearchResults" class="sheet-search-results" hidden></div>
+        </div>
+      </div>
+      <div class="hint" id="scanHint">โหมดค้นหา: พิมพ์รหัสหรือชื่อชีท แล้วกดเลือกเพื่อเพิ่มเข้ารายการรอตัด</div>
       <div class="summary"><div class="metric"><div class="k">รอตัด</div><div class="v" id="metricCount">0</div></div><div class="metric"><div class="k">รหัสชีท</div><div class="v" id="metricSheetCount">0</div></div><div class="metric"><div class="k">วันที่แจก</div><div class="v" style="font-size:18px"><input id="allocationDate" type="date" value="{{ today|date:'Y-m-d' }}"></div></div></div>
     </section>
 
@@ -82,6 +97,17 @@
       <div id="queueList" class="queue-list" style="margin-top:10px"><div class="empty">ยังไม่มีรายการรอตัด</div></div>
     </section>
   </div>
+
+  <section class="panel recent-panel">
+    <div class="queue-head">
+      <div>
+        <div class="section-title">ประวัติการตัดชีทล่าสุด</div>
+        <div class="hint">แสดงรายการแจกชีทล่าสุด 20 รายการ เพื่อใช้ตรวจย้อนหลังเร็ว ๆ</div>
+      </div>
+      <a class="btn soft" href="{% url 'core:sheet_allocation_report' %}">เปิดรายงานเต็ม</a>
+    </div>
+    <div id="recentAllocationList" class="recent-list"><div class="empty">ยังไม่มีประวัติการแจกชีท</div></div>
+  </section>
 </div>
 <script>
 (function(){
@@ -89,14 +115,18 @@
   const STUDENTS = {{ students_json|safe }};
   const ADMISSIONS = {{ admissions_json|safe }};
   const CLASSES = {{ class_students_json|safe }};
+  let RECENT_ALLOCATIONS = {{ recent_allocations_json|safe }};
   const sheetMap = new Map(SHEETS.map(s => [String(s.code).toUpperCase(), s]));
   let mode = 'one_person_many_sheets';
   let recipientSource = 'student';
   let queue = [];
   let scanTimer = null;
+  let inputMode = 'search';
   const selectedClassStudentIds = new Set();
 
   const scanInput = document.getElementById('scanInput');
+  const sheetSearchResults = document.getElementById('sheetSearchResults');
+  const recentAllocationList = document.getElementById('recentAllocationList');
   const queueList = document.getElementById('queueList');
   const hint = document.getElementById('scanHint');
   const metricCount = document.getElementById('metricCount');
@@ -277,6 +307,52 @@
     return [{recipient_source:'unassigned', label:'ไม่ระบุชื่อ'}];
   }
 
+
+  function setSheetInputMode(nextMode){
+    inputMode = nextMode === 'scan' ? 'scan' : 'search';
+    document.querySelectorAll('.scan-mode-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.inputMode === inputMode));
+    scanInput.value = '';
+    sheetSearchResults.hidden = true;
+    sheetSearchResults.innerHTML = '';
+    if(inputMode === 'scan'){
+      scanInput.placeholder = 'SCAN CODE';
+      hint.textContent = 'โหมด QR: คลิกช่องนี้ไว้ แล้วสแกนได้เลย ไม่ต้องกด Enter';
+    }else{
+      scanInput.placeholder = 'ค้นหารหัสชีท';
+      hint.textContent = 'โหมดค้นหา: พิมพ์รหัสหรือชื่อชีท แล้วกดเลือกเพื่อเพิ่มเข้ารายการรอตัด';
+    }
+    setTimeout(()=>scanInput.focus(),40);
+  }
+
+  function sheetSearchText(sheet){
+    return normalize([sheet.code, sheet.title, sheet.subject, sheet.grade_label, sheet.grade_level].join(' '));
+  }
+  function renderSheetSearch(term){
+    const needle = normalize(term);
+    if(!needle){ sheetSearchResults.hidden = true; sheetSearchResults.innerHTML = ''; return; }
+    const rows = SHEETS.filter(s => sheetSearchText(s).includes(needle)).slice(0, 14);
+    if(!rows.length){
+      sheetSearchResults.innerHTML = '<div class="student-result-empty">ไม่พบรหัสชีทที่ตรงกับคำค้นหา</div>';
+      sheetSearchResults.hidden = false;
+      return;
+    }
+    sheetSearchResults.innerHTML = rows.map(s => '<button type="button" class="sheet-result-item" data-code="'+escapeHtml(s.code)+'"><div class="sheet-result-code">'+escapeHtml(s.code)+' · '+escapeHtml(s.title)+'</div><div class="sheet-result-meta">'+escapeHtml(s.subject || '-')+' · คงเหลือ '+escapeHtml(s.quantity)+' เล่ม</div></button>').join('');
+    sheetSearchResults.hidden = false;
+    sheetSearchResults.querySelectorAll('.sheet-result-item').forEach(btn => btn.addEventListener('click', () => {
+      addScanned(btn.dataset.code);
+      scanInput.value = '';
+      sheetSearchResults.hidden = true;
+      scanInput.focus();
+    }));
+  }
+
+  function renderRecentAllocations(){
+    if(!recentAllocationList) return;
+    const rows = RECENT_ALLOCATIONS || [];
+    if(!rows.length){ recentAllocationList.innerHTML = '<div class="empty">ยังไม่มีประวัติการแจกชีท</div>'; return; }
+    recentAllocationList.innerHTML = rows.map((r, idx) => '<div class="recent-item"><div class="recent-no">#'+(idx+1)+'</div><div class="recent-main"><div class="recent-title">'+escapeHtml(r.sheet_code)+' · '+escapeHtml(r.sheet_title)+'</div><div class="recent-meta">ผู้รับ: '+escapeHtml(r.recipient || '-')+'<br>Class: '+escapeHtml(r.class_name || '-')+' · '+escapeHtml(r.created_text || '-')+'</div></div><div class="recent-date">'+escapeHtml(r.allocation_date || '-')+'</div></div>').join('');
+  }
+
   function addScanned(code){
     code = String(code||'').trim().toUpperCase();
     if(!code) return;
@@ -287,10 +363,15 @@
     hint.textContent = 'เพิ่ม '+code+' แล้ว ('+recipients.length+' รายการ)';
     renderQueue();
   }
+  document.querySelectorAll('.scan-mode-btn').forEach(btn => btn.addEventListener('click', () => setSheetInputMode(btn.dataset.inputMode)));
   scanInput.addEventListener('input', function(){
     clearTimeout(scanTimer);
+    const raw = scanInput.value.trim();
+    if(inputMode === 'search'){
+      scanTimer = setTimeout(() => renderSheetSearch(raw), 120);
+      return;
+    }
     scanTimer = setTimeout(() => {
-      const raw=scanInput.value.trim();
       if(raw.length >= 3){ addScanned(raw); scanInput.value=''; }
     }, 140);
   });
@@ -300,7 +381,11 @@
       const raw=scanInput.value.trim();
       addScanned(raw);
       scanInput.value='';
+      sheetSearchResults.hidden = true;
     }
+  });
+  document.addEventListener('click', function(event){
+    if(!event.target.closest('.scan-input-wrap')) sheetSearchResults.hidden = true;
   });
 
   function renderQueue(){
@@ -329,12 +414,13 @@
       body:JSON.stringify({allocation_date:document.getElementById('allocationDate').value, items:queue})
     })
     .then(resp => resp.json().then(data => { if(!resp.ok || !data.ok) throw new Error(data.message || 'บันทึกไม่สำเร็จ'); return data; }))
-    .then(data => { toast(data.message || 'บันทึกสำเร็จ'); queue=[]; renderQueue(); })
+    .then(data => { toast(data.message || 'บันทึกสำเร็จ'); if(data.latest_allocations){ RECENT_ALLOCATIONS = data.latest_allocations; renderRecentAllocations(); } queue=[]; renderQueue(); })
     .catch(err => toast(err.message || 'บันทึกไม่สำเร็จ', true))
     .finally(()=>{ btn.disabled=false; btn.textContent='💾 บันทึกตัด stock'; scanInput.focus(); });
   });
   renderQueue();
-  setTimeout(()=>document.getElementById('studentSearchInput').focus(),80);
+  renderRecentAllocations();
+  setSheetInputMode('search');
 })();
 </script>
 {% endblock %}

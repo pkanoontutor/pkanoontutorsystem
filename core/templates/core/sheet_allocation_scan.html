@@ -378,6 +378,10 @@
   scanInput.addEventListener('keydown', function(e){
     if(e.key === 'Enter'){
       e.preventDefault();
+      // QR scanner in instant upload mode usually types the code, then sends Enter.
+      // The input event above may already have scheduled an auto-add timer.
+      // Clear it here so one physical scan creates only one pending deduction row.
+      clearTimeout(scanTimer);
       const raw=scanInput.value.trim();
       addScanned(raw);
       scanInput.value='';

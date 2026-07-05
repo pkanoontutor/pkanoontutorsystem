@@ -28,14 +28,14 @@
     <div class="metric">
       <div class="k">ยอดรับชำระใบเสร็จที่ออกแล้ว</div>
       <div class="v">
-        <span class="money-value is-hidden" data-money-value data-real="{{ issued_total|floatformat:'0g' }}">••••••</span>
+        <span class="money-value is-hidden" data-money-value data-real="{{ issued_total_display }}">••••••</span>
         <button class="money-eye" type="button" data-money-toggle title="ซ่อน/แสดงยอดเงิน">👁</button>
       </div>
     </div>
     <div class="metric">
       <div class="k">ยอดรวมตามรายการที่ filter</div>
       <div class="v">
-        <span class="money-value is-hidden" data-money-value data-real="{{ all_total|floatformat:'0g' }}">••••••</span>
+        <span class="money-value is-hidden" data-money-value data-real="{{ all_total_display }}">••••••</span>
         <button class="money-eye" type="button" data-money-toggle title="ซ่อน/แสดงยอดเงิน">👁</button>
       </div>
     </div>
@@ -54,139 +54,12 @@
   <section class="table-wrap">
     <table class="tbl">
       <thead><tr><th>เลขที่</th><th>วันที่รับเงิน</th><th>นักเรียน</th><th>Class</th><th>Enrollment</th><th>ครั้ง</th><th>วิธีจ่าย</th><th>ยอดรับชำระ</th><th>สถานะ</th><th></th></tr></thead>
-      <tbody>{% for p in payments %}<tr><td><b>{{ p.receipt_no }}</b></td><td>{{ p.payment_date|date:"d/m/Y" }}</td><td>{{ p.student.display_name }}</td><td>{{ p.tutoring_class.name }}</td><td>{% if p.enrollment %}{{ p.enrollment.sale_run_no|default:p.enrollment_id }}{% else %}-{% endif %}</td><td>{{ p.sessions_granted }}</td><td>{{ p.get_payment_method_display }}</td><td><span class="amount">{{ p.amount_paid|floatformat:"0g" }}</span></td><td><span class="badge {% if p.status == 'cancelled' %}cancelled{% else %}issued{% endif %}">{{ p.get_status_display }}</span></td><td><a class="btnx soft" href="{% url 'core:course_payment_detail' p.id %}">เปิด</a></td></tr>{% empty %}<tr><td colspan="10" style="text-align:center;color:#64748b;">ยังไม่มีใบเสร็จ</td></tr>{% endfor %}</tbody>
+      <tbody>{% for p in payments %}<tr><td><b>{{ p.receipt_no }}</b></td><td>{{ p.payment_date|date:"d/m/Y" }}</td><td>{{ p.student.display_name }}</td><td>{{ p.tutoring_class.name }}</td><td>{% if p.enrollment %}{{ p.enrollment.sale_run_no|default:p.enrollment_id }}{% else %}-{% endif %}</td><td>{{ p.sessions_granted }}</td><td>{{ p.get_payment_method_display }}</td><td><span class="amount">{{ p.amount_paid|floatformat:"0" }}</span></td><td><span class="badge {% if p.status == 'cancelled' %}cancelled{% else %}issued{% endif %}">{{ p.get_status_display }}</span></td><td><a class="btnx soft" href="{% url 'core:course_payment_detail' p.id %}">เปิด</a></td></tr>{% empty %}<tr><td colspan="10" style="text-align:center;color:#64748b;">ยังไม่มีใบเสร็จ</td></tr>{% endfor %}</tbody>
     </table>
   </section>
 
   <section class="mobile-list">
-    {% for p in payments %}<div class="mobile-card"><div style="display:flex;justify-content:space-between;gap:8px;"><b>{{ p.receipt_no }}</b><span class="amount">{{ p.amount_paid|floatformat:"0g" }}</span></div><div style="font-size:12px;color:#64748b;margin-top:6px;line-height:1.5;">{{ p.payment_date|date:"d/m/Y" }} · {{ p.student.display_name }}<br>{{ p.tutoring_class.name }} · {{ p.sessions_granted }} ครั้ง · {{ p.get_payment_method_display }}</div><div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;"><span class="badge {% if p.status == 'cancelled' %}cancelled{% else %}issued{% endif %}">{{ p.get_status_display }}</span><a class="btnx soft" href="{% url 'core:course_payment_detail' p.id %}">เปิดใบเสร็จ</a></div></div>{% empty %}<div class="mobile-card">ยังไม่มีใบเสร็จ</div>{% endfor %}
-  </section>
-</div>
-
-<div class="pin-modal-backdrop" id="moneyPinModal" aria-hidden="true">
-  <div class="pin-modal" role="dialog" aria-modal="true">
-    <div class="pin-title">ใส่ PIN เพื่อแสดงยอดเงิน</div>
-    <div class="pin-sub">ยอดเงินด้านบนถูกซ่อนไว้เป็นค่าเริ่มต้น</div>
-    <input class="pin-input" id="moneyPinInput" type="password" inputmode="numeric" maxlength="6" placeholder="PIN">
-    <div class="pin-error" id="moneyPinError">PIN ไม่ถูกต้อง</div>
-    <div class="pin-actions">
-      <button class="btnx soft" type="button" id="moneyPinCancel">ยกเลิก</button>
-      <button class="btnx primary" type="button" id="moneyPinSubmit">แสดงยอด</button>
-    </div>
-  </div>
-</div>
-
-<script>
-(function(){
-  const PIN = '180441';
-  let visible = false;
-  const values = Array.from(document.querySelectorAll('[data-money-value]'));
-  const toggles = Array.from(document.querySelectorAll('[data-money-toggle]'));
-  const modal = document.getElementById('moneyPinModal');
-  const input = document.getElementById('moneyPinInput');
-  const errorBox = document.getElementById('moneyPinError');
-  const mask = '••••••';
-  function render(){
-    values.forEach(v => {
-      if(visible){
-        v.textContent = v.dataset.real || '0';
-        v.classList.remove('is-hidden');
-      }else{
-        v.textContent = mask;
-        v.classList.add('is-hidden');
-      }
-    });
-    toggles.forEach(b => b.textContent = visible ? '🙈' : '👁');
-  }
-  function openModal(){
-    errorBox.style.display = 'none';
-    input.value = '';
-    modal.classList.add('show');
-    modal.setAttribute('aria-hidden','false');
-    setTimeout(()=>input.focus(),50);
-  }
-  function closeModal(){
-    modal.classList.remove('show');
-    modal.setAttribute('aria-hidden','true');
-  }
-  function submitPin(){
-    if((input.value || '').trim() === PIN){ visible = true; closeModal(); render(); }
-    else{ errorBox.style.display = 'block'; input.select(); }
-  }
-  toggles.forEach(btn => btn.addEventListener('click', () => {
-    if(visible){ visible = false; render(); }
-    else openModal();
-  }));
-  document.getElementById('moneyPinCancel').addEventListener('click', closeModal);
-  document.getElementById('moneyPinSubmit').addEventListener('click', submitPin);
-  input.addEventListener('keydown', e => { if(e.key === 'Enter'){ e.preventDefault(); submitPin(); } });
-  modal.addEventListener('click', e => { if(e.target === modal) closeModal(); });
-  render();
-})();
-</script>
-{% endblock %}
-{% extends "core/base.html" %}
-{% block title %}รับชำระเงิน / ใบเสร็จ{% endblock %}
-{% block head %}
-<style>
-  .pay-wrap{max-width:1280px;margin:0 auto;display:grid;gap:14px;}
-  .hero{background:linear-gradient(135deg,#0f172a,#1d4ed8,#7c3aed);color:#fff;border-radius:24px;padding:22px;box-shadow:0 14px 30px rgba(15,23,42,.20);display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;align-items:flex-start;}
-  .title{font-size:26px;font-weight:1000;letter-spacing:-.03em}.sub{color:#dbeafe;font-size:13px;margin-top:5px;line-height:1.6}.actions{display:flex;gap:8px;flex-wrap:wrap}.btnx{border:0;border-radius:14px;padding:10px 14px;font-weight:1000;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:7px;cursor:pointer}.primary{background:#2563eb;color:#fff}.soft{background:#fff;color:#0f172a;border:1px solid #e2e8f0}.dark{background:#0f172a;color:#fff}.danger{background:#fee2e2;color:#991b1b;border:1px solid #fecaca}.cardx{background:#fff;border-radius:20px;padding:16px;box-shadow:0 6px 16px rgba(15,23,42,.08);border:1px solid rgba(255,255,255,.88)}
-  .filter-grid{display:grid;grid-template-columns:2fr 1fr 1fr 1fr auto;gap:10px;align-items:end}.field{display:flex;flex-direction:column;gap:5px}.field label{font-size:11px;font-weight:1000;color:#334155;text-transform:uppercase;letter-spacing:.04em}input,select{border:1px solid #e2e8f0;border-radius:12px;padding:10px;font-weight:800;background:#fff;width:100%}.metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.metric{background:#fff;border-radius:18px;padding:14px;border:1px solid #e2e8f0;box-shadow:0 4px 12px rgba(15,23,42,.06)}.metric .k{font-size:11px;color:#64748b;font-weight:1000;text-transform:uppercase}.metric .v{font-size:24px;font-weight:1000;margin-top:4px;color:#15803d;display:flex;align-items:center;gap:8px;flex-wrap:wrap}.money-eye{width:30px;height:30px;border:1px solid #bbf7d0;background:#f0fdf4;color:#166534;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;font-size:15px;font-weight:1000}.money-eye:hover{background:#dcfce7;transform:translateY(-1px)}.money-value.is-hidden{letter-spacing:.08em;color:#0f172a}.table-wrap{overflow:auto;border:1px solid #e2e8f0;border-radius:18px;background:#fff}.tbl{min-width:1050px;width:100%;border-collapse:separate;border-spacing:0}.tbl th{background:#f8fafc;color:#334155;font-size:11px;text-transform:uppercase;letter-spacing:.04em;padding:10px;position:sticky;top:0}.tbl td{padding:10px;border-top:1px solid #edf2f7;vertical-align:middle}.amount{font-weight:1000;color:#15803d}.badge{display:inline-flex;padding:4px 9px;border-radius:999px;font-size:12px;font-weight:1000;border:1px solid #e2e8f0;background:#f8fafc}.cancelled{background:#fee2e2;color:#991b1b;border-color:#fecaca}.issued{background:#dcfce7;color:#166534;border-color:#bbf7d0}.mobile-list{display:none;gap:10px}.mobile-card{background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:12px;box-shadow:0 3px 8px rgba(15,23,42,.06)}
-  .pin-modal-backdrop{position:fixed;inset:0;background:rgba(15,23,42,.42);z-index:9998;display:none;align-items:center;justify-content:center;padding:18px}.pin-modal-backdrop.show{display:flex}.pin-modal{width:min(100%,380px);background:#fff;border-radius:22px;padding:18px;box-shadow:0 24px 60px rgba(15,23,42,.30);border:1px solid #e2e8f0}.pin-title{font-size:19px;font-weight:1000;color:#0f172a}.pin-sub{font-size:12px;color:#64748b;font-weight:800;margin-top:4px;line-height:1.45}.pin-input{font-size:24px;text-align:center;letter-spacing:.22em;margin-top:12px;border:2px solid #bfdbfe}.pin-error{display:none;margin-top:9px;color:#991b1b;background:#fee2e2;border:1px solid #fecaca;border-radius:12px;padding:8px 10px;font-size:12px;font-weight:900}.pin-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:13px}.pin-actions .btnx{min-width:96px}
-  @media(max-width:900px){.filter-grid{grid-template-columns:1fr 1fr}.metrics{grid-template-columns:1fr}.filter-grid .actions{grid-column:1/-1}.table-wrap{display:none}.mobile-list{display:grid}.btnx{width:100%}.hero .btnx{width:auto}.pin-actions{display:grid;grid-template-columns:1fr 1fr}.pin-actions .btnx{width:100%}}
-</style>
-{% endblock %}
-{% block content %}
-<div class="pay-wrap">
-  <section class="hero">
-    <div>
-      <div class="title">🧾 รับชำระเงิน / ใบเสร็จ</div>
-      <div class="sub">ออกใบเสร็จ สร้างนักเรียนใหม่หรือเลือกนักเรียนเดิม และสร้าง/เพิ่ม Enrollment ได้ในหน้าเดียว</div>
-    </div>
-    <div class="actions">
-      <a class="btnx soft" href="/pkanoon-admin-tool/">← Admin Tool</a>
-      <a class="btnx soft" href="/school-finance/">💰 รายรับรายจ่าย</a>
-      <a class="btnx primary" href="/course-payments/new/">+ ออกใบเสร็จใหม่</a>
-    </div>
-  </section>
-
-  <section class="metrics">
-    <div class="metric">
-      <div class="k">ยอดรับชำระใบเสร็จที่ออกแล้ว</div>
-      <div class="v">
-        <span class="money-value is-hidden" data-money-value data-real="{{ issued_total|floatformat:'0g' }}">••••••</span>
-        <button class="money-eye" type="button" data-money-toggle title="ซ่อน/แสดงยอดเงิน">👁</button>
-      </div>
-    </div>
-    <div class="metric">
-      <div class="k">ยอดรวมตามรายการที่ filter</div>
-      <div class="v">
-        <span class="money-value is-hidden" data-money-value data-real="{{ all_total|floatformat:'0g' }}">••••••</span>
-        <button class="money-eye" type="button" data-money-toggle title="ซ่อน/แสดงยอดเงิน">👁</button>
-      </div>
-    </div>
-  </section>
-
-  <section class="cardx">
-    <form method="get" class="filter-grid">
-      <div class="field"><label>ค้นหา</label><input name="q" value="{{ filters.q }}" placeholder="เลขใบเสร็จ / ชื่อนักเรียน / class"></div>
-      <div class="field"><label>สถานะ</label><select name="status"><option value="">ทั้งหมด</option>{% for value,label in status_choices %}<option value="{{ value }}" {% if filters.status == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
-      <div class="field"><label>จากวันที่</label><input type="date" name="date_from" value="{{ filters.date_from }}"></div>
-      <div class="field"><label>ถึงวันที่</label><input type="date" name="date_to" value="{{ filters.date_to }}"></div>
-      <div class="actions"><button class="btnx primary" type="submit">Filter</button><a class="btnx soft" href="/course-payments/">Reset</a></div>
-    </form>
-  </section>
-
-  <section class="table-wrap">
-    <table class="tbl">
-      <thead><tr><th>เลขที่</th><th>วันที่รับเงิน</th><th>นักเรียน</th><th>Class</th><th>Enrollment</th><th>ครั้ง</th><th>วิธีจ่าย</th><th>ยอดรับชำระ</th><th>สถานะ</th><th></th></tr></thead>
-      <tbody>{% for p in payments %}<tr><td><b>{{ p.receipt_no }}</b></td><td>{{ p.payment_date|date:"d/m/Y" }}</td><td>{{ p.student.display_name }}</td><td>{{ p.tutoring_class.name }}</td><td>{% if p.enrollment %}{{ p.enrollment.sale_run_no|default:p.enrollment_id }}{% else %}-{% endif %}</td><td>{{ p.sessions_granted }}</td><td>{{ p.get_payment_method_display }}</td><td><span class="amount">{{ p.amount_paid|floatformat:"0g" }}</span></td><td><span class="badge {% if p.status == 'cancelled' %}cancelled{% else %}issued{% endif %}">{{ p.get_status_display }}</span></td><td><a class="btnx soft" href="{% url 'core:course_payment_detail' p.id %}">เปิด</a></td></tr>{% empty %}<tr><td colspan="10" style="text-align:center;color:#64748b;">ยังไม่มีใบเสร็จ</td></tr>{% endfor %}</tbody>
-    </table>
-  </section>
-
-  <section class="mobile-list">
-    {% for p in payments %}<div class="mobile-card"><div style="display:flex;justify-content:space-between;gap:8px;"><b>{{ p.receipt_no }}</b><span class="amount">{{ p.amount_paid|floatformat:"0g" }}</span></div><div style="font-size:12px;color:#64748b;margin-top:6px;line-height:1.5;">{{ p.payment_date|date:"d/m/Y" }} · {{ p.student.display_name }}<br>{{ p.tutoring_class.name }} · {{ p.sessions_granted }} ครั้ง · {{ p.get_payment_method_display }}</div><div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;"><span class="badge {% if p.status == 'cancelled' %}cancelled{% else %}issued{% endif %}">{{ p.get_status_display }}</span><a class="btnx soft" href="{% url 'core:course_payment_detail' p.id %}">เปิดใบเสร็จ</a></div></div>{% empty %}<div class="mobile-card">ยังไม่มีใบเสร็จ</div>{% endfor %}
+    {% for p in payments %}<div class="mobile-card"><div style="display:flex;justify-content:space-between;gap:8px;"><b>{{ p.receipt_no }}</b><span class="amount">{{ p.amount_paid|floatformat:"0" }}</span></div><div style="font-size:12px;color:#64748b;margin-top:6px;line-height:1.5;">{{ p.payment_date|date:"d/m/Y" }} · {{ p.student.display_name }}<br>{{ p.tutoring_class.name }} · {{ p.sessions_granted }} ครั้ง · {{ p.get_payment_method_display }}</div><div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;"><span class="badge {% if p.status == 'cancelled' %}cancelled{% else %}issued{% endif %}">{{ p.get_status_display }}</span><a class="btnx soft" href="{% url 'core:course_payment_detail' p.id %}">เปิดใบเสร็จ</a></div></div>{% empty %}<div class="mobile-card">ยังไม่มีใบเสร็จ</div>{% endfor %}
   </section>
 </div>
 

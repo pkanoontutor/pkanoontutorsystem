@@ -3605,6 +3605,18 @@ def _money(x) -> Decimal:
 
 
 
+def _format_money_for_display(value) -> str:
+    """Format money as integer with comma separators for display in templates."""
+    try:
+        amount = Decimal(str(value or 0))
+        return f"{amount:,.0f}"
+    except Exception:
+        try:
+            return f"{float(value or 0):,.0f}"
+        except Exception:
+            return "0"
+
+
 
 COURSE_SESSION_CHOICES = [
     ("5", "5 ครั้ง", 5),
@@ -5636,13 +5648,16 @@ def course_payment_list(request: HttpRequest) -> HttpResponse:
 
     totals = qs.aggregate(total=Sum("amount_paid"))
     issued_total = qs.filter(status=CoursePayment.ReceiptStatus.ISSUED).aggregate(total=Sum("amount_paid")).get("total") or Decimal("0")
+    all_total = totals.get("total") or Decimal("0")
 
     return render(request, "core/course_payment_list.html", {
         "payments": qs[:300],
         "filters": {"q": q, "status": status, "date_from": request.GET.get("date_from", ""), "date_to": request.GET.get("date_to", "")},
         "status_choices": CoursePayment.ReceiptStatus.choices,
         "issued_total": issued_total,
-        "all_total": totals.get("total") or Decimal("0"),
+        "all_total": all_total,
+        "issued_total_display": _format_money_for_display(issued_total),
+        "all_total_display": _format_money_for_display(all_total),
     })
 
 

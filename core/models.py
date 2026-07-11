@@ -1908,3 +1908,44 @@ class TestScore(models.Model):
     def __str__(self) -> str:
         return f"{self.participant} - {self.subject.name}: {self.score}"
 
+
+class AdminToolCard(models.Model):
+    """A configurable menu card shown on the Pkanoon Admin Tool landing page.
+
+    Stored in DB so every admin/device sees the same shared configuration.
+    """
+
+    class Section(models.TextChoices):
+        PRIVATE = "private", "Private / Management"
+        OPERATION = "operation", "Operation"
+
+    section = models.CharField("หมวด", max_length=20, choices=Section.choices, default=Section.PRIVATE)
+    icon = models.CharField("ไอคอน", max_length=16, default="🔗")
+    name = models.CharField("ชื่อเมนู", max_length=200)
+    desc = models.TextField("คำอธิบาย", blank=True)
+    url = models.CharField("ลิงก์", max_length=300)
+    color = models.CharField("สีไอคอน", max_length=20, default="c-sky")
+    order = models.IntegerField("ลำดับ", default=0)
+    created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Admin Tool Card"
+        verbose_name_plural = "Admin Tool Cards"
+        ordering = ("section", "order", "id")
+
+    def __str__(self) -> str:
+        return f"[{self.section}] {self.name}"
+
+    def as_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "section": self.section,
+            "icon": self.icon,
+            "name": self.name,
+            "desc": self.desc,
+            "url": self.url,
+            "color": self.color,
+            "order": self.order,
+        }
+

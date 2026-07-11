@@ -14,6 +14,10 @@ urlpatterns = [
     path("dashboard/", views.dashboard, name="dashboard"),
     path("super-dashboard/", views.super_dashboard, name="super_dashboard"),
     path("pkanoon-admin-tool/", views.pkanoon_admin_tool, name="pkanoon_admin_tool"),
+    path("pkanoon-admin-tool/cards/save/", views.admin_tool_card_save, name="admin_tool_card_save"),
+    path("pkanoon-admin-tool/cards/delete/", views.admin_tool_card_delete, name="admin_tool_card_delete"),
+    path("pkanoon-admin-tool/cards/reorder/", views.admin_tool_card_reorder, name="admin_tool_card_reorder"),
+    path("pkanoon-admin-tool/cards/reset/", views.admin_tool_card_reset, name="admin_tool_card_reset"),
     path("learning-record/", views.learning_record, name="learning_record"),
 
     # Attendance

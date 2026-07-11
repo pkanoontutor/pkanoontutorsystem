@@ -5,23 +5,23 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>{% block title %}Lookmak System{% endblock %}</title>
 
-  <!-- ฟอนต์หลักของทั้งเว็บ: TH Sarabun New (ถ้าเครื่องผู้ใช้ลงไว้) มิฉะนั้น fallback เป็น Sarabun (Google Fonts) -->
+  <!-- ฟอนต์หลักของทั้งเว็บ: IBM Plex Sans Thai (รองรับทั้งไทย/อังกฤษในตัวเดียว อ่านง่าย ดีไซน์ทันสมัย) -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet" />
 
   <style>
     /* =========================
        Global
     ========================= */
     :root {
-      --app-font: "Aptos", "TH Sarabun New", "Sarabun", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      --app-font: "IBM Plex Sans Thai", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
     }
 
     body {
       font-family: var(--app-font);
-      font-size: 18px;          /* TH Sarabun New เล็กกว่าฟอนต์ระบบ จึงตั้งฐานให้ใหญ่ขึ้น */
-      line-height: 1.5;
+      font-size: 16px;
+      line-height: 1.6;
       margin: 0;
       background: #93d3f8; /* พื้นหลังเพจ */
       color: #111827;

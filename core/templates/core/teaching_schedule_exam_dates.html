@@ -1,0 +1,60 @@
+{% extends "core/base.html" %}
+{% block title %}ตั้งวันสอบ (Countdown){% endblock %}
+
+{% block head %}
+<style>
+  .ex-wrap{max-width:760px;margin:0 auto;display:grid;gap:16px;}
+  .ex-card{background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:18px;box-shadow:0 4px 10px rgba(0,0,0,.06);}
+  .ex-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;align-items:end;}
+  .ex-grid label{font-size:12px;font-weight:700;color:#475569;display:block;margin-bottom:4px;}
+  .ex-grid input{width:100%;box-sizing:border-box;padding:9px 11px;border:1px solid #cbd5e1;border-radius:10px;font-size:14px;font-family:inherit;}
+  .sbtn{border:0;border-radius:10px;padding:10px 15px;font-weight:700;cursor:pointer;font-size:14px;font-family:inherit;
+    display:inline-flex;align-items:center;gap:6px;text-decoration:none;}
+  .sbtn.blue{background:#1d4ed8;color:#fff}.sbtn.soft{background:#f1f5f9;color:#0f172a;border:1px solid #cbd5e1}
+  .sbtn.red{background:#dc2626;color:#fff}
+  .ex-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:11px 14px;
+    border:1px solid #eef2f7;border-radius:12px;margin-bottom:8px;}
+  .ex-row .g{font-weight:700;font-size:16px;}
+  .ex-row .m{font-size:13px;color:#64748b;}
+  .badge{background:#e11d2a;color:#fff;border-radius:10px;padding:4px 10px;font-weight:700;font-size:13px;}
+  @media(max-width:620px){.ex-grid{grid-template-columns:1fr 1fr}}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="ex-wrap">
+  <div class="ex-card">
+    <h2 style="margin:0 0 4px;">⏱️ ตั้งวันสอบ (Countdown บนตาราง)</h2>
+    <p class="m" style="color:#64748b;margin:0 0 14px;">วันสอบต่อระดับชั้น จะถูกนำไปคำนวณ "จำนวนวันที่เหลือ" อัตโนมัติบนรูปตารางแต่ละวัน</p>
+    <form method="post" class="ex-grid">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="add">
+      <div><label>ระดับชั้น</label><input type="text" name="grade_label" placeholder="เช่น ม.1" required></div>
+      <div><label>วันสอบ</label><input type="date" name="exam_date" required></div>
+      <div><label>หมายเหตุ</label><input type="text" name="note" placeholder="เช่น รอบแรก - ห้องพิเศษ"></div>
+      <div><button class="sbtn blue" type="submit" style="width:100%;justify-content:center;">+ เพิ่ม</button></div>
+    </form>
+  </div>
+
+  <div class="ex-card">
+    <h3 style="margin:0 0 12px;">รายการวันสอบ</h3>
+    {% for it in items %}
+      <div class="ex-row">
+        <div>
+          <div class="g">{{ it.grade_label }} <span class="badge">{{ it.days_to_go }} วัน</span></div>
+          <div class="m">สอบ {{ it.exam_date_th }}{% if it.note %} · {{ it.note }}{% endif %}</div>
+        </div>
+        <form method="post" onsubmit="return confirm('ลบวันสอบนี้?');">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="delete">
+          <input type="hidden" name="id" value="{{ it.id }}">
+          <button class="sbtn red" type="submit">ลบ</button>
+        </form>
+      </div>
+    {% empty %}
+      <div class="m" style="text-align:center;padding:16px;color:#64748b;">ยังไม่มีวันสอบ</div>
+    {% endfor %}
+    <a class="sbtn soft" href="/teaching-schedule/" style="margin-top:8px;">← กลับหน้าตาราง</a>
+  </div>
+</div>
+{% endblock %}

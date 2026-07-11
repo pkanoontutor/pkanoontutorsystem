@@ -1,0 +1,231 @@
+{% extends "core/base.html" %}
+{% block title %}จัดตารางเรียน {{ thai_date }}{% endblock %}
+
+{% block head %}
+<style>
+  .sch-wrap{max-width:1300px;margin:0 auto;display:grid;gap:16px;}
+  .sch-bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:#fff;border:1px solid #e5e7eb;
+    border-radius:16px;padding:14px 16px;box-shadow:0 4px 10px rgba(0,0,0,.06);}
+  .sch-bar input[type=date],.sch-bar input[type=text]{padding:9px 12px;border:1px solid #cbd5e1;border-radius:10px;font-size:15px;}
+  .sbtn{border:0;border-radius:10px;padding:10px 15px;font-weight:700;cursor:pointer;font-size:14px;
+    display:inline-flex;align-items:center;gap:6px;text-decoration:none;font-family:inherit;}
+  .sbtn.blue{background:#1d4ed8;color:#fff}.sbtn.green{background:#16a34a;color:#fff}
+  .sbtn.soft{background:#f1f5f9;color:#0f172a;border:1px solid #cbd5e1}.sbtn.amber{background:#f59e0b;color:#fff}
+  .warn{background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;border-radius:12px;padding:10px 14px;font-weight:600;display:none;}
+  .warn.show{display:block;}
+
+  table.sch{width:100%;border-collapse:separate;border-spacing:5px;background:#fff;border-radius:16px;
+    padding:10px;box-shadow:0 4px 10px rgba(0,0,0,.06);}
+  table.sch th.rh{padding:10px 6px;border-radius:10px;font-weight:700;text-align:center;font-size:14px;color:#3f3a2f;}
+  .tcol{width:96px;background:#d98c1f;color:#fff;font-weight:700;border-radius:10px;text-align:center;font-size:13px;padding:8px 4px;}
+  td.ec{background:#fdfaf0;border:1px solid #f0e6c8;border-radius:10px;padding:6px;vertical-align:top;min-width:150px;}
+  tr.brk td{background:#cdeafd !important;border:0;height:26px;text-align:center;color:#0369a1;font-weight:700;font-size:12px;}
+  .ec select,.ec input{width:100%;box-sizing:border-box;font-family:inherit;font-size:12.5px;
+    padding:5px 6px;border:1px solid #d8dee9;border-radius:8px;margin-bottom:4px;background:#fff;}
+  .ec .hint{font-size:10.5px;color:#64748b;margin:-2px 0 3px;}
+  td.ec.conflict{outline:2px solid #dc2626;background:#fff1f1;}
+  td.ec.conflict .cf{display:block;color:#dc2626;font-size:10.5px;font-weight:700;}
+  .ec .cf{display:none;}
+  .legend{font-size:13px;color:#475569;}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="sch-wrap">
+  <form method="get" action="/teaching-schedule/edit/" class="sch-bar">
+    <strong style="font-size:17px;">🗓️ จัดตารางเรียน</strong>
+    <span class="legend">— {{ thai_date }}</span>
+    <span style="flex:1"></span>
+    <label class="legend">เปลี่ยนวันที่:</label>
+    <input type="date" name="date" value="{{ date|date:'Y-m-d' }}">
+    <button class="sbtn soft" type="submit">เปิด</button>
+    <a class="sbtn soft" href="/teaching-schedule/">📅 ทั้งหมด</a>
+    <a class="sbtn soft" href="/teaching-schedule/exam-dates/">⏱️ ตั้งวันสอบ</a>
+  </form>
+
+  <div class="warn" id="warnBox">⚠ มีติวเตอร์ถูกจัดสอนชนกันในช่วงเวลาเดียวกัน (ช่องขอบแดง)</div>
+
+  <form method="post" action="/teaching-schedule/edit/?date={{ date|date:'Y-m-d' }}" id="schForm">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="save">
+    <input type="hidden" name="date" value="{{ date|date:'Y-m-d' }}">
+
+    <div class="sch-bar" style="margin-bottom:12px;">
+      <button class="sbtn green" type="submit">💾 บันทึก + ดูรูป</button>
+      {% if has_previous %}
+      <button class="sbtn amber" type="submit" formaction="/teaching-schedule/edit/?date={{ date|date:'Y-m-d' }}"
+        name="action" value="carry_forward"
+        onclick="return confirm('คัดลอกตารางจากวันก่อนหน้ามาทับตารางวันนี้?');">↩ คัดลอกจากวันก่อนหน้า</button>
+      {% endif %}
+      <span class="legend">เลือกคลาส/วิชาในแต่ละช่อง ระบบจะเติมชื่อติวเตอร์จากการตั้งค่าประจำสัปดาห์ให้อัตโนมัติ (แก้ทับได้)</span>
+    </div>
+
+    <table class="sch">
+      <thead>
+        <tr>
+          <th class="tcol">เวลา</th>
+          {% for room in rooms %}
+            <th class="rh" style="background:{{ room.header_color }};">{{ room.name }}</th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in editor_rows %}
+          {% if row.is_break %}
+            <tr class="brk"><td class="tcol">{{ row.label }}</td><td colspan="{{ rooms|length }}">พักกลางวัน</td></tr>
+          {% else %}
+            <tr>
+              <td class="tcol">{{ row.label }}</td>
+              {% for c in row.cells %}
+                <td class="ec" data-key="{{ c.room.id }}_{{ row.index }}" data-room="{{ c.room.id }}" data-time="{{ row.index }}"></td>
+              {% endfor %}
+            </tr>
+          {% endif %}
+        {% endfor %}
+      </tbody>
+    </table>
+  </form>
+</div>
+
+<script>
+  window.SCH_CLASSES = {{ class_data_json|safe }};
+  window.SCH_TUTORS = {{ tutors_json|safe }};
+  window.SCH_ROOMS = {{ rooms_json|safe }};
+  window.SCH_EXISTING = {{ existing_json|safe }};
+</script>
+
+{% verbatim %}
+<script>
+(function(){
+  "use strict";
+  var classes=window.SCH_CLASSES||[], tutors=window.SCH_TUTORS||[],
+      rooms=window.SCH_ROOMS||[], existing=window.SCH_EXISTING||{};
+  var classById={}; classes.forEach(function(c){classById[c.id]=c;});
+  var roomById={}; rooms.forEach(function(r){roomById[r.id]=r;});
+  var tutorById={}; tutors.forEach(function(t){tutorById[t.id]=t;});
+  var cellControls=[]; // {key, room, time, els:{cls,tmpl,grade,tutor,subj,hint}}
+
+  function opt(val,label,sel){
+    var o=document.createElement("option"); o.value=val; o.textContent=label;
+    if(sel) o.selected=true; return o;
+  }
+
+  function buildTutorSelect(name,selId){
+    var s=document.createElement("select"); s.name=name;
+    s.appendChild(opt("","— ติวเตอร์ —",!selId));
+    tutors.forEach(function(t){
+      var o=opt(t.id,t.name,String(t.id)===String(selId)); s.appendChild(o);
+    });
+    s.style.fontWeight="700";
+    return s;
+  }
+
+  function colorTutorSelect(s){
+    var t=tutorById[s.value];
+    s.style.color=t?t.color:"#0f172a";
+  }
+
+  function build(td){
+    var room=td.getAttribute("data-room"), time=td.getAttribute("data-time");
+    var key=td.getAttribute("data-key");
+    var ex=existing[key]||{};
+    var prefix="cell_"+room+"_"+time+"_";
+    var defClass=(roomById[room]&&roomById[room].default_class)||"";
+    var curClass=ex.class_id||defClass||"";
+
+    // class select
+    var cls=document.createElement("select"); cls.name=prefix+"class";
+    cls.appendChild(opt("","— คลาส —",!curClass));
+    classes.forEach(function(c){ cls.appendChild(opt(c.id,c.name,String(c.id)===String(curClass))); });
+
+    // subject/template select
+    var tmpl=document.createElement("select"); tmpl.name=prefix+"template";
+
+    // grade
+    var grade=document.createElement("input"); grade.type="text"; grade.name=prefix+"grade";
+    grade.placeholder="ระดับชั้น"; grade.value=ex.grade||"";
+
+    // hidden subject snapshot
+    var subj=document.createElement("input"); subj.type="hidden"; subj.name=prefix+"subject"; subj.value=ex.subject||"";
+
+    // tutor
+    var tutor=buildTutorSelect(prefix+"tutor",ex.tutor_id||"");
+
+    var hint=document.createElement("div"); hint.className="hint";
+
+    var cf=document.createElement("div"); cf.className="cf"; cf.textContent="⚠ ติวเตอร์ชนกัน";
+
+    td.appendChild(cls); td.appendChild(tmpl); td.appendChild(grade);
+    td.appendChild(tutor); td.appendChild(subj); td.appendChild(cf);
+
+    var ctrl={key:key,room:room,time:time,td:td,
+      els:{cls:cls,tmpl:tmpl,grade:grade,tutor:tutor,subj:subj,hint:hint}};
+    td.insertBefore(hint,cf);
+    cellControls.push(ctrl);
+
+    function fillTemplates(selTmplId,autoTutor){
+      tmpl.innerHTML="";
+      tmpl.appendChild(opt("","— วิชา —",!selTmplId));
+      var c=classById[cls.value];
+      if(c){ c.subjects.forEach(function(sj){
+        var label=sj.subject_name+" ("+sj.taught_count+")";
+        var o=opt(sj.template_id,label,String(sj.template_id)===String(selTmplId));
+        o.setAttribute("data-name",sj.subject_name);
+        o.setAttribute("data-tutor",sj.tutor_id||"");
+        tmpl.appendChild(o);
+      }); }
+      if(autoTutor) applyTemplate(true);
+    }
+    function applyTemplate(setTutor){
+      var o=tmpl.options[tmpl.selectedIndex];
+      subj.value=o?(o.getAttribute("data-name")||""):"";
+      var tid=o?o.getAttribute("data-tutor"):"";
+      if(setTutor && tid){ tutor.value=tid; colorTutorSelect(tutor); }
+      hint.textContent = (subj.value? "วิชา: "+subj.value : "");
+      recalcConflicts();
+    }
+
+    cls.addEventListener("change",function(){
+      var c=classById[cls.value];
+      grade.value=c?c.grade:"";
+      fillTemplates("",false);
+      // reset subject/tutor snapshot when class changes
+      subj.value="";
+      recalcConflicts();
+    });
+    tmpl.addEventListener("change",function(){ applyTemplate(true); });
+    tutor.addEventListener("change",function(){ colorTutorSelect(tutor); recalcConflicts(); });
+
+    // initial fill
+    fillTemplates(ex.template_id||"",false);
+    if(!ex.grade && classById[cls.value]) grade.value=classById[cls.value].grade;
+    if(ex.subject) subj.value=ex.subject;
+    hint.textContent = subj.value? "วิชา: "+subj.value : "";
+    colorTutorSelect(tutor);
+  }
+
+  function recalcConflicts(){
+    var byTime={};
+    cellControls.forEach(function(c){
+      var tv=c.els.tutor.value;
+      if(!tv) return;
+      (byTime[c.time]=byTime[c.time]||{});
+      (byTime[c.time][tv]=byTime[c.time][tv]||[]).push(c);
+    });
+    var any=false;
+    cellControls.forEach(function(c){ c.td.classList.remove("conflict"); });
+    Object.keys(byTime).forEach(function(t){
+      Object.keys(byTime[t]).forEach(function(tid){
+        var list=byTime[t][tid];
+        if(list.length>1){ any=true; list.forEach(function(c){ c.td.classList.add("conflict"); }); }
+      });
+    });
+    document.getElementById("warnBox").classList.toggle("show",any);
+  }
+
+  [].forEach.call(document.querySelectorAll("td.ec"),build);
+  recalcConflicts();
+})();
+</script>
+{% endverbatim %}
+{% endblock %}

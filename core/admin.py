@@ -948,9 +948,9 @@ class AdminToolCardAdmin(admin.ModelAdmin):
 
 @admin.register(ScheduleRoom)
 class ScheduleRoomAdmin(admin.ModelAdmin):
-    list_display = ("name", "display_order", "header_color", "default_class", "is_active")
+    list_display = ("name", "display_order", "header_color", "morning_class", "afternoon_class", "is_active")
     list_editable = ("display_order", "is_active")
-    autocomplete_fields = ("default_class",)
+    autocomplete_fields = ("morning_class", "afternoon_class")
     ordering = ("display_order", "id")
 
 

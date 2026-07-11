@@ -3,9 +3,9 @@
 
 {% block head %}
 <style>
-  .sch-wrap{max-width:1300px;margin:0 auto;display:grid;gap:16px;}
+  .sch-wrap{max-width:1320px;margin:0 auto;display:grid;gap:14px;}
   .sch-bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:#fff;border:1px solid #e5e7eb;
-    border-radius:16px;padding:14px 16px;box-shadow:0 4px 10px rgba(0,0,0,.06);}
+    border-radius:16px;padding:12px 16px;box-shadow:0 4px 10px rgba(0,0,0,.06);}
   .sch-bar input[type=date],.sch-bar input[type=text]{padding:9px 12px;border:1px solid #cbd5e1;border-radius:10px;font-size:15px;}
   .sbtn{border:0;border-radius:10px;padding:10px 15px;font-weight:700;cursor:pointer;font-size:14px;
     display:inline-flex;align-items:center;gap:6px;text-decoration:none;font-family:inherit;}
@@ -13,20 +13,23 @@
   .sbtn.soft{background:#f1f5f9;color:#0f172a;border:1px solid #cbd5e1}.sbtn.amber{background:#f59e0b;color:#fff}
   .warn{background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;border-radius:12px;padding:10px 14px;font-weight:600;display:none;}
   .warn.show{display:block;}
+  .legend{font-size:13px;color:#475569;}
 
   table.sch{width:100%;border-collapse:separate;border-spacing:5px;background:#fff;border-radius:16px;
-    padding:10px;box-shadow:0 4px 10px rgba(0,0,0,.06);}
-  table.sch th.rh{padding:10px 6px;border-radius:10px;font-weight:700;text-align:center;font-size:14px;color:#3f3a2f;}
-  .tcol{width:96px;background:#d98c1f;color:#fff;font-weight:700;border-radius:10px;text-align:center;font-size:13px;padding:8px 4px;}
-  td.ec{background:#fdfaf0;border:1px solid #f0e6c8;border-radius:10px;padding:6px;vertical-align:top;min-width:150px;}
-  tr.brk td{background:#cdeafd !important;border:0;height:26px;text-align:center;color:#0369a1;font-weight:700;font-size:12px;}
-  .ec select,.ec input{width:100%;box-sizing:border-box;font-family:inherit;font-size:12.5px;
-    padding:5px 6px;border:1px solid #d8dee9;border-radius:8px;margin-bottom:4px;background:#fff;}
-  .ec .hint{font-size:10.5px;color:#64748b;margin:-2px 0 3px;}
-  td.ec.conflict{outline:2px solid #dc2626;background:#fff1f1;}
-  td.ec.conflict .cf{display:block;color:#dc2626;font-size:10.5px;font-weight:700;}
-  .ec .cf{display:none;}
-  .legend{font-size:13px;color:#475569;}
+    padding:10px;box-shadow:0 4px 10px rgba(0,0,0,.06);table-layout:fixed;}
+  table.sch th.rh{padding:9px 6px;border-radius:10px;font-weight:700;text-align:center;font-size:14px;color:#3f3a2f;}
+  table.sch th.rh .cls{display:block;font-size:10.5px;font-weight:600;color:#6b7280;margin-top:2px;}
+  .tcol{width:88px;background:#d98c1f;color:#fff;font-weight:700;border-radius:10px;text-align:center;font-size:12.5px;padding:8px 4px;}
+  td.ec{background:#fdfaf0;border:1px solid #f0e6c8;border-radius:10px;padding:6px;vertical-align:middle;transition:background .12s;}
+  tr.brk td{background:#cdeafd !important;border:0;height:24px;text-align:center;color:#0369a1;font-weight:700;font-size:12px;}
+  .ec .grade{font-size:11px;font-weight:700;color:#4b5563;margin-bottom:3px;}
+  .ec .controls{display:flex;gap:5px;align-items:center;}
+  .ec select{flex:1;min-width:0;box-sizing:border-box;font-family:inherit;font-size:12px;
+    padding:5px 4px;border:1px solid #d8dee9;border-radius:7px;background:#fff;}
+  .ec select.tsel{font-weight:700;max-width:44%;}
+  .ec .nolink{font-size:11px;color:#9ca3af;text-align:center;padding:6px 2px;font-style:italic;}
+  td.ec.conflict{outline:2px solid #dc2626;}
+  td.ec.conflict::after{content:"⚠ ชน";display:block;color:#dc2626;font-size:10px;font-weight:700;margin-top:2px;text-align:center;}
 </style>
 {% endblock %}
 
@@ -39,7 +42,7 @@
     <label class="legend">เปลี่ยนวันที่:</label>
     <input type="date" name="date" value="{{ date|date:'Y-m-d' }}">
     <button class="sbtn soft" type="submit">เปิด</button>
-    <a class="sbtn soft" href="/teaching-schedule/">📅 ทั้งหมด</a>
+    <a class="sbtn soft" href="/teaching-schedule/rooms/">🏫 ผูกคลาสห้อง</a>
     <a class="sbtn soft" href="/teaching-schedule/exam-dates/">⏱️ ตั้งวันสอบ</a>
   </form>
 
@@ -50,14 +53,13 @@
     <input type="hidden" name="action" value="save">
     <input type="hidden" name="date" value="{{ date|date:'Y-m-d' }}">
 
-    <div class="sch-bar" style="margin-bottom:12px;">
+    <div class="sch-bar" style="margin-bottom:10px;">
       <button class="sbtn green" type="submit">💾 บันทึก + ดูรูป</button>
       {% if has_previous %}
-      <button class="sbtn amber" type="submit" formaction="/teaching-schedule/edit/?date={{ date|date:'Y-m-d' }}"
-        name="action" value="carry_forward"
+      <button class="sbtn amber" type="submit" name="action" value="carry_forward"
         onclick="return confirm('คัดลอกตารางจากวันก่อนหน้ามาทับตารางวันนี้?');">↩ คัดลอกจากวันก่อนหน้า</button>
       {% endif %}
-      <span class="legend">เลือกคลาส/วิชาในแต่ละช่อง ระบบจะเติมชื่อติวเตอร์จากการตั้งค่าประจำสัปดาห์ให้อัตโนมัติ (แก้ทับได้)</span>
+      <span class="legend">เลือกวิชา + ติวเตอร์ในแต่ละช่อง (เลือกติวเตอร์แล้วช่องจะเปลี่ยนเป็นสีประจำตัวทันที) — คลาสตั้งจากหน้า "ผูกคลาสห้อง"</span>
     </div>
 
     <table class="sch">
@@ -65,7 +67,10 @@
         <tr>
           <th class="tcol">เวลา</th>
           {% for room in rooms %}
-            <th class="rh" style="background:{{ room.header_color }};">{{ room.name }}</th>
+            <th class="rh" style="background:{{ room.header_color }};">
+              {{ room.name }}
+              <span class="cls">เช้า: {{ room.morning_class.name|default:"—" }} · บ่าย: {{ room.afternoon_class.name|default:"—" }}</span>
+            </th>
           {% endfor %}
         </tr>
       </thead>
@@ -103,26 +108,33 @@
   var classById={}; classes.forEach(function(c){classById[c.id]=c;});
   var roomById={}; rooms.forEach(function(r){roomById[r.id]=r;});
   var tutorById={}; tutors.forEach(function(t){tutorById[t.id]=t;});
-  var cellControls=[]; // {key, room, time, els:{cls,tmpl,grade,tutor,subj,hint}}
+  var cellControls=[];
 
   function opt(val,label,sel){
     var o=document.createElement("option"); o.value=val; o.textContent=label;
     if(sel) o.selected=true; return o;
   }
-
-  function buildTutorSelect(name,selId){
-    var s=document.createElement("select"); s.name=name;
-    s.appendChild(opt("","— ติวเตอร์ —",!selId));
-    tutors.forEach(function(t){
-      var o=opt(t.id,t.name,String(t.id)===String(selId)); s.appendChild(o);
-    });
-    s.style.fontWeight="700";
-    return s;
+  function hexToRgba(hex,a){
+    var h=(hex||"").replace("#","");
+    if(h.length===3) h=h[0]+h[0]+h[1]+h[1]+h[2]+h[2];
+    var n=parseInt(h,16);
+    if(isNaN(n)||h.length!==6) return "";
+    return "rgba("+((n>>16)&255)+","+((n>>8)&255)+","+(n&255)+","+a+")";
+  }
+  function roomClassId(room,time){
+    var r=roomById[room]; if(!r) return "";
+    return (parseInt(time,10)<=3 ? r.morning_class : r.afternoon_class) || "";
   }
 
-  function colorTutorSelect(s){
-    var t=tutorById[s.value];
-    s.style.color=t?t.color:"#0f172a";
+  function tintCell(td,tutorSel){
+    var t=tutorById[tutorSel.value];
+    if(t){
+      td.style.background=hexToRgba(t.color,0.20)||"#fdfaf0";
+      tutorSel.style.color=t.color;
+    } else {
+      td.style.background="#fdfaf0";
+      tutorSel.style.color="#0f172a";
+    }
   }
 
   function build(td){
@@ -130,85 +142,55 @@
     var key=td.getAttribute("data-key");
     var ex=existing[key]||{};
     var prefix="cell_"+room+"_"+time+"_";
-    var defClass=(roomById[room]&&roomById[room].default_class)||"";
-    var curClass=ex.class_id||defClass||"";
+    var classId=roomClassId(room,time);
+    var cls=classById[classId];
 
-    // class select
-    var cls=document.createElement("select"); cls.name=prefix+"class";
-    cls.appendChild(opt("","— คลาส —",!curClass));
-    classes.forEach(function(c){ cls.appendChild(opt(c.id,c.name,String(c.id)===String(curClass))); });
+    if(!cls){
+      var nl=document.createElement("div"); nl.className="nolink"; nl.textContent="ยังไม่ผูกคลาส";
+      td.appendChild(nl);
+      return;
+    }
 
-    // subject/template select
-    var tmpl=document.createElement("select"); tmpl.name=prefix+"template";
+    var grade=document.createElement("div"); grade.className="grade"; grade.textContent=cls.grade||"";
+    var controls=document.createElement("div"); controls.className="controls";
 
-    // grade
-    var grade=document.createElement("input"); grade.type="text"; grade.name=prefix+"grade";
-    grade.placeholder="ระดับชั้น"; grade.value=ex.grade||"";
-
-    // hidden subject snapshot
-    var subj=document.createElement("input"); subj.type="hidden"; subj.name=prefix+"subject"; subj.value=ex.subject||"";
+    // subject
+    var subj=document.createElement("select"); subj.name=prefix+"template";
+    subj.appendChild(opt("","— วิชา —",!ex.template_id));
+    cls.subjects.forEach(function(sj){
+      var o=opt(sj.template_id, sj.subject_name+" ("+sj.taught_count+")", String(sj.template_id)===String(ex.template_id));
+      o.setAttribute("data-tutor",sj.tutor_id||"");
+      subj.appendChild(o);
+    });
 
     // tutor
-    var tutor=buildTutorSelect(prefix+"tutor",ex.tutor_id||"");
+    var tutor=document.createElement("select"); tutor.name=prefix+"tutor"; tutor.className="tsel";
+    tutor.appendChild(opt("","ติวเตอร์",!ex.tutor_id));
+    tutors.forEach(function(t){
+      tutor.appendChild(opt(t.id,t.name,String(t.id)===String(ex.tutor_id)));
+    });
 
-    var hint=document.createElement("div"); hint.className="hint";
+    controls.appendChild(subj); controls.appendChild(tutor);
+    td.appendChild(grade); td.appendChild(controls);
 
-    var cf=document.createElement("div"); cf.className="cf"; cf.textContent="⚠ ติวเตอร์ชนกัน";
-
-    td.appendChild(cls); td.appendChild(tmpl); td.appendChild(grade);
-    td.appendChild(tutor); td.appendChild(subj); td.appendChild(cf);
-
-    var ctrl={key:key,room:room,time:time,td:td,
-      els:{cls:cls,tmpl:tmpl,grade:grade,tutor:tutor,subj:subj,hint:hint}};
-    td.insertBefore(hint,cf);
+    var ctrl={key:key,room:room,time:time,td:td,tutor:tutor};
     cellControls.push(ctrl);
 
-    function fillTemplates(selTmplId,autoTutor){
-      tmpl.innerHTML="";
-      tmpl.appendChild(opt("","— วิชา —",!selTmplId));
-      var c=classById[cls.value];
-      if(c){ c.subjects.forEach(function(sj){
-        var label=sj.subject_name+" ("+sj.taught_count+")";
-        var o=opt(sj.template_id,label,String(sj.template_id)===String(selTmplId));
-        o.setAttribute("data-name",sj.subject_name);
-        o.setAttribute("data-tutor",sj.tutor_id||"");
-        tmpl.appendChild(o);
-      }); }
-      if(autoTutor) applyTemplate(true);
-    }
-    function applyTemplate(setTutor){
-      var o=tmpl.options[tmpl.selectedIndex];
-      subj.value=o?(o.getAttribute("data-name")||""):"";
+    subj.addEventListener("change",function(){
+      var o=subj.options[subj.selectedIndex];
       var tid=o?o.getAttribute("data-tutor"):"";
-      if(setTutor && tid){ tutor.value=tid; colorTutorSelect(tutor); }
-      hint.textContent = (subj.value? "วิชา: "+subj.value : "");
-      recalcConflicts();
-    }
-
-    cls.addEventListener("change",function(){
-      var c=classById[cls.value];
-      grade.value=c?c.grade:"";
-      fillTemplates("",false);
-      // reset subject/tutor snapshot when class changes
-      subj.value="";
-      recalcConflicts();
+      if(tid && !tutor.value){ tutor.value=tid; }
+      tintCell(td,tutor); recalcConflicts();
     });
-    tmpl.addEventListener("change",function(){ applyTemplate(true); });
-    tutor.addEventListener("change",function(){ colorTutorSelect(tutor); recalcConflicts(); });
+    tutor.addEventListener("change",function(){ tintCell(td,tutor); recalcConflicts(); });
 
-    // initial fill
-    fillTemplates(ex.template_id||"",false);
-    if(!ex.grade && classById[cls.value]) grade.value=classById[cls.value].grade;
-    if(ex.subject) subj.value=ex.subject;
-    hint.textContent = subj.value? "วิชา: "+subj.value : "";
-    colorTutorSelect(tutor);
+    tintCell(td,tutor);
   }
 
   function recalcConflicts(){
     var byTime={};
     cellControls.forEach(function(c){
-      var tv=c.els.tutor.value;
-      if(!tv) return;
+      var tv=c.tutor.value; if(!tv) return;
       (byTime[c.time]=byTime[c.time]||{});
       (byTime[c.time][tv]=byTime[c.time][tv]||[]).push(c);
     });

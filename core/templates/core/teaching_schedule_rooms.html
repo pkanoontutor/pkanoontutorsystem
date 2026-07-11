@@ -1,0 +1,61 @@
+{% extends "core/base.html" %}
+{% block title %}ตั้งค่าห้อง — ผูกคลาส{% endblock %}
+
+{% block head %}
+<style>
+  .rm-wrap{max-width:820px;margin:0 auto;display:grid;gap:16px;}
+  .rm-card{background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:18px;box-shadow:0 4px 10px rgba(0,0,0,.06);}
+  .rm-row{display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid #f1f5f9;}
+  .rm-row:last-child{border-bottom:0;}
+  .rm-head{font-weight:700;font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:.04em;}
+  .rm-name{font-weight:700;display:flex;align-items:center;gap:8px;}
+  .dot{width:16px;height:16px;border-radius:5px;border:1px solid rgba(0,0,0,.1);}
+  select{width:100%;box-sizing:border-box;padding:9px 11px;border:1px solid #cbd5e1;border-radius:10px;font-size:14px;font-family:inherit;background:#fff;}
+  .sbtn{border:0;border-radius:10px;padding:11px 16px;font-weight:700;cursor:pointer;font-size:14px;font-family:inherit;
+    display:inline-flex;align-items:center;gap:6px;text-decoration:none;}
+  .sbtn.green{background:#16a34a;color:#fff}.sbtn.soft{background:#f1f5f9;color:#0f172a;border:1px solid #cbd5e1}
+  @media(max-width:620px){.rm-row{grid-template-columns:1fr}}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="rm-wrap">
+  <div class="rm-card">
+    <h2 style="margin:0 0 4px;">🏫 ตั้งค่าห้อง — ผูกคลาสตามรอบเวลา</h2>
+    <p style="color:#64748b;margin:0 0 14px;font-size:14px;">แต่ละห้องจะมี 1 คลาสในรอบเช้า (08.30–12.30) และอีก 1 คลาสในรอบบ่าย (13.30–17.30) — ตอนจัดตารางจะเลือกได้แค่วิชา/ติวเตอร์ (ชื่อคลาสไม่แสดงบนรูป)</p>
+    <form method="post">
+      {% csrf_token %}
+      <div class="rm-row">
+        <div class="rm-head">ห้อง</div>
+        <div class="rm-head">คลาสรอบเช้า</div>
+        <div class="rm-head">คลาสรอบบ่าย</div>
+      </div>
+      {% for r in rooms %}
+        <div class="rm-row">
+          <div class="rm-name"><span class="dot" style="background:{{ r.header_color }};"></span>{{ r.name }}</div>
+          <div>
+            <select name="room_{{ r.id }}_morning">
+              <option value="">— ไม่ผูก —</option>
+              {% for c in classes %}
+                <option value="{{ c.id }}" {% if r.morning_class_id == c.id %}selected{% endif %}>{{ c.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div>
+            <select name="room_{{ r.id }}_afternoon">
+              <option value="">— ไม่ผูก —</option>
+              {% for c in classes %}
+                <option value="{{ c.id }}" {% if r.afternoon_class_id == c.id %}selected{% endif %}>{{ c.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+      {% endfor %}
+      <div style="display:flex;gap:8px;margin-top:16px;">
+        <button class="sbtn green" type="submit">💾 บันทึกการผูกคลาส</button>
+        <a class="sbtn soft" href="/teaching-schedule/">← กลับหน้าตาราง</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

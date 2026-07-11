@@ -1,0 +1,53 @@
+{% extends "core/base.html" %}
+{% block title %}ตารางเรียน (สร้างรูป){% endblock %}
+
+{% block head %}
+<style>
+  .tl-wrap{max-width:900px;margin:0 auto;display:grid;gap:16px;}
+  .tl-card{background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:18px;box-shadow:0 4px 10px rgba(0,0,0,.06);}
+  .tl-bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+  .tl-bar input[type=date]{padding:9px 12px;border:1px solid #cbd5e1;border-radius:10px;font-size:15px;}
+  .sbtn{border:0;border-radius:10px;padding:10px 15px;font-weight:700;cursor:pointer;font-size:14px;
+    display:inline-flex;align-items:center;gap:6px;text-decoration:none;font-family:inherit;}
+  .sbtn.blue{background:#1d4ed8;color:#fff}.sbtn.soft{background:#f1f5f9;color:#0f172a;border:1px solid #cbd5e1}
+  .tl-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 14px;
+    border:1px solid #eef2f7;border-radius:12px;margin-bottom:8px;}
+  .tl-row .d{font-weight:700;font-size:16px;}
+  .tl-row .m{font-size:13px;color:#64748b;}
+  .empty{color:#64748b;text-align:center;padding:20px;}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="tl-wrap">
+  <div class="tl-card">
+    <h2 style="margin:0 0 12px;">🗓️ ตารางเรียน — สร้างเป็นรูปภาพ</h2>
+    <form method="post" class="tl-bar">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="create">
+      <label>สร้าง/เปิดตารางของวันที่:</label>
+      <input type="date" name="date" value="{{ today|date:'Y-m-d' }}" required>
+      <button class="sbtn blue" type="submit">+ เปิดหน้าจัดตาราง</button>
+      <a class="sbtn soft" href="/teaching-schedule/exam-dates/">⏱️ ตั้งวันสอบ (countdown)</a>
+    </form>
+  </div>
+
+  <div class="tl-card">
+    <h3 style="margin:0 0 12px;">ประวัติตารางที่เคยทำ (ย้อนดู / คัดลอกต่อได้)</h3>
+    {% for s in schedules %}
+      <div class="tl-row">
+        <div>
+          <div class="d">{{ s.thai_date }}</div>
+          <div class="m">กรอกแล้ว {{ s.filled_count }} ช่อง</div>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <a class="sbtn soft" href="/teaching-schedule/edit/?date={{ s.date|date:'Y-m-d' }}">✏️ แก้ไข</a>
+          <a class="sbtn blue" href="/teaching-schedule/image/{{ s.id }}/">🖼️ ดูรูป</a>
+        </div>
+      </div>
+    {% empty %}
+      <div class="empty">ยังไม่มีตารางที่บันทึกไว้ — สร้างอันแรกจากด้านบนได้เลย</div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

@@ -1543,6 +1543,7 @@ class TutorPayrollEntry(models.Model):
 class TeachingTutor(models.Model):
     name = models.CharField("ชื่อติวเตอร์", max_length=120, unique=True)
     phone = models.CharField("เบอร์ติดต่อ", max_length=50, blank=True)
+    color = models.CharField("สีประจำตัว (ใช้บนตารางเรียน)", max_length=20, default="#1d4ed8")
     note = models.TextField("หมายเหตุ", blank=True)
     is_active = models.BooleanField("ใช้งาน", default=True)
     created_at = models.DateTimeField("วันที่สร้าง", default=timezone.now)
@@ -1949,3 +1950,100 @@ class AdminToolCard(models.Model):
             "order": self.order,
         }
 
+
+
+# =========================================================
+# Teaching schedule (weekly class timetable image generator)
+# =========================================================
+class ScheduleRoom(models.Model):
+    """A physical room shown as a column on the schedule (named after fruits).
+
+    Each room may be bound to a default TutoringClass so the editor can
+    auto-suggest subjects/tutors/grade for that room; the class name itself is
+    never shown on the generated image.
+    """
+    name = models.CharField("ชื่อห้อง", max_length=120)
+    header_color = models.CharField("สีหัวคอลัมน์", max_length=20, default="#fdf3bf")
+    display_order = models.PositiveIntegerField("ลำดับคอลัมน์", default=1)
+    default_class = models.ForeignKey(
+        "TutoringClass", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="default_schedule_rooms", verbose_name="ผูกกับคลาส (ไม่แสดงชื่อ)",
+    )
+    is_active = models.BooleanField("ใช้งาน", default=True)
+
+    class Meta:
+        verbose_name = "Schedule Room"
+        verbose_name_plural = "Schedule Rooms"
+        ordering = ("display_order", "id")
+
+    def __str__(self) -> str:
+        return self.name
+
+
+class ScheduleExamCountdown(models.Model):
+    """An exam date shown as a countdown badge in the schedule footer."""
+    grade_label = models.CharField("ระดับชั้น", max_length=40)  # e.g. "ม.1"
+    exam_date = models.DateField("วันสอบ")
+    note = models.CharField("หมายเหตุ (เช่น รอบแรก - ห้องพิเศษ)", max_length=120, blank=True)
+    display_order = models.PositiveIntegerField("ลำดับ", default=1)
+    is_active = models.BooleanField("แสดงบนตาราง", default=True)
+
+    class Meta:
+        verbose_name = "Schedule Exam Countdown"
+        verbose_name_plural = "Schedule Exam Countdowns"
+        ordering = ("display_order", "exam_date", "id")
+
+    def __str__(self) -> str:
+        return f"{self.grade_label} - {self.exam_date}"
+
+
+class DailySchedule(models.Model):
+    """One day's timetable. The rendered image shows the Thai date derived from it."""
+    date = models.DateField("วันที่", unique=True)
+    title_note = models.CharField("ข้อความหัวเรื่องเพิ่มเติม", max_length=200, blank=True)
+    created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Daily Schedule"
+        verbose_name_plural = "Daily Schedules"
+        ordering = ("-date",)
+
+    def __str__(self) -> str:
+        return f"ตารางเรียน {self.date.isoformat()}"
+
+
+class DailyScheduleCell(models.Model):
+    """A single cell (room x time slot) inside a DailySchedule."""
+    schedule = models.ForeignKey(DailySchedule, on_delete=models.CASCADE, related_name="cells")
+    room = models.ForeignKey(ScheduleRoom, on_delete=models.CASCADE, related_name="cells")
+    time_index = models.PositiveIntegerField("ลำดับคาบ")  # index into TEACHING_SCHEDULE_SLOTS
+
+    tutoring_class = models.ForeignKey(
+        "TutoringClass", on_delete=models.SET_NULL, null=True, blank=True, related_name="schedule_cells",
+    )
+    subject_template = models.ForeignKey(
+        "TeachingClassSubjectTemplate", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="schedule_cells",
+    )
+    tutor = models.ForeignKey(
+        "TeachingTutor", on_delete=models.SET_NULL, null=True, blank=True, related_name="schedule_cells",
+    )
+    # Snapshot / override text shown on the image
+    grade_label = models.CharField("ระดับชั้น", max_length=40, blank=True)
+    subject_label = models.CharField("วิชา", max_length=120, blank=True)
+
+    class Meta:
+        verbose_name = "Daily Schedule Cell"
+        verbose_name_plural = "Daily Schedule Cells"
+        ordering = ("time_index", "room__display_order")
+        constraints = [
+            models.UniqueConstraint(fields=["schedule", "room", "time_index"], name="uniq_schedule_cell"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.schedule_id} r{self.room_id} t{self.time_index}"
+
+    @property
+    def is_empty(self) -> bool:
+        return not (self.grade_label or self.subject_label or self.tutor_id)

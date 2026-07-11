@@ -5254,6 +5254,7 @@ def learning_record(request: HttpRequest) -> HttpResponse:
 _ADMIN_TOOL_DEFAULTS = [
     ("private", "c-sky",   "🚀", "Super Dashboard", "Monitor นักเรียน รายรับรายจ่าย ที่นั่ง ชีท คอร์สใกล้ครบ และงานปรินท์ในหน้าเดียว", "/super-dashboard/"),
     ("private", "c-lilac", "👩‍🏫", "อัปเดตการสอนติวเตอร์", "ตั้งค่า template วิชา เลือกติวเตอร์ประจำสัปดาห์ และเปิดหน้าบันทึกการสอน", "/teaching/weekly-setup/"),
+    ("private", "c-sand", "🗓️", "สร้างตารางเรียน (รูปภาพ)", "จัดตารางเรียนรายวันแบบ grid ผูกกับติวเตอร์ประจำสัปดาห์และระบบนับวิชา แล้วสร้างเป็นรูปพร้อมส่ง", "/teaching-schedule/"),
     ("private", "c-teal",  "📚", "Learning Record", "ดูประวัติวิชาเรียนราย Class ว่าแต่ละวิชาเรียนไปแล้วกี่ครั้ง ล่าสุดเรียนวันไหน ใครสอน และถึงชีทหน้า/ข้อไหน", "/learning-record/"),
     ("private", "c-sage",  "🧾", "รับชำระเงิน / ใบเสร็จ", "ออกใบเสร็จ รับชำระค่าคอร์ส และสร้าง Enrollment ได้ในหน้าเดียว", "/course-payments/"),
     ("private", "c-clay",  "🔁", "ระบบสร้างใบแจ้งต่อคอร์ส", "ดูคอร์สที่ใกล้ครบ สร้างใบแจ้งต่อคอร์ส พร้อม QR และ Copy Image ส่งผู้ปกครอง", "/course-renewal-notices/"),
@@ -7117,3 +7118,317 @@ def test_score_import_template(request: HttpRequest, round_id: int) -> HttpRespo
     response = HttpResponse(buffer.getvalue(), content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
     response["Content-Disposition"] = f'attachment; filename="test_score_import_template_{test_round.id}.xlsx"'
     return response
+
+
+# =========================================================
+# Teaching schedule image generator
+# =========================================================
+TEACHING_SCHEDULE_SLOTS = [
+    {"label": "08.30 - 09.30", "is_break": False},
+    {"label": "09.30 - 10.30", "is_break": False},
+    {"label": "10.30 - 11.30", "is_break": False},
+    {"label": "11.30 - 12.30", "is_break": False},
+    {"label": "12.30 - 13.30", "is_break": True},
+    {"label": "13.30 - 14.30", "is_break": False},
+    {"label": "14.30 - 15.30", "is_break": False},
+    {"label": "15.30 - 16.30", "is_break": False},
+    {"label": "16.30 - 17.30", "is_break": False},
+]
+
+_THAI_DAYS = ["จันทร์", "อังคาร", "พุธ", "พฤหัสบดี", "ศุกร์", "เสาร์", "อาทิตย์"]
+_THAI_MONTHS_ABBR = ["", "ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.",
+                     "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."]
+
+_DEFAULT_SCHEDULE_ROOMS = [
+    ("ห้องทุเรียนหมอนทอง", "#fdf3bf"),
+    ("ห้องมังคุดคัด", "#efe1f5"),
+    ("ห้องมะม่วงเขียวเสวย", "#dcefc9"),
+    ("ห้องแตงโมอินทรา", "#f8d7de"),
+    ("ห้องมะพร้าว", "#ddd6ca"),
+]
+
+
+def _thai_schedule_date(d: date) -> str:
+    """e.g. date(2026,7,11) -> 'เสาร์ 11 ก.ค. 2569'."""
+    return f"{_THAI_DAYS[d.weekday()]} {d.day} {_THAI_MONTHS_ABBR[d.month]} {d.year + 543}"
+
+
+def _thai_date_short_be(d: date) -> str:
+    """e.g. date(2027,2,20) -> '20 ก.พ. 70' (2-digit Buddhist year)."""
+    return f"{d.day} {_THAI_MONTHS_ABBR[d.month]} {(d.year + 543) % 100:02d}"
+
+
+def _grade_from_class_name(name: str) -> str:
+    """Extract a grade label like 'ม.1' / 'ป.6' from a class name."""
+    m = re.search(r"(ม\.|ป\.)\s*(\d+)", name or "")
+    return f"{m.group(1)}{m.group(2)}" if m else ""
+
+
+def _seed_schedule_rooms() -> None:
+    from .models import ScheduleRoom
+    if ScheduleRoom.objects.exists():
+        return
+    with transaction.atomic():
+        for i, (name, color) in enumerate(_DEFAULT_SCHEDULE_ROOMS):
+            ScheduleRoom.objects.create(
+                name=name, header_color=color, display_order=(i + 1) * 10, is_active=True,
+            )
+
+
+def _schedule_taught_counts(template_ids) -> dict:
+    """Return {template_id: taught_count} from learning-record teaching updates."""
+    counts = {tid: 0 for tid in template_ids}
+    if not template_ids:
+        return counts
+    rows = (
+        TeachingProgressUpdate.objects
+        .filter(assignment__subject_template_id__in=template_ids, no_teaching=False)
+        .values("assignment__subject_template_id")
+        .annotate(n=Count("id"))
+    )
+    for r in rows:
+        counts[r["assignment__subject_template_id"]] = r["n"]
+    return counts
+
+
+def _schedule_class_data(week_start: date) -> list:
+    """Classes -> subjects (with taught count and the tutor assigned for the week)."""
+    templates = list(
+        TeachingClassSubjectTemplate.objects
+        .select_related("tutoring_class")
+        .filter(is_active=True, tutoring_class__is_active=True)
+        .order_by("tutoring_class__name", "display_order", "subject_name")
+    )
+    taught = _schedule_taught_counts([t.id for t in templates])
+
+    week_tutor = {}
+    for a in (
+        TeachingWeeklyAssignment.objects
+        .filter(week_start_date=week_start, tutor__isnull=False)
+        .values("subject_template_id", "tutor_id")
+    ):
+        week_tutor[a["subject_template_id"]] = a["tutor_id"]
+
+    classes = OrderedDict()
+    for t in templates:
+        c = t.tutoring_class
+        bucket = classes.setdefault(c.id, {
+            "id": c.id,
+            "name": c.name,
+            "grade": _grade_from_class_name(c.name),
+            "subjects": [],
+        })
+        bucket["subjects"].append({
+            "template_id": t.id,
+            "subject_name": t.subject_name,
+            "taught_count": taught.get(t.id, 0),
+            "tutor_id": week_tutor.get(t.id),
+        })
+    return list(classes.values())
+
+
+def _annotate_schedule_grid(schedule):
+    """Return (grid, has_conflict). Marks conflict on cells whose tutor appears
+    more than once within the same time row."""
+    from .models import ScheduleRoom
+    rooms = list(ScheduleRoom.objects.filter(is_active=True))
+    cells = list(schedule.cells.select_related("tutor", "room"))
+    by_pos = {(c.room_id, c.time_index): c for c in cells}
+
+    grid = []
+    has_conflict = False
+    for ti, slot in enumerate(TEACHING_SCHEDULE_SLOTS):
+        row = {"index": ti, "label": slot["label"], "is_break": slot["is_break"], "rooms": []}
+        tutor_seen = {}
+        for r in rooms:
+            c = by_pos.get((r.id, ti))
+            if c and c.tutor_id:
+                tutor_seen[c.tutor_id] = tutor_seen.get(c.tutor_id, 0) + 1
+        for r in rooms:
+            c = by_pos.get((r.id, ti))
+            conflict = bool(c and c.tutor_id and tutor_seen.get(c.tutor_id, 0) > 1)
+            if conflict:
+                has_conflict = True
+            row["rooms"].append({
+                "room": r,
+                "cell": c,
+                "conflict": conflict,
+                "tutor_color": (c.tutor.color if c and c.tutor_id else ""),
+                "tutor_name": (c.tutor.name if c and c.tutor_id else ""),
+            })
+        grid.append(row)
+    return grid, has_conflict
+
+
+def teaching_schedule_list(request: HttpRequest) -> HttpResponse:
+    """History of daily schedules + quick create."""
+    from .models import DailySchedule
+    _seed_schedule_rooms()
+
+    if request.method == "POST" and (request.POST.get("action") == "create"):
+        d = _parse_date(request.POST.get("date"))
+        DailySchedule.objects.get_or_create(date=d)
+        return redirect(f"/teaching-schedule/edit/?date={d.isoformat()}")
+
+    schedules = list(DailySchedule.objects.all()[:60])
+    for s in schedules:
+        s.thai_date = _thai_schedule_date(s.date)
+        s.filled_count = s.cells.exclude(subject_label="", grade_label="").count()
+    return render(request, "core/teaching_schedule_list.html", {
+        "schedules": schedules,
+        "today": timezone.localdate(),
+    })
+
+
+def teaching_schedule_editor(request: HttpRequest) -> HttpResponse:
+    from .models import (
+        DailySchedule, ScheduleRoom, TeachingTutor, DailyScheduleCell,
+    )
+    _seed_schedule_rooms()
+
+    d = _parse_date(request.GET.get("date") or request.POST.get("date"))
+    schedule, _created = DailySchedule.objects.get_or_create(date=d)
+    week_start, _week_end = _teaching_week_range(d)
+    rooms = list(ScheduleRoom.objects.filter(is_active=True))
+
+    if request.method == "POST":
+        action = (request.POST.get("action") or "").strip()
+
+        if action == "carry_forward":
+            prev = DailySchedule.objects.filter(date__lt=d).order_by("-date").first()
+            if prev:
+                with transaction.atomic():
+                    schedule.cells.all().delete()
+                    for pc in prev.cells.all():
+                        DailyScheduleCell.objects.create(
+                            schedule=schedule, room_id=pc.room_id, time_index=pc.time_index,
+                            tutoring_class_id=pc.tutoring_class_id,
+                            subject_template_id=pc.subject_template_id,
+                            tutor_id=pc.tutor_id,
+                            grade_label=pc.grade_label, subject_label=pc.subject_label,
+                        )
+            return redirect(f"/teaching-schedule/edit/?date={d.isoformat()}")
+
+        if action == "save":
+            with transaction.atomic():
+                schedule.title_note = (request.POST.get("title_note") or "").strip()
+                schedule.save()
+                schedule.cells.all().delete()
+                for r in rooms:
+                    for ti, slot in enumerate(TEACHING_SCHEDULE_SLOTS):
+                        if slot["is_break"]:
+                            continue
+                        prefix = f"cell_{r.id}_{ti}_"
+                        class_id = (request.POST.get(prefix + "class") or "").strip()
+                        template_id = (request.POST.get(prefix + "template") or "").strip()
+                        tutor_id = (request.POST.get(prefix + "tutor") or "").strip()
+                        grade = (request.POST.get(prefix + "grade") or "").strip()
+                        subject = (request.POST.get(prefix + "subject") or "").strip()
+                        if not (grade or subject or tutor_id):
+                            continue
+                        DailyScheduleCell.objects.create(
+                            schedule=schedule, room=r, time_index=ti,
+                            tutoring_class_id=class_id or None,
+                            subject_template_id=template_id or None,
+                            tutor_id=tutor_id or None,
+                            grade_label=grade, subject_label=subject,
+                        )
+            return redirect(f"/teaching-schedule/image/{schedule.id}/")
+
+    class_data = _schedule_class_data(week_start)
+    tutors = list(TeachingTutor.objects.filter(is_active=True).order_by("name"))
+    existing = {(c.room_id, c.time_index): c for c in schedule.cells.all()}
+
+    existing_map = {}
+    for (room_id, ti), c in existing.items():
+        existing_map[f"{room_id}_{ti}"] = {
+            "class_id": c.tutoring_class_id,
+            "template_id": c.subject_template_id,
+            "tutor_id": c.tutor_id,
+            "grade": c.grade_label,
+            "subject": c.subject_label,
+        }
+
+    editor_rows = []
+    for ti, slot in enumerate(TEACHING_SCHEDULE_SLOTS):
+        cells = []
+        for r in rooms:
+            cells.append({"room": r, "cell": existing.get((r.id, ti))})
+        editor_rows.append({
+            "index": ti, "label": slot["label"], "is_break": slot["is_break"], "cells": cells,
+        })
+
+    has_previous = DailySchedule.objects.filter(date__lt=d).exists()
+
+    return render(request, "core/teaching_schedule_editor.html", {
+        "schedule": schedule,
+        "thai_date": _thai_schedule_date(d),
+        "date": d,
+        "rooms": rooms,
+        "editor_rows": editor_rows,
+        "tutors": tutors,
+        "has_previous": has_previous,
+        "class_data_json": json.dumps(class_data, ensure_ascii=False),
+        "tutors_json": json.dumps(
+            [{"id": t.id, "name": t.name, "color": t.color} for t in tutors],
+            ensure_ascii=False,
+        ),
+        "existing_json": json.dumps(existing_map, ensure_ascii=False),
+    })
+
+
+def teaching_schedule_image(request: HttpRequest, pk: int) -> HttpResponse:
+    from .models import DailySchedule, ScheduleRoom, ScheduleExamCountdown
+    schedule = get_object_or_404(DailySchedule, pk=pk)
+    rooms = list(ScheduleRoom.objects.filter(is_active=True))
+    grid, has_conflict = _annotate_schedule_grid(schedule)
+
+    countdowns = []
+    for e in ScheduleExamCountdown.objects.filter(is_active=True):
+        countdowns.append({
+            "grade_label": e.grade_label,
+            "days": (e.exam_date - schedule.date).days,
+            "exam_date_th": _thai_date_short_be(e.exam_date),
+            "note": e.note,
+        })
+
+    footer_note = countdowns[0]["note"] if (countdowns and countdowns[0]["note"]) else ""
+
+    return render(request, "core/teaching_schedule_image.html", {
+        "schedule": schedule,
+        "thai_date": _thai_schedule_date(schedule.date),
+        "rooms": rooms,
+        "grid": grid,
+        "has_conflict": has_conflict,
+        "countdowns": countdowns,
+        "footer_note": footer_note,
+    })
+
+
+def teaching_schedule_exam_dates(request: HttpRequest) -> HttpResponse:
+    from .models import ScheduleExamCountdown
+    if request.method == "POST":
+        action = (request.POST.get("action") or "").strip()
+        if action == "add":
+            grade = (request.POST.get("grade_label") or "").strip()
+            exam_date = request.POST.get("exam_date")
+            if grade and exam_date:
+                ScheduleExamCountdown.objects.create(
+                    grade_label=grade,
+                    exam_date=_parse_date(exam_date),
+                    note=(request.POST.get("note") or "").strip(),
+                    display_order=(ScheduleExamCountdown.objects.count() + 1) * 10,
+                )
+        elif action == "delete":
+            ScheduleExamCountdown.objects.filter(id=request.POST.get("id")).delete()
+        return redirect("/teaching-schedule/exam-dates/")
+
+    items = list(ScheduleExamCountdown.objects.all())
+    today = timezone.localdate()
+    for it in items:
+        it.days_to_go = (it.exam_date - today).days
+        it.exam_date_th = _thai_date_short_be(it.exam_date)
+    return render(request, "core/teaching_schedule_exam_dates.html", {
+        "items": items,
+        "today": today,
+    })

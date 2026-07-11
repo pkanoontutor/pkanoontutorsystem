@@ -1,0 +1,166 @@
+{% load static %}
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>ตารางเรียน {{ thai_date }}</title>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    *{box-sizing:border-box}
+    :root{--font:"IBM Plex Sans Thai",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+    body{margin:0;background:#e6f4fb;font-family:var(--font);color:#1f2937}
+    .wrap{max-width:1360px;margin:0 auto;padding:16px;}
+    .toolbar{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-bottom:14px;}
+    .btn{border:0;border-radius:12px;padding:11px 16px;font-weight:600;cursor:pointer;
+      background:#1d4ed8;color:#fff;text-decoration:none;display:inline-flex;align-items:center;gap:6px;font-family:inherit;}
+    .btn.soft{background:#fff;color:#0f172a;border:1px solid #cbd5e1}
+    .btn.green{background:#16a34a}
+    .warn-banner{max-width:1280px;margin:0 auto 12px;background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;
+      border-radius:12px;padding:10px 14px;font-weight:600;text-align:center;}
+
+    /* ===== The exportable card ===== */
+    .sched{width:1280px;max-width:100%;margin:0 auto;background:#fff;border:6px solid #f2a93b;
+      border-radius:26px;padding:22px 26px 26px;}
+    .head{text-align:center;position:relative;}
+    .brand{display:flex;align-items:center;justify-content:center;gap:10px;}
+    .brand img{height:52px;object-fit:contain;}
+    .brand .name{font-size:34px;font-weight:700;color:#38b6ff;letter-spacing:.3px;}
+    .brand .sub{font-size:15px;color:#5b8f2f;font-weight:600;align-self:flex-start;margin-top:6px;}
+    .title{font-size:30px;font-weight:700;color:#e23b3b;margin:6px 0 16px;}
+
+    table.grid{width:100%;border-collapse:separate;border-spacing:7px;}
+    table.grid th,table.grid td{border-radius:12px;}
+    .time-h{background:transparent;width:118px;}
+    .room-h{padding:12px 8px;font-size:17px;font-weight:700;color:#3f3a2f;text-align:center;
+      box-shadow:0 2px 4px rgba(0,0,0,.06);}
+    .time-c{background:#d98c1f;color:#fff;font-weight:700;font-size:16px;text-align:center;padding:12px 6px;white-space:nowrap;}
+    .cell{background:#fdf6c9;padding:10px 8px;text-align:center;font-size:15px;font-weight:500;
+      min-height:52px;height:52px;line-height:1.35;color:#3a3527;}
+    .cell .g{font-weight:700}
+    .cell .tutor{font-weight:700}
+    .cell.empty{background:#fdf6c9;}
+    .row-break td.cell{background:#8fd3f4;}
+    .cell.conflict{outline:3px solid #dc2626;position:relative;}
+    .cell.conflict::after{content:"⚠";position:absolute;top:2px;right:5px;font-size:13px;color:#dc2626;}
+
+    .footer{margin-top:18px;display:flex;align-items:center;justify-content:center;gap:26px;flex-wrap:wrap;}
+    .foot-note{font-size:20px;font-weight:700;color:#3a3527;text-align:center;line-height:1.35;max-width:360px;}
+    .cd{display:flex;align-items:center;gap:10px;}
+    .cd .grade{font-size:26px;font-weight:700;color:#111827;}
+    .cd .badge{background:#e11d2a;color:#fff;border-radius:12px;padding:6px 14px;text-align:center;
+      box-shadow:0 4px 0 rgba(0,0,0,.18);}
+    .cd .badge .n{font-size:26px;font-weight:700;line-height:1;}
+    .cd .badge .lbl{font-size:12px;font-weight:700;letter-spacing:.14em;}
+    .cd .date{font-size:15px;font-weight:600;color:#374151;margin-top:2px;text-align:center;}
+    .tagline{text-align:center;color:#f2994a;font-weight:600;font-size:18px;margin-top:16px;font-style:italic;}
+    @media(max-width:1320px){.sched{width:100%}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="toolbar">
+      <a class="btn soft" href="/teaching-schedule/edit/?date={{ schedule.date|date:'Y-m-d' }}">← แก้ไขตาราง</a>
+      <a class="btn soft" href="/teaching-schedule/">📅 ตารางทั้งหมด</a>
+      <button class="btn green" type="button" onclick="copyImage()">Copy Image</button>
+      <button class="btn" type="button" onclick="downloadImage()">Download PNG</button>
+      <button class="btn soft" type="button" onclick="openImage()">Open Image</button>
+    </div>
+
+    {% if has_conflict %}
+      <div class="warn-banner">⚠ มีติวเตอร์ถูกจัดสอนชนกันในช่วงเวลาเดียวกัน (ช่องที่ขอบแดง) — โปรดตรวจสอบก่อนส่ง</div>
+    {% endif %}
+
+    <div class="sched" id="schedCard">
+      <div class="head">
+        <div class="brand">
+          <span class="sub">สถาบันกวดวิชา</span>
+          <img src="{% static 'core/logo1.png' %}" alt="logo" onerror="this.style.display='none'">
+          <span class="name">พี่ขนุนติวเตอร์</span>
+        </div>
+        <div class="title">ตารางเรียน {{ thai_date }}</div>
+      </div>
+
+      <table class="grid">
+        <thead>
+          <tr>
+            <th class="time-h"></th>
+            {% for room in rooms %}
+              <th class="room-h" style="background:{{ room.header_color }};">{{ room.name }}</th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in grid %}
+            <tr class="{% if row.is_break %}row-break{% endif %}">
+              <td class="time-c">{{ row.label }}</td>
+              {% for rc in row.rooms %}
+                {% if row.is_break %}
+                  <td class="cell"></td>
+                {% else %}
+                  <td class="cell {% if not rc.cell %}empty{% endif %} {% if rc.conflict %}conflict{% endif %}">
+                    {% if rc.cell %}
+                      {% if rc.cell.grade_label %}<span class="g">{{ rc.cell.grade_label }}</span>{% endif %}{% if rc.cell.subject_label %} / {{ rc.cell.subject_label }}{% endif %}{% if rc.tutor_name %} / <span class="tutor" style="color:{{ rc.tutor_color }};">{{ rc.tutor_name }}</span>{% endif %}
+                    {% endif %}
+                  </td>
+                {% endif %}
+              {% endfor %}
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      <div class="footer">
+        {% if countdowns %}
+          <div class="foot-note">{% if footer_note %}{{ footer_note }}{% else %}นับถอยหลังสู่วันสอบ{% endif %}</div>
+          {% for c in countdowns %}
+            <div class="cd">
+              <div>
+                <div class="grade">{{ c.grade_label }}</div>
+                <div class="date">{{ c.exam_date_th }}</div>
+              </div>
+              <div class="badge">
+                <div class="n">{{ c.days }}</div>
+                <div class="lbl">DAYS TO GO</div>
+              </div>
+            </div>
+          {% endfor %}
+        {% endif %}
+      </div>
+
+      <div class="tagline">Where we learn to grow up with smile :)</div>
+    </div>
+  </div>
+
+  <script>
+    async function makeCanvas(){
+      const el=document.getElementById("schedCard");
+      return await html2canvas(el,{scale:2,backgroundColor:"#ffffff",useCORS:true});
+    }
+    async function downloadImage(){
+      const c=await makeCanvas();
+      const a=document.createElement("a");
+      a.href=c.toDataURL("image/png");
+      a.download="schedule-{{ schedule.date|date:'Y-m-d' }}.png";
+      a.click();
+    }
+    async function openImage(){
+      const c=await makeCanvas();
+      const w=window.open();
+      w.document.write('<img src="'+c.toDataURL("image/png")+'" style="max-width:100%">');
+    }
+    async function copyImage(){
+      try{
+        const c=await makeCanvas();
+        c.toBlob(async(b)=>{
+          await navigator.clipboard.write([new ClipboardItem({"image/png":b})]);
+          alert("Copy รูปตารางแล้วครับ");
+        });
+      }catch(e){ alert("Browser นี้อาจไม่รองรับ Copy Image ใช้ Download PNG แทนครับ"); }
+    }
+  </script>
+</body>
+</html>

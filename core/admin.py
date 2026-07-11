@@ -26,6 +26,10 @@ from .models import (
     CoursePayment,
     CourseRenewalNotice,
     TeachingTutor,
+    ScheduleRoom,
+    ScheduleExamCountdown,
+    DailySchedule,
+    DailyScheduleCell,
     TeachingClassSubjectTemplate,
     TeachingWeeklyAssignment,
     TeachingProgressUpdate,
@@ -719,7 +723,8 @@ class CoursePaymentAdmin(admin.ModelAdmin):
 # =========================================================
 @admin.register(TeachingTutor)
 class TeachingTutorAdmin(admin.ModelAdmin):
-    list_display = ("name", "phone", "is_active", "updated_at")
+    list_display = ("name", "phone", "color", "is_active", "updated_at")
+    list_editable = ("color",)
     search_fields = ("name", "phone")
     list_filter = ("is_active",)
     ordering = ("name",)
@@ -939,4 +944,32 @@ class AdminToolCardAdmin(admin.ModelAdmin):
     list_editable = ("section", "order")
     search_fields = ("name", "desc", "url")
     ordering = ("section", "order", "id")
+
+
+@admin.register(ScheduleRoom)
+class ScheduleRoomAdmin(admin.ModelAdmin):
+    list_display = ("name", "display_order", "header_color", "default_class", "is_active")
+    list_editable = ("display_order", "is_active")
+    autocomplete_fields = ("default_class",)
+    ordering = ("display_order", "id")
+
+
+@admin.register(ScheduleExamCountdown)
+class ScheduleExamCountdownAdmin(admin.ModelAdmin):
+    list_display = ("grade_label", "exam_date", "note", "display_order", "is_active")
+    list_editable = ("display_order", "is_active")
+    ordering = ("display_order", "exam_date")
+
+
+class DailyScheduleCellInline(admin.TabularInline):
+    model = DailyScheduleCell
+    extra = 0
+    autocomplete_fields = ("tutoring_class", "subject_template", "tutor")
+
+
+@admin.register(DailySchedule)
+class DailyScheduleAdmin(admin.ModelAdmin):
+    list_display = ("date", "title_note", "updated_at")
+    date_hierarchy = "date"
+    inlines = (DailyScheduleCellInline,)
 

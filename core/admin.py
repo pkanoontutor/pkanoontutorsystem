@@ -35,6 +35,7 @@ from .models import (
     TestSubject,
     TestParticipant,
     TestScore,
+    AdminToolCard,
 )
 
 
@@ -929,4 +930,13 @@ class TestScoreAdmin(admin.ModelAdmin):
     list_filter = ("subject__test_round", "subject")
     search_fields = ("participant__nickname", "participant__full_name", "subject__name")
     autocomplete_fields = ("participant", "subject")
+
+
+@admin.register(AdminToolCard)
+class AdminToolCardAdmin(admin.ModelAdmin):
+    list_display = ("name", "section", "url", "order", "icon", "color", "updated_at")
+    list_filter = ("section",)
+    list_editable = ("section", "order")
+    search_fields = ("name", "desc", "url")
+    ordering = ("section", "order", "id")
 

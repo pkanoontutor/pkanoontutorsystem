@@ -11,7 +11,7 @@ from io import BytesIO
 from django import forms
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
-from django.db.models import Count, Q, Sum
+from django.db.models import Count, Max, Q, Sum
 from django.http import JsonResponse, HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
@@ -5249,9 +5249,169 @@ def learning_record(request: HttpRequest) -> HttpResponse:
     })
 
 
+# Default cards seeded once into AdminToolCard the first time the page is opened.
+# Order here defines the initial display order (step 10).
+_ADMIN_TOOL_DEFAULTS = [
+    ("private", "c-sky",   "🚀", "Super Dashboard", "Monitor นักเรียน รายรับรายจ่าย ที่นั่ง ชีท คอร์สใกล้ครบ และงานปรินท์ในหน้าเดียว", "/super-dashboard/"),
+    ("private", "c-lilac", "👩‍🏫", "อัปเดตการสอนติวเตอร์", "ตั้งค่า template วิชา เลือกติวเตอร์ประจำสัปดาห์ และเปิดหน้าบันทึกการสอน", "/teaching/weekly-setup/"),
+    ("private", "c-teal",  "📚", "Learning Record", "ดูประวัติวิชาเรียนราย Class ว่าแต่ละวิชาเรียนไปแล้วกี่ครั้ง ล่าสุดเรียนวันไหน ใครสอน และถึงชีทหน้า/ข้อไหน", "/learning-record/"),
+    ("private", "c-sage",  "🧾", "รับชำระเงิน / ใบเสร็จ", "ออกใบเสร็จ รับชำระค่าคอร์ส และสร้าง Enrollment ได้ในหน้าเดียว", "/course-payments/"),
+    ("private", "c-clay",  "🔁", "ระบบสร้างใบแจ้งต่อคอร์ส", "ดูคอร์สที่ใกล้ครบ สร้างใบแจ้งต่อคอร์ส พร้อม QR และ Copy Image ส่งผู้ปกครอง", "/course-renewal-notices/"),
+    ("private", "c-teal",  "📦", "Sheet Inventory", "สร้างชีท จัดการ stock สแกน QR ตัด/นับชีท และดูชีทที่ต้องใช้ตามรายการสมัคร/ทดลองเรียน", "/sheet-inventory/"),
+    ("private", "c-sage",  "📤", "ระบบแจกชีท", "สแกน QR เพื่อแจกชีท ตัด stock ตอนกดบันทึก และดูประวัติ Sheet Allocation รายเด็ก/ราย class", "/sheet-allocation/"),
+    ("private", "c-teal",  "🖨️", "ระบบส่งปรินท์ชีท", "สร้างรายการรอปรินท์จาก Sheet Inventory และส่ง link ให้ร้านปรินท์เข้าดูโดยไม่ต้อง login", "/sheet-print-orders/"),
+    ("private", "c-sage",  "💰", "รายรับรายจ่าย", "บันทึกค่าใช้จ่าย ค่าติวเตอร์ และ Export Excel", "/school-finance/"),
+    ("private", "c-rose",  "📌", "รายงานสมัคร/ทดลองเรียน", "ติดตามใบสมัคร จองทดลองเรียน และสถานะภายใน", "/admission-report/"),
+    ("private", "c-stone", "⚙️", "Django Admin", "จัดการข้อมูล master data และตารางระบบ", "/adminlublub/"),
+    ("private", "c-teal",  "⬇️", "Export ข้อมูลหลัก", "Export enrollments และ students จากระบบหลัก", "/export/excel/"),
+    ("private", "c-lilac", "🏆", "ระบบประกาศผลการสอบ", "สร้างรอบสอบ เพิ่มวิชา เพิ่มนักเรียน กรอก/Import คะแนน และดูภาพรวมผลสอบ", "/test-score-admin/"),
+    ("private", "c-sand",  "⭐", "Test ย่อยรายสัปดาห์", "บันทึกผล Test ย่อยจาก Dashboard แยกตามสัปดาห์ ห้อง และระดับชั้น พร้อมหน้าสรุปสำหรับแคปส่งผู้ปกครอง", "/weekly-tests/"),
+    ("operation", "c-sky",   "🏠", "Dashboard เช็คชื่อ", "กลับหน้า Dashboard หลักสำหรับเช็คชื่อ", "/dashboard/"),
+    ("operation", "c-lilac", "📋", "เช็คชื่อรวม", "ตาราง Attendance รายห้องและรายคอร์ส", "/attendance-details/"),
+]
+
+_ADMIN_TOOL_COLORS = {"c-sky", "c-teal", "c-sage", "c-clay", "c-sand", "c-rose", "c-lilac", "c-stone"}
+_ADMIN_TOOL_SECTIONS = {"private", "operation"}
+
+
+def _seed_admin_tool_cards() -> None:
+    """Create default cards once, if the table is completely empty."""
+    from .models import AdminToolCard
+    if AdminToolCard.objects.exists():
+        return
+    with transaction.atomic():
+        for i, (section, color, icon, name, desc, url) in enumerate(_ADMIN_TOOL_DEFAULTS):
+            AdminToolCard.objects.create(
+                section=section, color=color, icon=icon,
+                name=name, desc=desc, url=url, order=(i + 1) * 10,
+            )
+
+
 def pkanoon_admin_tool(request: HttpRequest) -> HttpResponse:
     """Private landing page for sensitive school tools."""
-    return render(request, "core/pkanoon_admin_tool.html")
+    from .models import AdminToolCard
+    _seed_admin_tool_cards()
+    cards = [c.as_dict() for c in AdminToolCard.objects.all()]
+    can_edit = bool(request.user.is_authenticated and request.user.is_staff)
+    return render(request, "core/pkanoon_admin_tool.html", {
+        "cards_json": json.dumps(cards, ensure_ascii=False),
+        "can_edit": can_edit,
+    })
+
+
+def _admin_tool_card_payload(request: HttpRequest) -> dict:
+    try:
+        return json.loads(request.body.decode("utf-8") or "{}")
+    except (ValueError, UnicodeDecodeError):
+        return {}
+
+
+def _admin_tool_staff_denied(request: HttpRequest) -> JsonResponse | None:
+    """Return a 403 JSON response if the user may not modify cards, else None.
+
+    Only authenticated staff users can create/edit/delete/reorder/reset cards.
+    """
+    user = getattr(request, "user", None)
+    if user is not None and user.is_authenticated and user.is_staff:
+        return None
+    return JsonResponse(
+        {"ok": False, "error": "ต้องเข้าสู่ระบบด้วยบัญชี staff จึงจะแก้ไขเมนูได้"},
+        status=403,
+    )
+
+
+@require_POST
+def admin_tool_card_save(request: HttpRequest) -> JsonResponse:
+    """Create or update a single card. Returns the saved card as JSON."""
+    denied = _admin_tool_staff_denied(request)
+    if denied:
+        return denied
+    from .models import AdminToolCard
+    data = _admin_tool_card_payload(request)
+    name = (data.get("name") or "").strip()
+    url = (data.get("url") or "").strip()
+    if not name or not url:
+        return JsonResponse({"ok": False, "error": "ต้องกรอกชื่อและลิงก์"}, status=400)
+
+    section = data.get("section") if data.get("section") in _ADMIN_TOOL_SECTIONS else "private"
+    color = data.get("color") if data.get("color") in _ADMIN_TOOL_COLORS else "c-sky"
+    icon = (data.get("icon") or "🔗").strip()[:16] or "🔗"
+    desc = (data.get("desc") or "").strip()
+
+    card_id = data.get("id")
+    if card_id:
+        card = get_object_or_404(AdminToolCard, pk=card_id)
+        card.section = section
+        card.color = color
+        card.icon = icon
+        card.name = name[:200]
+        card.desc = desc
+        card.url = url[:300]
+        card.save()
+    else:
+        max_order = (
+            AdminToolCard.objects.filter(section=section)
+            .aggregate(m=Max("order")).get("m") or 0
+        )
+        card = AdminToolCard.objects.create(
+            section=section, color=color, icon=icon,
+            name=name[:200], desc=desc, url=url[:300], order=max_order + 10,
+        )
+    return JsonResponse({"ok": True, "card": card.as_dict()})
+
+
+@require_POST
+def admin_tool_card_delete(request: HttpRequest) -> JsonResponse:
+    denied = _admin_tool_staff_denied(request)
+    if denied:
+        return denied
+    from .models import AdminToolCard
+    data = _admin_tool_card_payload(request)
+    card_id = data.get("id")
+    AdminToolCard.objects.filter(pk=card_id).delete()
+    return JsonResponse({"ok": True})
+
+
+@require_POST
+def admin_tool_card_reorder(request: HttpRequest) -> JsonResponse:
+    """Apply a new global ordering / section assignment.
+
+    Body: {"items": [{"id": 1, "section": "private"}, ...]} in desired order.
+    """
+    denied = _admin_tool_staff_denied(request)
+    if denied:
+        return denied
+    from .models import AdminToolCard
+    data = _admin_tool_card_payload(request)
+    items = data.get("items") or []
+    by_id = {c.id: c for c in AdminToolCard.objects.all()}
+    updates = []
+    for i, item in enumerate(items):
+        cid = item.get("id")
+        card = by_id.get(cid)
+        if not card:
+            continue
+        section = item.get("section")
+        if section in _ADMIN_TOOL_SECTIONS:
+            card.section = section
+        card.order = (i + 1) * 10
+        updates.append(card)
+    if updates:
+        AdminToolCard.objects.bulk_update(updates, ["section", "order"])
+    return JsonResponse({"ok": True})
+
+
+@require_POST
+def admin_tool_card_reset(request: HttpRequest) -> JsonResponse:
+    """Wipe all cards and re-seed defaults."""
+    denied = _admin_tool_staff_denied(request)
+    if denied:
+        return denied
+    from .models import AdminToolCard
+    AdminToolCard.objects.all().delete()
+    _seed_admin_tool_cards()
+    cards = [c.as_dict() for c in AdminToolCard.objects.all()]
+    return JsonResponse({"ok": True, "cards": cards})
 
 
 

@@ -3,55 +3,510 @@
 
 {% block head %}
 <style>
-  .tool-wrap{max-width:1100px;margin:0 auto;display:grid;gap:16px;}
-  .tool-hero{background:linear-gradient(135deg,#0f172a,#1d4ed8);color:#fff;border-radius:24px;padding:24px;box-shadow:0 14px 28px rgba(15,23,42,.22);}
-  .tool-title{font-size:28px;font-weight:1000;letter-spacing:-.03em;}
-  .tool-sub{margin-top:6px;color:#dbeafe;font-size:14px;line-height:1.6;}
+  :root{
+    --ink:#1f1b16; --ink-soft:#5c554c; --ink-faint:#8a8378;
+    --panel:#faf9f5; --panel-2:#f3f1ea; --line:#e6e2d8; --line-strong:#d8d3c6;
+    --accent:#cc785c; --accent-strong:#b15c42; --accent-soft:#f3e4dd;
+    --shadow:0 1px 2px rgba(31,27,22,.05), 0 4px 14px rgba(31,27,22,.06);
+    --shadow-hi:0 6px 22px rgba(31,27,22,.12);
+    --radius:14px; --radius-lg:20px;
+  }
+  body.pk-dark{ --ink:#f2ede4; --ink-soft:#c3bcae; --ink-faint:#8f887b;
+    --panel:#2a2621; --panel-2:#211e19; --line:#3a352d; --line-strong:#4a4438;
+    --accent:#d8886b; --accent-strong:#e0a68f; --accent-soft:#3a2c25;
+    --shadow:0 1px 2px rgba(0,0,0,.3), 0 4px 14px rgba(0,0,0,.25);
+    --shadow-hi:0 6px 22px rgba(0,0,0,.4);
+  }
+
+  .tool-wrap{max-width:1120px;margin:0 auto;display:grid;gap:22px;
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--ink);}
+
+  /* Hero */
+  .tool-hero{position:relative;overflow:hidden;background:var(--panel);
+    border:1px solid var(--line);border-left:4px solid var(--accent);
+    border-radius:var(--radius-lg);padding:26px 28px;box-shadow:var(--shadow);}
+  .tool-hero-row{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;}
+  .tool-title{font-size:26px;font-weight:700;letter-spacing:-.02em;color:var(--ink);display:flex;align-items:center;gap:10px;}
+  .tool-sub{margin-top:8px;color:var(--ink-soft);font-size:14px;line-height:1.7;max-width:640px;}
+  .hero-actions{display:flex;gap:8px;flex-wrap:wrap;}
+
+  /* Controls */
+  .pk-btn{appearance:none;cursor:pointer;font-family:inherit;font-size:13px;font-weight:600;
+    border-radius:10px;padding:9px 14px;border:1px solid var(--line-strong);
+    background:var(--panel);color:var(--ink-soft);display:inline-flex;align-items:center;gap:7px;
+    transition:.15s ease;text-decoration:none;white-space:nowrap;}
+  .pk-btn:hover{border-color:var(--accent);color:var(--ink);background:var(--panel-2);}
+  .pk-btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;}
+  .pk-btn.primary:hover{background:var(--accent-strong);border-color:var(--accent-strong);color:#fff;}
+  .pk-btn.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent-strong);}
+
+  .pk-toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+  .pk-search{flex:1;min-width:220px;position:relative;}
+  .pk-search input{width:100%;box-sizing:border-box;font-family:inherit;font-size:14px;
+    padding:11px 14px 11px 40px;border-radius:12px;border:1px solid var(--line-strong);
+    background:var(--panel);color:var(--ink);outline:none;transition:.15s;}
+  .pk-search input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft);}
+  .pk-search svg{position:absolute;left:14px;top:50%;transform:translateY(-50%);opacity:.5;}
+  .pk-saving{font-size:12px;font-weight:600;color:var(--ink-faint);opacity:0;transition:.2s;}
+  .pk-saving.show{opacity:1;}
+
+  /* Section */
+  .pk-section{display:grid;gap:14px;}
+  .section-head{display:flex;align-items:center;gap:12px;}
+  .section-label{font-size:12px;font-weight:700;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.08em;white-space:nowrap;}
+  .section-rule{height:1px;background:var(--line);flex:1;}
+  .section-count{font-size:11px;font-weight:700;color:var(--ink-faint);background:var(--panel-2);
+    border:1px solid var(--line);border-radius:999px;padding:2px 9px;}
+
+  /* Grid + cards */
   .tool-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;}
-  .tool-card{background:#fff;border-radius:20px;padding:18px;text-decoration:none;color:#0f172a;box-shadow:0 6px 14px rgba(15,23,42,.10);border:1px solid rgba(255,255,255,.9);transition:.14s;min-height:138px;display:flex;flex-direction:column;justify-content:space-between;}
-  .tool-card:hover{transform:translateY(-3px);box-shadow:0 12px 26px rgba(15,23,42,.16);}
-  .tool-icon{width:44px;height:44px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:24px;margin-bottom:12px;}
-  .blue{background:#dbeafe}.green{background:#dcfce7}.pink{background:#fce7f3}.amber{background:#fef3c7}.slate{background:#f1f5f9}.purple{background:#ede9fe}.red{background:#fee2e2}.teal{background:#ccfbf1}.orange{background:#ffedd5}
-  .tool-name{font-size:17px;font-weight:1000;}
-  .tool-desc{font-size:12px;color:#64748b;line-height:1.5;margin-top:4px;}
-  .section-label{font-size:12px;font-weight:1000;color:#475569;text-transform:uppercase;letter-spacing:.06em;margin-top:4px;}
-  @media(max-width:900px){.tool-grid{grid-template-columns:1fr 1fr}.tool-title{font-size:24px}}
-  @media(max-width:620px){.tool-grid{grid-template-columns:1fr}.tool-hero{padding:20px}.tool-card{min-height:120px}}
+  .tool-card{position:relative;background:var(--panel);border:1px solid var(--line);
+    border-radius:var(--radius);padding:18px;text-decoration:none;color:var(--ink);
+    box-shadow:var(--shadow);transition:.16s ease;min-height:132px;
+    display:flex;flex-direction:column;gap:2px;}
+  .tool-card:hover{border-color:var(--line-strong);box-shadow:var(--shadow-hi);transform:translateY(-2px);}
+  .tool-icon{width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;
+    font-size:22px;margin-bottom:10px;border:1px solid transparent;}
+  .tool-name{font-size:16px;font-weight:700;letter-spacing:-.01em;line-height:1.3;}
+  .tool-desc{font-size:12.5px;color:var(--ink-soft);line-height:1.6;margin-top:5px;}
+
+  /* Icon color themes (calm/warm) */
+  .c-clay{background:#f3e4dd;color:#b15c42;border-color:#e7cec3;}
+  .c-sage{background:#e5ece1;color:#5c7355;border-color:#d3e0cc;}
+  .c-sky{background:#e2eaf1;color:#4a6b8a;border-color:#cfddea;}
+  .c-sand{background:#f1ead6;color:#8a7333;border-color:#e6dbbe;}
+  .c-rose{background:#f2e1e7;color:#9a5c6e;border-color:#e8ccd6;}
+  .c-lilac{background:#eae4f1;color:#6b5c8a;border-color:#dcd2ea;}
+  .c-stone{background:#eae7e0;color:#6b665c;border-color:#ddd8cd;}
+  .c-teal{background:#dfece9;color:#3f6e68;border-color:#cde2dd;}
+  body.pk-dark .c-clay{background:#3a2c25;color:#e0a68f;border-color:#4a382f;}
+  body.pk-dark .c-sage{background:#2a3226;color:#a9c29f;border-color:#38412f;}
+  body.pk-dark .c-sky{background:#243040;color:#9cbbd8;border-color:#334154;}
+  body.pk-dark .c-sand{background:#332e1f;color:#d6c48a;border-color:#443d29;}
+  body.pk-dark .c-rose{background:#372630;color:#d69cae;border-color:#48313d;}
+  body.pk-dark .c-lilac{background:#2d2739;color:#b9a9d8;border-color:#3c3450;}
+  body.pk-dark .c-stone{background:#2f2c26;color:#c2bcae;border-color:#403c33;}
+  body.pk-dark .c-teal{background:#233432;color:#8ec7bf;border-color:#324744;}
+
+  /* Manage mode */
+  .managing .tool-card{cursor:grab;}
+  .managing .tool-card:active{cursor:grabbing;}
+  .tool-card.dragging{opacity:.4;}
+  .tool-card.drop-before{box-shadow:-4px 0 0 var(--accent), var(--shadow);}
+  .tool-card.drop-after{box-shadow:4px 0 0 var(--accent), var(--shadow);}
+  .card-ctrls{display:none;position:absolute;top:8px;right:8px;gap:6px;}
+  .managing .card-ctrls{display:flex;}
+  .card-ctrls button{width:26px;height:26px;border-radius:8px;border:1px solid var(--line-strong);
+    background:var(--panel);color:var(--ink-soft);cursor:pointer;font-size:13px;line-height:1;
+    display:flex;align-items:center;justify-content:center;transition:.12s;}
+  .card-ctrls button:hover{border-color:var(--accent);color:var(--accent-strong);}
+  .card-ctrls button.del:hover{border-color:#c0483a;color:#c0483a;}
+  .add-card{display:none;align-items:center;justify-content:center;gap:8px;min-height:132px;
+    border:1.5px dashed var(--line-strong);border-radius:var(--radius);background:transparent;
+    color:var(--ink-faint);font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;transition:.15s;}
+  .add-card:hover{border-color:var(--accent);color:var(--accent-strong);background:var(--panel-2);}
+  .managing .add-card{display:flex;}
+  .managing .tool-name, .managing .tool-desc{pointer-events:none;}
+
+  .pk-empty{grid-column:1/-1;text-align:center;color:var(--ink-faint);font-size:14px;
+    padding:26px;border:1.5px dashed var(--line);border-radius:var(--radius);}
+
+  /* Modal */
+  .pk-modal-bg{position:fixed;inset:0;background:rgba(31,27,22,.45);display:none;
+    align-items:center;justify-content:center;z-index:50;padding:16px;}
+  .pk-modal-bg.show{display:flex;}
+  .pk-modal{width:100%;max-width:460px;background:var(--panel);border:1px solid var(--line);
+    border-radius:var(--radius-lg);box-shadow:var(--shadow-hi);padding:22px;max-height:90vh;overflow:auto;}
+  .pk-modal h3{margin:0 0 16px;font-size:18px;font-weight:700;color:var(--ink);}
+  .pk-field{margin-bottom:13px;}
+  .pk-field label{display:block;font-size:12px;font-weight:700;color:var(--ink-soft);margin-bottom:5px;}
+  .pk-field input, .pk-field select, .pk-field textarea{width:100%;box-sizing:border-box;font-family:inherit;
+    font-size:14px;padding:9px 11px;border-radius:10px;border:1px solid var(--line-strong);
+    background:var(--panel);color:var(--ink);outline:none;transition:.15s;}
+  .pk-field input:focus, .pk-field select:focus, .pk-field textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft);}
+  .pk-field textarea{resize:vertical;min-height:56px;}
+  .pk-row{display:grid;grid-template-columns:1fr 1fr;gap:11px;}
+  .swatches{display:flex;gap:7px;flex-wrap:wrap;}
+  .swatch{width:30px;height:30px;border-radius:9px;cursor:pointer;border:2px solid transparent;}
+  .swatch.sel{border-color:var(--ink);}
+  .emoji-pick{display:flex;flex-wrap:wrap;gap:5px;}
+  .emoji-pick button{width:34px;height:34px;font-size:18px;border-radius:9px;border:1px solid var(--line);
+    background:var(--panel);cursor:pointer;transition:.12s;}
+  .emoji-pick button:hover, .emoji-pick button.sel{border-color:var(--accent);background:var(--accent-soft);}
+  .pk-modal-actions{display:flex;justify-content:space-between;gap:10px;margin-top:20px;}
+
+  @media(max-width:900px){.tool-grid{grid-template-columns:1fr 1fr}.tool-title{font-size:23px}}
+  @media(max-width:620px){.tool-grid{grid-template-columns:1fr}.tool-hero{padding:22px}.pk-row{grid-template-columns:1fr}}
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="tool-wrap">
+<div class="tool-wrap" id="pkTool">
+
   <div class="tool-hero">
-    <div class="tool-title">🔐 Pkanoon Admin Tool</div>
-    <div class="tool-sub">ศูนย์รวมเมนูหลังบ้านและหน้าที่มีข้อมูลสำคัญ ใช้หน้านี้แทนการวางปุ่มลับไว้บน Dashboard หลัก</div>
+    <div class="tool-hero-row">
+      <div>
+        <div class="tool-title">🔐 Pkanoon Admin Tool</div>
+        <div class="tool-sub">ศูนย์รวมเมนูหลังบ้านและหน้าที่มีข้อมูลสำคัญ ใช้หน้านี้แทนการวางปุ่มลับไว้บน Dashboard หลัก — การจัดเรียง/เพิ่ม/ลบเมนู จะถูกบันทึกบนเซิร์ฟเวอร์และเห็นเหมือนกันทุกเครื่อง</div>
+      </div>
+      <div class="hero-actions">
+        <button class="pk-btn" id="pkTheme" type="button">🌙 <span>Dark</span></button>
+        {% if can_edit %}<button class="pk-btn" id="pkManage" type="button">✏️ <span>จัดการเมนู</span></button>{% endif %}
+      </div>
+    </div>
   </div>
 
-  <div class="section-label">Private / Management</div>
-  <div class="tool-grid">
-    <a class="tool-card" href="/super-dashboard/"><div><div class="tool-icon blue">🚀</div><div class="tool-name">Super Dashboard</div><div class="tool-desc">Monitor นักเรียน รายรับรายจ่าย ที่นั่ง ชีท คอร์สใกล้ครบ และงานปรินท์ในหน้าเดียว</div></div></a>
-    <a class="tool-card" href="/school-overview/"><div><div class="tool-icon blue">📊</div><div class="tool-name">ภาพรวมโรงเรียน</div><div class="tool-desc">Attendance, รายได้ประมาณการ, ค่าใช้จ่าย และกราฟรายสัปดาห์</div></div></a>
-    <a class="tool-card" href="/test-score-admin/"><div><div class="tool-icon purple">🏆</div><div class="tool-name">ระบบประกาศผลการสอบ</div><div class="tool-desc">สร้างรอบสอบ เพิ่มวิชา เพิ่มนักเรียน กรอก/Import คะแนน และดูภาพรวมผลสอบ</div></div></a>
-    <a class="tool-card" href="/weekly-tests/"><div><div class="tool-icon amber">⭐</div><div class="tool-name">Test ย่อยรายสัปดาห์</div><div class="tool-desc">บันทึกผล Test ย่อยจาก Dashboard แยกตามสัปดาห์ ห้อง และระดับชั้น พร้อมหน้าสรุปสำหรับแคปส่งผู้ปกครอง</div></div></a>
-    <a class="tool-card" href="/teaching/weekly-setup/"><div><div class="tool-icon purple">👩‍🏫</div><div class="tool-name">อัปเดตการสอนติวเตอร์</div><div class="tool-desc">ตั้งค่า template วิชา เลือกติวเตอร์ประจำสัปดาห์ และเปิดหน้าบันทึกการสอน</div></div></a>
-    <a class="tool-card" href="/learning-record/"><div><div class="tool-icon teal">📚</div><div class="tool-name">Learning Record</div><div class="tool-desc">ดูประวัติวิชาเรียนราย Class ว่าแต่ละวิชาเรียนไปแล้วกี่ครั้ง ล่าสุดเรียนวันไหน ใครสอน และถึงชีทหน้า/ข้อไหน</div></div></a>
-    <a class="tool-card" href="/course-payments/"><div><div class="tool-icon green">🧾</div><div class="tool-name">รับชำระเงิน / ใบเสร็จ</div><div class="tool-desc">ออกใบเสร็จ รับชำระค่าคอร์ส และสร้าง Enrollment ได้ในหน้าเดียว</div></div></a>
-    <a class="tool-card" href="/course-renewal-notices/"><div><div class="tool-icon orange">🔁</div><div class="tool-name">ระบบสร้างใบแจ้งต่อคอร์ส</div><div class="tool-desc">ดูคอร์สที่ใกล้ครบ สร้างใบแจ้งต่อคอร์ส พร้อม QR และ Copy Image ส่งผู้ปกครอง</div></div></a>
-    <a class="tool-card" href="/sheet-inventory/"><div><div class="tool-icon teal">📦</div><div class="tool-name">Sheet Inventory</div><div class="tool-desc">สร้างชีท จัดการ stock สแกน QR ตัด/นับชีท และดูชีทที่ต้องใช้ตามรายการสมัคร/ทดลองเรียน</div></div></a>
-    <a class="tool-card" href="/sheet-allocation/"><div><div class="tool-icon green">📤</div><div class="tool-name">ระบบแจกชีท</div><div class="tool-desc">สแกน QR เพื่อแจกชีท ตัด stock ตอนกดบันทึก และดูประวัติ Sheet Allocation รายเด็ก/ราย class</div></div></a>
-    <a class="tool-card" href="/sheet-print-orders/"><div><div class="tool-icon teal">🖨️</div><div class="tool-name">ระบบส่งปรินท์ชีท</div><div class="tool-desc">สร้างรายการรอปรินท์จาก Sheet Inventory และส่ง link ให้ร้านปรินท์เข้าดูโดยไม่ต้อง login</div></div></a>
-    <a class="tool-card" href="/school-finance/"><div><div class="tool-icon green">💰</div><div class="tool-name">รายรับรายจ่าย</div><div class="tool-desc">บันทึกค่าใช้จ่าย ค่าติวเตอร์ และ Export Excel</div></div></a>
-    <a class="tool-card" href="/admission-report/"><div><div class="tool-icon pink">📌</div><div class="tool-name">รายงานสมัคร/ทดลองเรียน</div><div class="tool-desc">ติดตามใบสมัคร จองทดลองเรียน และสถานะภายใน</div></div></a>
-    <a class="tool-card" href="/admin-dashboard/"><div><div class="tool-icon amber">📈</div><div class="tool-name">Admin Dashboard</div><div class="tool-desc">ภาพรวมหลังบ้านเพิ่มเติม</div></div></a>
-    <a class="tool-card" href="/adminlublub/"><div><div class="tool-icon slate">⚙️</div><div class="tool-name">Django Admin</div><div class="tool-desc">จัดการข้อมูล master data และตารางระบบ</div></div></a>
-    <a class="tool-card" href="/export/excel/"><div><div class="tool-icon teal">⬇️</div><div class="tool-name">Export ข้อมูลหลัก</div><div class="tool-desc">Export enrollments และ students จากระบบหลัก</div></div></a>
+  <div class="pk-toolbar">
+    <div class="pk-search">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+      <input id="pkSearch" type="text" placeholder="ค้นหาเมนู… (ชื่อหรือคำอธิบาย)" autocomplete="off">
+    </div>
+    <span class="pk-saving" id="pkSaving">กำลังบันทึก…</span>
+    <button class="pk-btn" id="pkReset" type="button" style="display:none">↺ รีเซ็ตค่าเริ่มต้น</button>
   </div>
 
-  <div class="section-label">Operation</div>
-  <div class="tool-grid">
-    <a class="tool-card" href="/dashboard/"><div><div class="tool-icon blue">🏠</div><div class="tool-name">Dashboard เช็คชื่อ</div><div class="tool-desc">กลับหน้า Dashboard หลักสำหรับเช็คชื่อ</div></div></a>
-    <a class="tool-card" href="/attendance-details/"><div><div class="tool-icon purple">📋</div><div class="tool-name">เช็คชื่อรวม</div><div class="tool-desc">ตาราง Attendance รายห้องและรายคอร์ส</div></div></a>
-    <a class="tool-card" href="/student-id-list/"><div><div class="tool-icon orange">🧒</div><div class="tool-name">Student ID List</div><div class="tool-desc">หน้ารายการรหัสนักเรียนสำหรับผู้ปกครอง</div></div></a>
+  <div id="pkSections"></div>
+</div>
+
+<!-- Modal -->
+<div class="pk-modal-bg" id="pkModalBg">
+  <div class="pk-modal">
+    <h3 id="pkModalTitle">เพิ่มเมนูใหม่</h3>
+    <div class="pk-field">
+      <label>ชื่อเมนู</label>
+      <input id="fName" type="text" placeholder="เช่น รายงานสรุปประจำเดือน">
+    </div>
+    <div class="pk-field">
+      <label>คำอธิบาย</label>
+      <textarea id="fDesc" placeholder="อธิบายสั้น ๆ ว่าเมนูนี้ทำอะไร"></textarea>
+    </div>
+    <div class="pk-field">
+      <label>ลิงก์ (URL)</label>
+      <input id="fUrl" type="text" placeholder="/example/">
+    </div>
+    <div class="pk-row">
+      <div class="pk-field">
+        <label>หมวด</label>
+        <select id="fSection"></select>
+      </div>
+      <div class="pk-field">
+        <label>สีไอคอน</label>
+        <div class="swatches" id="fColors"></div>
+      </div>
+    </div>
+    <div class="pk-field">
+      <label>ไอคอน</label>
+      <div class="emoji-pick" id="fEmojis"></div>
+      <input id="fIcon" type="text" maxlength="4" placeholder="วางอีโมจิเองก็ได้" style="margin-top:8px;width:150px;">
+    </div>
+    <div class="pk-modal-actions">
+      <button class="pk-btn del" id="pkModalDelete" type="button" style="display:none;border-color:#c0483a;color:#c0483a;">🗑 ลบเมนูนี้</button>
+      <span style="flex:1"></span>
+      <button class="pk-btn" id="pkModalCancel" type="button">ยกเลิก</button>
+      <button class="pk-btn primary" id="pkModalSave" type="button">บันทึก</button>
+    </div>
   </div>
 </div>
+
+<script>
+  /* Data injected by Django (kept outside {% verbatim %} so tags render). */
+  window.PK_CARDS = {{ cards_json|safe }};
+  window.PK_CSRF = "{{ csrf_token }}";
+  window.PK_URLS = {
+    save: "{% url 'core:admin_tool_card_save' %}",
+    del: "{% url 'core:admin_tool_card_delete' %}",
+    reorder: "{% url 'core:admin_tool_card_reorder' %}",
+    reset: "{% url 'core:admin_tool_card_reset' %}"
+  };
+</script>
+
+{% verbatim %}
+<script>
+(function(){
+  "use strict";
+  var LS_THEME="pkanoon_admin_theme";
+
+  var SECTIONS=[
+    {id:"private", label:"Private / Management"},
+    {id:"operation", label:"Operation"}
+  ];
+  var SEC_RANK={private:0, operation:1};
+  var COLORS=["c-sky","c-teal","c-sage","c-clay","c-sand","c-rose","c-lilac","c-stone"];
+  var EMOJIS=["🚀","📊","🏆","⭐","👩‍🏫","📚","🧾","🔁","📦","📤","🖨️","💰","📌","📈","⚙️","⬇️","🏠","📋","🧒","🔔","📝","🗂️","🔗","🧮"];
+
+  var cards=(window.PK_CARDS||[]).slice();
+  sortCards();
+
+  var $=function(s){return document.getElementById(s);};
+  var elSections=$("pkSections"), elSearch=$("pkSearch");
+  var managing=false, query="";
+
+  // ---------- Server ----------
+  function api(url,body){
+    flash(true);
+    return fetch(url,{
+      method:"POST",
+      headers:{"Content-Type":"application/json","X-CSRFToken":window.PK_CSRF},
+      body:JSON.stringify(body||{})
+    }).then(function(r){ return r.json().catch(function(){return {ok:r.ok};}).then(function(j){
+      if(!r.ok||(j&&j.ok===false)) throw new Error((j&&j.error)||("HTTP "+r.status));
+      return j;
+    }); }).catch(function(e){
+      alert("บันทึกไม่สำเร็จ: "+e.message+"\nกำลังโหลดข้อมูลใหม่");
+      location.reload(); throw e;
+    }).finally(function(){ flash(false); });
+  }
+  var flashTimer=null;
+  function flash(on){
+    var el=$("pkSaving");
+    if(on){ clearTimeout(flashTimer); el.classList.add("show"); }
+    else { flashTimer=setTimeout(function(){el.classList.remove("show");},400); }
+  }
+
+  function sortCards(){
+    cards.sort(function(a,b){
+      var sa=SEC_RANK[a.section]||0, sb=SEC_RANK[b.section]||0;
+      if(sa!==sb) return sa-sb;
+      if(a.order!==b.order) return (a.order||0)-(b.order||0);
+      return (a.id||0)-(b.id||0);
+    });
+  }
+
+  // ---------- Render ----------
+  function render(){
+    elSections.innerHTML="";
+    SECTIONS.forEach(function(sec){
+      var secCards=cards.filter(function(c){return c.section===sec.id;});
+      var shown=secCards.filter(matchQuery);
+      if(shown.length===0 && !managing && query) return;
+
+      var wrap=document.createElement("div");
+      wrap.className="pk-section";
+      var head=document.createElement("div");
+      head.className="section-head";
+      head.innerHTML='<span class="section-label">'+esc(sec.label)+'</span>'
+        +'<span class="section-count">'+secCards.length+'</span><span class="section-rule"></span>';
+      wrap.appendChild(head);
+
+      var grid=document.createElement("div");
+      grid.className="tool-grid";
+      grid.setAttribute("data-section",sec.id);
+
+      secCards.forEach(function(c){ if(matchQuery(c)) grid.appendChild(cardEl(c)); });
+
+      if(managing){
+        var add=document.createElement("button");
+        add.className="add-card"; add.type="button";
+        add.innerHTML="＋ เพิ่มเมนู";
+        add.onclick=function(){ openModal(null,sec.id); };
+        grid.appendChild(add);
+      } else if(shown.length===0){
+        var em=document.createElement("div");
+        em.className="pk-empty";
+        em.textContent=query?"ไม่พบเมนูที่ตรงกับคำค้นหา":"ยังไม่มีเมนูในหมวดนี้";
+        grid.appendChild(em);
+      }
+
+      wrap.appendChild(grid);
+      elSections.appendChild(wrap);
+      if(managing) enableDnD(grid);
+    });
+  }
+
+  function cardEl(c){
+    var a=document.createElement("a");
+    a.className="tool-card";
+    a.href=managing?"javascript:void(0)":c.url;
+    a.setAttribute("data-id",c.id);
+    if(managing) a.setAttribute("draggable","true");
+    a.innerHTML=
+      '<div class="card-ctrls">'
+        +'<button class="edit" title="แก้ไข">✎</button>'
+        +'<button class="del" title="ลบ">✕</button>'
+      +'</div>'
+      +'<div class="tool-icon '+esc(c.color)+'">'+esc(c.icon)+'</div>'
+      +'<div class="tool-name">'+esc(c.name)+'</div>'
+      +'<div class="tool-desc">'+esc(c.desc)+'</div>';
+    if(managing){
+      a.querySelector(".edit").onclick=function(e){e.preventDefault();e.stopPropagation();openModal(c,c.section);};
+      a.querySelector(".del").onclick=function(e){e.preventDefault();e.stopPropagation();delCard(c.id);};
+      a.onclick=function(e){e.preventDefault();openModal(c,c.section);};
+    }
+    return a;
+  }
+
+  function matchQuery(c){
+    if(!query) return true;
+    var q=query.toLowerCase();
+    return (c.name||"").toLowerCase().indexOf(q)>=0 || (c.desc||"").toLowerCase().indexOf(q)>=0;
+  }
+  function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g,function(m){
+    return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m];}); }
+  function findCard(id){ return cards.filter(function(c){return String(c.id)===String(id);})[0]; }
+
+  // ---------- Drag & Drop ----------
+  var dragId=null;
+  function enableDnD(grid){
+    grid.addEventListener("dragstart",function(e){
+      var card=e.target.closest(".tool-card"); if(!card) return;
+      dragId=card.getAttribute("data-id"); card.classList.add("dragging");
+    });
+    grid.addEventListener("dragend",function(e){
+      var card=e.target.closest(".tool-card"); if(card) card.classList.remove("dragging");
+      clearDropMarks(); dragId=null;
+    });
+    grid.addEventListener("dragover",function(e){
+      e.preventDefault();
+      var card=e.target.closest(".tool-card");
+      clearDropMarks();
+      if(card && card.getAttribute("data-id")!==dragId){
+        var r=card.getBoundingClientRect();
+        card.classList.add((e.clientX < r.left+r.width/2)?"drop-before":"drop-after");
+      }
+    });
+    grid.addEventListener("drop",function(e){
+      e.preventDefault();
+      var targetSection=grid.getAttribute("data-section");
+      var card=e.target.closest(".tool-card");
+      var beforeId=null;
+      if(card && card.getAttribute("data-id")!==dragId){
+        var r=card.getBoundingClientRect();
+        beforeId=(e.clientX < r.left+r.width/2)?card.getAttribute("data-id"):nextId(card);
+      }
+      moveCard(dragId,targetSection,beforeId);
+    });
+  }
+  function nextId(card){ var n=card.nextElementSibling; return (n&&n.classList.contains("tool-card"))?n.getAttribute("data-id"):null; }
+  function clearDropMarks(){ [].forEach.call(document.querySelectorAll(".drop-before,.drop-after"),function(el){el.classList.remove("drop-before","drop-after");}); }
+
+  function moveCard(id,section,beforeId){
+    var card=findCard(id); if(!card) return;
+    cards=cards.filter(function(c){return String(c.id)!==String(id);});
+    card.section=section;
+    if(beforeId){
+      var bi=cards.findIndex(function(c){return String(c.id)===String(beforeId);});
+      cards.splice(bi<0?cards.length:bi,0,card);
+    } else { cards.push(card); }
+    reindex(); render();
+    persistOrder();
+  }
+  function reindex(){
+    // assign sequential order within final array (per section keeps relative order)
+    var counters={};
+    cards.forEach(function(c){ counters[c.section]=(counters[c.section]||0)+10; c.order=counters[c.section]; });
+    sortCards();
+  }
+  function persistOrder(){
+    var items=cards.map(function(c){return {id:c.id, section:c.section};});
+    api(window.PK_URLS.reorder,{items:items});
+  }
+
+  function delCard(id){
+    var c=findCard(id); if(!c) return;
+    if(!confirm('ลบเมนู "'+c.name+'" ?')) return;
+    cards=cards.filter(function(x){return String(x.id)!==String(id);});
+    render();
+    api(window.PK_URLS.del,{id:id});
+  }
+
+  // ---------- Modal ----------
+  var editing=null, mColor=COLORS[0], mIcon=EMOJIS[0];
+  function buildModalPickers(){
+    var sel=$("fSection"); sel.innerHTML="";
+    SECTIONS.forEach(function(s){ var o=document.createElement("option"); o.value=s.id; o.textContent=s.label; sel.appendChild(o); });
+    var cw=$("fColors"); cw.innerHTML="";
+    COLORS.forEach(function(col){
+      var d=document.createElement("div"); d.className="swatch "+col; d.setAttribute("data-c",col);
+      d.onclick=function(){ mColor=col; markSel(cw,"data-c",col); };
+      cw.appendChild(d);
+    });
+    var ew=$("fEmojis"); ew.innerHTML="";
+    EMOJIS.forEach(function(em){
+      var b=document.createElement("button"); b.type="button"; b.textContent=em; b.setAttribute("data-e",em);
+      b.onclick=function(){ mIcon=em; $("fIcon").value=em; markSel(ew,"data-e",em); };
+      ew.appendChild(b);
+    });
+  }
+  function markSel(container,attr,val){
+    [].forEach.call(container.children,function(ch){ ch.classList.toggle("sel",ch.getAttribute(attr)===val); });
+  }
+  function openModal(card,section){
+    editing=card;
+    $("pkModalTitle").textContent=card?"แก้ไขเมนู":"เพิ่มเมนูใหม่";
+    $("fName").value=card?card.name:"";
+    $("fDesc").value=card?card.desc:"";
+    $("fUrl").value=card?card.url:"";
+    $("fSection").value=card?card.section:section;
+    mColor=card?card.color:COLORS[0];
+    mIcon=card?card.icon:EMOJIS[0];
+    $("fIcon").value=mIcon;
+    markSel($("fColors"),"data-c",mColor);
+    markSel($("fEmojis"),"data-e",mIcon);
+    $("pkModalDelete").style.display=card?"inline-flex":"none";
+    $("pkModalBg").classList.add("show");
+    setTimeout(function(){$("fName").focus();},30);
+  }
+  function closeModal(){ $("pkModalBg").classList.remove("show"); editing=null; }
+  function saveModal(){
+    var name=$("fName").value.trim();
+    var url=$("fUrl").value.trim();
+    if(!name){ alert("กรุณากรอกชื่อเมนู"); return; }
+    if(!url){ alert("กรุณากรอกลิงก์ (URL)"); return; }
+    var body={
+      icon:($("fIcon").value.trim()||mIcon),
+      name:name, desc:$("fDesc").value.trim(), url:url,
+      color:mColor, section:$("fSection").value
+    };
+    if(editing) body.id=editing.id;
+    closeModal();
+    api(window.PK_URLS.save,body).then(function(j){
+      var saved=j.card;
+      var ex=findCard(saved.id);
+      if(ex){ Object.keys(saved).forEach(function(k){ex[k]=saved[k];}); }
+      else { cards.push(saved); }
+      sortCards(); render();
+    });
+  }
+
+  // ---------- Manage / theme / reset ----------
+  function toggleManage(){
+    managing=!managing;
+    $("pkTool").classList.toggle("managing",managing);
+    var b=$("pkManage");
+    b.classList.toggle("on",managing);
+    b.querySelector("span").textContent=managing?"เสร็จสิ้น":"จัดการเมนู";
+    $("pkReset").style.display=managing?"inline-flex":"none";
+    render();
+  }
+  function resetAll(){
+    if(!confirm("รีเซ็ตเมนูทั้งหมดกลับเป็นค่าเริ่มต้น? การเปลี่ยนแปลงทั้งหมด (ทุกเครื่อง) จะหายไป")) return;
+    api(window.PK_URLS.reset,{}).then(function(j){
+      cards=(j.cards||[]).slice(); sortCards(); render();
+    });
+  }
+  function applyTheme(dark){
+    document.body.classList.toggle("pk-dark",dark);
+    var b=$("pkTheme");
+    b.querySelector("span").textContent=dark?"Light":"Dark";
+    b.firstChild.textContent=dark?"☀️ ":"🌙 ";
+    try{ localStorage.setItem(LS_THEME,dark?"1":"0"); }catch(e){}
+  }
+
+  // ---------- Wire up ----------
+  if($("pkManage")) $("pkManage").onclick=toggleManage;
+  $("pkReset").onclick=resetAll;
+  $("pkTheme").onclick=function(){ applyTheme(!document.body.classList.contains("pk-dark")); };
+  $("pkModalSave").onclick=saveModal;
+  $("pkModalCancel").onclick=closeModal;
+  $("pkModalDelete").onclick=function(){ if(editing){ var id=editing.id; closeModal(); delCard(id);} };
+  $("pkModalBg").onclick=function(e){ if(e.target===$("pkModalBg")) closeModal(); };
+  elSearch.addEventListener("input",function(){ query=this.value.trim(); render(); });
+  document.addEventListener("keydown",function(e){ if(e.key==="Escape") closeModal(); });
+
+  buildModalPickers();
+  try{ applyTheme(localStorage.getItem(LS_THEME)==="1"); }catch(e){}
+  render();
+})();
+</script>
+{% endverbatim %}
 {% endblock %}

@@ -723,10 +723,11 @@ class CoursePaymentAdmin(admin.ModelAdmin):
 # =========================================================
 @admin.register(TeachingTutor)
 class TeachingTutorAdmin(admin.ModelAdmin):
-    list_display = ("name", "phone", "color", "is_active", "updated_at")
+    list_display = ("name", "phone", "color", "payroll_tutor", "is_active", "updated_at")
     list_editable = ("color",)
     search_fields = ("name", "phone")
     list_filter = ("is_active",)
+    autocomplete_fields = ("payroll_tutor",)
     ordering = ("name",)
 
 
@@ -949,7 +950,7 @@ class AdminToolCardAdmin(admin.ModelAdmin):
 @admin.register(ScheduleRoom)
 class ScheduleRoomAdmin(admin.ModelAdmin):
     list_display = (
-        "name", "display_order",
+        "name", "icon", "display_order",
         "sat_morning_class", "sat_afternoon_class",
         "sun_morning_class", "sun_afternoon_class", "is_active",
     )

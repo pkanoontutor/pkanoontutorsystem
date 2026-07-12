@@ -7140,11 +7140,11 @@ _THAI_MONTHS_ABBR = ["", "ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "
                      "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."]
 
 _DEFAULT_SCHEDULE_ROOMS = [
-    ("ห้องทุเรียนหมอนทอง", "#fbf2b0"),
-    ("ห้องมังคุดคัด", "#eadaf0"),
-    ("ห้องมะม่วงเขียวเสวย", "#d9ebc6"),
-    ("ห้องแตงโมอินทรา", "#f8d3d9"),
-    ("ห้องมะพร้าว", "#dad1c5"),
+    ("ห้องทุเรียนหมอนทอง", "#f6e88a", "🍈"),
+    ("ห้องมังคุดคัด", "#dfc6ea", "🍇"),
+    ("ห้องมะม่วงเขียวเสวย", "#c6e2a8", "🥭"),
+    ("ห้องแตงโมจินตหรา", "#f5bcc7", "🍉"),
+    ("ห้องมะพร้าว", "#cbbfae", "🥥"),
 ]
 
 # Distinct, readable tutor-name colours (used when a tutor has no custom colour).
@@ -7205,9 +7205,10 @@ def _seed_schedule_rooms() -> None:
     if ScheduleRoom.objects.exists():
         return
     with transaction.atomic():
-        for i, (name, color) in enumerate(_DEFAULT_SCHEDULE_ROOMS):
+        for i, (name, color, icon) in enumerate(_DEFAULT_SCHEDULE_ROOMS):
             ScheduleRoom.objects.create(
-                name=name, header_color=color, display_order=(i + 1) * 10, is_active=True,
+                name=name, header_color=color, icon=icon,
+                display_order=(i + 1) * 10, is_active=True,
             )
 
 
@@ -7384,6 +7385,7 @@ def teaching_schedule_editor(request: HttpRequest) -> HttpResponse:
                             tutor_id=tutor_id or None,
                             grade_label=grade, subject_label=subject,
                         )
+                _sync_schedule_to_teaching_week(schedule, rooms, is_sunday, week_start, _week_end)
             return redirect(f"/teaching-schedule/image/{schedule.id}/")
 
     class_data = _schedule_class_data(week_start)
@@ -7444,13 +7446,56 @@ def teaching_schedule_editor(request: HttpRequest) -> HttpResponse:
     })
 
 
+def _schedule_progress_map(schedule) -> dict:
+    """Latest real (non no-teaching) progress update per subject template used
+    on this schedule: sheet name, page/question reached, last teacher."""
+    template_ids = [
+        c.subject_template_id for c in schedule.cells.all() if c.subject_template_id
+    ]
+    if not template_ids:
+        return {}
+    progress = {}
+    updates = (
+        TeachingProgressUpdate.objects
+        .filter(assignment__subject_template_id__in=template_ids, no_teaching=False)
+        .select_related("assignment", "assignment__tutor")
+        .order_by("assignment__subject_template_id", "-teaching_date", "-updated_at")
+    )
+    for u in updates:
+        tid = u.assignment.subject_template_id
+        if tid in progress:
+            continue
+        teacher = (u.updated_by_name or "").strip()
+        if not teacher and u.assignment.tutor_id:
+            teacher = u.assignment.tutor.name
+        pos_parts = []
+        if u.page_to:
+            pos_parts.append(f"หน้า {u.page_to}")
+        if u.question_to:
+            pos_parts.append(f"ข้อ {u.question_to}")
+        progress[tid] = {
+            "sheet_name": u.sheet_name or "-",
+            "position": " ".join(pos_parts) or "-",
+            "last_teacher": teacher or "-",
+        }
+    return progress
+
+
 def teaching_schedule_image(request: HttpRequest, pk: int) -> HttpResponse:
     from .models import DailySchedule, ScheduleRoom, ScheduleExamCountdown
     from .models import TeachingTutor
     schedule = get_object_or_404(DailySchedule, pk=pk)
+    version = "tutor" if (request.GET.get("v") == "tutor") else "parent"
     rooms = list(ScheduleRoom.objects.filter(is_active=True))
     color_map = _schedule_tutor_color_map(list(TeachingTutor.objects.all()))
     grid, has_conflict = _annotate_schedule_grid(schedule, color_map=color_map)
+
+    if version == "tutor":
+        progress = _schedule_progress_map(schedule)
+        for row in grid:
+            for rc in row["rooms"]:
+                c = rc.get("cell")
+                rc["progress"] = progress.get(c.subject_template_id) if (c and c.subject_template_id) else None
 
     countdowns = []
     for e in ScheduleExamCountdown.objects.filter(is_active=True):
@@ -7463,14 +7508,23 @@ def teaching_schedule_image(request: HttpRequest, pk: int) -> HttpResponse:
 
     footer_note = countdowns[0]["note"] if (countdowns and countdowns[0]["note"]) else ""
 
+    payroll_rows = _schedule_tutor_day_summary(schedule)
+    try:
+        payroll_sent = int(request.GET.get("payroll_sent") or 0)
+    except ValueError:
+        payroll_sent = 0
+
     return render(request, "core/teaching_schedule_image.html", {
         "schedule": schedule,
+        "version": version,
         "thai_date": _thai_schedule_date(schedule.date),
         "rooms": rooms,
         "grid": grid,
         "has_conflict": has_conflict,
         "countdowns": countdowns,
         "footer_note": footer_note,
+        "payroll_rows": payroll_rows,
+        "payroll_sent": payroll_sent,
     })
 
 
@@ -7533,4 +7587,217 @@ def teaching_schedule_rooms(request: HttpRequest) -> HttpResponse:
     return render(request, "core/teaching_schedule_rooms.html", {
         "rooms": rooms,
         "classes": classes,
+    })
+
+
+# =========================================================
+# Teaching schedule ↔ teaching-update / payroll integration
+# =========================================================
+def _sync_schedule_to_teaching_week(schedule, rooms, is_sunday: bool, week_start: date, week_end: date) -> None:
+    """Push the day's tutor/subject assignments into the weekly teaching-update
+    system: subjects on the schedule get their weekly tutor updated; subjects
+    of today's hosted classes that are absent are marked as no-teaching."""
+    _ensure_teaching_assignments(week_start, week_end)
+
+    class_ids = set()
+    for r in rooms:
+        for is_aft in (False, True):
+            c = r.class_for(is_sunday=is_sunday, is_afternoon=is_aft)
+            if c:
+                class_ids.add(c.id)
+    if not class_ids:
+        return
+
+    cell_tutor_by_template = {}
+    for c in schedule.cells.all():
+        if c.subject_template_id:
+            cell_tutor_by_template[c.subject_template_id] = c.tutor_id
+
+    assignments = (
+        TeachingWeeklyAssignment.objects
+        .select_related("subject_template", "tutoring_class")
+        .filter(week_start_date=week_start, tutoring_class_id__in=class_ids)
+    )
+    for a in assignments:
+        if a.subject_template_id in cell_tutor_by_template:
+            tutor_id = cell_tutor_by_template[a.subject_template_id]
+            if tutor_id:
+                a.tutor_id = tutor_id
+            a.is_teaching = True
+            a.save()
+            _clear_auto_no_teaching_updates(a)
+        else:
+            a.is_teaching = False
+            a.save()
+            _sync_no_teaching_update_for_assignment(a, week_start, updated_by_name="ตารางสอน")
+
+
+def _schedule_gap_fee(taught_hours: int, gap_hours: int) -> int:
+    """Idle-gap fee (ค่านั่งว่าง/ชม.แหว่ง) per the school's rate card:
+    - teach <= 2 hr/day: +100 per gap hour
+    - teach 3 hr/day: first gap hour +50, +100 per hour from the 2nd
+    - teach > 3 hr/day: first gap hour free, +100 per hour from the 2nd
+    Lunch break is never counted as a gap hour."""
+    if gap_hours <= 0 or taught_hours <= 0:
+        return 0
+    if taught_hours <= 2:
+        return 100 * gap_hours
+    if taught_hours == 3:
+        return 50 + 100 * (gap_hours - 1)
+    return 100 * (gap_hours - 1)
+
+
+def _schedule_tutor_day_summary(schedule) -> list:
+    """Per-tutor teaching-hour / gap-hour summary for one day's schedule."""
+    from .models import TutorPayrollEntry
+    break_idx = {i for i, s in enumerate(TEACHING_SCHEDULE_SLOTS) if s["is_break"]}
+    by_tutor = {}
+    for c in schedule.cells.select_related("tutor", "tutor__payroll_tutor").filter(tutor__isnull=False):
+        by_tutor.setdefault(c.tutor, set()).add(c.time_index)
+
+    existing = {}
+    payroll_ids = [t.payroll_tutor_id for t in by_tutor if t.payroll_tutor_id]
+    if payroll_ids:
+        existing = {
+            e.tutor_id: e
+            for e in TutorPayrollEntry.objects.filter(work_date=schedule.date, tutor_id__in=payroll_ids)
+        }
+
+    rows = []
+    for tutor, idxs in sorted(by_tutor.items(), key=lambda kv: kv[0].name):
+        taught = len(idxs)
+        lo, hi = min(idxs), max(idxs)
+        gap = sum(1 for i in range(lo, hi + 1) if i not in idxs and i not in break_idx)
+        gap_fee = _schedule_gap_fee(taught, gap)
+        rate = TutorPayrollEntry.calculate_hourly_rate(Decimal(taught))
+        entry = existing.get(tutor.payroll_tutor_id) if tutor.payroll_tutor_id else None
+        rows.append({
+            "tutor": tutor,
+            "taught_hours": taught,
+            "gap_hours": gap,
+            "gap_fee": gap_fee,
+            "hourly_rate": rate,
+            "teaching_fee": rate * taught,
+            "has_existing": bool(entry),
+            "existing_total": (entry.total_amount if entry else None),
+        })
+    return rows
+
+
+@require_POST
+def teaching_schedule_send_payroll(request: HttpRequest, pk: int) -> HttpResponse:
+    """Write approved tutors' hours + gap fee into the payroll system."""
+    from .models import DailySchedule, TeachingTutor, Tutor, TutorPayrollEntry
+    schedule = get_object_or_404(DailySchedule, pk=pk)
+    approved_ids = [x for x in request.POST.getlist("tutor_ids") if x.strip()]
+    if not approved_ids:
+        return redirect(f"/teaching-schedule/image/{schedule.id}/")
+
+    summary = {row["tutor"].id: row for row in _schedule_tutor_day_summary(schedule)}
+    sent = 0
+    with transaction.atomic():
+        for tid in approved_ids:
+            try:
+                row = summary.get(int(tid))
+            except ValueError:
+                continue
+            if not row:
+                continue
+            teaching_tutor = row["tutor"]
+            payroll_tutor = teaching_tutor.payroll_tutor
+            if payroll_tutor is None:
+                payroll_tutor, _ = Tutor.objects.get_or_create(
+                    name=teaching_tutor.name.strip(), defaults={"is_active": True},
+                )
+                teaching_tutor.payroll_tutor = payroll_tutor
+                teaching_tutor.save(update_fields=["payroll_tutor"])
+
+            entry, _created = TutorPayrollEntry.objects.get_or_create(
+                work_date=schedule.date, tutor=payroll_tutor,
+            )
+            entry.teaching_hours = Decimal(row["taught_hours"])
+            entry.idle_fee = Decimal(row["gap_fee"])
+            gap_note = f"ชม.แหว่ง {row['gap_hours']} ชม. (จากตารางสอน)" if row["gap_hours"] else ""
+            if gap_note and gap_note not in (entry.note or ""):
+                entry.note = f"{entry.note}\n{gap_note}".strip()
+            entry.save()
+            sent += 1
+    return redirect(f"/teaching-schedule/image/{schedule.id}/?payroll_sent={sent}")
+
+
+def teaching_schedule_tutor_profiles(request: HttpRequest) -> HttpResponse:
+    """Manage tutor profiles: signature colour, payroll link, accumulated
+    earnings with a date-range filter."""
+    from .models import TeachingTutor, Tutor, TutorPayrollEntry
+
+    today = timezone.localdate()
+    date_from = _parse_date(request.GET.get("date_from") or request.POST.get("date_from") or today.replace(day=1).isoformat())
+    date_to = _parse_date(request.GET.get("date_to") or request.POST.get("date_to") or today.isoformat())
+
+    tutors = list(TeachingTutor.objects.select_related("payroll_tutor").order_by("-is_active", "name"))
+
+    if request.method == "POST" and (request.POST.get("action") or "") == "save_profiles":
+        for t in tutors:
+            color = (request.POST.get(f"color_{t.id}") or "").strip()
+            payroll_raw = (request.POST.get(f"payroll_{t.id}") or "").strip()
+            changed = []
+            if color and color != t.color:
+                t.color = color
+                changed.append("color")
+            new_payroll_id = int(payroll_raw) if payroll_raw else None
+            if new_payroll_id != t.payroll_tutor_id:
+                t.payroll_tutor_id = new_payroll_id
+                changed.append("payroll_tutor")
+            if changed:
+                t.save(update_fields=changed)
+        return redirect(f"/teaching-schedule/tutors/?date_from={date_from.isoformat()}&date_to={date_to.isoformat()}")
+
+    # Auto-match by exact name for still-unlinked tutors.
+    payroll_by_name = {p.name.strip(): p for p in Tutor.objects.all()}
+    for t in tutors:
+        if t.payroll_tutor_id is None:
+            match = payroll_by_name.get(t.name.strip())
+            if match:
+                t.payroll_tutor = match
+                t.save(update_fields=["payroll_tutor"])
+
+    linked_ids = [t.payroll_tutor_id for t in tutors if t.payroll_tutor_id]
+    earnings = {}
+    if linked_ids:
+        rows = (
+            TutorPayrollEntry.objects
+            .filter(tutor_id__in=linked_ids, work_date__gte=date_from, work_date__lte=date_to)
+            .values("tutor_id")
+            .annotate(
+                total=Sum("total_amount"),
+                hours=Sum("teaching_hours"),
+                online_hours=Sum("online_teaching_hours"),
+                idle=Sum("idle_fee"),
+                days=Count("id"),
+            )
+        )
+        earnings = {r["tutor_id"]: r for r in rows}
+
+    profile_rows = []
+    grand_total = Decimal("0")
+    for t in tutors:
+        e = earnings.get(t.payroll_tutor_id) if t.payroll_tutor_id else None
+        total = (e or {}).get("total") or Decimal("0")
+        grand_total += total
+        profile_rows.append({
+            "tutor": t,
+            "total": total,
+            "hours": (e or {}).get("hours") or 0,
+            "online_hours": (e or {}).get("online_hours") or 0,
+            "idle": (e or {}).get("idle") or 0,
+            "days": (e or {}).get("days") or 0,
+        })
+
+    payroll_tutors = list(Tutor.objects.filter(is_active=True).order_by("name"))
+    return render(request, "core/teaching_schedule_tutors.html", {
+        "profile_rows": profile_rows,
+        "payroll_tutors": payroll_tutors,
+        "date_from": date_from,
+        "date_to": date_to,
+        "grand_total": grand_total,
     })

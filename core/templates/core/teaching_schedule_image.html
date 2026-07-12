@@ -49,11 +49,13 @@
     .cell.conflict{outline:3px solid #dc2626;position:relative;}
     .cell.conflict::after{content:"⚠";position:absolute;top:2px;right:5px;font-size:13px;color:#dc2626;}
 
-    /* Tutor version: taller rows, smaller main line + progress lines (same size as the main line) */
-    .sched.tutor-mode .cell{height:126px;font-size:13px;padding:10px 12px;vertical-align:top;}
+    /* Tutor version: rows size to fit their own content (wrap instead of
+       truncating), so short cells stay compact and long ones grow instead
+       of leaving empty space or clipping text. */
+    .sched.tutor-mode .cell{height:auto;min-height:58px;font-size:13px;padding:9px 12px;vertical-align:top;overflow:visible;}
     .sched.tutor-mode .time-c{font-size:14px;}
-    .prog{margin-top:4px;font-size:13px;line-height:1.4;color:#57534e;font-weight:400;}
-    .prog div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .prog{margin-top:4px;font-size:13px;line-height:1.35;color:#57534e;font-weight:400;}
+    .prog div{white-space:normal;overflow-wrap:break-word;word-break:break-word;}
     .prog .sheet{font-weight:700;}
 
     .footer{margin-top:18px;display:flex;align-items:center;justify-content:center;gap:26px;flex-wrap:wrap;}

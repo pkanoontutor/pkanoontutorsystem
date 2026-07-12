@@ -7169,11 +7169,9 @@ def _schedule_half(time_index: int) -> str:
     return "morning" if time_index <= 3 else "afternoon"
 
 
-def _schedule_room_class(room, time_index: int):
-    """The class bound to a room for the half-day that time_index falls in."""
-    if _schedule_half(time_index) == "morning":
-        return room.morning_class if room.morning_class_id else None
-    return room.afternoon_class if room.afternoon_class_id else None
+def _schedule_room_class(room, time_index: int, is_sunday: bool):
+    """The class bound to a room for the given day + half-day block."""
+    return room.class_for(is_sunday=is_sunday, is_afternoon=(time_index > 3))
 
 
 def _seed_schedule_rooms() -> None:
@@ -7301,9 +7299,13 @@ def teaching_schedule_editor(request: HttpRequest) -> HttpResponse:
     d = _parse_date(request.GET.get("date") or request.POST.get("date"))
     schedule, _created = DailySchedule.objects.get_or_create(date=d)
     week_start, _week_end = _teaching_week_range(d)
+    is_sunday = (d.weekday() == 6)
     rooms = list(
         ScheduleRoom.objects.filter(is_active=True)
-        .select_related("morning_class", "afternoon_class")
+        .select_related(
+            "sat_morning_class", "sat_afternoon_class",
+            "sun_morning_class", "sun_afternoon_class",
+        )
     )
 
     if request.method == "POST":
@@ -7334,7 +7336,7 @@ def teaching_schedule_editor(request: HttpRequest) -> HttpResponse:
                     for ti, slot in enumerate(TEACHING_SCHEDULE_SLOTS):
                         if slot["is_break"]:
                             continue
-                        bound_class = _schedule_room_class(r, ti)
+                        bound_class = _schedule_room_class(r, ti, is_sunday)
                         prefix = f"cell_{r.id}_{ti}_"
                         template_id = (request.POST.get(prefix + "template") or "").strip()
                         tutor_id = (request.POST.get(prefix + "tutor") or "").strip()
@@ -7378,19 +7380,25 @@ def teaching_schedule_editor(request: HttpRequest) -> HttpResponse:
 
     rooms_payload = []
     for r in rooms:
+        cur_m = r.class_for(is_sunday=is_sunday, is_afternoon=False)
+        cur_a = r.class_for(is_sunday=is_sunday, is_afternoon=True)
+        # Attributes consumed by the editor column header.
+        r.cur_morning_name = cur_m.name if cur_m else ""
+        r.cur_afternoon_name = cur_a.name if cur_a else ""
         rooms_payload.append({
             "id": r.id,
             "name": r.name,
-            "morning_class": r.morning_class_id,
-            "afternoon_class": r.afternoon_class_id,
-            "morning_class_name": (r.morning_class.name if r.morning_class_id else ""),
-            "afternoon_class_name": (r.afternoon_class.name if r.afternoon_class_id else ""),
+            "morning_class": (cur_m.id if cur_m else None),
+            "afternoon_class": (cur_a.id if cur_a else None),
         })
+
+    day_label = "อาทิตย์" if is_sunday else "เสาร์"
 
     return render(request, "core/teaching_schedule_editor.html", {
         "schedule": schedule,
         "thai_date": _thai_schedule_date(d),
         "date": d,
+        "day_label": day_label,
         "rooms": rooms,
         "editor_rows": editor_rows,
         "tutors": tutors,
@@ -7463,22 +7471,29 @@ def teaching_schedule_exam_dates(request: HttpRequest) -> HttpResponse:
 
 
 def teaching_schedule_rooms(request: HttpRequest) -> HttpResponse:
-    """Configure which class each room hosts in the morning / afternoon block."""
+    """Configure which class each room hosts per weekday + half-day block.
+
+    These bindings are standing defaults, so they automatically apply to
+    every following week until changed.
+    """
     from .models import ScheduleRoom
     _seed_schedule_rooms()
 
     rooms = list(
         ScheduleRoom.objects.filter(is_active=True)
-        .select_related("morning_class", "afternoon_class")
+        .select_related(
+            "sat_morning_class", "sat_afternoon_class",
+            "sun_morning_class", "sun_afternoon_class",
+        )
     )
 
+    fields = ["sat_morning", "sat_afternoon", "sun_morning", "sun_afternoon"]
     if request.method == "POST":
         for r in rooms:
-            m = (request.POST.get(f"room_{r.id}_morning") or "").strip()
-            a = (request.POST.get(f"room_{r.id}_afternoon") or "").strip()
-            r.morning_class_id = int(m) if m else None
-            r.afternoon_class_id = int(a) if a else None
-            r.save(update_fields=["morning_class", "afternoon_class"])
+            for f in fields:
+                raw = (request.POST.get(f"room_{r.id}_{f}") or "").strip()
+                setattr(r, f"{f}_class_id", int(raw) if raw else None)
+            r.save(update_fields=[f"{f}_class" for f in fields])
         return redirect("/teaching-schedule/rooms/")
 
     classes = list(TutoringClass.objects.filter(is_active=True).order_by("name"))

@@ -1958,20 +1958,30 @@ class AdminToolCard(models.Model):
 class ScheduleRoom(models.Model):
     """A physical room shown as a column on the schedule (named after fruits).
 
-    A room hosts one class in the morning block and (optionally) a different
-    class in the afternoon block. These bindings drive the subject/tutor/grade
-    options in the editor; the class name itself is never shown on the image.
+    A room hosts one class per half-day, and the classes differ between
+    Saturday and Sunday. These bindings are standing defaults (they rarely
+    change, so they automatically apply to every following week). They drive
+    the subject/tutor/grade options in the editor; the class name itself is
+    never shown on the generated image.
     """
     name = models.CharField("ชื่อห้อง", max_length=120)
     header_color = models.CharField("สีหัวคอลัมน์", max_length=20, default="#fdf3bf")
     display_order = models.PositiveIntegerField("ลำดับคอลัมน์", default=1)
-    morning_class = models.ForeignKey(
+    sat_morning_class = models.ForeignKey(
         "TutoringClass", on_delete=models.SET_NULL, null=True, blank=True,
-        related_name="morning_schedule_rooms", verbose_name="คลาสรอบเช้า (08.30-12.30)",
+        related_name="sat_morning_schedule_rooms", verbose_name="เสาร์เช้า (08.30-12.30)",
     )
-    afternoon_class = models.ForeignKey(
+    sat_afternoon_class = models.ForeignKey(
         "TutoringClass", on_delete=models.SET_NULL, null=True, blank=True,
-        related_name="afternoon_schedule_rooms", verbose_name="คลาสรอบบ่าย (13.30-17.30)",
+        related_name="sat_afternoon_schedule_rooms", verbose_name="เสาร์บ่าย (13.30-17.30)",
+    )
+    sun_morning_class = models.ForeignKey(
+        "TutoringClass", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="sun_morning_schedule_rooms", verbose_name="อาทิตย์เช้า (08.30-12.30)",
+    )
+    sun_afternoon_class = models.ForeignKey(
+        "TutoringClass", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="sun_afternoon_schedule_rooms", verbose_name="อาทิตย์บ่าย (13.30-17.30)",
     )
     is_active = models.BooleanField("ใช้งาน", default=True)
 
@@ -1982,6 +1992,11 @@ class ScheduleRoom(models.Model):
 
     def __str__(self) -> str:
         return self.name
+
+    def class_for(self, is_sunday: bool, is_afternoon: bool):
+        if is_sunday:
+            return self.sun_afternoon_class if is_afternoon else self.sun_morning_class
+        return self.sat_afternoon_class if is_afternoon else self.sat_morning_class
 
 
 class ScheduleExamCountdown(models.Model):

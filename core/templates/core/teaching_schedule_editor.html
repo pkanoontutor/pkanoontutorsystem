@@ -69,7 +69,7 @@
           {% for room in rooms %}
             <th class="rh" style="background:{{ room.header_color }};">
               {{ room.name }}
-              <span class="cls">เช้า: {{ room.morning_class.name|default:"—" }} · บ่าย: {{ room.afternoon_class.name|default:"—" }}</span>
+              <span class="cls">เช้า: {{ room.cur_morning_name|default:"—" }} · บ่าย: {{ room.cur_afternoon_name|default:"—" }}</span>
             </th>
           {% endfor %}
         </tr>

@@ -7140,12 +7140,38 @@ _THAI_MONTHS_ABBR = ["", "ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "
                      "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."]
 
 _DEFAULT_SCHEDULE_ROOMS = [
-    ("ห้องทุเรียนหมอนทอง", "#fdf3bf"),
-    ("ห้องมังคุดคัด", "#efe1f5"),
-    ("ห้องมะม่วงเขียวเสวย", "#dcefc9"),
-    ("ห้องแตงโมอินทรา", "#f8d7de"),
-    ("ห้องมะพร้าว", "#ddd6ca"),
+    ("ห้องทุเรียนหมอนทอง", "#fbf2b0"),
+    ("ห้องมังคุดคัด", "#eadaf0"),
+    ("ห้องมะม่วงเขียวเสวย", "#d9ebc6"),
+    ("ห้องแตงโมอินทรา", "#f8d3d9"),
+    ("ห้องมะพร้าว", "#dad1c5"),
 ]
+
+# Distinct, readable tutor-name colours (used when a tutor has no custom colour).
+_SCHEDULE_TUTOR_PALETTE = [
+    "#e11d48", "#1d4ed8", "#059669", "#7c3aed", "#ea580c", "#0891b2",
+    "#be123c", "#4d7c0f", "#9333ea", "#c2410c", "#0d9488", "#b45309",
+    "#db2777", "#4338ca", "#15803d", "#a16207",
+]
+_SCHEDULE_TUTOR_DEFAULT_COLOR = "#1d4ed8"
+
+
+def _schedule_tutor_color_map(tutors) -> dict:
+    """Map tutor id -> display colour, guaranteeing distinct colours.
+
+    A tutor's own colour is honoured when it has been customised (differs from
+    the default); otherwise a distinct palette colour is assigned by order.
+    """
+    color_map = {}
+    palette_i = 0
+    for t in sorted(tutors, key=lambda x: x.id):
+        custom = (t.color or "").strip().lower()
+        if custom and custom != _SCHEDULE_TUTOR_DEFAULT_COLOR:
+            color_map[t.id] = t.color
+        else:
+            color_map[t.id] = _SCHEDULE_TUTOR_PALETTE[palette_i % len(_SCHEDULE_TUTOR_PALETTE)]
+            palette_i += 1
+    return color_map
 
 
 def _thai_schedule_date(d: date) -> str:
@@ -7237,10 +7263,11 @@ def _schedule_class_data(week_start: date) -> list:
     return list(classes.values())
 
 
-def _annotate_schedule_grid(schedule):
+def _annotate_schedule_grid(schedule, color_map=None):
     """Return (grid, has_conflict). Marks conflict on cells whose tutor appears
     more than once within the same time row."""
     from .models import ScheduleRoom
+    color_map = color_map or {}
     rooms = list(ScheduleRoom.objects.filter(is_active=True))
     cells = list(schedule.cells.select_related("tutor", "room"))
     by_pos = {(c.room_id, c.time_index): c for c in cells}
@@ -7259,11 +7286,14 @@ def _annotate_schedule_grid(schedule):
             conflict = bool(c and c.tutor_id and tutor_seen.get(c.tutor_id, 0) > 1)
             if conflict:
                 has_conflict = True
+            tutor_color = ""
+            if c and c.tutor_id:
+                tutor_color = color_map.get(c.tutor_id) or c.tutor.color
             row["rooms"].append({
                 "room": r,
                 "cell": c,
                 "conflict": conflict,
-                "tutor_color": (c.tutor.color if c and c.tutor_id else ""),
+                "tutor_color": tutor_color,
                 "tutor_name": (c.tutor.name if c and c.tutor_id else ""),
             })
         grid.append(row)
@@ -7393,6 +7423,7 @@ def teaching_schedule_editor(request: HttpRequest) -> HttpResponse:
         })
 
     day_label = "อาทิตย์" if is_sunday else "เสาร์"
+    color_map = _schedule_tutor_color_map(tutors)
 
     return render(request, "core/teaching_schedule_editor.html", {
         "schedule": schedule,
@@ -7405,7 +7436,7 @@ def teaching_schedule_editor(request: HttpRequest) -> HttpResponse:
         "has_previous": has_previous,
         "class_data_json": json.dumps(class_data, ensure_ascii=False),
         "tutors_json": json.dumps(
-            [{"id": t.id, "name": t.name, "color": t.color} for t in tutors],
+            [{"id": t.id, "name": t.name, "color": color_map.get(t.id, t.color)} for t in tutors],
             ensure_ascii=False,
         ),
         "rooms_json": json.dumps(rooms_payload, ensure_ascii=False),
@@ -7415,9 +7446,11 @@ def teaching_schedule_editor(request: HttpRequest) -> HttpResponse:
 
 def teaching_schedule_image(request: HttpRequest, pk: int) -> HttpResponse:
     from .models import DailySchedule, ScheduleRoom, ScheduleExamCountdown
+    from .models import TeachingTutor
     schedule = get_object_or_404(DailySchedule, pk=pk)
     rooms = list(ScheduleRoom.objects.filter(is_active=True))
-    grid, has_conflict = _annotate_schedule_grid(schedule)
+    color_map = _schedule_tutor_color_map(list(TeachingTutor.objects.all()))
+    grid, has_conflict = _annotate_schedule_grid(schedule, color_map=color_map)
 
     countdowns = []
     for e in ScheduleExamCountdown.objects.filter(is_active=True):

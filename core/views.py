@@ -7200,6 +7200,23 @@ def _schedule_room_class(room, time_index: int, is_sunday: bool):
     return room.class_for(is_sunday=is_sunday, is_afternoon=(time_index > 3))
 
 
+def _previous_same_weekday_schedule(d: date):
+    """Most recent earlier DailySchedule that falls on the same weekday as d.
+
+    Room-to-class bindings differ between Saturday and Sunday, so "carry
+    forward" must compare against the same weekday's schedule, not merely
+    the chronologically previous one, or subjects won't match the current
+    day's bound classes (though the tutor still would, since the tutor
+    dropdown isn't filtered by class).
+    """
+    from .models import DailySchedule
+    candidates = DailySchedule.objects.filter(date__lt=d).order_by("-date")[:60]
+    for cand in candidates:
+        if cand.date.weekday() == d.weekday():
+            return cand
+    return None
+
+
 def _seed_schedule_rooms() -> None:
     from .models import ScheduleRoom
     if ScheduleRoom.objects.exists():
@@ -7343,7 +7360,7 @@ def teaching_schedule_editor(request: HttpRequest) -> HttpResponse:
         action = (request.POST.get("action") or "").strip()
 
         if action == "carry_forward":
-            prev = DailySchedule.objects.filter(date__lt=d).order_by("-date").first()
+            prev = _previous_same_weekday_schedule(d)
             if prev:
                 with transaction.atomic():
                     schedule.cells.all().delete()
@@ -7408,7 +7425,7 @@ def teaching_schedule_editor(request: HttpRequest) -> HttpResponse:
             "index": ti, "label": slot["label"], "is_break": slot["is_break"], "cells": cells,
         })
 
-    has_previous = DailySchedule.objects.filter(date__lt=d).exists()
+    has_previous = _previous_same_weekday_schedule(d) is not None
 
     rooms_payload = []
     for r in rooms:

@@ -1,8 +1,114 @@
 {% extends "core/base.html" %}
 {% block title %}ใบเสร็จ {{ payment.receipt_no }}{% endblock %}
 {% block head %}
-<style>.wrapx{max-width:960px;margin:0 auto;display:grid;gap:14px}.cardx{background:#fff;border-radius:20px;padding:18px;box-shadow:0 6px 16px rgba(15,23,42,.08)}.head{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}.title{font-size:24px;font-weight:1000}.badge{display:inline-flex;padding:5px 10px;border-radius:999px;font-weight:1000;font-size:12px}.issued{background:#dcfce7;color:#166534;border:1px solid #bbf7d0}.cancelled{background:#fee2e2;color:#991b1b;border:1px solid #fecaca}.grid{display:grid;grid-template-columns:180px 1fr;gap:0;border:1px solid #e2e8f0;border-radius:16px;overflow:hidden}.label{background:#f8fafc;color:#475569;font-weight:1000;padding:10px}.value{padding:10px;font-weight:800}.btnx{border:0;border-radius:14px;padding:10px 14px;font-weight:1000;text-decoration:none;display:inline-flex;justify-content:center;align-items:center;gap:7px;cursor:pointer}.primary{background:#2563eb;color:#fff}.soft{background:#fff;color:#0f172a;border:1px solid #e2e8f0}.danger{background:#fee2e2;color:#991b1b;border:1px solid #fecaca}.actions{display:flex;gap:8px;flex-wrap:wrap}.cancelbox{background:#fff7ed;border:1px solid #fed7aa;border-radius:16px;padding:12px}textarea{width:100%;border:1px solid #e2e8f0;border-radius:12px;padding:10px;font-weight:800;min-height:70px}@media(max-width:720px){.grid{grid-template-columns:1fr}.btnx{width:100%}}</style>
+<style>
+  .wrapx{max-width:1180px;margin:0 auto;display:grid;gap:14px}
+  .cols{display:grid;grid-template-columns:1fr 460px;gap:14px;align-items:start;}
+  .cardx{background:#fff;border-radius:20px;padding:18px;box-shadow:0 6px 16px rgba(15,23,42,.08)}
+  .head{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+  .title{font-size:24px;font-weight:1000}
+  .badge{display:inline-flex;padding:5px 10px;border-radius:999px;font-weight:1000;font-size:12px}
+  .issued{background:#dcfce7;color:#166534;border:1px solid #bbf7d0}
+  .cancelled{background:#fee2e2;color:#991b1b;border:1px solid #fecaca}
+  .grid{display:grid;grid-template-columns:180px 1fr;gap:0;border:1px solid #e2e8f0;border-radius:16px;overflow:hidden}
+  .label{background:#f8fafc;color:#475569;font-weight:1000;padding:10px}
+  .value{padding:10px;font-weight:800}
+  .btnx{border:0;border-radius:14px;padding:10px 14px;font-weight:1000;text-decoration:none;display:inline-flex;justify-content:center;align-items:center;gap:7px;cursor:pointer;font-family:inherit;}
+  .primary{background:#e0722b;color:#fff}
+  .soft{background:#fff;color:#0f172a;border:1px solid #e2e8f0}
+  .green{background:#16a34a;color:#fff}
+  .danger{background:#fee2e2;color:#991b1b;border:1px solid #fecaca}
+  .actions{display:flex;gap:8px;flex-wrap:wrap}
+  .cancelbox{background:#fff7ed;border:1px solid #fed7aa;border-radius:16px;padding:12px}
+  textarea{width:100%;border:1px solid #e2e8f0;border-radius:12px;padding:10px;font-weight:800;min-height:70px}
+  .preview-head{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px;}
+  .preview-title{font-size:16px;font-weight:1000;}
+  .preview-actions{display:flex;gap:6px;flex-wrap:wrap;}
+  .preview-frame-wrap{border:1px solid #f1e0ad;border-radius:16px;overflow:hidden;background:#fdf3d8;height:640px;}
+  .preview-frame-wrap iframe{width:100%;height:100%;border:0;}
+  .copy-toast{font-size:12px;font-weight:800;color:#166534;margin-top:8px;display:none;}
+  .copy-toast.show{display:block;}
+  @media(max-width:960px){.cols{grid-template-columns:1fr}.preview-frame-wrap{height:560px;}}
+  @media(max-width:720px){.grid{grid-template-columns:1fr}.btnx{width:100%}}
+</style>
 {% endblock %}
 {% block content %}
-<div class="wrapx"><div class="cardx head"><div><div class="title">ใบเสร็จ {{ payment.receipt_no }}</div><div style="color:#64748b;margin-top:4px;">{{ payment.student.display_name }}</div></div><div class="actions"><a class="btnx soft" href="/course-payments/">← รายการ</a><a class="btnx primary" href="{% url 'core:course_payment_receipt_image' payment.id %}" target="_blank">เปิดใบเสร็จเป็นรูป</a></div></div><div class="cardx"><span class="badge {% if payment.status == 'cancelled' %}cancelled{% else %}issued{% endif %}">{{ payment.get_status_display }}</span><div class="grid" style="margin-top:12px;"><div class="label">วันที่รับเงิน</div><div class="value">{{ payment.payment_date|date:"d/m/Y" }}</div><div class="label">นักเรียน</div><div class="value">{{ payment.student.display_name }}</div><div class="label">Class</div><div class="value">{{ payment.tutoring_class.name }}</div><div class="label">Enrollment</div><div class="value">{% if payment.enrollment %}{{ payment.enrollment.sale_run_no|default:payment.enrollment_id }}{% else %}-{% endif %}</div><div class="label">จำนวนครั้ง</div><div class="value">{{ payment.sessions_granted }}</div><div class="label">ราคาคอร์ส</div><div class="value">{{ payment.course_price|floatformat:"0g" }}</div><div class="label">ส่วนลด</div><div class="value">{{ payment.discount_amount|floatformat:"0g" }}</div><div class="label">ยอดสุทธิ</div><div class="value">{{ payment.net_amount|floatformat:"0g" }}</div><div class="label">ยอดรับชำระ</div><div class="value"><b>{{ payment.amount_paid|floatformat:"0g" }}</b></div><div class="label">วิธีชำระเงิน</div><div class="value">{{ payment.get_payment_method_display }}</div><div class="label">หมายเหตุ</div><div class="value">{{ payment.note|default:"-" }}</div></div></div>{% if payment.status != 'cancelled' %}<div class="cancelbox"><form method="post" action="{% url 'core:course_payment_cancel' payment.id %}" onsubmit="return confirm('ยืนยันยกเลิกใบเสร็จนี้ใช่ไหม? ระบบจะ reverse จำนวนครั้งเรียนที่เพิ่มจากใบเสร็จนี้ด้วย')">{% csrf_token %}<label style="font-weight:1000;color:#92400e;">เหตุผลการยกเลิก</label><textarea name="cancel_reason" placeholder="เช่น ออกผิด / ยอดผิด / เลือกคอร์สผิด"></textarea><div style="margin-top:8px;"><button class="btnx danger" type="submit">ยกเลิกใบเสร็จนี้</button></div></form></div>{% else %}<div class="cardx" style="background:#fef2f2;color:#991b1b;"><b>ใบเสร็จนี้ถูกยกเลิกแล้ว</b><br>{{ payment.cancel_reason|default:"-" }}</div>{% endif %}</div>
+<div class="wrapx">
+  <div class="cardx head">
+    <div>
+      <div class="title">ใบเสร็จ {{ payment.receipt_no }}</div>
+      <div style="color:#64748b;margin-top:4px;">{{ payment.student.display_name }}</div>
+    </div>
+    <div class="actions">
+      <a class="btnx soft" href="/course-payments/">← รายการ</a>
+      <a class="btnx soft" href="{% url 'core:course_payment_receipt_image' payment.id %}" target="_blank">เปิดในแท็บใหม่</a>
+    </div>
+  </div>
+
+  <div class="cols">
+    <div class="cardx">
+      <span class="badge {% if payment.status == 'cancelled' %}cancelled{% else %}issued{% endif %}">{{ payment.get_status_display }}</span>
+      <div class="grid" style="margin-top:12px;">
+        <div class="label">วันที่รับเงิน</div><div class="value">{{ payment.payment_date|date:"d/m/Y" }}</div>
+        <div class="label">นักเรียน</div><div class="value">{{ payment.student.display_name }}</div>
+        <div class="label">Class</div><div class="value">{{ payment.tutoring_class.name }}</div>
+        <div class="label">Enrollment</div><div class="value">{% if payment.enrollment %}{{ payment.enrollment.sale_run_no|default:payment.enrollment_id }}{% else %}-{% endif %}</div>
+        <div class="label">จำนวนครั้ง</div><div class="value">{{ payment.sessions_granted }}</div>
+        <div class="label">ราคาคอร์ส</div><div class="value">{{ payment.course_price|floatformat:"0g" }}</div>
+        <div class="label">ส่วนลด</div><div class="value">{{ payment.discount_amount|floatformat:"0g" }}</div>
+        <div class="label">ยอดสุทธิ</div><div class="value">{{ payment.net_amount|floatformat:"0g" }}</div>
+        <div class="label">ยอดรับชำระ</div><div class="value"><b>{{ payment.amount_paid|floatformat:"0g" }}</b></div>
+        <div class="label">วิธีชำระเงิน</div><div class="value">{{ payment.get_payment_method_display }}</div>
+        <div class="label">หมายเหตุ</div><div class="value">{{ payment.note|default:"-" }}</div>
+      </div>
+
+      {% if payment.status != 'cancelled' %}
+        <div class="cancelbox" style="margin-top:14px;">
+          <form method="post" action="{% url 'core:course_payment_cancel' payment.id %}" onsubmit="return confirm('ยืนยันยกเลิกใบเสร็จนี้ใช่ไหม? ระบบจะ reverse จำนวนครั้งเรียนที่เพิ่มจากใบเสร็จนี้ด้วย')">
+            {% csrf_token %}
+            <label style="font-weight:1000;color:#92400e;">เหตุผลการยกเลิก</label>
+            <textarea name="cancel_reason" placeholder="เช่น ออกผิด / ยอดผิด / เลือกคอร์สผิด"></textarea>
+            <div style="margin-top:8px;"><button class="btnx danger" type="submit">ยกเลิกใบเสร็จนี้</button></div>
+          </form>
+        </div>
+      {% else %}
+        <div class="cardx" style="background:#fef2f2;color:#991b1b;margin-top:14px;"><b>ใบเสร็จนี้ถูกยกเลิกแล้ว</b><br>{{ payment.cancel_reason|default:"-" }}</div>
+      {% endif %}
+    </div>
+
+    <div class="cardx">
+      <div class="preview-head">
+        <div class="preview-title">🧾 พรีวิวใบเสร็จ</div>
+        <div class="preview-actions">
+          <button class="btnx green" type="button" onclick="copyReceiptImage()">Copy Image</button>
+          <button class="btnx soft" type="button" onclick="downloadReceiptImage()">Download PNG</button>
+        </div>
+      </div>
+      <div class="preview-frame-wrap">
+        <iframe id="receiptFrame" src="{% url 'core:course_payment_receipt_image' payment.id %}"></iframe>
+      </div>
+      <div class="copy-toast" id="copyToast">✅ Copy รูปใบเสร็จแล้ว วางได้เลย (Ctrl+V / Cmd+V)</div>
+    </div>
+  </div>
+</div>
+
+<script>
+function receiptWin(){
+  var f=document.getElementById('receiptFrame');
+  return f && f.contentWindow;
+}
+function copyReceiptImage(){
+  var w=receiptWin();
+  if(w && typeof w.copyImage === 'function'){
+    w.copyImage();
+    var t=document.getElementById('copyToast');
+    t.classList.add('show');
+    setTimeout(function(){t.classList.remove('show');},4000);
+  }
+}
+function downloadReceiptImage(){
+  var w=receiptWin();
+  if(w && typeof w.downloadImage === 'function'){ w.downloadImage(); }
+}
+</script>
 {% endblock %}

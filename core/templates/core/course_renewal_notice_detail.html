@@ -7,13 +7,17 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>{{ notice.get_notice_type_display }} {{ notice.id }}</title>
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <style>
     *{box-sizing:border-box}
-    body{margin:0;background:#e0f2fe;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#0f172a}
+    body{margin:0;background:#e0f2fe;font-family:"IBM Plex Sans Thai",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:#0f172a}
     .page{min-height:100vh;padding:14px;display:grid;gap:14px;grid-template-columns:minmax(320px,430px) minmax(360px,520px);justify-content:center;align-items:start}
     .editor,.receipt{background:#fff;border-radius:26px;box-shadow:0 14px 32px rgba(15,23,42,.16);border:1px solid rgba(255,255,255,.9)}
     .editor{padding:16px;display:grid;gap:12px;position:sticky;top:12px}
     .editor h1{font-size:20px;margin:0;color:#0f172a}.hint{font-size:12px;color:#64748b;line-height:1.45;font-weight:800}
+    #dateAutoSaveHint{color:#16a34a;font-weight:1000;}
     .grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.field{display:flex;flex-direction:column;gap:5px}.field label{font-size:11px;font-weight:1000;color:#334155;text-transform:uppercase;letter-spacing:.04em}
     input,textarea,select{border:1px solid #e2e8f0;border-radius:13px;padding:10px;font-weight:800;background:#fff;width:100%;font-family:inherit}
     textarea{min-height:88px;resize:vertical}.pkg-edit{border:1px solid #e2e8f0;background:#f8fafc;border-radius:16px;padding:10px;display:grid;gap:8px}
@@ -69,13 +73,14 @@
         <div class="grid">
           <div class="field">
             <label>วันที่คาดว่าจะครบคอร์ส</label>
-            <input type="date" name="expected_course_end_date" value="{{ notice.expected_course_end_date|date:'Y-m-d' }}">
+            <input type="date" id="expEndDate" name="expected_course_end_date" value="{{ notice.expected_course_end_date|date:'Y-m-d' }}">
           </div>
           <div class="field">
-            <label>วันที่เริ่มต้นใหม่</label>
-            <input type="date" name="next_course_start_date" value="{{ notice.next_course_start_date|date:'Y-m-d' }}">
+            <label>วันที่เริ่มต้นใหม่ <span style="font-weight:400;color:#64748b;">(auto = ครบคอร์ส +7 วัน, แก้เองได้)</span></label>
+            <input type="date" id="nextStartDate" name="next_course_start_date" value="{{ notice.next_course_start_date|date:'Y-m-d' }}">
           </div>
         </div>
+        <div class="hint" id="dateAutoSaveHint" style="display:none;">💾 บันทึกวันที่แล้ว</div>
 
         <div id="renewalEditor">
           <div class="pkg-edit">
@@ -169,8 +174,8 @@
         </div>
 
         <div class="date-row">
-          <div class="date-box end"><div class="k">คาดว่าจะครบคอร์ส</div><div class="v">{{ notice.expected_course_end_date|date:"d/m/Y" }}</div></div>
-          <div class="date-box start"><div class="k">เริ่มเรียนรอบใหม่</div><div class="v">{{ notice.next_course_start_date|date:"d/m/Y" }}</div></div>
+          <div class="date-box end"><div class="k">คาดว่าจะครบคอร์ส</div><div class="v" id="endDateView">{{ notice.expected_course_end_date|date:"d/m/Y" }}</div></div>
+          <div class="date-box start"><div class="k">เริ่มเรียนรอบใหม่</div><div class="v" id="startDateView">{{ notice.next_course_start_date|date:"d/m/Y" }}</div></div>
         </div>
 
         {% if notice.notice_type == "installment" %}
@@ -215,6 +220,68 @@
     }
     document.getElementById("noticeKind").addEventListener("change", updateMode);
     updateMode();
+
+    // --- Interactive dates: next start date auto-fills as end date +7,
+    // and both fields autosave without needing the main "บันทึก" button. ---
+    (function () {
+      const endInput = document.getElementById("expEndDate");
+      const startInput = document.getElementById("nextStartDate");
+      const endView = document.getElementById("endDateView");
+      const startView = document.getElementById("startDateView");
+      const savedHint = document.getElementById("dateAutoSaveHint");
+      const form = document.getElementById("editForm");
+      let startTouchedManually = false;
+
+      function fmtDMY(isoStr) {
+        if (!isoStr) return "-";
+        const [y, m, d] = isoStr.split("-");
+        if (!y || !m || !d) return "-";
+        return `${d}/${m}/${y}`;
+      }
+      function plusDaysISO(isoStr, days) {
+        const dt = new Date(isoStr + "T00:00:00");
+        if (isNaN(dt.getTime())) return "";
+        dt.setDate(dt.getDate() + days);
+        const y = dt.getFullYear();
+        const m = String(dt.getMonth() + 1).padStart(2, "0");
+        const d = String(dt.getDate()).padStart(2, "0");
+        return `${y}-${m}-${d}`;
+      }
+
+      let saveTimer = null;
+      function scheduleAutoSave() {
+        if (saveTimer) clearTimeout(saveTimer);
+        saveTimer = setTimeout(async () => {
+          try {
+            await fetch(window.location.pathname + window.location.search, {
+              method: "POST",
+              body: new FormData(form),
+            });
+            savedHint.style.display = "block";
+            clearTimeout(savedHint._hideTimer);
+            savedHint._hideTimer = setTimeout(() => { savedHint.style.display = "none"; }, 2000);
+          } catch (e) { /* ignore network hiccup; user can still hit the main save button */ }
+        }, 350);
+      }
+
+      endInput.addEventListener("change", function () {
+        endView.textContent = fmtDMY(endInput.value);
+        if (!startTouchedManually) {
+          const auto = plusDaysISO(endInput.value, 7);
+          if (auto) {
+            startInput.value = auto;
+            startView.textContent = fmtDMY(auto);
+          }
+        }
+        scheduleAutoSave();
+      });
+
+      startInput.addEventListener("change", function () {
+        startTouchedManually = true;
+        startView.textContent = fmtDMY(startInput.value);
+        scheduleAutoSave();
+      });
+    })();
 
     async function makeCanvas() {
       const el = document.getElementById("receiptCard");

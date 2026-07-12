@@ -52,8 +52,9 @@
     /* Tutor version: taller rows, smaller main line + tiny progress lines */
     .sched.tutor-mode .cell{height:84px;font-size:13px;padding:8px 11px;vertical-align:top;}
     .sched.tutor-mode .time-c{font-size:14px;}
-    .prog{margin-top:3px;font-size:6.5px;line-height:1.5;color:#57534e;font-weight:500;}
+    .prog{margin-top:3px;font-size:7.8px;line-height:1.5;color:#57534e;font-weight:400;}
     .prog div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .prog .sheet{font-weight:700;}
 
     .footer{margin-top:18px;display:flex;align-items:center;justify-content:center;gap:26px;flex-wrap:wrap;}
     .foot-note{font-size:20px;font-weight:700;color:#3a3527;text-align:center;line-height:1.35;max-width:360px;}
@@ -125,7 +126,7 @@
                   <td class="cell"></td>
                 {% else %}
                   <td class="cell {% if not rc.cell %}empty{% endif %} {% if rc.conflict %}conflict{% endif %}">
-                    {% if rc.cell %}{% if rc.cell.grade_label %}{{ rc.cell.grade_label }}{% endif %}{% if rc.cell.subject_label %} / {{ rc.cell.subject_label }}{% endif %}{% if rc.tutor_name %} / <span class="tutor" style="color:{{ rc.tutor_color }};">{{ rc.tutor_name }}</span>{% endif %}{% if version == "tutor" and rc.progress %}<div class="prog"><div>ชีท: {{ rc.progress.sheet_name }}</div><div>ถึง: {{ rc.progress.position }} · ล่าสุด: {{ rc.progress.last_teacher }}</div></div>{% endif %}{% endif %}
+                    {% if rc.cell %}{% if rc.cell.grade_label %}{{ rc.cell.grade_label }}{% endif %}{% if rc.cell.subject_label %} / {{ rc.cell.subject_label }}{% endif %}{% if rc.tutor_name %} / <span class="tutor" style="color:{{ rc.tutor_color }};">{{ rc.tutor_name }}</span>{% endif %}{% if version == "tutor" and rc.progress %}<div class="prog"><div class="sheet">ชีท: {{ rc.progress.sheet_name }}</div><div>ถึง: {{ rc.progress.position }} · ล่าสุด: {{ rc.progress.last_teacher }}</div></div>{% endif %}{% endif %}
                   </td>
                 {% endif %}
               {% endfor %}

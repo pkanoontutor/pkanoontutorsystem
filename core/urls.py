@@ -126,6 +126,7 @@ urlpatterns = [
     path("teaching-schedule/edit/", views.teaching_schedule_editor, name="teaching_schedule_editor"),
     path("teaching-schedule/image/<int:pk>/", views.teaching_schedule_image, name="teaching_schedule_image"),
     path("teaching-schedule/exam-dates/", views.teaching_schedule_exam_dates, name="teaching_schedule_exam_dates"),
+    path("teaching-schedule/rooms/", views.teaching_schedule_rooms, name="teaching_schedule_rooms"),
 
     # Generate course notice
     path("generate/course-notice/", views.generate_course_notice, name="generate_course_notice"),

@@ -7164,6 +7164,18 @@ def _grade_from_class_name(name: str) -> str:
     return f"{m.group(1)}{m.group(2)}" if m else ""
 
 
+def _schedule_half(time_index: int) -> str:
+    """Morning block = slots 0-3 (before lunch), afternoon = slots 5-8."""
+    return "morning" if time_index <= 3 else "afternoon"
+
+
+def _schedule_room_class(room, time_index: int):
+    """The class bound to a room for the half-day that time_index falls in."""
+    if _schedule_half(time_index) == "morning":
+        return room.morning_class if room.morning_class_id else None
+    return room.afternoon_class if room.afternoon_class_id else None
+
+
 def _seed_schedule_rooms() -> None:
     from .models import ScheduleRoom
     if ScheduleRoom.objects.exists():
@@ -7289,7 +7301,10 @@ def teaching_schedule_editor(request: HttpRequest) -> HttpResponse:
     d = _parse_date(request.GET.get("date") or request.POST.get("date"))
     schedule, _created = DailySchedule.objects.get_or_create(date=d)
     week_start, _week_end = _teaching_week_range(d)
-    rooms = list(ScheduleRoom.objects.filter(is_active=True))
+    rooms = list(
+        ScheduleRoom.objects.filter(is_active=True)
+        .select_related("morning_class", "afternoon_class")
+    )
 
     if request.method == "POST":
         action = (request.POST.get("action") or "").strip()
@@ -7310,6 +7325,7 @@ def teaching_schedule_editor(request: HttpRequest) -> HttpResponse:
             return redirect(f"/teaching-schedule/edit/?date={d.isoformat()}")
 
         if action == "save":
+            from .models import TeachingClassSubjectTemplate
             with transaction.atomic():
                 schedule.title_note = (request.POST.get("title_note") or "").strip()
                 schedule.save()
@@ -7318,17 +7334,20 @@ def teaching_schedule_editor(request: HttpRequest) -> HttpResponse:
                     for ti, slot in enumerate(TEACHING_SCHEDULE_SLOTS):
                         if slot["is_break"]:
                             continue
+                        bound_class = _schedule_room_class(r, ti)
                         prefix = f"cell_{r.id}_{ti}_"
-                        class_id = (request.POST.get(prefix + "class") or "").strip()
                         template_id = (request.POST.get(prefix + "template") or "").strip()
                         tutor_id = (request.POST.get(prefix + "tutor") or "").strip()
-                        grade = (request.POST.get(prefix + "grade") or "").strip()
-                        subject = (request.POST.get(prefix + "subject") or "").strip()
-                        if not (grade or subject or tutor_id):
+                        if not (template_id or tutor_id):
                             continue
+                        subject = ""
+                        if template_id:
+                            tmpl = TeachingClassSubjectTemplate.objects.filter(id=template_id).first()
+                            subject = tmpl.subject_name if tmpl else ""
+                        grade = _grade_from_class_name(bound_class.name) if bound_class else ""
                         DailyScheduleCell.objects.create(
                             schedule=schedule, room=r, time_index=ti,
-                            tutoring_class_id=class_id or None,
+                            tutoring_class_id=(bound_class.id if bound_class else None),
                             subject_template_id=template_id or None,
                             tutor_id=tutor_id or None,
                             grade_label=grade, subject_label=subject,
@@ -7342,11 +7361,8 @@ def teaching_schedule_editor(request: HttpRequest) -> HttpResponse:
     existing_map = {}
     for (room_id, ti), c in existing.items():
         existing_map[f"{room_id}_{ti}"] = {
-            "class_id": c.tutoring_class_id,
             "template_id": c.subject_template_id,
             "tutor_id": c.tutor_id,
-            "grade": c.grade_label,
-            "subject": c.subject_label,
         }
 
     editor_rows = []
@@ -7359,6 +7375,17 @@ def teaching_schedule_editor(request: HttpRequest) -> HttpResponse:
         })
 
     has_previous = DailySchedule.objects.filter(date__lt=d).exists()
+
+    rooms_payload = []
+    for r in rooms:
+        rooms_payload.append({
+            "id": r.id,
+            "name": r.name,
+            "morning_class": r.morning_class_id,
+            "afternoon_class": r.afternoon_class_id,
+            "morning_class_name": (r.morning_class.name if r.morning_class_id else ""),
+            "afternoon_class_name": (r.afternoon_class.name if r.afternoon_class_id else ""),
+        })
 
     return render(request, "core/teaching_schedule_editor.html", {
         "schedule": schedule,
@@ -7373,6 +7400,7 @@ def teaching_schedule_editor(request: HttpRequest) -> HttpResponse:
             [{"id": t.id, "name": t.name, "color": t.color} for t in tutors],
             ensure_ascii=False,
         ),
+        "rooms_json": json.dumps(rooms_payload, ensure_ascii=False),
         "existing_json": json.dumps(existing_map, ensure_ascii=False),
     })
 
@@ -7431,4 +7459,30 @@ def teaching_schedule_exam_dates(request: HttpRequest) -> HttpResponse:
     return render(request, "core/teaching_schedule_exam_dates.html", {
         "items": items,
         "today": today,
+    })
+
+
+def teaching_schedule_rooms(request: HttpRequest) -> HttpResponse:
+    """Configure which class each room hosts in the morning / afternoon block."""
+    from .models import ScheduleRoom
+    _seed_schedule_rooms()
+
+    rooms = list(
+        ScheduleRoom.objects.filter(is_active=True)
+        .select_related("morning_class", "afternoon_class")
+    )
+
+    if request.method == "POST":
+        for r in rooms:
+            m = (request.POST.get(f"room_{r.id}_morning") or "").strip()
+            a = (request.POST.get(f"room_{r.id}_afternoon") or "").strip()
+            r.morning_class_id = int(m) if m else None
+            r.afternoon_class_id = int(a) if a else None
+            r.save(update_fields=["morning_class", "afternoon_class"])
+        return redirect("/teaching-schedule/rooms/")
+
+    classes = list(TutoringClass.objects.filter(is_active=True).order_by("name"))
+    return render(request, "core/teaching_schedule_rooms.html", {
+        "rooms": rooms,
+        "classes": classes,
     })

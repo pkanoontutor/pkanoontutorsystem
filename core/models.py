@@ -1958,16 +1958,20 @@ class AdminToolCard(models.Model):
 class ScheduleRoom(models.Model):
     """A physical room shown as a column on the schedule (named after fruits).
 
-    Each room may be bound to a default TutoringClass so the editor can
-    auto-suggest subjects/tutors/grade for that room; the class name itself is
-    never shown on the generated image.
+    A room hosts one class in the morning block and (optionally) a different
+    class in the afternoon block. These bindings drive the subject/tutor/grade
+    options in the editor; the class name itself is never shown on the image.
     """
     name = models.CharField("ชื่อห้อง", max_length=120)
     header_color = models.CharField("สีหัวคอลัมน์", max_length=20, default="#fdf3bf")
     display_order = models.PositiveIntegerField("ลำดับคอลัมน์", default=1)
-    default_class = models.ForeignKey(
+    morning_class = models.ForeignKey(
         "TutoringClass", on_delete=models.SET_NULL, null=True, blank=True,
-        related_name="default_schedule_rooms", verbose_name="ผูกกับคลาส (ไม่แสดงชื่อ)",
+        related_name="morning_schedule_rooms", verbose_name="คลาสรอบเช้า (08.30-12.30)",
+    )
+    afternoon_class = models.ForeignKey(
+        "TutoringClass", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="afternoon_schedule_rooms", verbose_name="คลาสรอบบ่าย (13.30-17.30)",
     )
     is_active = models.BooleanField("ใช้งาน", default=True)
 

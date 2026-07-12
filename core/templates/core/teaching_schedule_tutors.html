@@ -1,0 +1,99 @@
+{% extends "core/base.html" %}
+{% load humanize %}
+{% block title %}Profile ติวเตอร์{% endblock %}
+
+{% block head %}
+<style>
+  .tp-wrap{max-width:1080px;margin:0 auto;display:grid;gap:16px;}
+  .tp-card{background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:18px;box-shadow:0 4px 10px rgba(0,0,0,.06);overflow-x:auto;}
+  .tp-bar{display:flex;gap:10px;align-items:end;flex-wrap:wrap;}
+  .tp-bar label{font-size:12px;font-weight:700;color:#475569;display:block;margin-bottom:4px;}
+  .tp-bar input[type=date]{padding:9px 12px;border:1px solid #cbd5e1;border-radius:10px;font-size:14px;font-family:inherit;}
+  .sbtn{border:0;border-radius:10px;padding:10px 15px;font-weight:700;cursor:pointer;font-size:14px;font-family:inherit;
+    display:inline-flex;align-items:center;gap:6px;text-decoration:none;}
+  .sbtn.blue{background:#1d4ed8;color:#fff}.sbtn.green{background:#16a34a;color:#fff}
+  .sbtn.soft{background:#f1f5f9;color:#0f172a;border:1px solid #cbd5e1}
+  table.tp{width:100%;border-collapse:collapse;min-width:860px;font-size:14px;}
+  table.tp th,table.tp td{padding:10px 8px;border-bottom:1px solid #f1f5f9;text-align:left;vertical-align:middle;}
+  table.tp th{font-size:11.5px;color:#64748b;text-transform:uppercase;letter-spacing:.03em;}
+  table.tp td.num,table.tp th.num{text-align:right;}
+  .tname{font-weight:700;font-size:15px;}
+  .inactive{opacity:.5;}
+  input[type=color]{width:44px;height:32px;border:1px solid #cbd5e1;border-radius:8px;padding:2px;cursor:pointer;background:#fff;}
+  select{padding:7px 9px;border:1px solid #cbd5e1;border-radius:9px;font-size:13px;font-family:inherit;background:#fff;max-width:180px;}
+  .total-row{font-weight:700;background:#f8fafc;}
+  .nolink-tag{display:inline-block;font-size:11px;font-weight:700;color:#b91c1c;background:#fef2f2;border:1px solid #fecaca;border-radius:999px;padding:1px 8px;}
+  .hint{font-size:13px;color:#64748b;}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="tp-wrap">
+  <div class="tp-card">
+    <h2 style="margin:0 0 4px;">👩‍🏫 Profile ติวเตอร์ — สี & รายได้สะสม</h2>
+    <p class="hint" style="margin:0 0 14px;">ตั้งสีประจำตัว (ใช้เป็นสีฟอนต์ชื่อบนตารางสอน) และดูรายได้สะสมจากระบบค่าติวเตอร์ ตามช่วงเวลาที่เลือก</p>
+    <form method="get" class="tp-bar">
+      <div><label>จากวันที่</label><input type="date" name="date_from" value="{{ date_from|date:'Y-m-d' }}"></div>
+      <div><label>ถึงวันที่</label><input type="date" name="date_to" value="{{ date_to|date:'Y-m-d' }}"></div>
+      <button class="sbtn blue" type="submit">🔍 ดูรายได้ช่วงนี้</button>
+      <span style="flex:1"></span>
+      <a class="sbtn soft" href="/teaching-schedule/">← กลับหน้าตาราง</a>
+      <a class="sbtn soft" href="/school-finance/">💰 รายรับรายจ่าย</a>
+    </form>
+  </div>
+
+  <form method="post" class="tp-card">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="save_profiles">
+    <input type="hidden" name="date_from" value="{{ date_from|date:'Y-m-d' }}">
+    <input type="hidden" name="date_to" value="{{ date_to|date:'Y-m-d' }}">
+    <table class="tp">
+      <thead>
+        <tr>
+          <th>ติวเตอร์</th>
+          <th>สีประจำตัว</th>
+          <th>ผูกกับระบบเงิน</th>
+          <th class="num">วันที่สอน</th>
+          <th class="num">ชม.สอน</th>
+          <th class="num">ชม.ออนไลน์</th>
+          <th class="num">ค่าแหว่ง/อื่นๆ</th>
+          <th class="num">รายได้รวม (บาท)</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in profile_rows %}
+          <tr class="{% if not row.tutor.is_active %}inactive{% endif %}">
+            <td><span class="tname" style="color:{{ row.tutor.color }};">{{ row.tutor.name }}</span>{% if not row.tutor.is_active %} (ปิดใช้งาน){% endif %}</td>
+            <td><input type="color" name="color_{{ row.tutor.id }}" value="{{ row.tutor.color }}"></td>
+            <td>
+              <select name="payroll_{{ row.tutor.id }}">
+                <option value="">— ไม่ผูก —</option>
+                {% for p in payroll_tutors %}
+                  <option value="{{ p.id }}" {% if row.tutor.payroll_tutor_id == p.id %}selected{% endif %}>{{ p.name }}</option>
+                {% endfor %}
+              </select>
+              {% if not row.tutor.payroll_tutor_id %}<span class="nolink-tag">ยังไม่ผูก</span>{% endif %}
+            </td>
+            <td class="num">{{ row.days }}</td>
+            <td class="num">{{ row.hours|floatformat:1 }}</td>
+            <td class="num">{{ row.online_hours|floatformat:1 }}</td>
+            <td class="num">{{ row.idle|floatformat:0|intcomma }}</td>
+            <td class="num" style="font-weight:700;">{{ row.total|floatformat:0|intcomma }}</td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="8" style="text-align:center;color:#64748b;padding:18px;">ยังไม่มีติวเตอร์ — เพิ่มได้ที่หน้า "อัปเดตการสอนติวเตอร์"</td></tr>
+        {% endfor %}
+        {% if profile_rows %}
+          <tr class="total-row">
+            <td colspan="7" style="text-align:right;">รวมทั้งหมด</td>
+            <td class="num">{{ grand_total|floatformat:0|intcomma }}</td>
+          </tr>
+        {% endif %}
+      </tbody>
+    </table>
+    <div style="display:flex;gap:8px;margin-top:14px;">
+      <button class="sbtn green" type="submit">💾 บันทึกสี / การผูกระบบเงิน</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

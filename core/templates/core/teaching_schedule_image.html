@@ -1,10 +1,11 @@
 {% load static %}
+{% load humanize %}
 <!doctype html>
 <html lang="th">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>ตารางเรียน {{ thai_date }}</title>
+  <title>ตารางเรียน {{ thai_date }}{% if version == "tutor" %} (ติวเตอร์){% endif %}</title>
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -16,32 +17,43 @@
     .wrap{max-width:1360px;margin:0 auto;padding:16px;}
     .toolbar{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-bottom:14px;}
     .btn{border:0;border-radius:12px;padding:11px 16px;font-weight:600;cursor:pointer;
-      background:#1d4ed8;color:#fff;text-decoration:none;display:inline-flex;align-items:center;gap:6px;font-family:inherit;}
+      background:#1d4ed8;color:#fff;text-decoration:none;display:inline-flex;align-items:center;gap:6px;font-family:inherit;font-size:14px;}
     .btn.soft{background:#fff;color:#0f172a;border:1px solid #cbd5e1}
     .btn.green{background:#16a34a}
+    .btn.amber{background:#f59e0b}
+    .btn.on{outline:3px solid #93c5fd;}
     .warn-banner{max-width:1280px;margin:0 auto 12px;background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;
+      border-radius:12px;padding:10px 14px;font-weight:600;text-align:center;}
+    .ok-banner{max-width:1280px;margin:0 auto 12px;background:#f0fdf4;border:1px solid #86efac;color:#166534;
       border-radius:12px;padding:10px 14px;font-weight:600;text-align:center;}
 
     /* ===== The exportable card ===== */
-    .sched{width:1280px;max-width:100%;margin:0 auto;background:#fdf6df;border:8px solid #efa53c;
+    .sched{width:1280px;max-width:100%;margin:0 auto;background:#ffffff;border:8px solid #efa53c;
       border-radius:28px;padding:22px 26px 26px;}
     .head{text-align:center;}
     .logo{height:78px;object-fit:contain;margin:2px auto 4px;display:block;}
     .title{font-size:30px;font-weight:700;color:#e0322f;margin:2px 0 16px;}
 
-    table.grid{width:100%;border-collapse:separate;border-spacing:7px;}
+    table.grid{width:100%;border-collapse:separate;border-spacing:7px;table-layout:fixed;}
     table.grid th,table.grid td{border-radius:12px;}
     .time-h{background:transparent;width:120px;}
-    .room-h{padding:12px 8px;font-size:17px;font-weight:700;color:#3f3a2f;text-align:center;
-      box-shadow:0 2px 4px rgba(0,0,0,.05);}
+    .room-h{padding:12px 6px;font-size:16.5px;font-weight:700;color:#3f3a2f;text-align:center;
+      box-shadow:0 2px 4px rgba(0,0,0,.05);overflow:hidden;}
+    .room-h .ric{font-size:15px;margin-right:4px;}
     .time-c{background:#e19a2e;color:#fff;font-weight:700;font-size:16px;text-align:center;padding:12px 6px;white-space:nowrap;}
-    .cell{background:#fceebe;padding:11px 13px;text-align:left;font-size:15px;font-weight:500;
-      height:54px;line-height:1.35;color:#3a3527;vertical-align:middle;}
+    .cell{background:#ffeb9a;padding:11px 13px;text-align:left;font-size:15px;font-weight:500;
+      height:54px;line-height:1.35;color:#3a3527;vertical-align:middle;overflow:hidden;}
     .cell.empty{background:#7ed2f2;}
     .row-break td.cell{background:#7ed2f2;}
     .cell .tutor{font-weight:700;}
     .cell.conflict{outline:3px solid #dc2626;position:relative;}
     .cell.conflict::after{content:"⚠";position:absolute;top:2px;right:5px;font-size:13px;color:#dc2626;}
+
+    /* Tutor version: taller rows, smaller main line + tiny progress lines */
+    .sched.tutor-mode .cell{height:84px;font-size:13px;padding:8px 11px;vertical-align:top;}
+    .sched.tutor-mode .time-c{font-size:14px;}
+    .prog{margin-top:3px;font-size:6.5px;line-height:1.5;color:#57534e;font-weight:500;}
+    .prog div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 
     .footer{margin-top:18px;display:flex;align-items:center;justify-content:center;gap:26px;flex-wrap:wrap;}
     .foot-note{font-size:20px;font-weight:700;color:#3a3527;text-align:center;line-height:1.35;max-width:360px;}
@@ -54,26 +66,45 @@
     .cd .date{font-size:15px;font-weight:600;color:#374151;margin-top:2px;text-align:center;}
     .tagline{text-align:center;color:#f2994a;font-weight:600;font-size:18px;margin-top:16px;font-style:italic;}
     @media(max-width:1320px){.sched{width:100%}}
+
+    /* ===== Payroll modal ===== */
+    .pay-bg{position:fixed;inset:0;background:rgba(15,23,42,.5);display:none;align-items:center;justify-content:center;z-index:60;padding:14px;}
+    .pay-bg.show{display:flex;}
+    .pay-modal{width:100%;max-width:640px;background:#fff;border-radius:20px;padding:20px;max-height:90vh;overflow:auto;box-shadow:0 20px 50px rgba(0,0,0,.3);}
+    .pay-modal h3{margin:0 0 4px;font-size:19px;}
+    .pay-modal .sub{color:#64748b;font-size:13px;margin:0 0 14px;}
+    table.pay{width:100%;border-collapse:collapse;font-size:14px;}
+    table.pay th,table.pay td{padding:8px 6px;border-bottom:1px solid #f1f5f9;text-align:left;}
+    table.pay th{font-size:11px;color:#64748b;text-transform:uppercase;}
+    table.pay td.num,table.pay th.num{text-align:right;}
+    .exist-tag{display:inline-block;font-size:11px;font-weight:700;color:#b45309;background:#fffbeb;border:1px solid #fde68a;border-radius:999px;padding:1px 8px;margin-left:6px;}
+    .pay-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:14px;flex-wrap:wrap;}
+    .chk{width:17px;height:17px;}
   </style>
 </head>
 <body>
   <div class="wrap">
     <div class="toolbar">
       <a class="btn soft" href="/teaching-schedule/edit/?date={{ schedule.date|date:'Y-m-d' }}">← แก้ไขตาราง</a>
-      <a class="btn soft" href="/teaching-schedule/">📅 ตารางทั้งหมด</a>
+      <a class="btn soft" href="/teaching-schedule/">📅 ทั้งหมด</a>
+      <a class="btn soft {% if version == 'parent' %}on{% endif %}" href="/teaching-schedule/image/{{ schedule.id }}/">👨‍👩‍👧 ผู้ปกครอง</a>
+      <a class="btn soft {% if version == 'tutor' %}on{% endif %}" href="/teaching-schedule/image/{{ schedule.id }}/?v=tutor">👩‍🏫 ติวเตอร์</a>
+      {% if payroll_rows %}<button class="btn amber" type="button" onclick="openPay()">💸 ส่งค่าติวเตอร์</button>{% endif %}
       <button class="btn green" type="button" onclick="copyImage()">Copy Image</button>
       <button class="btn" type="button" onclick="downloadImage()">Download PNG</button>
-      <button class="btn soft" type="button" onclick="openImage()">Open Image</button>
     </div>
 
+    {% if payroll_sent %}
+      <div class="ok-banner">✅ ส่งข้อมูลเข้าระบบค่าติวเตอร์แล้ว {{ payroll_sent }} คน (ดูได้ที่หน้ารายรับรายจ่าย)</div>
+    {% endif %}
     {% if has_conflict %}
       <div class="warn-banner">⚠ มีติวเตอร์ถูกจัดสอนชนกันในช่วงเวลาเดียวกัน (ช่องที่ขอบแดง) — โปรดตรวจสอบก่อนส่ง</div>
     {% endif %}
 
-    <div class="sched" id="schedCard">
+    <div class="sched {% if version == 'tutor' %}tutor-mode{% endif %}" id="schedCard">
       <div class="head">
         <img class="logo" src="{% static 'core/logo2.png' %}" alt="พี่ขนุนติวเตอร์">
-        <div class="title">ตารางเรียน {{ thai_date }}</div>
+        <div class="title">ตารางเรียน {{ thai_date }}{% if version == "tutor" %} (ฉบับติวเตอร์){% endif %}</div>
       </div>
 
       <table class="grid">
@@ -81,7 +112,7 @@
           <tr>
             <th class="time-h"></th>
             {% for room in rooms %}
-              <th class="room-h" style="background:{{ room.header_color }};">{{ room.name }}</th>
+              <th class="room-h" style="background:{{ room.header_color }};">{% if room.icon %}<span class="ric">{{ room.icon }}</span>{% endif %}{{ room.name }}</th>
             {% endfor %}
           </tr>
         </thead>
@@ -94,7 +125,7 @@
                   <td class="cell"></td>
                 {% else %}
                   <td class="cell {% if not rc.cell %}empty{% endif %} {% if rc.conflict %}conflict{% endif %}">
-                    {% if rc.cell %}{% if rc.cell.grade_label %}{{ rc.cell.grade_label }}{% endif %}{% if rc.cell.subject_label %} / {{ rc.cell.subject_label }}{% endif %}{% if rc.tutor_name %} / <span class="tutor" style="color:{{ rc.tutor_color }};">{{ rc.tutor_name }}</span>{% endif %}{% endif %}
+                    {% if rc.cell %}{% if rc.cell.grade_label %}{{ rc.cell.grade_label }}{% endif %}{% if rc.cell.subject_label %} / {{ rc.cell.subject_label }}{% endif %}{% if rc.tutor_name %} / <span class="tutor" style="color:{{ rc.tutor_color }};">{{ rc.tutor_name }}</span>{% endif %}{% if version == "tutor" and rc.progress %}<div class="prog"><div>ชีท: {{ rc.progress.sheet_name }}</div><div>ถึง: {{ rc.progress.position }} · ล่าสุด: {{ rc.progress.last_teacher }}</div></div>{% endif %}{% endif %}
                   </td>
                 {% endif %}
               {% endfor %}
@@ -125,7 +156,56 @@
     </div>
   </div>
 
+  <!-- Payroll approve modal -->
+  {% if payroll_rows %}
+  <div class="pay-bg" id="payBg">
+    <form class="pay-modal" method="post" action="/teaching-schedule/image/{{ schedule.id }}/send-payroll/">
+      {% csrf_token %}
+      <h3>💸 ส่งค่าติวเตอร์เข้าระบบรายจ่าย — {{ thai_date }}</h3>
+      <p class="sub">เลือกติวเตอร์ที่ต้องการ approve แล้วกดส่ง ระบบจะบันทึกชม.สอน + ค่าชม.แหว่ง ลง Tutor Payroll ของวันนี้ (รายการที่มีอยู่แล้วจะถูกอัปเดตชม.สอนและค่าแหว่งทับ)</p>
+      <table class="pay">
+        <thead>
+          <tr>
+            <th><input type="checkbox" class="chk" id="payAll" checked onclick="toggleAll(this)"></th>
+            <th>ติวเตอร์</th>
+            <th class="num">ชม.สอน</th>
+            <th class="num">ชม.แหว่ง</th>
+            <th class="num">ค่าแหว่ง</th>
+            <th class="num">เรท/ชม.</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in payroll_rows %}
+            <tr>
+              <td><input type="checkbox" class="chk payrow" name="tutor_ids" value="{{ r.tutor.id }}" checked></td>
+              <td>
+                <span style="font-weight:700;color:{{ r.tutor.color }};">{{ r.tutor.name }}</span>
+                {% if r.has_existing %}<span class="exist-tag">มีรายการแล้ว {{ r.existing_total|floatformat:0|intcomma }}฿</span>{% endif %}
+              </td>
+              <td class="num">{{ r.taught_hours }}</td>
+              <td class="num">{{ r.gap_hours }}</td>
+              <td class="num">{{ r.gap_fee|intcomma }}</td>
+              <td class="num">{{ r.hourly_rate|floatformat:0 }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <div class="pay-actions">
+        <button class="btn soft" type="button" onclick="closePay()">ยกเลิก</button>
+        <button class="btn green" type="submit">✅ Approve และส่งที่เลือก</button>
+      </div>
+    </form>
+  </div>
+  {% endif %}
+
   <script>
+    function openPay(){document.getElementById("payBg").classList.add("show");}
+    function closePay(){document.getElementById("payBg").classList.remove("show");}
+    function toggleAll(cb){document.querySelectorAll(".payrow").forEach(function(x){x.checked=cb.checked;});}
+    document.addEventListener("keydown",function(e){if(e.key==="Escape")closePay();});
+    var bg=document.getElementById("payBg");
+    if(bg){bg.addEventListener("click",function(e){if(e.target===bg)closePay();});}
+
     async function makeCanvas(){
       const el=document.getElementById("schedCard");
       return await html2canvas(el,{scale:2,backgroundColor:"#ffffff",useCORS:true});
@@ -134,13 +214,8 @@
       const c=await makeCanvas();
       const a=document.createElement("a");
       a.href=c.toDataURL("image/png");
-      a.download="schedule-{{ schedule.date|date:'Y-m-d' }}.png";
+      a.download="schedule-{{ schedule.date|date:'Y-m-d' }}{% if version == 'tutor' %}-tutor{% endif %}.png";
       a.click();
-    }
-    async function openImage(){
-      const c=await makeCanvas();
-      const w=window.open();
-      w.document.write('<img src="'+c.toDataURL("image/png")+'" style="max-width:100%">');
     }
     async function copyImage(){
       try{

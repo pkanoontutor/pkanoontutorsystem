@@ -43,6 +43,7 @@
     <input type="date" name="date" value="{{ date|date:'Y-m-d' }}">
     <button class="sbtn soft" type="submit">เปิด</button>
     <a class="sbtn soft" href="/teaching-schedule/rooms/">🏫 ผูกคลาสห้อง</a>
+    <a class="sbtn soft" href="/teaching-schedule/tutors/">👩‍🏫 Profile ติวเตอร์</a>
     <a class="sbtn soft" href="/teaching-schedule/exam-dates/">⏱️ ตั้งวันสอบ</a>
   </form>
 
@@ -68,7 +69,7 @@
           <th class="tcol">เวลา</th>
           {% for room in rooms %}
             <th class="rh" style="background:{{ room.header_color }};">
-              {{ room.name }}
+              {% if room.icon %}{{ room.icon }} {% endif %}{{ room.name }}
               <span class="cls">เช้า: {{ room.cur_morning_name|default:"—" }} · บ่าย: {{ room.cur_afternoon_name|default:"—" }}</span>
             </th>
           {% endfor %}

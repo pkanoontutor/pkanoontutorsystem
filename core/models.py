@@ -1544,6 +1544,11 @@ class TeachingTutor(models.Model):
     name = models.CharField("ชื่อติวเตอร์", max_length=120, unique=True)
     phone = models.CharField("เบอร์ติดต่อ", max_length=50, blank=True)
     color = models.CharField("สีประจำตัว (ใช้บนตารางเรียน)", max_length=20, default="#1d4ed8")
+    payroll_tutor = models.ForeignKey(
+        "Tutor", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="teaching_profiles",
+        verbose_name="ผูกกับติวเตอร์ในระบบเงิน (รายจ่าย/ค่าสอน)",
+    )
     note = models.TextField("หมายเหตุ", blank=True)
     is_active = models.BooleanField("ใช้งาน", default=True)
     created_at = models.DateTimeField("วันที่สร้าง", default=timezone.now)
@@ -1965,6 +1970,7 @@ class ScheduleRoom(models.Model):
     never shown on the generated image.
     """
     name = models.CharField("ชื่อห้อง", max_length=120)
+    icon = models.CharField("ไอคอนผลไม้ (emoji)", max_length=16, blank=True, default="")
     header_color = models.CharField("สีหัวคอลัมน์", max_length=20, default="#fdf3bf")
     display_order = models.PositiveIntegerField("ลำดับคอลัมน์", default=1)
     sat_morning_class = models.ForeignKey(

@@ -58,7 +58,7 @@
       <button class="sbtn green" type="submit">💾 บันทึก + ดูรูป</button>
       {% if has_previous %}
       <button class="sbtn amber" type="submit" name="action" value="carry_forward"
-        onclick="return confirm('คัดลอกตารางจากวันก่อนหน้ามาทับตารางวันนี้?');">↩ คัดลอกจากวันก่อนหน้า</button>
+        onclick="return confirm('คัดลอกตารางจาก{{ day_label }}สัปดาห์ก่อนมาทับตารางวันนี้?');">↩ คัดลอกจาก{{ day_label }}สัปดาห์ก่อน</button>
       {% endif %}
       <span class="legend">เลือกวิชา + ติวเตอร์ในแต่ละช่อง (เลือกติวเตอร์แล้วช่องจะเปลี่ยนเป็นสีประจำตัวทันที) — คลาสตั้งจากหน้า "ผูกคลาสห้อง"</span>
     </div>

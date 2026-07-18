@@ -3120,6 +3120,24 @@ def student_portal_logout(request: HttpRequest) -> HttpResponse:
     return redirect("core:student_portal_login")
 
 
+# Distinct chip colours for subject/tutor tags on the E-Learning page.
+# A tag always maps to the same colour (stable hash of the tag text).
+_COURSE_TAG_PALETTE = [
+    ("#eff6ff", "#1d4ed8"), ("#f0fdf4", "#15803d"), ("#fef2f2", "#b91c1c"),
+    ("#f5f3ff", "#6d28d9"), ("#fff7ed", "#c2410c"), ("#ecfeff", "#0e7490"),
+    ("#fdf2f8", "#be185d"), ("#f7fee7", "#4d7c0f"), ("#fffbeb", "#b45309"),
+    ("#f0f9ff", "#0369a1"),
+]
+
+
+def _course_tag_color(tag: str) -> dict:
+    if not (tag or "").strip():
+        return {}
+    digest = sum(ord(ch) for ch in tag.strip())
+    bg, fg = _COURSE_TAG_PALETTE[digest % len(_COURSE_TAG_PALETTE)]
+    return {"bg": bg, "fg": fg}
+
+
 def online_course_home(request: HttpRequest) -> HttpResponse:
     from .models import OnlineCourseVideo
     student = _get_portal_student(request)
@@ -3127,11 +3145,28 @@ def online_course_home(request: HttpRequest) -> HttpResponse:
     if not student:
         return redirect("core:online_course_login")
 
-    videos = OnlineCourseVideo.objects.filter(course_key="p6", is_active=True)
+    videos = list(OnlineCourseVideo.objects.filter(course_key="p6", is_active=True))
+    payload = []
+    for v in videos:
+        if not v.embed_url:
+            continue
+        payload.append({
+            "id": v.id,
+            "title": v.title,
+            "note": v.note,
+            "subject": v.subject_tag,
+            "subject_color": _course_tag_color(v.subject_tag),
+            "tutor": v.tutor_name,
+            "tutor_color": _course_tag_color(v.tutor_name),
+            "embed_url": v.embed_url,
+            "thumbnail_url": v.thumbnail_url,
+            "duration_minutes": int(v.duration_minutes or 0),
+        })
 
     return render(request, "core/online_course_home.html", {
         "student": student,
-        "videos": videos,
+        "has_videos": bool(payload),
+        "videos_json": json.dumps(payload, ensure_ascii=False),
     })
 
 
@@ -3148,6 +3183,12 @@ def online_course_video_manage(request: HttpRequest) -> HttpResponse:
             title = (request.POST.get("title") or "").strip()
             drive_url = (request.POST.get("drive_url") or "").strip()
             note = (request.POST.get("note") or "").strip()
+            subject_tag = (request.POST.get("subject_tag") or "").strip()
+            tutor_name = (request.POST.get("tutor_name") or "").strip()
+            try:
+                duration_minutes = max(int(request.POST.get("duration_minutes") or 0), 0)
+            except ValueError:
+                duration_minutes = 0
             if title and drive_url:
                 max_order = (
                     OnlineCourseVideo.objects.filter(course_key="p6")
@@ -3155,6 +3196,8 @@ def online_course_video_manage(request: HttpRequest) -> HttpResponse:
                 )
                 OnlineCourseVideo.objects.create(
                     course_key="p6", title=title, drive_url=drive_url, note=note,
+                    subject_tag=subject_tag, tutor_name=tutor_name,
+                    duration_minutes=duration_minutes,
                     display_order=max_order + 1,
                 )
         elif action == "toggle":
@@ -3167,7 +3210,10 @@ def online_course_video_manage(request: HttpRequest) -> HttpResponse:
 
         return redirect("core:online_course_video_manage")
 
-    videos = OnlineCourseVideo.objects.filter(course_key="p6")
+    videos = list(OnlineCourseVideo.objects.filter(course_key="p6"))
+    for v in videos:
+        v.subject_color = _course_tag_color(v.subject_tag)
+        v.tutor_color = _course_tag_color(v.tutor_name)
     return render(request, "core/online_course_video_manage.html", {
         "videos": videos,
     })

@@ -2092,6 +2092,12 @@ class OnlineCourseVideo(models.Model):
         help_text="วางลิงก์แชร์ไฟล์วิดีโอจาก Google Drive (ต้องแชร์แบบ 'ทุกคนที่มีลิงก์ดูได้')",
     )
     note = models.CharField("หมายเหตุ (เช่น สัปดาห์ที่สอน)", max_length=255, blank=True)
+    subject_tag = models.CharField("วิชา", max_length=100, blank=True)
+    tutor_name = models.CharField("ชื่อติวเตอร์", max_length=120, blank=True)
+    duration_minutes = models.PositiveIntegerField(
+        "ความยาวคลิป (นาที)", default=0,
+        help_text="ใช้สำหรับ auto play คลิปถัดไปเมื่อคลิปนี้จบ (0 = ไม่ทราบ ระบบจะไม่ auto ต่อ)",
+    )
     display_order = models.PositiveIntegerField("ลำดับแสดงผล", default=1)
     is_active = models.BooleanField("แสดงให้ดู", default=True)
     created_at = models.DateTimeField(default=timezone.now)
@@ -2117,3 +2123,8 @@ class OnlineCourseVideo(models.Model):
     def embed_url(self) -> str:
         file_id = self.drive_file_id
         return f"https://drive.google.com/file/d/{file_id}/preview" if file_id else ""
+
+    @property
+    def thumbnail_url(self) -> str:
+        file_id = self.drive_file_id
+        return f"https://drive.google.com/thumbnail?id={file_id}&sz=w480" if file_id else ""

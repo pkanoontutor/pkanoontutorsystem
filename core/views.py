@@ -16,6 +16,7 @@ from django.http import JsonResponse, HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST, require_GET
+from django.views.decorators.clickjacking import xframe_options_sameorigin
 
 from openpyxl import Workbook, load_workbook
 from openpyxl.utils import get_column_letter
@@ -5999,6 +6000,7 @@ def course_payment_detail(request: HttpRequest, pk: int) -> HttpResponse:
 
 
 @login_required
+@xframe_options_sameorigin
 def course_payment_receipt_image(request: HttpRequest, pk: int) -> HttpResponse:
     payment = get_object_or_404(
         CoursePayment.objects.select_related("student", "student__school", "tutoring_class", "enrollment"),

@@ -90,7 +90,7 @@
                 <button class="tiny-btn deduct" type="submit" name="action" value="receive_print_order_zero:{{ o.id }}" title="ตรวจรับ 0 เล่ม">✕ รับ 0</button>
               </div>
             </div>
-            {% if o.onedrive_url %}<a class="mini-link" href="{{ o.onedrive_url }}" target="_blank">เปิดไฟล์</a>{% endif %}
+            {% if o.file_url %}<a class="mini-link" href="{{ o.file_url }}" target="_blank">เปิดไฟล์</a>{% endif %}
           </form>
         {% endfor %}
       </div>

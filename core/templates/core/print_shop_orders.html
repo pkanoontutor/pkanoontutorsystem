@@ -123,19 +123,19 @@
 
           <div class="progress"><div style="width:{{ o.print_progress_percent }}%"></div></div>
 
-          <div class="link-box {% if not o.onedrive_url %}missing{% endif %}" data-link-box="{{ o.id }}">
+          <div class="link-box {% if not o.file_url %}missing{% endif %}" data-link-box="{{ o.id }}">
             <div class="link-row">
-              <div class="link-label">{% if o.onedrive_url %}📎 ไฟล์ต้นฉบับพร้อมแล้ว{% else %}⚠ ยังไม่มีลิงก์ไฟล์ต้นฉบับ{% endif %}</div>
-              {% if o.onedrive_url %}
-                <a class="btn blue" href="{{ o.onedrive_url }}" target="_blank">เปิดไฟล์</a>
-                <button class="btn soft" type="button" data-copy-link="{{ o.onedrive_url }}">📋 คัดลอกลิงก์</button>
+              <div class="link-label">{% if o.file_url %}📎 ไฟล์ต้นฉบับพร้อมแล้ว{% if not o.file_url_is_custom %} (จาก Sheet Inventory){% endif %}{% else %}⚠ ยังไม่มีลิงก์ไฟล์ต้นฉบับ{% endif %}</div>
+              {% if o.file_url %}
+                <a class="btn blue" href="{{ o.file_url }}" target="_blank">เปิดไฟล์</a>
+                <button class="btn soft" type="button" data-copy-link="{{ o.file_url }}">📋 คัดลอกลิงก์</button>
               {% endif %}
-              <button class="btn soft" type="button" data-toggle-link="{{ o.id }}">{% if o.onedrive_url %}แก้ไขลิงก์{% else %}+ เพิ่มลิงก์ไฟล์{% endif %}</button>
+              <button class="btn soft" type="button" data-toggle-link="{{ o.id }}">{% if o.file_url %}แก้ไขลิงก์{% else %}+ เพิ่มลิงก์ไฟล์{% endif %}</button>
               <span class="copied-flag" data-copied-flag="{{ o.id }}">คัดลอกแล้ว ✓</span>
             </div>
             <form class="link-edit" data-link-edit="{{ o.id }}" method="post" action="{% url 'core:print_shop_update_order' o.id %}">
               {% csrf_token %}
-              <input type="url" name="onedrive_url" value="{{ o.onedrive_url }}" placeholder="วางลิงก์ไฟล์ (OneDrive/Google Drive) ที่นี่" style="flex:1;min-width:220px">
+              <input type="url" name="onedrive_url" value="{{ o.file_url }}" placeholder="วางลิงก์ไฟล์ (OneDrive/Google Drive) ที่นี่" style="flex:1;min-width:220px">
               <button class="btn dark" name="action" value="update_link" type="submit">บันทึกลิงก์</button>
             </form>
           </div>
@@ -186,7 +186,7 @@
             <span class="pill">{{ o.spine_color_label }}</span>
             <span class="pill">กดเสร็จเมื่อ {{ o.completed_at|date:'d/m/Y H:i' }}</span>
           </div>
-          {% if o.onedrive_url %}<a class="btn soft" href="{{ o.onedrive_url }}" target="_blank" style="justify-self:start;width:fit-content;">เปิดไฟล์อีกครั้ง</a>{% endif %}
+          {% if o.file_url %}<a class="btn soft" href="{{ o.file_url }}" target="_blank" style="justify-self:start;width:fit-content;">เปิดไฟล์อีกครั้ง</a>{% endif %}
         </div>
       {% empty %}<div class="empty">ยังไม่มีรายการที่เสร็จแล้ว</div>{% endfor %}
     </div>

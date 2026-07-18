@@ -690,12 +690,7 @@ def _sheet_inventory_context(*, q: str = "", extra: dict | None = None) -> dict:
         "binding_type_choices": SheetPrintOrder.BindingType.choices,
         "spine_color_choices": _print_color_choices(),
         "default_print_due_date": timezone.localdate() + timedelta(days=3),
-        "ready_to_receive_orders": (
-            SheetPrintOrder.objects
-            .select_related("sheet", "sheet__subject", "requested_by")
-            .filter(status=SheetPrintOrder.Status.READY)
-            .order_by("completed_at", "due_date", "created_at")
-        ),
+        "ready_to_receive_orders": _ready_to_receive_orders_with_links(),
     }
     if extra:
         context.update(extra)
@@ -2119,18 +2114,20 @@ def sheet_print_order_admin(request: HttpRequest) -> HttpResponse:
 
             return redirect("core:sheet_print_order_admin")
 
-    pending_orders = (
+    pending_orders = list(
         SheetPrintOrder.objects
         .select_related("sheet", "sheet__subject", "requested_by")
         .filter(status=SheetPrintOrder.Status.PENDING)
         .order_by("due_date", "created_at")
     )
-    ready_orders = (
+    ready_orders = list(
         SheetPrintOrder.objects
         .select_related("sheet", "sheet__subject", "requested_by")
         .filter(status=SheetPrintOrder.Status.READY)
         .order_by("-completed_at", "-updated_at")[:80]
     )
+    _attach_inventory_file_links(pending_orders)
+    _attach_inventory_file_links(ready_orders)
     rows = _print_order_dashboard_rows()
 
     return render(request, "core/sheet_print_order_admin.html", {
@@ -2143,6 +2140,39 @@ def sheet_print_order_admin(request: HttpRequest) -> HttpResponse:
         "binding_type_choices": SheetPrintOrder.BindingType.choices,
         "spine_color_choices": _print_color_choices(),
     })
+
+
+def _attach_inventory_file_links(orders: list) -> None:
+    """The authoritative file link lives on SheetInventory.onedrive_url (set
+    once per sheet in the Sheet Inventory profile) -- pull it live for each
+    order instead of relying on the order's own onedrive_url snapshot, which
+    can go stale if the inventory link is added/changed after the order was
+    created. Custom (non-inventory) documents have no Sheet to pull from, so
+    they keep using their own onedrive_url."""
+    sheet_ids = [o.sheet_id for o in orders if o.sheet_id]
+    inv_map = {}
+    if sheet_ids:
+        inv_map = dict(
+            SheetInventory.objects.filter(sheet_id__in=sheet_ids).values_list("sheet_id", "onedrive_url")
+        )
+    for o in orders:
+        if o.sheet_id:
+            o.file_url = inv_map.get(o.sheet_id) or ""
+            o.file_url_is_custom = False
+        else:
+            o.file_url = o.onedrive_url or ""
+            o.file_url_is_custom = True
+
+
+def _ready_to_receive_orders_with_links() -> list:
+    orders = list(
+        SheetPrintOrder.objects
+        .select_related("sheet", "sheet__subject", "requested_by")
+        .filter(status=SheetPrintOrder.Status.READY)
+        .order_by("completed_at", "due_date", "created_at")
+    )
+    _attach_inventory_file_links(orders)
+    return orders
 
 
 def print_shop_order_list(request: HttpRequest) -> HttpResponse:
@@ -2160,14 +2190,17 @@ def print_shop_order_list(request: HttpRequest) -> HttpResponse:
     )
     today = timezone.localdate()
     pending_list = list(pending_orders)
+    ready_list = list(ready_orders)
     for o in pending_list:
         o.is_overdue = bool(o.due_date and o.due_date < today and not o.can_mark_ready)
+    _attach_inventory_file_links(pending_list)
+    _attach_inventory_file_links(ready_list)
     total_pending_books = sum(int(o.quantity or 0) for o in pending_list)
     overdue_count = sum(1 for o in pending_list if o.is_overdue)
 
     return render(request, "core/print_shop_orders.html", {
         "pending_orders": pending_list,
-        "ready_orders": ready_orders,
+        "ready_orders": ready_list,
         "today": today,
         "total_pending_books": total_pending_books,
         "pending_count": len(pending_list),
@@ -2182,8 +2215,17 @@ def print_shop_update_order(request: HttpRequest, pk: int) -> HttpResponse:
 
     if action == "update_link":
         onedrive_url = (request.POST.get("onedrive_url") or "").strip()
-        order.onedrive_url = onedrive_url
-        order.save(update_fields=["onedrive_url", "updated_at"])
+        if order.sheet_id:
+            # Save to the sheet's inventory record -- the authoritative link
+            # that every past/future print order for this sheet should use.
+            inventory, _ = SheetInventory.objects.get_or_create(
+                sheet_id=order.sheet_id, defaults={"quantity": 0},
+            )
+            inventory.onedrive_url = onedrive_url
+            inventory.save(update_fields=["onedrive_url"])
+        else:
+            order.onedrive_url = onedrive_url
+            order.save(update_fields=["onedrive_url", "updated_at"])
         return redirect("core:print_shop_order_list")
 
     try:

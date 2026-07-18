@@ -134,7 +134,7 @@
         <div class="order-card" style="background:{{ o.spine_color_bg }};border-color:{{ o.spine_color_border }}">
           <div class="order-top"><div class="order-name">{{ o.display_code }} · {{ o.display_title }}</div><span class="due">ส่งภายใน {{ o.due_date|date:'d/m/Y'|default:'ไม่ระบุ' }}</span></div>
           <div class="pillrow"><span class="pill orange">จำนวน {{ o.quantity }}</span><span class="pill blue">{{ o.subject_name }}</span><span class="pill">{{ o.binding_label }}</span><span class="pill">{{ o.spine_color_label }}</span></div>
-          {% if o.onedrive_url %}<a class="btnx soft" href="{{ o.onedrive_url }}" target="_blank">เปิด OneDrive</a>{% endif %}
+          {% if o.file_url %}<a class="btnx soft" href="{{ o.file_url }}" target="_blank">เปิด OneDrive</a>{% endif %}
           {% if o.note %}<div class="mini">{{ o.note }}</div>{% endif %}
         </div>
       {% empty %}

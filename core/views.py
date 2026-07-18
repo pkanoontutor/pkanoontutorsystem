@@ -2067,7 +2067,15 @@ def sheet_print_order_admin(request: HttpRequest) -> HttpResponse:
 
             if quantity > 0:
                 inventory, _ = SheetInventory.objects.get_or_create(sheet=sheet, defaults={"quantity": 0})
-                if not onedrive_url:
+                if onedrive_url:
+                    # Keep SheetInventory as the single source of truth: any
+                    # link entered while creating an order also updates the
+                    # sheet's stored link, so every past/future order for this
+                    # sheet (and the print-shop page) picks it up too.
+                    if inventory.onedrive_url != onedrive_url:
+                        inventory.onedrive_url = onedrive_url
+                        inventory.save(update_fields=["onedrive_url"])
+                else:
                     onedrive_url = inventory.onedrive_url or ""
 
                 SheetPrintOrder.objects.create(

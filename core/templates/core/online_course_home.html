@@ -4,71 +4,266 @@
 
 {% block head %}
 <style>
-  .video-list{display:grid;gap:18px;margin-top:20px;text-align:left;}
-  .video-item{background:#fff;border-radius:16px;padding:12px;box-shadow:0 4px 10px rgba(0,0,0,.06);border:1px solid #e5e7eb;}
-  .video-title{font-weight:700;font-size:16px;color:#0f172a;margin-bottom:2px;}
-  .video-note{font-size:13px;color:#64748b;margin-bottom:8px;}
-  .video-frame-wrap{position:relative;width:100%;padding-top:56.25%;border-radius:12px;overflow:hidden;background:#000;}
-  .video-frame-wrap iframe{position:absolute;inset:0;width:100%;height:100%;border:0;}
+  .el-wrap{max-width:1280px;margin:0 auto;display:grid;gap:14px;}
+
+  /* Toolbar */
+  .el-toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;background:#fff;
+    border:1px solid #e5e7eb;border-radius:16px;padding:12px 16px;box-shadow:0 4px 10px rgba(0,0,0,.06);}
+  .el-title{font-size:19px;font-weight:1000;display:flex;align-items:center;gap:8px;}
+  .el-btn{border:0;border-radius:12px;padding:11px 16px;font-weight:800;cursor:pointer;font-size:14px;
+    display:inline-flex;align-items:center;gap:7px;text-decoration:none;font-family:inherit;}
+  .el-btn.meet{background:#0f9d58;color:#fff;}
+  .el-btn.docs{background:#0f172a;color:#fff;}
+  .el-btn.soft{background:#f1f5f9;color:#0f172a;border:1px solid #cbd5e1;}
+
+  /* Layout: player + playlist */
+  .el-grid{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:14px;align-items:start;}
+  .el-player-card{background:#fff;border:1px solid #e5e7eb;border-radius:16px;overflow:hidden;
+    box-shadow:0 4px 10px rgba(0,0,0,.06);}
+  .el-stage{position:relative;width:100%;padding-top:56.25%;background:#000;}
+  .el-stage iframe{position:absolute;inset:0;width:100%;height:100%;border:0;}
+  .el-player-meta{padding:14px 16px;display:grid;gap:8px;}
+  .el-now-title{font-size:18px;font-weight:1000;line-height:1.35;}
+  .el-now-note{font-size:13px;color:#64748b;}
+  .el-tagrow{display:flex;gap:6px;flex-wrap:wrap;align-items:center;}
+  .el-tag{display:inline-flex;border-radius:999px;padding:4px 11px;font-size:12px;font-weight:800;}
+  .el-controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center;border-top:1px solid #f1f5f9;padding-top:10px;}
+  .el-autoplay{display:inline-flex;gap:7px;align-items:center;font-size:13px;font-weight:800;color:#334155;
+    border:1px solid #e2e8f0;border-radius:999px;padding:8px 12px;background:#f8fafc;cursor:pointer;}
+  .el-autoplay input{width:16px;height:16px;}
+  .el-countdown{font-size:12px;font-weight:800;color:#b45309;display:none;}
+  .el-countdown.show{display:inline;}
+
+  /* Playlist */
+  .el-list-card{background:#fff;border:1px solid #e5e7eb;border-radius:16px;box-shadow:0 4px 10px rgba(0,0,0,.06);
+    display:flex;flex-direction:column;max-height:calc(56.25vw * 0.72 + 160px);}
+  .el-list-head{padding:12px 14px;border-bottom:1px solid #f1f5f9;font-weight:1000;font-size:14px;
+    display:flex;justify-content:space-between;align-items:center;}
+  .el-count{font-size:11px;font-weight:800;color:#64748b;background:#f1f5f9;border-radius:999px;padding:2px 9px;}
+  .el-list{overflow-y:auto;padding:8px;display:grid;gap:6px;}
+  .el-item{display:grid;grid-template-columns:120px 1fr;gap:9px;padding:7px;border-radius:12px;cursor:pointer;
+    border:2px solid transparent;transition:.12s;background:#fff;text-align:left;font-family:inherit;}
+  .el-item:hover{background:#f8fafc;}
+  .el-item.active{border-color:#2563eb;background:#eff6ff;}
+  .el-thumb{position:relative;width:120px;height:68px;border-radius:9px;overflow:hidden;background:#0f172a;}
+  .el-thumb img{width:100%;height:100%;object-fit:cover;display:block;}
+  .el-thumb .ph{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:26px;color:#fff;}
+  .el-thumb .dur{position:absolute;right:4px;bottom:4px;background:rgba(0,0,0,.75);color:#fff;font-size:10px;
+    font-weight:800;border-radius:5px;padding:1px 5px;}
+  .el-item-title{font-size:13px;font-weight:800;line-height:1.35;color:#0f172a;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+  .el-item-tags{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px;}
+  .el-item-tags .el-tag{padding:2px 8px;font-size:10.5px;}
+  .el-item .now{font-size:10.5px;font-weight:1000;color:#2563eb;margin-top:3px;display:none;}
+  .el-item.active .now{display:block;}
+
+  .el-empty{background:#fff;border:1.5px dashed #cbd5e1;border-radius:16px;padding:32px;text-align:center;
+    color:#64748b;font-weight:800;}
+
+  /* Fullscreen mode on the stage container */
+  .el-player-card:fullscreen{border-radius:0;display:flex;flex-direction:column;background:#000;}
+  .el-player-card:fullscreen .el-stage{flex:1;padding-top:0;}
+  .el-player-card:fullscreen .el-player-meta{background:#111;color:#fff;}
+  .el-player-card:fullscreen .el-now-title{color:#fff;}
+
+  @media(max-width:900px){
+    .el-grid{grid-template-columns:1fr;}
+    .el-list-card{max-height:440px;}
+    .el-toolbar{flex-direction:column;align-items:stretch;}
+    .el-btn{justify-content:center;}
+  }
 </style>
 {% endblock %}
 
 {% block content %}
 
-<div class="card" style="max-width:760px;margin:0 auto;text-align:center;">
+<div class="el-wrap">
 
-  <h2 style="margin-bottom:24px;">
-    🎓 คอร์สติวออนไลน์ ป.6
-  </h2>
-
-  <div style="display:flex;flex-direction:column;gap:16px;">
-
-    <a
-      href="https://meet.google.com/ddp-niwy-icp"
-      target="_blank"
-      class="btn btn-blue"
-      style="justify-content:center;padding:18px;font-size:18px;"
-    >
-      ช่องทางเข้าเรียน Google Meet
-    </a>
-
-    <a
-      href="https://drive.google.com/drive/folders/10iYUiHHp9Rs_3VZ7iIoskZIDGRjxLN9p?usp=sharing"
-      target="_blank"
-      class="btn btn-dark"
-      style="justify-content:center;padding:18px;font-size:18px;"
-    >
-      เอกสารประกอบการเรียน
-    </a>
-
-    <a
-      href="https://drive.google.com/drive/folders/157ZPeFIJTF-brx83gJ9WPiywX4okuHkY?usp=sharing"
-      target="_blank"
-      class="btn btn-blue"
-      style="justify-content:center;padding:18px;font-size:18px;"
-    >
-      โฟลเดอร์คลิปติวย้อนหลังทั้งหมด
-    </a>
-
+  <div class="el-toolbar">
+    <div class="el-title">🎓 คอร์สติวออนไลน์ ป.6</div>
+    <span style="flex:1"></span>
+    <a class="el-btn meet" href="https://meet.google.com/ddp-niwy-icp" target="_blank">📹 ช่องทางเข้าเรียน Google Meet</a>
+    <a class="el-btn docs" href="https://drive.google.com/drive/folders/10iYUiHHp9Rs_3VZ7iIoskZIDGRjxLN9p?usp=sharing" target="_blank">📄 เอกสารประกอบการเรียน</a>
   </div>
 
-  {% if videos %}
-    <h3 style="margin:28px 0 4px;text-align:left;">▶️ คลิปติวย้อนหลัง</h3>
-    <div class="video-list">
-      {% for v in videos %}
-        <div class="video-item">
-          <div class="video-title">{{ v.title }}</div>
-          {% if v.note %}<div class="video-note">{{ v.note }}</div>{% endif %}
-          {% if v.embed_url %}
-            <div class="video-frame-wrap">
-              <iframe src="{{ v.embed_url }}" allow="autoplay" allowfullscreen></iframe>
-            </div>
-          {% endif %}
+  {% if has_videos %}
+    <div class="el-grid">
+      <div class="el-player-card" id="playerCard">
+        <div class="el-stage"><iframe id="playerFrame" src="" allow="autoplay" allowfullscreen></iframe></div>
+        <div class="el-player-meta">
+          <div class="el-now-title" id="nowTitle"></div>
+          <div class="el-now-note" id="nowNote" style="display:none;"></div>
+          <div class="el-tagrow" id="nowTags"></div>
+          <div class="el-controls">
+            <button class="el-btn soft" type="button" id="prevBtn">⏮ คลิปก่อนหน้า</button>
+            <button class="el-btn soft" type="button" id="nextBtn">คลิปถัดไป ⏭</button>
+            <button class="el-btn soft" type="button" id="fsBtn">⛶ เต็มจอ</button>
+            <label class="el-autoplay"><input type="checkbox" id="autoplayChk" checked> Auto play คลิปถัดไป</label>
+            <span class="el-countdown" id="autoplayCountdown"></span>
+          </div>
         </div>
-      {% endfor %}
+      </div>
+
+      <div class="el-list-card">
+        <div class="el-list-head"><span>▶️ คลิปติวย้อนหลัง</span><span class="el-count" id="clipCount"></span></div>
+        <div class="el-list" id="playlist"></div>
+      </div>
     </div>
+  {% else %}
+    <div class="el-empty">ยังไม่มีคลิปติวย้อนหลัง — คลิปจะปรากฏที่นี่เมื่อติวเตอร์อัปโหลด</div>
   {% endif %}
 
 </div>
+
+<script id="videosData" type="application/json">{{ videos_json|safe }}</script>
+
+{% verbatim %}
+<script>
+(function () {
+  "use strict";
+  var dataEl = document.getElementById("videosData");
+  var videos = [];
+  try { videos = JSON.parse(dataEl.textContent || "[]"); } catch (e) { videos = []; }
+  if (!videos.length) return;
+
+  var frame = document.getElementById("playerFrame");
+  var nowTitle = document.getElementById("nowTitle");
+  var nowNote = document.getElementById("nowNote");
+  var nowTags = document.getElementById("nowTags");
+  var playlist = document.getElementById("playlist");
+  var countEl = document.getElementById("clipCount");
+  var autoplayChk = document.getElementById("autoplayChk");
+  var countdownEl = document.getElementById("autoplayCountdown");
+  var current = 0;
+  var autoplayTimer = null, countdownTimer = null;
+
+  countEl.textContent = videos.length + " คลิป";
+
+  function tagChip(text, color, small) {
+    if (!text) return null;
+    var chip = document.createElement("span");
+    chip.className = "el-tag";
+    chip.textContent = text;
+    chip.style.background = (color && color.bg) || "#f1f5f9";
+    chip.style.color = (color && color.fg) || "#334155";
+    return chip;
+  }
+
+  function clearAutoplayTimers() {
+    if (autoplayTimer) { clearTimeout(autoplayTimer); autoplayTimer = null; }
+    if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
+    countdownEl.classList.remove("show");
+  }
+
+  function scheduleAutoplay(v) {
+    clearAutoplayTimers();
+    if (!autoplayChk.checked) return;
+    var mins = parseInt(v.duration_minutes, 10) || 0;
+    if (mins <= 0 || current >= videos.length - 1) return;
+    // Google Drive's embedded player can't tell us when the clip ends
+    // (cross-origin iframe, no player API), so auto-advance is driven by
+    // the clip length entered on the manage page, plus a small buffer.
+    var totalSec = mins * 60 + 15;
+    var remain = totalSec;
+    countdownEl.classList.add("show");
+    function renderCountdown() {
+      var m = Math.floor(remain / 60), s = remain % 60;
+      countdownEl.textContent = "เล่นคลิปถัดไปอัตโนมัติในอีก " + m + ":" + String(s).padStart(2, "0") + " นาที";
+    }
+    renderCountdown();
+    countdownTimer = setInterval(function () {
+      remain -= 1;
+      if (remain <= 0) { clearInterval(countdownTimer); return; }
+      renderCountdown();
+    }, 1000);
+    autoplayTimer = setTimeout(function () { play(current + 1); }, totalSec * 1000);
+  }
+
+  function play(index) {
+    if (index < 0 || index >= videos.length) return;
+    current = index;
+    var v = videos[index];
+    frame.src = v.embed_url;
+    nowTitle.textContent = v.title;
+    if (v.note) { nowNote.textContent = v.note; nowNote.style.display = "block"; }
+    else { nowNote.style.display = "none"; }
+
+    nowTags.innerHTML = "";
+    var s = tagChip(v.subject, v.subject_color); if (s) nowTags.appendChild(s);
+    var t = tagChip(v.tutor ? "👩‍🏫 " + v.tutor : "", v.tutor_color); if (t) nowTags.appendChild(t);
+
+    Array.prototype.forEach.call(playlist.children, function (el, i) {
+      el.classList.toggle("active", i === index);
+    });
+    var activeEl = playlist.children[index];
+    if (activeEl && activeEl.scrollIntoView) activeEl.scrollIntoView({ block: "nearest", behavior: "smooth" });
+
+    scheduleAutoplay(v);
+  }
+
+  // Build playlist
+  videos.forEach(function (v, i) {
+    var item = document.createElement("button");
+    item.type = "button";
+    item.className = "el-item";
+
+    var thumb = document.createElement("div");
+    thumb.className = "el-thumb";
+    if (v.thumbnail_url) {
+      var img = document.createElement("img");
+      img.src = v.thumbnail_url;
+      img.loading = "lazy";
+      img.alt = v.title;
+      img.onerror = function () { img.remove(); thumb.insertAdjacentHTML("beforeend", '<div class="ph">▶️</div>'); };
+      thumb.appendChild(img);
+    } else {
+      thumb.insertAdjacentHTML("beforeend", '<div class="ph">▶️</div>');
+    }
+    if (v.duration_minutes > 0) {
+      var dur = document.createElement("span");
+      dur.className = "dur";
+      dur.textContent = v.duration_minutes + " นาที";
+      thumb.appendChild(dur);
+    }
+
+    var body = document.createElement("div");
+    var title = document.createElement("div");
+    title.className = "el-item-title";
+    title.textContent = v.title;
+    body.appendChild(title);
+
+    var tags = document.createElement("div");
+    tags.className = "el-item-tags";
+    var s = tagChip(v.subject, v.subject_color); if (s) tags.appendChild(s);
+    var t = tagChip(v.tutor, v.tutor_color); if (t) tags.appendChild(t);
+    if (tags.children.length) body.appendChild(tags);
+
+    var now = document.createElement("div");
+    now.className = "now";
+    now.textContent = "▶ กำลังเล่น";
+    body.appendChild(now);
+
+    item.appendChild(thumb);
+    item.appendChild(body);
+    item.addEventListener("click", function () { play(i); });
+    playlist.appendChild(item);
+  });
+
+  document.getElementById("prevBtn").addEventListener("click", function () { play(current - 1); });
+  document.getElementById("nextBtn").addEventListener("click", function () { play(current + 1); });
+  document.getElementById("fsBtn").addEventListener("click", function () {
+    var card = document.getElementById("playerCard");
+    if (document.fullscreenElement) { document.exitFullscreen(); }
+    else if (card.requestFullscreen) { card.requestFullscreen(); }
+  });
+  autoplayChk.addEventListener("change", function () {
+    if (autoplayChk.checked) { scheduleAutoplay(videos[current]); }
+    else { clearAutoplayTimers(); }
+  });
+
+  play(0);
+})();
+</script>
+{% endverbatim %}
 
 {% endblock %}

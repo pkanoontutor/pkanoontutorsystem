@@ -3121,13 +3121,55 @@ def student_portal_logout(request: HttpRequest) -> HttpResponse:
 
 
 def online_course_home(request: HttpRequest) -> HttpResponse:
+    from .models import OnlineCourseVideo
     student = _get_portal_student(request)
 
     if not student:
         return redirect("core:online_course_login")
 
+    videos = OnlineCourseVideo.objects.filter(course_key="p6", is_active=True)
+
     return render(request, "core/online_course_home.html", {
         "student": student,
+        "videos": videos,
+    })
+
+
+@login_required
+def online_course_video_manage(request: HttpRequest) -> HttpResponse:
+    """Staff page to paste/manage Google Drive clip links shown on the
+    Online Course page (embedded playback, no Drive folder navigation)."""
+    from .models import OnlineCourseVideo
+
+    if request.method == "POST":
+        action = (request.POST.get("action") or "").strip()
+
+        if action == "add":
+            title = (request.POST.get("title") or "").strip()
+            drive_url = (request.POST.get("drive_url") or "").strip()
+            note = (request.POST.get("note") or "").strip()
+            if title and drive_url:
+                max_order = (
+                    OnlineCourseVideo.objects.filter(course_key="p6")
+                    .aggregate(m=Max("display_order")).get("m") or 0
+                )
+                OnlineCourseVideo.objects.create(
+                    course_key="p6", title=title, drive_url=drive_url, note=note,
+                    display_order=max_order + 1,
+                )
+        elif action == "toggle":
+            video = OnlineCourseVideo.objects.filter(id=request.POST.get("id")).first()
+            if video:
+                video.is_active = not video.is_active
+                video.save(update_fields=["is_active"])
+        elif action == "delete":
+            OnlineCourseVideo.objects.filter(id=request.POST.get("id")).delete()
+
+        return redirect("core:online_course_video_manage")
+
+    videos = OnlineCourseVideo.objects.filter(course_key="p6")
+    return render(request, "core/online_course_video_manage.html", {
+        "videos": videos,
     })
 
 
@@ -5331,6 +5373,7 @@ _ADMIN_TOOL_DEFAULTS = [
     ("private", "c-sky",   "🚀", "Super Dashboard", "Monitor นักเรียน รายรับรายจ่าย ที่นั่ง ชีท คอร์สใกล้ครบ และงานปรินท์ในหน้าเดียว", "/super-dashboard/"),
     ("private", "c-lilac", "👩‍🏫", "อัปเดตการสอนติวเตอร์", "ตั้งค่า template วิชา เลือกติวเตอร์ประจำสัปดาห์ และเปิดหน้าบันทึกการสอน", "/teaching/weekly-setup/"),
     ("private", "c-sand", "🗓️", "สร้างตารางเรียน (รูปภาพ)", "จัดตารางเรียนรายวันแบบ grid ผูกกับติวเตอร์ประจำสัปดาห์และระบบนับวิชา แล้วสร้างเป็นรูปพร้อมส่ง", "/teaching-schedule/"),
+    ("private", "c-rose", "🎬", "จัดการคลิปติวออนไลน์ ป.6", "วางลิงก์คลิป Google Drive แล้วฝังเล่นวิดีโอในหน้าคอร์สออนไลน์ให้ผู้ปกครอง/นักเรียนดูได้เลย ไม่ต้องเปิดโฟลเดอร์ Drive เอง", "/online-course-p6/videos/"),
     ("private", "c-teal",  "📚", "Learning Record", "ดูประวัติวิชาเรียนราย Class ว่าแต่ละวิชาเรียนไปแล้วกี่ครั้ง ล่าสุดเรียนวันไหน ใครสอน และถึงชีทหน้า/ข้อไหน", "/learning-record/"),
     ("private", "c-sage",  "🧾", "รับชำระเงิน / ใบเสร็จ", "ออกใบเสร็จ รับชำระค่าคอร์ส และสร้าง Enrollment ได้ในหน้าเดียว", "/course-payments/"),
     ("private", "c-clay",  "🔁", "ระบบสร้างใบแจ้งต่อคอร์ส", "ดูคอร์สที่ใกล้ครบ สร้างใบแจ้งต่อคอร์ส พร้อม QR และ Copy Image ส่งผู้ปกครอง", "/course-renewal-notices/"),

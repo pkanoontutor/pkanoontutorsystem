@@ -1,3 +1,4 @@
+import re
 from django.db import models, transaction
 from decimal import Decimal
 from django.utils import timezone
@@ -2072,3 +2073,47 @@ class DailyScheduleCell(models.Model):
     @property
     def is_empty(self) -> bool:
         return not (self.grade_label or self.subject_label or self.tutor_id)
+
+
+# =========================================================
+# Online course video clips (embedded playback for parents/students)
+# =========================================================
+class OnlineCourseVideo(models.Model):
+    """A recorded lesson clip stored in Google Drive, embedded for playback
+    directly on the Online Course page instead of linking out to Drive."""
+    course_key = models.CharField(
+        "รหัสคอร์ส", max_length=50, default="p6",
+        help_text="ใช้แยกชุดคลิปตามคอร์ส เช่น p6",
+    )
+    title = models.CharField("ชื่อคลิป", max_length=255)
+    drive_url = models.URLField(
+        "ลิงก์ Google Drive",
+        max_length=1000,
+        help_text="วางลิงก์แชร์ไฟล์วิดีโอจาก Google Drive (ต้องแชร์แบบ 'ทุกคนที่มีลิงก์ดูได้')",
+    )
+    note = models.CharField("หมายเหตุ (เช่น สัปดาห์ที่สอน)", max_length=255, blank=True)
+    display_order = models.PositiveIntegerField("ลำดับแสดงผล", default=1)
+    is_active = models.BooleanField("แสดงให้ดู", default=True)
+    created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Online Course Video"
+        verbose_name_plural = "Online Course Videos"
+        ordering = ("course_key", "display_order", "-created_at")
+
+    def __str__(self) -> str:
+        return f"[{self.course_key}] {self.title}"
+
+    @property
+    def drive_file_id(self) -> str:
+        m = re.search(r"/file/d/([a-zA-Z0-9_-]+)", self.drive_url or "")
+        if m:
+            return m.group(1)
+        m = re.search(r"[?&]id=([a-zA-Z0-9_-]+)", self.drive_url or "")
+        return m.group(1) if m else ""
+
+    @property
+    def embed_url(self) -> str:
+        file_id = self.drive_file_id
+        return f"https://drive.google.com/file/d/{file_id}/preview" if file_id else ""

@@ -114,6 +114,7 @@ urlpatterns = [
     # ✅ Online Course P6
     path("online-course-p6/", views.online_course_login, name="online_course_login"),
     path("online-course-p6/home/", views.online_course_home, name="online_course_home"),
+    path("online-course-p6/videos/", views.online_course_video_manage, name="online_course_video_manage"),
 
     # Student ID List (Public)
     path("student-id-list/", views.student_id_list, name="student_id_list"),

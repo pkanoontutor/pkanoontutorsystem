@@ -30,6 +30,7 @@ from .models import (
     ScheduleExamCountdown,
     DailySchedule,
     DailyScheduleCell,
+    OnlineCourseVideo,
     TeachingClassSubjectTemplate,
     TeachingWeeklyAssignment,
     TeachingProgressUpdate,
@@ -980,4 +981,13 @@ class DailyScheduleAdmin(admin.ModelAdmin):
     list_display = ("date", "title_note", "updated_at")
     date_hierarchy = "date"
     inlines = (DailyScheduleCellInline,)
+
+
+@admin.register(OnlineCourseVideo)
+class OnlineCourseVideoAdmin(admin.ModelAdmin):
+    list_display = ("title", "course_key", "note", "display_order", "is_active", "updated_at")
+    list_editable = ("display_order", "is_active")
+    list_filter = ("course_key", "is_active")
+    search_fields = ("title", "note", "drive_url")
+    ordering = ("course_key", "display_order", "-created_at")
 

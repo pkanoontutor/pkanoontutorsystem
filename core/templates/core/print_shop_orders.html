@@ -4,7 +4,72 @@
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <title>รายการปรินท์ชีท | PKanoon Tutor</title>
   <style>
-    *{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:#f1f5f9;color:#0f172a}.wrap{max-width:1080px;margin:0 auto;padding:14px;display:grid;gap:14px}.hero{background:linear-gradient(135deg,#0f172a,#2563eb);color:#fff;border-radius:24px;padding:20px;box-shadow:0 14px 30px rgba(15,23,42,.20)}.title{font-size:25px;font-weight:1000}.sub{color:#dbeafe;font-size:13px;margin-top:6px;line-height:1.6}.panel{background:#fff;border-radius:22px;padding:15px;box-shadow:0 6px 16px rgba(15,23,42,.08);border:1px solid #e2e8f0}.section-title{font-size:18px;font-weight:1000;margin-bottom:10px}.cards{display:grid;gap:12px}.card{border:2px solid #e2e8f0;border-radius:22px;padding:14px;background:#fff;display:grid;gap:12px;box-shadow:0 4px 12px rgba(15,23,42,.06)}.card.ready{background:#f0fdf4!important;border-color:#bbf7d0!important}.top{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:start}.name{font-size:20px;font-weight:1000;color:#0f172a;line-height:1.25}.title2{font-size:13px;color:#475569;font-weight:850;line-height:1.4;margin-top:3px}.due{font-weight:1000;color:#7c2d12;background:#ffedd5;border:1px solid #fed7aa;border-radius:999px;padding:7px 11px;font-size:12px;white-space:nowrap}.item-grid{display:grid;grid-template-columns:1fr 190px;gap:12px;align-items:stretch}.qty-box{background:linear-gradient(135deg,#14532d,#16a34a);color:#fff;border-radius:22px;padding:14px;text-align:center;box-shadow:0 10px 20px rgba(22,163,74,.20)}.qty-label{font-size:13px;font-weight:1000;opacity:.9}.qty-number{font-size:52px;font-weight:1000;line-height:1;letter-spacing:-.04em}.qty-unit{font-size:15px;font-weight:1000;margin-top:2px}.progress{height:12px;border-radius:999px;background:#e2e8f0;overflow:hidden}.progress div{height:100%;background:linear-gradient(90deg,#38bdf8,#16a34a)}.pillrow{display:flex;gap:6px;flex-wrap:wrap}.pill{border-radius:999px;padding:6px 10px;font-size:12px;font-weight:1000;border:1px solid #e2e8f0;background:rgba(255,255,255,.75);color:#334155}.qty{background:#dcfce7;color:#166534;border-color:#86efac}.warn{background:#fee2e2;color:#991b1b;border-color:#fecaca}.bind{background:#ede9fe;color:#5b21b6;border-color:#c4b5fd}.btn{border:0;border-radius:14px;padding:10px 13px;font-weight:1000;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:7px;cursor:pointer}.blue{background:#2563eb;color:#fff}.green{background:#16a34a;color:#fff}.soft{background:#fff;color:#0f172a;border:1px solid #e2e8f0}.dark{background:#0f172a;color:#fff}.disabled{opacity:.45;pointer-events:none}.note{background:rgba(255,255,255,.75);border:1px dashed #cbd5e1;border-radius:14px;padding:10px;color:#475569;font-weight:850;font-size:13px;line-height:1.45}.empty{color:#64748b;font-weight:850;text-align:center;padding:16px}.actions{display:flex;gap:8px;flex-wrap:wrap}.status-form{display:grid;gap:8px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:16px;padding:10px}.status-grid{display:grid;grid-template-columns:120px 1fr auto;gap:8px;align-items:center}input[type=number]{border:1px solid #cbd5e1;border-radius:12px;padding:9px;font-weight:1000;width:100%}.toggle-row{display:flex;gap:7px;flex-wrap:wrap}.toggle{display:inline-flex;gap:6px;align-items:center;border:1px solid #e2e8f0;background:#fff;border-radius:999px;padding:7px 9px;font-size:12px;font-weight:1000}.ready-name{font-size:16px;font-weight:1000}@media(max-width:720px){.wrap{padding:10px}.top,.item-grid,.status-grid{grid-template-columns:1fr}.title{font-size:22px}.btn{width:100%}.qty-number{font-size:46px}}
+    *{box-sizing:border-box}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:#f1f5f9;color:#0f172a}
+    .wrap{max-width:1080px;margin:0 auto;padding:14px;display:grid;gap:14px}
+    .hero{background:linear-gradient(135deg,#0f172a,#2563eb);color:#fff;border-radius:24px;padding:20px;box-shadow:0 14px 30px rgba(15,23,42,.20)}
+    .title{font-size:25px;font-weight:1000}
+    .sub{color:#dbeafe;font-size:13px;margin-top:6px;line-height:1.6}
+    .summary-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+    .stat{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.25);border-radius:14px;padding:8px 12px;min-width:96px}
+    .stat .n{font-size:20px;font-weight:1000;line-height:1}
+    .stat .l{font-size:11px;color:#dbeafe;font-weight:800;margin-top:2px}
+    .stat.warn{background:#fee2e2;border-color:#fecaca}
+    .stat.warn .n{color:#991b1b}.stat.warn .l{color:#b91c1c}
+    .panel{background:#fff;border-radius:22px;padding:15px;box-shadow:0 6px 16px rgba(15,23,42,.08);border:1px solid #e2e8f0}
+    .section-title{font-size:18px;font-weight:1000;margin-bottom:10px;display:flex;align-items:center;gap:8px;justify-content:space-between}
+    .refresh-hint{font-size:11px;font-weight:800;color:#94a3b8;}
+    .cards{display:grid;gap:12px}
+    .card{border:2px solid #e2e8f0;border-radius:22px;padding:14px;background:#fff;display:grid;gap:12px;box-shadow:0 4px 12px rgba(15,23,42,.06)}
+    .card.ready{background:#f0fdf4!important;border-color:#bbf7d0!important}
+    .card.overdue{border-color:#fca5a5!important;box-shadow:0 4px 14px rgba(220,38,38,.14)}
+    .top{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:start}
+    .name{font-size:20px;font-weight:1000;color:#0f172a;line-height:1.25}
+    .title2{font-size:13px;color:#475569;font-weight:850;line-height:1.4;margin-top:3px}
+    .due{font-weight:1000;color:#7c2d12;background:#ffedd5;border:1px solid #fed7aa;border-radius:999px;padding:7px 11px;font-size:12px;white-space:nowrap}
+    .due.overdue{color:#991b1b;background:#fee2e2;border-color:#fecaca}
+    .item-grid{display:grid;grid-template-columns:1fr 190px;gap:12px;align-items:stretch}
+    .qty-box{background:linear-gradient(135deg,#14532d,#16a34a);color:#fff;border-radius:22px;padding:14px;text-align:center;box-shadow:0 10px 20px rgba(22,163,74,.20)}
+    .qty-label{font-size:13px;font-weight:1000;opacity:.9}
+    .qty-number{font-size:52px;font-weight:1000;line-height:1;letter-spacing:-.04em}
+    .qty-unit{font-size:15px;font-weight:1000;margin-top:2px}
+    .progress{height:12px;border-radius:999px;background:#e2e8f0;overflow:hidden}
+    .progress div{height:100%;background:linear-gradient(90deg,#38bdf8,#16a34a)}
+    .pillrow{display:flex;gap:6px;flex-wrap:wrap}
+    .pill{border-radius:999px;padding:6px 10px;font-size:12px;font-weight:1000;border:1px solid #e2e8f0;background:rgba(255,255,255,.75);color:#334155}
+    .qty{background:#dcfce7;color:#166534;border-color:#86efac}
+    .warn{background:#fee2e2;color:#991b1b;border-color:#fecaca}
+    .bind{background:#ede9fe;color:#5b21b6;border-color:#c4b5fd}
+    .btn{border:0;border-radius:14px;padding:10px 13px;font-weight:1000;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:7px;cursor:pointer}
+    .blue{background:#2563eb;color:#fff}
+    .green{background:#16a34a;color:#fff}
+    .soft{background:#fff;color:#0f172a;border:1px solid #e2e8f0}
+    .dark{background:#0f172a;color:#fff}
+    .disabled{opacity:.45;pointer-events:none}
+    .note{background:rgba(255,255,255,.75);border:1px dashed #cbd5e1;border-radius:14px;padding:10px;color:#475569;font-weight:850;font-size:13px;line-height:1.45}
+    .empty{color:#64748b;font-weight:850;text-align:center;padding:16px}
+    .actions{display:flex;gap:8px;flex-wrap:wrap}
+    .status-form{display:grid;gap:8px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:16px;padding:10px}
+    .status-grid{display:grid;grid-template-columns:120px 1fr auto;gap:8px;align-items:center}
+    input[type=number],input[type=url],input[type=text]{border:1px solid #cbd5e1;border-radius:12px;padding:9px;font-weight:1000;width:100%}
+    .toggle-row{display:flex;gap:7px;flex-wrap:wrap}
+    .toggle{display:inline-flex;gap:6px;align-items:center;border:1px solid #e2e8f0;background:#fff;border-radius:999px;padding:7px 9px;font-size:12px;font-weight:1000}
+    .ready-name{font-size:16px;font-weight:1000}
+    .link-box{background:#eff6ff;border:1px solid #bfdbfe;border-radius:16px;padding:10px;display:grid;gap:8px}
+    .link-box.missing{background:#fef2f2;border-color:#fecaca}
+    .link-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+    .link-label{font-size:12px;font-weight:1000;color:#1d4ed8;flex:1;min-width:140px}
+    .link-box.missing .link-label{color:#b91c1c}
+    .link-edit{display:none;gap:8px}
+    .link-edit.show{display:flex;flex-wrap:wrap}
+    .copied-flag{font-size:11px;font-weight:1000;color:#16a34a;display:none;}
+    @media(max-width:720px){
+      .wrap{padding:10px}
+      .top,.item-grid,.status-grid{grid-template-columns:1fr}
+      .title{font-size:22px}
+      .btn{width:100%}
+      .qty-number{font-size:46px}
+    }
   </style>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -13,20 +78,166 @@
   :root{--app-font:"IBM Plex Sans Thai",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
   html body{font-family:var(--app-font) !important}
   button,input,select,textarea,.btn{font-family:var(--app-font) !important}
-  
   </style>
 </head>
 <body><div class="wrap">
-  <section class="hero"><div class="title">🖨️ รายการปรินท์ชีท</div><div class="sub">อัปเดตจำนวนที่ปรินท์เสร็จได้ทีละบางส่วน แล้วกดพร้อมส่งเมื่อปรินท์ครบ เย็บครบ และไม่มีปัญหาสันรูด</div></section>
-  <section class="panel"><div class="section-title">⏳ รายการรอปรินท์</div><div class="cards">
-  {% for o in pending_orders %}
-    <div class="card" style="background:{{ o.spine_color_bg }};border-color:{{ o.spine_color_border }}">
-      <div class="item-grid"><div><div class="top"><div><div class="name">{{ o.display_code }} · {{ o.display_title }}</div><div class="title2">{{ o.subject_name }}</div></div><span class="due">ส่ง {{ o.due_date|date:'d/m/Y'|default:'ไม่ระบุวัน' }}</span></div><div class="pillrow"><span class="pill qty">สั่ง {{ o.quantity }} เล่ม</span><span class="pill">เสร็จ {{ o.printed_quantity }}/{{ o.quantity }}</span><span class="pill bind">{{ o.binding_label }}</span><span class="pill">{{ o.spine_color_label }}</span>{% if o.spine_unavailable %}<span class="pill warn">สันรูดหมด</span>{% endif %}</div>{% if o.note %}<div class="note" style="margin-top:10px">{{ o.note }}</div>{% endif %}</div><div class="qty-box"><div class="qty-label">จำนวนที่ต้องปรินท์</div><div class="qty-number">{{ o.quantity }}</div><div class="qty-unit">เล่ม</div></div></div>
-      <div class="progress"><div style="width:{{ o.print_progress_percent }}%"></div></div>
-      <form class="status-form" method="post" action="{% url 'core:print_shop_update_order' o.id %}">{% csrf_token %}<div class="status-grid"><label style="font-weight:1000">ปรินท์เสร็จแล้ว</label><input type="number" name="printed_quantity" min="0" max="{{ o.quantity }}" value="{{ o.printed_quantity }}"><button class="btn soft" name="action" value="fill_complete" type="submit">เติมครบ</button></div><div class="toggle-row"><label class="toggle"><input type="checkbox" name="print_done" value="yes" {% if o.print_done %}checked{% endif %}> ปรินท์แล้ว</label><label class="toggle"><input type="checkbox" name="bound_done" value="yes" {% if o.bound_done %}checked{% endif %}> เย็บแล้ว</label><label class="toggle"><input type="checkbox" name="spine_unavailable" value="yes" {% if o.spine_unavailable %}checked{% endif %}> สันรูดหมด</label></div><button class="btn dark" name="action" value="update_progress" type="submit">บันทึกความคืบหน้า</button></form>
-      <div class="actions">{% if o.onedrive_url %}<a class="btn blue" href="{{ o.onedrive_url }}" target="_blank">เปิดไฟล์ OneDrive</a>{% endif %}<form method="post" action="{% url 'core:print_shop_mark_ready' o.id %}" onsubmit="return confirm('ยืนยันว่าพร้อมส่งแล้วใช่ไหม?')">{% csrf_token %}<button class="btn green {% if not o.can_mark_ready %}disabled{% endif %}" type="submit">ปรินท์เสร็จแล้วพร้อมส่ง</button></form></div>{% if not o.can_mark_ready %}<div class="note">จะกดพร้อมส่งได้เมื่อจำนวนปรินท์เสร็จครบ {{ o.quantity }} เล่ม, กดเย็บแล้ว และไม่ได้ติ๊กว่าสันรูดหมด</div>{% endif %}
+  <section class="hero">
+    <div class="title">🖨️ รายการปรินท์ชีท</div>
+    <div class="sub">อัปเดตจำนวนที่ปรินท์เสร็จได้ทีละบางส่วน แล้วกดพร้อมส่งเมื่อปรินท์ครบ เย็บครบ และไม่มีปัญหาสันรูด · หน้านี้รีเฟรชอัตโนมัติทุก 45 วินาที</div>
+    <div class="summary-row">
+      <div class="stat"><div class="n">{{ pending_count }}</div><div class="l">รายการรอปรินท์</div></div>
+      <div class="stat"><div class="n">{{ total_pending_books }}</div><div class="l">เล่มที่ต้องปรินท์รวม</div></div>
+      {% if overdue_count %}<div class="stat warn"><div class="n">{{ overdue_count }}</div><div class="l">เลยกำหนดส่งแล้ว</div></div>{% endif %}
     </div>
-  {% empty %}<div class="empty">ตอนนี้ยังไม่มีรายการรอปรินท์ครับ</div>{% endfor %}
-  </div></section>
-  <section class="panel"><div class="section-title">✅ ดำเนินการเสร็จแล้ว</div><div class="cards">{% for o in ready_orders %}<div class="card ready"><div class="top"><div><div class="ready-name">{{ o.display_code }} · {{ o.display_title }}</div><div class="title2">{{ o.subject_name }}</div></div><span class="pill qty">เสร็จแล้ว</span></div><div class="pillrow"><span class="pill">จำนวน {{ o.quantity }} เล่ม</span><span class="pill">เสร็จ {{ o.printed_quantity }}/{{ o.quantity }}</span><span class="pill">{{ o.binding_label }}</span><span class="pill">{{ o.spine_color_label }}</span><span class="pill">กดเสร็จเมื่อ {{ o.completed_at|date:'d/m/Y H:i' }}</span></div></div>{% empty %}<div class="empty">ยังไม่มีรายการที่เสร็จแล้ว</div>{% endfor %}</div></section>
-</div></body></html>
+  </section>
+
+  <section class="panel">
+    <div class="section-title"><span>⏳ รายการรอปรินท์</span><span class="refresh-hint" id="refreshHint"></span></div>
+    <div class="cards">
+      {% for o in pending_orders %}
+        <div class="card {% if o.is_overdue %}overdue{% endif %}" style="background:{{ o.spine_color_bg }};border-color:{{ o.spine_color_border }}">
+          <div class="item-grid">
+            <div>
+              <div class="top">
+                <div>
+                  <div class="name">{{ o.display_code }} · {{ o.display_title }}</div>
+                  <div class="title2">{{ o.subject_name }}</div>
+                </div>
+                <span class="due {% if o.is_overdue %}overdue{% endif %}">{% if o.is_overdue %}⚠ เลยกำหนด {% endif %}ส่ง {{ o.due_date|date:'d/m/Y'|default:'ไม่ระบุวัน' }}</span>
+              </div>
+              <div class="pillrow">
+                <span class="pill qty">สั่ง {{ o.quantity }} เล่ม</span>
+                <span class="pill">เสร็จ {{ o.printed_quantity }}/{{ o.quantity }}</span>
+                <span class="pill bind">{{ o.binding_label }}</span>
+                <span class="pill">{{ o.spine_color_label }}</span>
+                {% if o.spine_unavailable %}<span class="pill warn">สันรูดหมด</span>{% endif %}
+              </div>
+              {% if o.note %}<div class="note" style="margin-top:10px">{{ o.note }}</div>{% endif %}
+            </div>
+            <div class="qty-box">
+              <div class="qty-label">จำนวนที่ต้องปรินท์</div>
+              <div class="qty-number">{{ o.quantity }}</div>
+              <div class="qty-unit">เล่ม</div>
+            </div>
+          </div>
+
+          <div class="progress"><div style="width:{{ o.print_progress_percent }}%"></div></div>
+
+          <div class="link-box {% if not o.onedrive_url %}missing{% endif %}" data-link-box="{{ o.id }}">
+            <div class="link-row">
+              <div class="link-label">{% if o.onedrive_url %}📎 ไฟล์ต้นฉบับพร้อมแล้ว{% else %}⚠ ยังไม่มีลิงก์ไฟล์ต้นฉบับ{% endif %}</div>
+              {% if o.onedrive_url %}
+                <a class="btn blue" href="{{ o.onedrive_url }}" target="_blank">เปิดไฟล์</a>
+                <button class="btn soft" type="button" data-copy-link="{{ o.onedrive_url }}">📋 คัดลอกลิงก์</button>
+              {% endif %}
+              <button class="btn soft" type="button" data-toggle-link="{{ o.id }}">{% if o.onedrive_url %}แก้ไขลิงก์{% else %}+ เพิ่มลิงก์ไฟล์{% endif %}</button>
+              <span class="copied-flag" data-copied-flag="{{ o.id }}">คัดลอกแล้ว ✓</span>
+            </div>
+            <form class="link-edit" data-link-edit="{{ o.id }}" method="post" action="{% url 'core:print_shop_update_order' o.id %}">
+              {% csrf_token %}
+              <input type="url" name="onedrive_url" value="{{ o.onedrive_url }}" placeholder="วางลิงก์ไฟล์ (OneDrive/Google Drive) ที่นี่" style="flex:1;min-width:220px">
+              <button class="btn dark" name="action" value="update_link" type="submit">บันทึกลิงก์</button>
+            </form>
+          </div>
+
+          <form class="status-form" method="post" action="{% url 'core:print_shop_update_order' o.id %}">
+            {% csrf_token %}
+            <div class="status-grid">
+              <label style="font-weight:1000">ปรินท์เสร็จแล้ว</label>
+              <input type="number" name="printed_quantity" min="0" max="{{ o.quantity }}" value="{{ o.printed_quantity }}">
+              <button class="btn soft" name="action" value="fill_complete" type="submit">เติมครบ</button>
+            </div>
+            <div class="toggle-row">
+              <label class="toggle"><input type="checkbox" name="print_done" value="yes" {% if o.print_done %}checked{% endif %}> ปรินท์แล้ว</label>
+              <label class="toggle"><input type="checkbox" name="bound_done" value="yes" {% if o.bound_done %}checked{% endif %}> เย็บแล้ว</label>
+              <label class="toggle"><input type="checkbox" name="spine_unavailable" value="yes" {% if o.spine_unavailable %}checked{% endif %}> สันรูดหมด</label>
+            </div>
+            <button class="btn dark" name="action" value="update_progress" type="submit">บันทึกความคืบหน้า</button>
+          </form>
+
+          <div class="actions">
+            <form method="post" action="{% url 'core:print_shop_mark_ready' o.id %}" onsubmit="return confirm('ยืนยันว่าพร้อมส่งแล้วใช่ไหม?')">
+              {% csrf_token %}
+              <button class="btn green {% if not o.can_mark_ready %}disabled{% endif %}" type="submit">ปรินท์เสร็จแล้วพร้อมส่ง</button>
+            </form>
+          </div>
+          {% if not o.can_mark_ready %}<div class="note">จะกดพร้อมส่งได้เมื่อจำนวนปรินท์เสร็จครบ {{ o.quantity }} เล่ม, กดเย็บแล้ว และไม่ได้ติ๊กว่าสันรูดหมด</div>{% endif %}
+        </div>
+      {% empty %}<div class="empty">ตอนนี้ยังไม่มีรายการรอปรินท์ครับ</div>{% endfor %}
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="section-title">✅ ดำเนินการเสร็จแล้ว</div>
+    <div class="cards">
+      {% for o in ready_orders %}
+        <div class="card ready">
+          <div class="top">
+            <div>
+              <div class="ready-name">{{ o.display_code }} · {{ o.display_title }}</div>
+              <div class="title2">{{ o.subject_name }}</div>
+            </div>
+            <span class="pill qty">เสร็จแล้ว</span>
+          </div>
+          <div class="pillrow">
+            <span class="pill">จำนวน {{ o.quantity }} เล่ม</span>
+            <span class="pill">เสร็จ {{ o.printed_quantity }}/{{ o.quantity }}</span>
+            <span class="pill">{{ o.binding_label }}</span>
+            <span class="pill">{{ o.spine_color_label }}</span>
+            <span class="pill">กดเสร็จเมื่อ {{ o.completed_at|date:'d/m/Y H:i' }}</span>
+          </div>
+          {% if o.onedrive_url %}<a class="btn soft" href="{{ o.onedrive_url }}" target="_blank" style="justify-self:start;width:fit-content;">เปิดไฟล์อีกครั้ง</a>{% endif %}
+        </div>
+      {% empty %}<div class="empty">ยังไม่มีรายการที่เสร็จแล้ว</div>{% endfor %}
+    </div>
+  </section>
+</div>
+
+<script>
+  // Toggle inline "add/edit link" form per card.
+  document.querySelectorAll('[data-toggle-link]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var id = btn.getAttribute('data-toggle-link');
+      var form = document.querySelector('[data-link-edit="' + id + '"]');
+      if (form) form.classList.toggle('show');
+    });
+  });
+
+  // Copy-link convenience button.
+  document.querySelectorAll('[data-copy-link]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var url = btn.getAttribute('data-copy-link');
+      navigator.clipboard.writeText(url).then(function () {
+        var box = btn.closest('.link-box');
+        var flag = box ? box.querySelector('[data-copied-flag]') : null;
+        if (flag) {
+          flag.style.display = 'inline';
+          setTimeout(function () { flag.style.display = 'none'; }, 2000);
+        }
+      }).catch(function () {});
+    });
+  });
+
+  // Auto-refresh so multiple print-shop staff always see the latest list,
+  // but never interrupt someone mid-edit (typing a number, pasting a link).
+  (function () {
+    var hint = document.getElementById('refreshHint');
+    var seconds = 45;
+    function isEditing() {
+      var el = document.activeElement;
+      if (!el) return false;
+      var tag = (el.tagName || '').toLowerCase();
+      return tag === 'input' || tag === 'textarea' || tag === 'select';
+    }
+    function tick() {
+      seconds -= 1;
+      if (hint) hint.textContent = 'รีเฟรชในอีก ' + Math.max(seconds, 0) + ' วิ';
+      if (seconds <= 0) {
+        if (isEditing()) { seconds = 5; return; }
+        window.location.reload();
+      }
+    }
+    setInterval(tick, 1000);
+  })();
+</script>
+</body></html>

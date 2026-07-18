@@ -72,6 +72,7 @@
               <span class="pill blue">สั่ง {{ o.quantity }} เล่ม</span>
               <span class="pill">เสร็จ {{ o.printed_quantity }}/{{ o.quantity }}</span>
               <span class="pill">{{ o.binding_label }}</span>
+              {% if not o.sheet_id %}<span class="pill" style="background:#fff7ed;color:#9a3412;border-color:#fed7aa;">เอกสารนอกคลัง (ไม่เพิ่ม stock)</span>{% endif %}
             </div>
             <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;background:#f8fafc;border:1px solid #e2e8f0;border-radius:14px;padding:8px 10px;">
               <div>

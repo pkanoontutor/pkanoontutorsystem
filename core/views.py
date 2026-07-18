@@ -693,7 +693,7 @@ def _sheet_inventory_context(*, q: str = "", extra: dict | None = None) -> dict:
         "ready_to_receive_orders": (
             SheetPrintOrder.objects
             .select_related("sheet", "sheet__subject", "requested_by")
-            .filter(status=SheetPrintOrder.Status.READY, sheet__isnull=False)
+            .filter(status=SheetPrintOrder.Status.READY)
             .order_by("completed_at", "due_date", "created_at")
         ),
     }
@@ -1081,8 +1081,8 @@ def sheet_inventory_dashboard(request: HttpRequest) -> HttpResponse:
                     order = get_object_or_404(
                         SheetPrintOrder.objects.select_for_update().select_related("sheet", "sheet__subject"),
                         id=order_id,
-                        sheet__isnull=False,
                     )
+                    is_custom_doc = order.sheet_id is None
 
                     if order.status != SheetPrintOrder.Status.READY:
                         return _receive_response(False, "รายการนี้ถูกตรวจรับไปแล้ว หรือยังไม่พร้อมตรวจรับ", 400)
@@ -1110,28 +1110,36 @@ def sheet_inventory_dashboard(request: HttpRequest) -> HttpResponse:
                         else:
                             note = f"ตรวจรับจากร้านปรินท์ Order #{order.id} (แก้จำนวนรับจริง)"
 
-                    inventory, _ = SheetInventory.objects.select_for_update().get_or_create(
-                        sheet=order.sheet,
-                        defaults={"quantity": 0},
-                    )
-
-                    if receive_qty > 0:
-                        ok, message, inventory, _movement = _apply_sheet_inventory_movement(
+                    inventory = None
+                    if not is_custom_doc:
+                        inventory, _ = SheetInventory.objects.select_for_update().get_or_create(
                             sheet=order.sheet,
-                            movement_type=SheetInventoryMovement.MovementType.ADD,
-                            quantity=receive_qty,
-                            note=note,
-                            user=request.user,
+                            defaults={"quantity": 0},
                         )
-                        if not ok:
-                            return _receive_response(False, message or "บันทึกตรวจรับไม่สำเร็จ", 400)
+
+                        if receive_qty > 0:
+                            ok, message, inventory, _movement = _apply_sheet_inventory_movement(
+                                sheet=order.sheet,
+                                movement_type=SheetInventoryMovement.MovementType.ADD,
+                                quantity=receive_qty,
+                                note=note,
+                                user=request.user,
+                            )
+                            if not ok:
+                                return _receive_response(False, message or "บันทึกตรวจรับไม่สำเร็จ", 400)
+                    elif receive_qty > 0:
+                        # Custom (non-inventory) documents have no Sheet to add stock to;
+                        # just record the acknowledged quantity via the receive note.
+                        note = f"{note} (เอกสารนอกคลัง ไม่เพิ่ม stock)"
 
                     order.status = SheetPrintOrder.Status.RECEIVED
                     order.received_at = timezone.now()
                     order.received_by = request.user if getattr(request.user, "is_authenticated", False) else None
                     order.save(update_fields=["status", "received_at", "received_by", "updated_at"])
 
-                    if receive_qty > 0:
+                    if is_custom_doc:
+                        msg = f"ตรวจรับ {order.display_title} จำนวน {receive_qty} เล่มแล้ว (เอกสารนอกคลัง)"
+                    elif receive_qty > 0:
                         msg = f"ตรวจรับ {order.display_code} จำนวน {receive_qty} เล่ม และเพิ่มเข้า stock แล้ว"
                     else:
                         msg = f"ตรวจรับ {order.display_code} จำนวน 0 เล่มแล้ว โดยไม่เพิ่ม stock"
@@ -2150,9 +2158,20 @@ def print_shop_order_list(request: HttpRequest) -> HttpResponse:
         .filter(status=SheetPrintOrder.Status.READY)
         .order_by("-completed_at", "-updated_at")[:80]
     )
+    today = timezone.localdate()
+    pending_list = list(pending_orders)
+    for o in pending_list:
+        o.is_overdue = bool(o.due_date and o.due_date < today and not o.can_mark_ready)
+    total_pending_books = sum(int(o.quantity or 0) for o in pending_list)
+    overdue_count = sum(1 for o in pending_list if o.is_overdue)
+
     return render(request, "core/print_shop_orders.html", {
-        "pending_orders": pending_orders,
+        "pending_orders": pending_list,
         "ready_orders": ready_orders,
+        "today": today,
+        "total_pending_books": total_pending_books,
+        "pending_count": len(pending_list),
+        "overdue_count": overdue_count,
     })
 
 
@@ -2160,6 +2179,12 @@ def print_shop_order_list(request: HttpRequest) -> HttpResponse:
 def print_shop_update_order(request: HttpRequest, pk: int) -> HttpResponse:
     order = get_object_or_404(SheetPrintOrder, pk=pk)
     action = (request.POST.get("action") or "update_progress").strip()
+
+    if action == "update_link":
+        onedrive_url = (request.POST.get("onedrive_url") or "").strip()
+        order.onedrive_url = onedrive_url
+        order.save(update_fields=["onedrive_url", "updated_at"])
+        return redirect("core:print_shop_order_list")
 
     try:
         printed_qty = int(request.POST.get("printed_quantity") or order.printed_quantity or 0)

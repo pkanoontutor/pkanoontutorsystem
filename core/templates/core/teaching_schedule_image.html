@@ -32,7 +32,9 @@
       border-radius:28px;padding:22px 26px 26px;}
     .head{text-align:center;}
     .logo{height:78px;object-fit:contain;margin:2px auto 4px;display:block;}
-    .title{font-size:30px;font-weight:700;color:#e0322f;margin:2px 0 16px;}
+    .title{font-size:30px;font-weight:700;color:#e0322f;margin:2px 0 16px;text-shadow:0 2px 4px rgba(0,0,0,.18);}
+    .title.day-sat{color:#5b21b6;}
+    .title.day-sun{color:#7f1d1d;}
 
     table.grid{width:100%;border-collapse:separate;border-spacing:7px;table-layout:fixed;}
     table.grid th,table.grid td{border-radius:12px;}
@@ -57,6 +59,8 @@
     .prog{margin-top:4px;font-size:13px;line-height:1.35;color:#57534e;font-weight:400;}
     .prog div{white-space:normal;overflow-wrap:break-word;word-break:break-word;}
     .prog .sheet{font-weight:700;}
+    .prog .fresh{color:#16a34a;font-weight:700;}
+    .prog .stale{color:#dc2626;font-weight:700;}
 
     .footer{margin-top:18px;display:flex;align-items:center;justify-content:center;gap:26px;flex-wrap:wrap;}
     .foot-note{font-size:20px;font-weight:700;color:#3a3527;text-align:center;line-height:1.35;max-width:360px;}
@@ -107,7 +111,7 @@
     <div class="sched {% if version == 'tutor' %}tutor-mode{% endif %}" id="schedCard">
       <div class="head">
         <img class="logo" src="{% static 'core/logo2.png' %}" alt="พี่ขนุนติวเตอร์">
-        <div class="title">ตารางเรียน {{ thai_date }}{% if version == "tutor" %} (ฉบับติวเตอร์){% endif %}</div>
+        <div class="title {% if is_sunday %}day-sun{% else %}day-sat{% endif %}">ตารางเรียน {{ thai_date }}{% if version == "tutor" %} (ฉบับติวเตอร์){% endif %}</div>
       </div>
 
       <table class="grid">
@@ -128,7 +132,7 @@
                   <td class="cell"></td>
                 {% else %}
                   <td class="cell {% if not rc.cell %}empty{% endif %} {% if rc.conflict %}conflict{% endif %}">
-                    {% if rc.cell %}{% if rc.cell.grade_label %}{{ rc.cell.grade_label }}{% endif %}{% if rc.cell.subject_label %} / {{ rc.cell.subject_label }}{% endif %}{% if rc.tutor_name %} / <span class="tutor" style="color:{{ rc.tutor_color }};">{{ rc.tutor_name }}</span>{% endif %}{% if version == "tutor" and rc.progress %}<div class="prog"><div class="sheet">ชีท: {{ rc.progress.sheet_name }}</div><div>ถึง: {{ rc.progress.position }} · ล่าสุด: {{ rc.progress.last_teacher }}</div></div>{% endif %}{% endif %}
+                    {% if rc.cell %}{% if rc.cell.grade_label %}{{ rc.cell.grade_label }}{% endif %}{% if rc.cell.subject_label %} / {{ rc.cell.subject_label }}{% endif %}{% if rc.tutor_name %} / <span class="tutor" style="color:{{ rc.tutor_color }};">{{ rc.tutor_name }}</span>{% endif %}{% if version == "tutor" and rc.progress %}<div class="prog"><div class="sheet">ชีท: {{ rc.progress.sheet_name }}</div><div>ถึง: {{ rc.progress.position }} · ล่าสุด: {{ rc.progress.last_teacher }}</div>{% if rc.progress.last_update_date %}<div class="{% if rc.progress.is_fresh %}fresh{% else %}stale{% endif %}">อัพเดทล่าสุด วันที่ {{ rc.progress.last_update_date|date:"d/m/y" }}</div>{% endif %}</div>{% endif %}{% endif %}
                   </td>
                 {% endif %}
               {% endfor %}

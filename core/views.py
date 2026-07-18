@@ -7465,12 +7465,17 @@ def teaching_schedule_editor(request: HttpRequest) -> HttpResponse:
 
 def _schedule_progress_map(schedule) -> dict:
     """Latest real (non no-teaching) progress update per subject template used
-    on this schedule: sheet name, page/question reached, last teacher."""
+    on this schedule: sheet name, page/question reached, last teacher, and
+    whether that update is fresh (made during the week before this schedule's
+    date, i.e. the tutor kept the sheet update current) or stale."""
     template_ids = [
         c.subject_template_id for c in schedule.cells.all() if c.subject_template_id
     ]
     if not template_ids:
         return {}
+
+    prev_week_start, _prev_week_end = _teaching_week_range(schedule.date - timedelta(days=7))
+
     progress = {}
     updates = (
         TeachingProgressUpdate.objects
@@ -7494,6 +7499,8 @@ def _schedule_progress_map(schedule) -> dict:
             "sheet_name": u.sheet_name or "-",
             "position": " ".join(pos_parts) or "-",
             "last_teacher": teacher or "-",
+            "last_update_date": u.teaching_date,
+            "is_fresh": u.teaching_date >= prev_week_start,
         }
     return progress
 
@@ -7534,6 +7541,7 @@ def teaching_schedule_image(request: HttpRequest, pk: int) -> HttpResponse:
     return render(request, "core/teaching_schedule_image.html", {
         "schedule": schedule,
         "version": version,
+        "is_sunday": (schedule.date.weekday() == 6),
         "thai_date": _thai_schedule_date(schedule.date),
         "rooms": rooms,
         "grid": grid,

@@ -1,0 +1,55 @@
+{% extends "core/base_portal.html" %}
+{% block title %}{{ quiz.title }}{% endblock %}
+
+{% block head %}
+<style>
+  .sq-wrap{max-width:760px;margin:0 auto;display:grid;gap:14px;}
+  .sq-head{background:#fff;border-radius:18px;padding:16px;box-shadow:0 6px 16px rgba(0,0,0,.08);}
+  .sq-code{font-size:12px;font-weight:800;color:#a16207;background:#fef9c3;border-radius:999px;padding:3px 10px;width:fit-content;}
+  .sq-title{font-size:20px;font-weight:1000;margin-top:6px;}
+  .sq-q{background:#fff;border-radius:16px;padding:16px;box-shadow:0 4px 12px rgba(0,0,0,.06);}
+  .sq-q-num{font-size:12px;font-weight:800;color:#64748b;text-transform:uppercase;}
+  .sq-q-text{font-size:16px;font-weight:800;margin-top:4px;line-height:1.5;}
+  .sq-choices{display:grid;gap:8px;margin-top:12px;}
+  .sq-choice{display:flex;gap:10px;align-items:center;border:1px solid #e2e8f0;border-radius:12px;padding:10px 12px;
+    cursor:pointer;font-weight:700;}
+  .sq-choice:has(input:checked){border-color:#f59e0b;background:#fffbeb;}
+  .sq-choice input{width:18px;height:18px;}
+  .sq-written{width:100%;box-sizing:border-box;border:1px solid #e2e8f0;border-radius:12px;padding:11px;
+    font-family:inherit;font-size:14px;min-height:90px;margin-top:10px;resize:vertical;}
+  .sq-submit{border:0;border-radius:14px;padding:14px;font-weight:1000;font-size:16px;background:#f59e0b;color:#fff;
+    width:100%;cursor:pointer;}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="sq-wrap">
+  <div class="sq-head">
+    <div class="sq-code">{{ quiz.code }}</div>
+    <div class="sq-title">{{ quiz.title }}</div>
+  </div>
+
+  <form method="post">
+    {% csrf_token %}
+    {% for q in questions %}
+      <div class="sq-q" style="margin-bottom:14px;">
+        <div class="sq-q-num">ข้อ {{ forloop.counter }} · {{ q.points }} คะแนน</div>
+        <div class="sq-q-text">{{ q.question_text }}</div>
+        {% if q.question_type == "mcq" %}
+          <div class="sq-choices">
+            {% for choice in q.choices.all %}
+              <label class="sq-choice">
+                <input type="radio" name="q_{{ q.id }}" value="{{ choice.id }}" required>
+                {{ choice.text }}
+              </label>
+            {% endfor %}
+          </div>
+        {% else %}
+          <textarea class="sq-written" name="q_{{ q.id }}" placeholder="พิมพ์คำตอบที่นี่..." required></textarea>
+        {% endif %}
+      </div>
+    {% endfor %}
+    <button class="sq-submit" type="submit">✅ ส่งคำตอบ</button>
+  </form>
+</div>
+{% endblock %}

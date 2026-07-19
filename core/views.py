@@ -1984,6 +1984,19 @@ def _parse_optional_date(value: str | None):
         return None
 
 
+def _parse_optional_datetime(value: str | None):
+    """Parse an HTML datetime-local value ("YYYY-MM-DDTHH:MM") as a
+    timezone-aware datetime in the local (Asia/Bangkok) timezone."""
+    raw = (value or "").strip()
+    if not raw:
+        return None
+    try:
+        naive = datetime.fromisoformat(raw)
+    except ValueError:
+        return None
+    return timezone.make_aware(naive) if timezone.is_naive(naive) else naive
+
+
 def _print_order_dashboard_rows() -> list[dict]:
     pending_by_sheet = {
         item["sheet_id"]: item["qty"] or 0
@@ -3086,6 +3099,10 @@ def student_portal_login(request: HttpRequest) -> HttpResponse:
             # ✅ ถ้า Login จากปุ่มคอร์สออนไลน์ ป.6 ให้ไปหน้า Online Course
             if request.path == "/online-course-p6/":
                 return redirect("core:online_course_home")
+
+            # ✅ ถ้า Login จากปุ่มระบบเทสเก็บดาว ให้ไปหน้า Star Quiz
+            if request.path == "/star-quiz/":
+                return redirect("core:star_quiz_home")
 
             # ✅ ถ้า Login จาก Student Portal ปกติ ให้ไปหน้า Student Portal Home
             return redirect("core:student_portal_home")
@@ -7991,4 +8008,302 @@ def teaching_schedule_tutor_profiles(request: HttpRequest) -> HttpResponse:
         "date_from": date_from,
         "date_to": date_to,
         "grand_total": grand_total,
+    })
+
+
+# =========================================================
+# Star Quiz system (weekly quizzes -> stars -> prize redemption)
+# =========================================================
+def _star_quiz_student_grade(student) -> str:
+    return _normalize_sheet_grade_level(getattr(student, "grade_level", "") or "")
+
+
+def star_quiz_login(request: HttpRequest) -> HttpResponse:
+    return student_portal_login(request)
+
+
+def star_quiz_home(request: HttpRequest) -> HttpResponse:
+    from .models import StarQuiz, StarQuizAttempt
+
+    student = _get_portal_student(request)
+    if not student:
+        return redirect("core:star_quiz_login")
+
+    grade = _star_quiz_student_grade(student)
+    now = timezone.now()
+    quizzes = list(
+        StarQuiz.objects
+        .filter(grade_level=grade, is_active=True, publish_at__lte=now)
+        .filter(Q(expires_at__isnull=True) | Q(expires_at__gte=now))
+        .order_by("-publish_at")
+    )
+    attempts = {
+        a.quiz_id: a
+        for a in StarQuizAttempt.objects.filter(student=student, quiz__in=quizzes)
+    }
+    total_stars = (
+        StarQuizAttempt.objects.filter(student=student, is_graded=True)
+        .aggregate(t=Sum("stars_awarded")).get("t") or 0
+    )
+
+    cards = []
+    for q in quizzes:
+        cards.append({"quiz": q, "attempt": attempts.get(q.id)})
+
+    return render(request, "core/star_quiz_home.html", {
+        "student": student,
+        "cards": cards,
+        "total_stars": total_stars,
+    })
+
+
+def star_quiz_take(request: HttpRequest, quiz_id: int) -> HttpResponse:
+    from .models import StarQuiz, StarQuizAttempt, StarQuizAnswer, StarQuizQuestion
+
+    student = _get_portal_student(request)
+    if not student:
+        return redirect("core:star_quiz_login")
+
+    quiz = get_object_or_404(StarQuiz.objects.prefetch_related("questions__choices"), pk=quiz_id)
+    if _star_quiz_student_grade(student) != quiz.grade_level or not quiz.is_published:
+        return redirect("core:star_quiz_home")
+
+    existing = StarQuizAttempt.objects.filter(quiz=quiz, student=student).first()
+    if existing:
+        return redirect("core:star_quiz_result", attempt_id=existing.id)
+
+    questions = list(quiz.questions.order_by("order", "id"))
+
+    if request.method == "POST":
+        with transaction.atomic():
+            max_points = sum(q.points for q in questions)
+            attempt = StarQuizAttempt.objects.create(
+                quiz=quiz, student=student, max_points=max_points,
+            )
+            for q in questions:
+                if q.question_type == StarQuizQuestion.QuestionType.MCQ:
+                    raw = request.POST.get(f"q_{q.id}")
+                    selected = None
+                    is_correct = False
+                    if raw:
+                        selected = q.choices.filter(id=raw).first()
+                        if selected is not None and q.correct_choice_index is not None:
+                            ordered = list(q.choices.order_by("order", "id"))
+                            idx = next((i for i, c in enumerate(ordered) if c.id == selected.id), None)
+                            is_correct = (idx == q.correct_choice_index)
+                    StarQuizAnswer.objects.create(
+                        attempt=attempt, question=q, selected_choice=selected,
+                        points_awarded=(q.points if is_correct else 0),
+                    )
+                else:
+                    written = (request.POST.get(f"q_{q.id}") or "").strip()
+                    StarQuizAnswer.objects.create(
+                        attempt=attempt, question=q, written_answer=written,
+                        points_awarded=None,
+                    )
+            attempt.recalculate()
+        return redirect("core:star_quiz_result", attempt_id=attempt.id)
+
+    return render(request, "core/star_quiz_take.html", {
+        "student": student,
+        "quiz": quiz,
+        "questions": questions,
+    })
+
+
+def star_quiz_result(request: HttpRequest, attempt_id: int) -> HttpResponse:
+    from .models import StarQuizAttempt
+
+    student = _get_portal_student(request)
+    if not student:
+        return redirect("core:star_quiz_login")
+
+    attempt = get_object_or_404(
+        StarQuizAttempt.objects.select_related("quiz", "student"), pk=attempt_id,
+    )
+    if attempt.student_id != student.id:
+        return redirect("core:star_quiz_home")
+
+    answers = list(
+        attempt.answers.select_related("question", "selected_choice").order_by("question__order")
+    )
+    return render(request, "core/star_quiz_result.html", {
+        "student": student,
+        "attempt": attempt,
+        "answers": answers,
+    })
+
+
+@login_required
+def star_quiz_manage(request: HttpRequest) -> HttpResponse:
+    from .models import StarQuiz
+
+    if request.method == "POST":
+        action = (request.POST.get("action") or "").strip()
+        if action == "create":
+            grade_level = (request.POST.get("grade_level") or "").strip()
+            title = (request.POST.get("title") or "").strip()
+            subject_tag = (request.POST.get("subject_tag") or "").strip()
+            try:
+                star_reward = max(int(request.POST.get("star_reward") or 5), 0)
+            except ValueError:
+                star_reward = 5
+            publish_at = _parse_optional_datetime(request.POST.get("publish_at")) or timezone.now()
+            expires_at = _parse_optional_datetime(request.POST.get("expires_at"))
+            if grade_level and title:
+                quiz = StarQuiz.objects.create(
+                    grade_level=grade_level, title=title, subject_tag=subject_tag,
+                    star_reward=star_reward, publish_at=publish_at, expires_at=expires_at,
+                )
+                return redirect("core:star_quiz_edit", quiz_id=quiz.id)
+        elif action == "toggle":
+            q = StarQuiz.objects.filter(id=request.POST.get("id")).first()
+            if q:
+                q.is_active = not q.is_active
+                q.save(update_fields=["is_active"])
+        elif action == "delete":
+            StarQuiz.objects.filter(id=request.POST.get("id")).delete()
+        return redirect("core:star_quiz_manage")
+
+    quizzes = list(StarQuiz.objects.all().order_by("-created_at"))
+    for q in quizzes:
+        q.question_count = q.questions.count()
+        q.attempt_count = q.attempts.count()
+    return render(request, "core/star_quiz_manage.html", {
+        "quizzes": quizzes,
+        "grade_choices": Sheet.GradeLevel.choices,
+    })
+
+
+@login_required
+def star_quiz_edit(request: HttpRequest, quiz_id: int) -> HttpResponse:
+    from .models import StarQuiz, StarQuizQuestion, StarQuizChoice
+
+    quiz = get_object_or_404(StarQuiz, pk=quiz_id)
+
+    if request.method == "POST":
+        action = (request.POST.get("action") or "add_question").strip()
+
+        if action == "add_question":
+            question_type = (request.POST.get("question_type") or StarQuizQuestion.QuestionType.MCQ).strip()
+            question_text = (request.POST.get("question_text") or "").strip()
+            try:
+                points = max(int(request.POST.get("points") or 1), 1)
+            except ValueError:
+                points = 1
+
+            if question_text:
+                with transaction.atomic():
+                    max_order = (
+                        quiz.questions.aggregate(m=Max("order")).get("m") or 0
+                    )
+                    question = StarQuizQuestion.objects.create(
+                        quiz=quiz, order=max_order + 1, question_type=question_type,
+                        question_text=question_text, points=points,
+                    )
+                    if question_type == StarQuizQuestion.QuestionType.MCQ:
+                        try:
+                            choice_count = max(min(int(request.POST.get("choice_count") or 4), 10), 2)
+                        except ValueError:
+                            choice_count = 4
+                        try:
+                            correct_index = int(request.POST.get("correct_index") or 0)
+                        except ValueError:
+                            correct_index = 0
+                        for i in range(choice_count):
+                            StarQuizChoice.objects.create(
+                                question=question, order=i,
+                                text=(request.POST.get(f"choice_{i}") or "").strip(),
+                            )
+                        question.correct_choice_index = max(0, min(correct_index, choice_count - 1))
+                        question.save(update_fields=["correct_choice_index"])
+            return redirect("core:star_quiz_edit", quiz_id=quiz.id)
+
+        elif action == "delete_question":
+            StarQuizQuestion.objects.filter(id=request.POST.get("id"), quiz=quiz).delete()
+            return redirect("core:star_quiz_edit", quiz_id=quiz.id)
+
+        elif action == "update_meta":
+            title = (request.POST.get("title") or "").strip()
+            subject_tag = (request.POST.get("subject_tag") or "").strip()
+            try:
+                star_reward = max(int(request.POST.get("star_reward") or quiz.star_reward), 0)
+            except ValueError:
+                star_reward = quiz.star_reward
+            publish_at = _parse_optional_datetime(request.POST.get("publish_at")) or quiz.publish_at
+            expires_at = _parse_optional_datetime(request.POST.get("expires_at"))
+            if title:
+                quiz.title = title
+                quiz.subject_tag = subject_tag
+                quiz.star_reward = star_reward
+                quiz.publish_at = publish_at
+                quiz.expires_at = expires_at
+                quiz.save(update_fields=["title", "subject_tag", "star_reward", "publish_at", "expires_at"])
+            return redirect("core:star_quiz_edit", quiz_id=quiz.id)
+
+    questions = list(quiz.questions.prefetch_related("choices").order_by("order", "id"))
+    return render(request, "core/star_quiz_question_edit.html", {
+        "quiz": quiz,
+        "questions": questions,
+        "question_type_choices": StarQuizQuestion.QuestionType.choices,
+    })
+
+
+@login_required
+def star_quiz_scores(request: HttpRequest) -> HttpResponse:
+    from .models import StarQuiz, StarQuizAttempt, StarQuizAnswer, StarQuizQuestion
+
+    if request.method == "POST":
+        action = (request.POST.get("action") or "").strip()
+        if action == "grade_answer":
+            answer = StarQuizAnswer.objects.filter(id=request.POST.get("id")).select_related("attempt", "question").first()
+            if answer:
+                try:
+                    pts = max(0, min(int(request.POST.get("points") or 0), answer.question.points))
+                except ValueError:
+                    pts = 0
+                answer.points_awarded = pts
+                answer.save(update_fields=["points_awarded"])
+                answer.attempt.recalculate()
+        return redirect("core:star_quiz_scores")
+
+    grade_filter = (request.GET.get("grade") or "").strip()
+
+    students_qs = (
+        Student.objects.filter(is_active=True, star_quiz_attempts__isnull=False)
+        .distinct()
+    )
+    if grade_filter:
+        students_qs = [
+            s for s in students_qs if _star_quiz_student_grade(s) == grade_filter
+        ]
+    else:
+        students_qs = list(students_qs)
+
+    rows = []
+    for s in students_qs:
+        agg = (
+            StarQuizAttempt.objects.filter(student=s, is_graded=True)
+            .aggregate(total=Sum("stars_awarded"), n=Count("id"))
+        )
+        rows.append({
+            "student": s,
+            "grade": _star_quiz_student_grade(s),
+            "total_stars": agg.get("total") or 0,
+            "quiz_count": agg.get("n") or 0,
+        })
+    rows.sort(key=lambda r: (-r["total_stars"], r["student"].full_name))
+
+    pending_answers = (
+        StarQuizAnswer.objects
+        .filter(question__question_type=StarQuizQuestion.QuestionType.WRITTEN, points_awarded__isnull=True)
+        .select_related("attempt", "attempt__student", "attempt__quiz", "question")
+        .order_by("attempt__quiz", "attempt__student__full_name")
+    )
+
+    return render(request, "core/star_quiz_scores.html", {
+        "rows": rows,
+        "grade_filter": grade_filter,
+        "grade_choices": Sheet.GradeLevel.choices,
+        "pending_answers": pending_answers,
     })

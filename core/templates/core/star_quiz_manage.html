@@ -1,0 +1,83 @@
+{% extends "core/base.html" %}
+{% block title %}จัดการระบบเทสเก็บดาว{% endblock %}
+
+{% block head %}
+<style>
+  .qm-wrap{max-width:960px;margin:0 auto;display:grid;gap:16px;}
+  .qm-card{background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:18px;box-shadow:0 4px 10px rgba(0,0,0,.06);}
+  .qm-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+  .qm-grid .full{grid-column:1/-1;}
+  .qm-grid label{font-size:12px;font-weight:700;color:#475569;display:block;margin-bottom:4px;}
+  .qm-grid input,.qm-grid select{width:100%;box-sizing:border-box;padding:9px 11px;border:1px solid #cbd5e1;
+    border-radius:10px;font-size:14px;font-family:inherit;}
+  .sbtn{border:0;border-radius:10px;padding:10px 15px;font-weight:700;cursor:pointer;font-size:14px;font-family:inherit;
+    display:inline-flex;align-items:center;gap:6px;text-decoration:none;}
+  .sbtn.blue{background:#1d4ed8;color:#fff}.sbtn.soft{background:#f1f5f9;color:#0f172a;border:1px solid #cbd5e1}
+  .sbtn.red{background:#dc2626;color:#fff}.sbtn.amber{background:#f59e0b;color:#fff}
+  .qm-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:11px 14px;
+    border:1px solid #eef2f7;border-radius:12px;margin-bottom:8px;flex-wrap:wrap;}
+  .qm-row.inactive{opacity:.5;}
+  .qm-code{font-size:11px;font-weight:800;color:#a16207;background:#fef9c3;border-radius:999px;padding:2px 9px;width:fit-content;}
+  .qm-title{font-weight:800;font-size:15px;margin-top:3px;}
+  .qm-meta{font-size:12px;color:#64748b;margin-top:3px;}
+  .qm-actions{display:flex;gap:6px;flex-wrap:wrap;}
+  .hint{font-size:13px;color:#64748b;}
+  @media(max-width:700px){.qm-grid{grid-template-columns:1fr}}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="qm-wrap">
+  <div class="qm-card">
+    <h2 style="margin:0 0 4px;">⭐ จัดการระบบเทสเก็บดาว</h2>
+    <p class="hint" style="margin:0 0 14px;">สร้างเทสใหม่ที่นี่ — หลังบันทึกจะไปหน้าเพิ่มโจทย์ต่อทันที รหัสเทสจะสร้างให้อัตโนมัติ (เช่น ป.6 Test 001)</p>
+    <form method="post" class="qm-grid">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="create">
+      <div><label>ระดับชั้น</label>
+        <select name="grade_level" required>
+          <option value="">— เลือก —</option>
+          {% for value, label in grade_choices %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="full"><label>ชื่อเทส / หัวข้อ</label><input type="text" name="title" placeholder="เช่น เศษส่วนสัปดาห์ที่ 5" required></div>
+      <div><label>วิชา</label><input type="text" name="subject_tag" placeholder="เช่น คณิตศาสตร์"></div>
+      <div><label>ดาวเต็ม</label><input type="number" name="star_reward" min="0" value="5"></div>
+      <div><label>วันเผยแพร่</label><input type="datetime-local" name="publish_at"></div>
+      <div><label>วันหมดอายุ (ไม่บังคับ)</label><input type="datetime-local" name="expires_at"></div>
+      <div class="full"><button class="sbtn blue" type="submit" style="width:100%;justify-content:center;">+ สร้างเทส</button></div>
+    </form>
+  </div>
+
+  <div class="qm-card">
+    <h3 style="margin:0 0 12px;">รายการเทสทั้งหมด</h3>
+    {% for q in quizzes %}
+      <div class="qm-row {% if not q.is_active %}inactive{% endif %}">
+        <div>
+          <div class="qm-code">{{ q.code }}</div>
+          <div class="qm-title">{{ q.title }}</div>
+          <div class="qm-meta">{{ q.get_grade_level_display }} · {{ q.subject_tag|default:"-" }} · {{ q.question_count }} ข้อ · {{ q.attempt_count }} คนทำแล้ว · เผยแพร่ {{ q.publish_at|date:"d/m/y H:i" }}{% if q.expires_at %} · หมดอายุ {{ q.expires_at|date:"d/m/y H:i" }}{% endif %}</div>
+        </div>
+        <div class="qm-actions">
+          <a class="sbtn soft" href="{% url 'core:star_quiz_edit' q.id %}">✏️ แก้ไข/เพิ่มข้อ</a>
+          <form method="post" style="display:inline;">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="toggle">
+            <input type="hidden" name="id" value="{{ q.id }}">
+            <button class="sbtn amber" type="submit">{% if q.is_active %}ซ่อน{% else %}แสดง{% endif %}</button>
+          </form>
+          <form method="post" style="display:inline;" onsubmit="return confirm('ลบเทสนี้ทั้งหมด รวมคำตอบนักเรียน?');">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="delete">
+            <input type="hidden" name="id" value="{{ q.id }}">
+            <button class="sbtn red" type="submit">ลบ</button>
+          </form>
+        </div>
+      </div>
+    {% empty %}
+      <div class="hint" style="text-align:center;padding:16px;">ยังไม่มีเทส</div>
+    {% endfor %}
+    <a class="sbtn soft" href="{% url 'core:star_quiz_scores' %}" style="margin-top:8px;">🏆 ดูคะแนนสะสมนักเรียน</a>
+  </div>
+</div>
+{% endblock %}

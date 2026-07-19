@@ -1,0 +1,61 @@
+{% extends "core/base_portal.html" %}
+{% block title %}ระบบเทสเก็บดาว{% endblock %}
+
+{% block head %}
+<style>
+  .sq-wrap{max-width:900px;margin:0 auto;display:grid;gap:16px;}
+  .sq-hero{background:linear-gradient(135deg,#f59e0b,#eab308);color:#fff;border-radius:20px;padding:20px;
+    display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;box-shadow:0 10px 24px rgba(245,158,11,.28);}
+  .sq-hero .who{font-size:14px;font-weight:700;opacity:.95;}
+  .sq-hero .stars{font-size:34px;font-weight:1000;display:flex;align-items:center;gap:8px;}
+  .sq-cards{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;}
+  .sq-card{background:#fff;border-radius:18px;padding:16px;box-shadow:0 6px 16px rgba(0,0,0,.08);border:1px solid #f1f5f9;
+    display:flex;flex-direction:column;gap:8px;}
+  .sq-code{font-size:12px;font-weight:800;color:#a16207;background:#fef9c3;border-radius:999px;padding:3px 10px;width:fit-content;}
+  .sq-title{font-size:17px;font-weight:1000;color:#0f172a;}
+  .sq-subject{font-size:12px;color:#64748b;font-weight:700;}
+  .sq-reward{font-size:13px;font-weight:800;color:#b45309;}
+  .sq-btn{margin-top:6px;border:0;border-radius:12px;padding:11px;font-weight:1000;text-align:center;text-decoration:none;
+    display:block;}
+  .sq-btn.go{background:#f59e0b;color:#fff;}
+  .sq-btn.done{background:#dcfce7;color:#166534;}
+  .sq-btn.pending{background:#fef3c7;color:#92400e;}
+  .sq-empty{grid-column:1/-1;text-align:center;color:#64748b;font-weight:800;padding:24px;
+    border:1.5px dashed #cbd5e1;border-radius:16px;}
+  @media(max-width:640px){.sq-cards{grid-template-columns:1fr}}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="sq-wrap">
+  <div class="sq-hero">
+    <div>
+      <div style="font-size:20px;font-weight:1000;">⭐ ระบบเทสเก็บดาว</div>
+      <div class="who">{{ student.nickname|default:student.full_name }}</div>
+    </div>
+    <div class="stars">⭐ {{ total_stars }} ดาว</div>
+  </div>
+
+  <div class="sq-cards">
+    {% for c in cards %}
+      <div class="sq-card">
+        <div class="sq-code">{{ c.quiz.code }}</div>
+        <div class="sq-title">{{ c.quiz.title }}</div>
+        {% if c.quiz.subject_tag %}<div class="sq-subject">{{ c.quiz.subject_tag }}</div>{% endif %}
+        <div class="sq-reward">⭐ เต็ม {{ c.quiz.star_reward }} ดาว</div>
+        {% if c.attempt %}
+          {% if c.attempt.is_graded %}
+            <a class="sq-btn done" href="{% url 'core:star_quiz_result' c.attempt.id %}">✅ ทำแล้ว ได้ {{ c.attempt.stars_awarded }} ดาว</a>
+          {% else %}
+            <a class="sq-btn pending" href="{% url 'core:star_quiz_result' c.attempt.id %}">⏳ รอตรวจข้อเขียน</a>
+          {% endif %}
+        {% else %}
+          <a class="sq-btn go" href="{% url 'core:star_quiz_take' c.quiz.id %}">📝 เริ่มทำเทส</a>
+        {% endif %}
+      </div>
+    {% empty %}
+      <div class="sq-empty">ยังไม่มีเทสสำหรับระดับชั้นนี้ในตอนนี้ กลับมาเช็คใหม่สัปดาห์หน้านะครับ</div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

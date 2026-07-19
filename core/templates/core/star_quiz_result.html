@@ -1,0 +1,65 @@
+{% extends "core/base_portal.html" %}
+{% block title %}ผลเทส {{ attempt.quiz.code }}{% endblock %}
+
+{% block head %}
+<style>
+  .sq-wrap{max-width:720px;margin:0 auto;display:grid;gap:14px;}
+  .sq-score{background:linear-gradient(135deg,#f59e0b,#eab308);color:#fff;border-radius:20px;padding:22px;text-align:center;
+    box-shadow:0 10px 24px rgba(245,158,11,.28);}
+  .sq-score .code{font-size:13px;font-weight:800;opacity:.9;}
+  .sq-score .title{font-size:19px;font-weight:1000;margin-top:4px;}
+  .sq-score .big{font-size:40px;font-weight:1000;margin-top:10px;}
+  .sq-score .sub{font-size:13px;font-weight:700;opacity:.95;margin-top:4px;}
+  .sq-list{display:grid;gap:10px;}
+  .sq-item{background:#fff;border-radius:14px;padding:13px;box-shadow:0 4px 10px rgba(0,0,0,.06);}
+  .sq-item .q{font-weight:800;font-size:14px;}
+  .sq-item .a{font-size:13px;color:#334155;margin-top:6px;}
+  .sq-tag{display:inline-block;font-size:11px;font-weight:800;border-radius:999px;padding:2px 9px;margin-top:6px;}
+  .sq-tag.correct{background:#dcfce7;color:#166534;}
+  .sq-tag.wrong{background:#fee2e2;color:#991b1b;}
+  .sq-tag.pending{background:#fef3c7;color:#92400e;}
+  .sq-back{display:block;text-align:center;margin-top:6px;font-weight:800;color:#0f172a;text-decoration:none;
+    background:#f1f5f9;border-radius:12px;padding:11px;}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="sq-wrap">
+  <div class="sq-score">
+    <div class="code">{{ attempt.quiz.code }}</div>
+    <div class="title">{{ attempt.quiz.title }}</div>
+    {% if attempt.is_graded %}
+      <div class="big">⭐ {{ attempt.stars_awarded }} ดาว</div>
+      <div class="sub">คะแนน {{ attempt.score_points }} / {{ attempt.max_points }}</div>
+    {% else %}
+      <div class="big">⏳</div>
+      <div class="sub">รอครูตรวจข้อเขียน ระบบจะตัดดาวให้หลังตรวจครบทุกข้อ</div>
+    {% endif %}
+  </div>
+
+  <div class="sq-list">
+    {% for a in answers %}
+      <div class="sq-item">
+        <div class="q">{{ a.question.question_text }}</div>
+        {% if a.question.question_type == "mcq" %}
+          <div class="a">คำตอบของน้อง: {{ a.selected_choice.text|default:"-" }}</div>
+          {% if a.points_awarded and a.points_awarded > 0 %}
+            <span class="sq-tag correct">✅ ถูก +{{ a.points_awarded }}</span>
+          {% else %}
+            <span class="sq-tag wrong">❌ ไม่ถูก</span>
+          {% endif %}
+        {% else %}
+          <div class="a">คำตอบของน้อง: {{ a.written_answer|default:"-" }}</div>
+          {% if a.points_awarded is None %}
+            <span class="sq-tag pending">⏳ รอตรวจ</span>
+          {% else %}
+            <span class="sq-tag correct">ได้ {{ a.points_awarded }} / {{ a.question.points }} คะแนน</span>
+          {% endif %}
+        {% endif %}
+      </div>
+    {% endfor %}
+  </div>
+
+  <a class="sq-back" href="{% url 'core:star_quiz_home' %}">← กลับหน้ารายการเทส</a>
+</div>
+{% endblock %}

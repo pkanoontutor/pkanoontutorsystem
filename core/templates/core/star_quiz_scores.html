@@ -1,0 +1,79 @@
+{% extends "core/base.html" %}
+{% block title %}คะแนนสะสมเทสเก็บดาว{% endblock %}
+
+{% block head %}
+<style>
+  .sc-wrap{max-width:960px;margin:0 auto;display:grid;gap:16px;}
+  .sc-card{background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:18px;box-shadow:0 4px 10px rgba(0,0,0,.06);
+    overflow-x:auto;}
+  .sc-bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+  .sc-bar select{padding:9px 11px;border:1px solid #cbd5e1;border-radius:10px;font-size:14px;font-family:inherit;}
+  .sbtn{border:0;border-radius:10px;padding:10px 15px;font-weight:700;cursor:pointer;font-size:14px;font-family:inherit;
+    display:inline-flex;align-items:center;gap:6px;text-decoration:none;}
+  .sbtn.blue{background:#1d4ed8;color:#fff}.sbtn.soft{background:#f1f5f9;color:#0f172a;border:1px solid #cbd5e1}
+  table.sc{width:100%;border-collapse:collapse;min-width:520px;}
+  table.sc th,table.sc td{padding:9px 8px;border-bottom:1px solid #f1f5f9;text-align:left;}
+  table.sc th{font-size:11px;color:#64748b;text-transform:uppercase;}
+  table.sc td.num,table.sc th.num{text-align:right;}
+  .rank{font-weight:800;color:#a16207;}
+  .grade-pending{background:#fef3c7;border:1px solid #fde68a;border-radius:12px;padding:12px;margin-bottom:8px;}
+  .gp-head{font-size:13px;font-weight:800;color:#0f172a;}
+  .gp-answer{font-size:13px;color:#334155;margin-top:6px;background:#fff;border-radius:8px;padding:8px;}
+  .gp-form{display:flex;gap:8px;align-items:center;margin-top:8px;}
+  .gp-form input{width:80px;padding:7px 9px;border:1px solid #cbd5e1;border-radius:8px;font-family:inherit;}
+  .hint{font-size:13px;color:#64748b;}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="sc-wrap">
+  {% if pending_answers %}
+    <div class="sc-card">
+      <h3 style="margin:0 0 10px;">⏳ ข้อเขียนที่รอตรวจ ({{ pending_answers|length }})</h3>
+      {% for a in pending_answers %}
+        <div class="grade-pending">
+          <div class="gp-head">{{ a.attempt.quiz.code }} · {{ a.attempt.student.nickname|default:a.attempt.student.full_name }} · {{ a.question.question_text|truncatechars:60 }}</div>
+          <div class="gp-answer">{{ a.written_answer|default:"(ไม่ได้ตอบ)" }}</div>
+          <form method="post" class="gp-form">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="grade_answer">
+            <input type="hidden" name="id" value="{{ a.id }}">
+            <label class="hint">คะแนน (เต็ม {{ a.question.points }})</label>
+            <input type="number" name="points" min="0" max="{{ a.question.points }}" value="{{ a.question.points }}">
+            <button class="sbtn blue" type="submit">บันทึกคะแนน</button>
+          </form>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  <div class="sc-card">
+    <h2 style="margin:0 0 4px;">🏆 คะแนนสะสมนักเรียน</h2>
+    <form method="get" class="sc-bar" style="margin:10px 0;">
+      <select name="grade" onchange="this.form.submit()">
+        <option value="">— ทุกระดับชั้น —</option>
+        {% for value, label in grade_choices %}
+          <option value="{{ value }}" {% if grade_filter == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+      <a class="sbtn soft" href="{% url 'core:star_quiz_manage' %}">← กลับหน้าจัดการเทส</a>
+    </form>
+    <table class="sc">
+      <thead><tr><th>อันดับ</th><th>นักเรียน</th><th>ระดับชั้น</th><th class="num">เทสที่ทำ</th><th class="num">ดาวสะสม</th></tr></thead>
+      <tbody>
+        {% for r in rows %}
+          <tr>
+            <td class="rank">#{{ forloop.counter }}</td>
+            <td>{{ r.student.nickname|default:r.student.full_name }} <span class="hint">({{ r.student.student_code }})</span></td>
+            <td>{{ r.student.grade_level }}</td>
+            <td class="num">{{ r.quiz_count }}</td>
+            <td class="num">⭐ {{ r.total_stars }}</td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="5" class="hint" style="text-align:center;padding:16px;">ยังไม่มีนักเรียนทำเทส</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

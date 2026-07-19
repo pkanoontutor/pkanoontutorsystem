@@ -41,6 +41,11 @@ from .models import (
     TestParticipant,
     TestScore,
     AdminToolCard,
+    StarQuiz,
+    StarQuizQuestion,
+    StarQuizChoice,
+    StarQuizAttempt,
+    StarQuizAnswer,
 )
 
 
@@ -990,4 +995,49 @@ class OnlineCourseVideoAdmin(admin.ModelAdmin):
     list_filter = ("course_key", "is_active")
     search_fields = ("title", "note", "drive_url")
     ordering = ("course_key", "display_order", "-created_at")
+
+
+@admin.register(StarQuiz)
+class StarQuizAdmin(admin.ModelAdmin):
+    list_display = ("code", "title", "grade_level", "subject_tag", "star_reward", "publish_at", "expires_at", "is_active")
+    list_filter = ("grade_level", "is_active")
+    search_fields = ("code", "title", "subject_tag")
+    ordering = ("-publish_at",)
+
+
+class StarQuizChoiceInline(admin.TabularInline):
+    model = StarQuizChoice
+    extra = 0
+
+
+@admin.register(StarQuizQuestion)
+class StarQuizQuestionAdmin(admin.ModelAdmin):
+    list_display = ("quiz", "order", "question_type", "points", "correct_choice_index")
+    list_filter = ("question_type", "quiz")
+    search_fields = ("question_text", "quiz__code", "quiz__title")
+    inlines = (StarQuizChoiceInline,)
+    autocomplete_fields = ("quiz",)
+
+
+@admin.register(StarQuizChoice)
+class StarQuizChoiceAdmin(admin.ModelAdmin):
+    list_display = ("question", "order", "text")
+    search_fields = ("text", "question__question_text")
+    autocomplete_fields = ("question",)
+
+
+@admin.register(StarQuizAttempt)
+class StarQuizAttemptAdmin(admin.ModelAdmin):
+    list_display = ("quiz", "student", "score_points", "max_points", "stars_awarded", "is_graded", "submitted_at")
+    list_filter = ("is_graded", "quiz")
+    search_fields = ("quiz__code", "quiz__title", "student__full_name", "student__nickname")
+    autocomplete_fields = ("quiz", "student")
+    ordering = ("-submitted_at",)
+
+
+@admin.register(StarQuizAnswer)
+class StarQuizAnswerAdmin(admin.ModelAdmin):
+    list_display = ("attempt", "question", "points_awarded")
+    search_fields = ("attempt__student__full_name", "question__question_text")
+    autocomplete_fields = ("attempt", "question", "selected_choice")
 

@@ -116,6 +116,15 @@ urlpatterns = [
     path("online-course-p6/home/", views.online_course_home, name="online_course_home"),
     path("online-course-p6/videos/", views.online_course_video_manage, name="online_course_video_manage"),
 
+    # ✅ Star Quiz system
+    path("star-quiz/", views.star_quiz_login, name="star_quiz_login"),
+    path("star-quiz/home/", views.star_quiz_home, name="star_quiz_home"),
+    path("star-quiz/take/<int:quiz_id>/", views.star_quiz_take, name="star_quiz_take"),
+    path("star-quiz/result/<int:attempt_id>/", views.star_quiz_result, name="star_quiz_result"),
+    path("star-quiz/manage/", views.star_quiz_manage, name="star_quiz_manage"),
+    path("star-quiz/manage/<int:quiz_id>/", views.star_quiz_edit, name="star_quiz_edit"),
+    path("star-quiz/manage/scores/", views.star_quiz_scores, name="star_quiz_scores"),
+
     # Student ID List (Public)
     path("student-id-list/", views.student_id_list, name="student_id_list"),
 

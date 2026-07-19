@@ -2128,3 +2128,178 @@ class OnlineCourseVideo(models.Model):
     def thumbnail_url(self) -> str:
         file_id = self.drive_file_id
         return f"https://drive.google.com/thumbnail?id={file_id}&sz=w480" if file_id else ""
+
+
+# =========================================================
+# Star Quiz system (weekly quizzes -> stars -> prize redemption)
+# =========================================================
+class StarQuiz(models.Model):
+    """A weekly quiz shown to students of one grade level. Accumulating
+    stars from completed quizzes lets students redeem prizes (redemption
+    itself is tracked/handled outside the system, offline)."""
+
+    grade_level = models.CharField(
+        "ระดับชั้น", max_length=20, choices=Sheet.GradeLevel.choices,
+        help_text="แสดงเทสนี้ให้เฉพาะนักเรียนระดับชั้นนี้เห็น",
+    )
+    code = models.CharField(
+        "รหัสเทส", max_length=40, unique=True, blank=True,
+        help_text="ระบบสร้างให้อัตโนมัติ เช่น ป.6 Test 001",
+    )
+    title = models.CharField("ชื่อเทส / หัวข้อ", max_length=255)
+    subject_tag = models.CharField("วิชา", max_length=100, blank=True)
+    star_reward = models.PositiveIntegerField(
+        "ดาวเต็มของเทสนี้", default=5,
+        help_text="ดาวที่ได้จะคำนวณตามสัดส่วนคะแนนที่ทำได้ เช่น ได้ 80% ของคะแนน = ได้ 80% ของดาวเต็ม (ปัดเศษ)",
+    )
+    publish_at = models.DateTimeField(
+        "วันเผยแพร่", default=timezone.now,
+        help_text="เทสจะเปิดให้ทำตั้งแต่วันเวลานี้เป็นต้นไป (ตั้งล่วงหน้าได้)",
+    )
+    expires_at = models.DateTimeField(
+        "วันหมดอายุ", null=True, blank=True,
+        help_text="เว้นว่างได้ถ้าไม่ต้องการวันหมดอายุ",
+    )
+    is_active = models.BooleanField("เปิดใช้งาน", default=True)
+    created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Star Quiz"
+        verbose_name_plural = "Star Quizzes"
+        ordering = ("-publish_at", "-id")
+
+    def __str__(self) -> str:
+        return self.code or self.title
+
+    def save(self, *args, **kwargs):
+        if not self.code and self.grade_level:
+            grade_label = dict(Sheet.GradeLevel.choices).get(self.grade_level, self.grade_level)
+            seq = StarQuiz.objects.filter(grade_level=self.grade_level).count() + 1
+            candidate = f"{grade_label} Test {seq:03d}"
+            while StarQuiz.objects.filter(code=candidate).exists():
+                seq += 1
+                candidate = f"{grade_label} Test {seq:03d}"
+            self.code = candidate
+        super().save(*args, **kwargs)
+
+    @property
+    def is_published(self) -> bool:
+        now = timezone.now()
+        if self.publish_at and self.publish_at > now:
+            return False
+        if self.expires_at and self.expires_at < now:
+            return False
+        return True
+
+    @property
+    def is_expired(self) -> bool:
+        return bool(self.expires_at and self.expires_at < timezone.now())
+
+    @property
+    def total_points(self) -> int:
+        return sum(q.points for q in self.questions.all())
+
+    @property
+    def has_written_questions(self) -> bool:
+        return self.questions.filter(question_type=StarQuizQuestion.QuestionType.WRITTEN).exists()
+
+
+class StarQuizQuestion(models.Model):
+    class QuestionType(models.TextChoices):
+        MCQ = "mcq", "ข้อกา (ปรนัย)"
+        WRITTEN = "written", "ข้อเขียน (อัตนัย)"
+
+    quiz = models.ForeignKey(StarQuiz, on_delete=models.CASCADE, related_name="questions")
+    order = models.PositiveIntegerField("ลำดับข้อ", default=1)
+    question_type = models.CharField(
+        "ประเภทข้อ", max_length=20, choices=QuestionType.choices, default=QuestionType.MCQ,
+    )
+    question_text = models.TextField("โจทย์")
+    points = models.PositiveIntegerField("คะแนนของข้อนี้", default=1)
+    correct_choice_index = models.PositiveIntegerField(
+        "เฉลย (ลำดับช้อยส์ที่ถูก เริ่มที่ 0)", null=True, blank=True,
+    )
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        verbose_name = "Star Quiz Question"
+        verbose_name_plural = "Star Quiz Questions"
+        ordering = ("quiz", "order", "id")
+
+    def __str__(self) -> str:
+        return f"{self.quiz.code} #{self.order}"
+
+
+class StarQuizChoice(models.Model):
+    question = models.ForeignKey(StarQuizQuestion, on_delete=models.CASCADE, related_name="choices")
+    order = models.PositiveIntegerField("ลำดับช้อยส์", default=1)
+    text = models.CharField("ข้อความช้อยส์", max_length=500, blank=True)
+
+    class Meta:
+        verbose_name = "Star Quiz Choice"
+        verbose_name_plural = "Star Quiz Choices"
+        ordering = ("question", "order", "id")
+
+    def __str__(self) -> str:
+        return f"{self.question_id} - {self.text[:30]}"
+
+
+class StarQuizAttempt(models.Model):
+    quiz = models.ForeignKey(StarQuiz, on_delete=models.CASCADE, related_name="attempts")
+    student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name="star_quiz_attempts")
+    submitted_at = models.DateTimeField(default=timezone.now)
+    score_points = models.PositiveIntegerField("คะแนนที่ได้", default=0)
+    max_points = models.PositiveIntegerField("คะแนนเต็ม", default=0)
+    stars_awarded = models.PositiveIntegerField("ดาวที่ได้", default=0)
+    is_graded = models.BooleanField(
+        "ตรวจครบแล้ว", default=False,
+        help_text="เป็น False ถ้ามีข้อเขียนที่ยังไม่ได้ตรวจ ดาวจะยังไม่ตัดให้จนกว่าจะตรวจครบ",
+    )
+
+    class Meta:
+        verbose_name = "Star Quiz Attempt"
+        verbose_name_plural = "Star Quiz Attempts"
+        ordering = ("-submitted_at",)
+        constraints = [
+            models.UniqueConstraint(fields=["quiz", "student"], name="uniq_star_quiz_attempt_per_student"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.student} - {self.quiz.code}"
+
+    def recalculate(self):
+        answers = list(self.answers.select_related("question"))
+        score = sum(a.points_awarded for a in answers)
+        pending = any(
+            a.question.question_type == StarQuizQuestion.QuestionType.WRITTEN and a.points_awarded is None
+            for a in answers
+        )
+        self.score_points = score
+        self.is_graded = not pending
+        if self.is_graded and self.max_points:
+            self.stars_awarded = round(self.quiz.star_reward * (self.score_points / self.max_points))
+        elif self.is_graded:
+            self.stars_awarded = 0
+        self.save(update_fields=["score_points", "stars_awarded", "is_graded"])
+
+
+class StarQuizAnswer(models.Model):
+    attempt = models.ForeignKey(StarQuizAttempt, on_delete=models.CASCADE, related_name="answers")
+    question = models.ForeignKey(StarQuizQuestion, on_delete=models.CASCADE, related_name="answers")
+    selected_choice = models.ForeignKey(
+        StarQuizChoice, on_delete=models.SET_NULL, null=True, blank=True, related_name="+",
+    )
+    written_answer = models.TextField("คำตอบข้อเขียน", blank=True)
+    points_awarded = models.PositiveIntegerField("คะแนนที่ได้ข้อนี้", null=True, blank=True)
+
+    class Meta:
+        verbose_name = "Star Quiz Answer"
+        verbose_name_plural = "Star Quiz Answers"
+        ordering = ("attempt", "question__order")
+        constraints = [
+            models.UniqueConstraint(fields=["attempt", "question"], name="uniq_star_quiz_answer_per_question"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.attempt_id} - Q{self.question_id}"

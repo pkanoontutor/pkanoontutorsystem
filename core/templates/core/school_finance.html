@@ -995,7 +995,7 @@
               </div>
 
               <label class="special-toggle">
-                <input class="js-special-rate" type="checkbox" name="special_rate_325_{{ tutor.id }}" value="yes" {% if entry and entry.special_rate_325 %}checked{% endif %}>
+                <input class="js-special-rate" type="checkbox" name="special_rate_325_{{ tutor.id }}" value="yes" {% if entry %}{% if entry.special_rate_325 %}checked{% endif %}{% elif tutor.default_special_rate_325 %}checked{% endif %}>
                 <span>เรทพิเศษ 325<br>เมื่อ onsite ≥ 4 ชม.</span>
               </label>
 

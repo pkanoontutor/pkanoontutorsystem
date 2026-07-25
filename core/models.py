@@ -1445,6 +1445,11 @@ class Tutor(models.Model):
     name = models.CharField("ชื่อติวเตอร์", max_length=120, unique=True)
     phone = models.CharField("เบอร์ติดต่อ", max_length=50, blank=True)
     note = models.TextField("หมายเหตุ", blank=True)
+    default_special_rate_325 = models.BooleanField(
+        "ค่าเริ่มต้นเรทพิเศษ 325 บาท/ชม.",
+        default=False,
+        help_text="ถ้าติ๊ก ช่องเรทพิเศษ 325 จะถูกติ๊กให้อัตโนมัติเมื่อกรอกค่าสอนของติวเตอร์คนนี้",
+    )
     is_active = models.BooleanField("ใช้งาน", default=True)
     created_at = models.DateTimeField("วันที่สร้าง", default=timezone.now)
     updated_at = models.DateTimeField("อัปเดตล่าสุด", auto_now=True)
@@ -1931,6 +1936,12 @@ class AdminToolCard(models.Model):
     name = models.CharField("ชื่อเมนู", max_length=200)
     desc = models.TextField("คำอธิบาย", blank=True)
     url = models.CharField("ลิงก์", max_length=300)
+    quick_add_url = models.CharField(
+        "ลิงก์ปุ่ม + (ลัดไปหน้าสร้างใหม่)",
+        max_length=300,
+        blank=True,
+        help_text="ถ้าใส่ จะมีปุ่ม + ที่มุมขวาบนของ card เพื่อลัดไปหน้าสร้างรายการใหม่",
+    )
     color = models.CharField("สีไอคอน", max_length=20, default="c-sky")
     order = models.IntegerField("ลำดับ", default=0)
     created_at = models.DateTimeField(default=timezone.now)
@@ -1952,6 +1963,7 @@ class AdminToolCard(models.Model):
             "name": self.name,
             "desc": self.desc,
             "url": self.url,
+            "quick_add_url": self.quick_add_url,
             "color": self.color,
             "order": self.order,
         }

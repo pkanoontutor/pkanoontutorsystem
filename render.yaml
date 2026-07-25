@@ -8,3 +8,24 @@ services:
       python manage.py collectstatic --no-input
       python manage.py migrate
     startCommand: gunicorn config.wsgi:application
+
+  # Full-system Excel export emailed to pkanoontutor@gmail.com.
+  # Schedules are UTC; the site runs on Asia/Bangkok (UTC+7), so 23:59 local
+  # is 16:59 UTC the same day.
+  #   Sunday 23:59 ICT -> "59 16 * * 0"
+  #   Friday 23:59 ICT -> "59 16 * * 5"
+  - type: cron
+    name: pkanoontutor-export-sunday
+    env: python
+    pythonVersion: 3.12.8
+    schedule: "59 16 * * 0"
+    buildCommand: pip install -r requirements.txt
+    startCommand: python manage.py email_full_export
+
+  - type: cron
+    name: pkanoontutor-export-friday
+    env: python
+    pythonVersion: 3.12.8
+    schedule: "59 16 * * 5"
+    buildCommand: pip install -r requirements.txt
+    startCommand: python manage.py email_full_export

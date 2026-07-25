@@ -3,6 +3,9 @@ from django.utils.safestring import mark_safe
 from django.utils import timezone
 
 from .models import (
+    CostScenario,
+    CostScenarioClass,
+    CostScenarioFixedCost,
     Student,
     School,
     TutoringClass,
@@ -1042,3 +1045,26 @@ class StarQuizAnswerAdmin(admin.ModelAdmin):
     search_fields = ("attempt__student__full_name", "question__question_text")
     autocomplete_fields = ("attempt", "question", "selected_choice")
 
+
+
+# ---------------------------------------------------------
+# Revenue & Cost Analysis
+# ---------------------------------------------------------
+class CostScenarioFixedCostInline(admin.TabularInline):
+    model = CostScenarioFixedCost
+    extra = 1
+
+
+class CostScenarioClassInline(admin.TabularInline):
+    model = CostScenarioClass
+    extra = 0
+    autocomplete_fields = ("tutoring_class",)
+
+
+@admin.register(CostScenario)
+class CostScenarioAdmin(admin.ModelAdmin):
+    list_display = ("name", "period_month", "allocation_method", "updated_at")
+    list_filter = ("allocation_method", "period_month")
+    search_fields = ("name", "note")
+    ordering = ("-period_month",)
+    inlines = (CostScenarioFixedCostInline, CostScenarioClassInline)

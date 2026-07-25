@@ -118,6 +118,42 @@
   .sens-cell.over{opacity:.45}
   .sens-cell .sd{font-size:10px;font-weight:1000;color:#64748b}
   .sens-cell .sp{font-size:13px;font-weight:1000;font-variant-numeric:tabular-nums}
+  /* ---- Interactive weekly chart ---- */
+  .chart-controls{display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start;
+    background:#f8fafc;border:1px solid #e2e8f0;border-radius:14px;padding:11px;margin-bottom:11px}
+  .cc-group{display:grid;gap:5px}
+  .cc-label{font-size:10px;font-weight:1000;color:#64748b;text-transform:uppercase;letter-spacing:.05em}
+  .cc-label small{text-transform:none;letter-spacing:0;font-weight:800;color:#94a3b8}
+  .cc-btns{display:flex;gap:4px;flex-wrap:wrap}
+  .seg{border:1px solid #cbd5e1;background:#fff;color:#334155;border-radius:9px;padding:6px 10px;
+    font-size:12px;font-weight:1000;cursor:pointer;font-family:inherit;transition:.12s}
+  .seg:hover{border-color:#94a3b8}
+  .seg.is-on{background:#0f172a;color:#fff;border-color:#0f172a}
+  .cc-input{border:1px solid #cbd5e1;border-radius:9px;padding:7px 9px;font-family:inherit;
+    font-size:12px;font-weight:800;min-width:150px}
+  .cc-checks{display:grid;gap:3px}
+  .cc-checks label{font-size:11.5px;font-weight:800;color:#334155;display:flex;gap:5px;align-items:center;cursor:pointer}
+  .metric-toggles{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:11px}
+  .mt{border:2px solid #e2e8f0;background:#fff;border-radius:999px;padding:5px 11px;font-size:12px;
+    font-weight:1000;cursor:pointer;font-family:inherit;display:flex;gap:6px;align-items:center;color:#94a3b8}
+  .mt .dot{width:10px;height:10px;border-radius:50%;background:currentColor}
+  .mt.is-on{color:#0f172a}
+  .chart-box{position:relative;background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:8px}
+  .chart-box svg{width:100%;height:auto;display:block;overflow:visible}
+  .chart-tip{position:absolute;pointer-events:none;background:#0f172a;color:#fff;border-radius:10px;
+    padding:8px 10px;font-size:11.5px;font-weight:800;line-height:1.6;z-index:5;
+    box-shadow:0 8px 20px rgba(15,23,42,.3);white-space:nowrap}
+  .chart-tip .tt-h{font-size:12px;font-weight:1000;margin-bottom:3px;border-bottom:1px solid rgba(255,255,255,.25);padding-bottom:3px}
+  .chart-tip .tt-r{display:flex;justify-content:space-between;gap:12px}
+  .chart-tip .tt-k{opacity:.85}
+  .chart-legend{display:flex;gap:12px;flex-wrap:wrap;margin-top:9px;justify-content:center}
+  .chart-legend span{font-size:11.5px;font-weight:900;color:#475569;display:flex;gap:5px;align-items:center}
+  .chart-legend i{width:12px;height:12px;border-radius:3px;display:inline-block}
+  .chart-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin-bottom:11px}
+  .ck{background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:9px 11px}
+  .ck .k{font-size:9.5px;font-weight:1000;color:#64748b;text-transform:uppercase;letter-spacing:.05em}
+  .ck .v{font-size:18px;font-weight:1000;color:#0f172a;margin-top:2px;font-variant-numeric:tabular-nums}
+  .ck.good .v{color:#047857}.ck.bad .v{color:#b91c1c}
   .empty{padding:32px;text-align:center;color:#64748b;font-weight:900;background:#f8fafc;
     border-radius:16px;border:1px dashed #cbd5e1}
   .hint{font-size:11.5px;color:#64748b;font-weight:800;line-height:1.5}
@@ -294,10 +330,75 @@
     <button class="btn btn-soft" type="submit">🔄 ดึงจำนวนครั้ง + จำนวนนักเรียนจากข้อมูลจริงอีกครั้ง</button>
   </form>
 
+  <!-- ================= WEEKLY CHARTS ================= -->
+
+  <div class="ra-card" id="weeklyChartCard">
+    <div class="sec-title">📉 กราฟรายสัปดาห์ <small>ข้อมูลจริงจากการเช็คชื่อ · รับรู้รายได้เมื่อเรียนจริง 1 ครั้ง = {{ session_hours|floatformat:0 }} ชม.</small></div>
+
+    <div class="chart-controls">
+      <div class="cc-group">
+        <label class="cc-label">ช่วงเวลา</label>
+        <div class="cc-btns" id="rangeBtns">
+          <button type="button" class="seg" data-weeks="8">8 สัปดาห์</button>
+          <button type="button" class="seg is-on" data-weeks="12">12 สัปดาห์</button>
+          <button type="button" class="seg" data-weeks="26">26 สัปดาห์</button>
+          <button type="button" class="seg" data-weeks="52">1 ปี</button>
+        </div>
+      </div>
+      <div class="cc-group">
+        <label class="cc-label">ถึงวันที่</label>
+        <input type="date" id="endDate" class="cc-input">
+      </div>
+      <div class="cc-group">
+        <label class="cc-label">รูปแบบกราฟ</label>
+        <div class="cc-btns" id="typeBtns">
+          <button type="button" class="seg is-on" data-type="line">เส้น</button>
+          <button type="button" class="seg" data-type="bar">แท่ง</button>
+          <button type="button" class="seg" data-type="stacked">แท่งซ้อน</button>
+          <button type="button" class="seg" data-type="area">พื้นที่</button>
+        </div>
+      </div>
+      <div class="cc-group">
+        <label class="cc-label">กรองห้อง <small>(เลือกห้องแล้วจะแสดงเฉพาะรายได้)</small></label>
+        <select id="classFilter" class="cc-input" multiple size="3">
+          {% for c in chart_classes %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="cc-group">
+        <label class="cc-label">ตัวเลือก</label>
+        <div class="cc-checks">
+          <label><input type="checkbox" id="optSpread" checked> เกลี่ย fixed cost รายสัปดาห์</label>
+          <label><input type="checkbox" id="optCumulative"> สะสม (cumulative)</label>
+          <label><input type="checkbox" id="optAvg"> เส้นค่าเฉลี่ยเคลื่อนที่ 4 สัปดาห์</label>
+          <label><input type="checkbox" id="optValues"> แสดงตัวเลขบนกราฟ</label>
+        </div>
+      </div>
+    </div>
+
+    <div class="metric-toggles" id="metricToggles"></div>
+
+    <div class="chart-kpis" id="chartKpis"></div>
+
+    <div class="chart-box">
+      <svg id="mainChart" viewBox="0 0 1000 380" preserveAspectRatio="xMidYMid meet" role="img"></svg>
+      <div class="chart-tip" id="chartTip" hidden></div>
+    </div>
+    <div class="chart-legend" id="chartLegend"></div>
+    <div class="hint" id="chartNote" style="margin-top:8px;"></div>
+  </div>
+
+  <div class="ra-card">
+    <div class="sec-title">💵 อัตรารายได้เฉลี่ยต่อชั่วโมงของโรงเรียน <small>เทียบรายสัปดาห์ · คำนวณจากเรทจริงของเด็กแต่ละคนที่ออกใบเสร็จไว้</small></div>
+    <div class="chart-box small">
+      <svg id="rateChart" viewBox="0 0 1000 240" preserveAspectRatio="xMidYMid meet" role="img"></svg>
+    </div>
+    <div class="hint" id="rateNote" style="margin-top:8px;"></div>
+  </div>
+
   <!-- ================= RESULTS ================= -->
 
   <div class="ra-card">
-    <div class="sec-title">📈 ภาพรวมเดือน {{ scenario.period_month|date:"m/Y" }}</div>
+    <div class="sec-title">📈 ภาพรวมเดือน {{ scenario.period_month|date:"m/Y" }} <small>(โมเดลจำลอง)</small></div>
     <div class="kpi-grid">
       <div class="kpi"><div class="k">รายได้รวม</div>
         <div class="v">{{ analysis.totals.revenue|floatformat:0 }}</div><div class="d">บาท/เดือน</div></div>
@@ -511,5 +612,489 @@ document.addEventListener('DOMContentLoaded', function(){
     if(rm){ e.preventDefault(); var r = rm.closest('.fc-row'); if(r) r.remove(); }
   });
 });
+</script>
+
+<script>
+/* =====================================================================
+   Weekly revenue / cost / profit charts.
+   Hand-rolled SVG rather than a charting library: no external request, so it
+   works offline and under a strict CSP, and the interaction model stays exactly
+   what this page needs.
+   ===================================================================== */
+(function(){
+  var card = document.getElementById('weeklyChartCard');
+  if(!card) return;
+
+  var DATA_URL = "{% url 'core:revenue_analysis_weekly_data' %}";
+  var NS = 'http://www.w3.org/2000/svg';
+
+  var METRICS = [
+    {key:'revenue',       label:'รายได้',            color:'#2563eb', on:true},
+    {key:'teaching_cost', label:'ค่าสอน',            color:'#f59e0b', on:true},
+    {key:'other_cost',    label:'ค่าใช้จ่ายอื่น',    color:'#94a3b8', on:true},
+    {key:'profit',        label:'กำไร',              color:'#059669', on:true},
+    {key:'avg_rate',      label:'เรทเฉลี่ย/ชม.',     color:'#8b5cf6', on:false, axis:'right'},
+    {key:'students',      label:'จำนวนนักเรียน',     color:'#ec4899', on:false, axis:'right'},
+    {key:'hours',         label:'ชั่วโมงสอน',        color:'#06b6d4', on:false, axis:'right'},
+    {key:'margin',        label:'อัตรากำไร %',       color:'#14b8a6', on:false, axis:'right'}
+  ];
+  // Metrics that stack meaningfully in "แท่งซ้อน" mode (cost composition).
+  var STACKABLE = ['teaching_cost','other_cost'];
+
+  var state = {
+    weeks: 12, end: '', type: 'line', classIds: [],
+    spread: true, cumulative: false, movingAvg: false, showValues: false,
+    metrics: METRICS.reduce(function(a,m){ a[m.key]=m.on; return a; }, {}),
+    data: null, loading: false
+  };
+
+  var el = {
+    metricToggles: document.getElementById('metricToggles'),
+    kpis: document.getElementById('chartKpis'),
+    chart: document.getElementById('mainChart'),
+    rate: document.getElementById('rateChart'),
+    legend: document.getElementById('chartLegend'),
+    tip: document.getElementById('chartTip'),
+    note: document.getElementById('chartNote'),
+    rateNote: document.getElementById('rateNote'),
+    endDate: document.getElementById('endDate'),
+    classFilter: document.getElementById('classFilter')
+  };
+
+  function fmt(n, dp){
+    if(n === null || n === undefined || isNaN(n)) return '-';
+    return Number(n).toLocaleString('th-TH', {minimumFractionDigits: dp||0, maximumFractionDigits: dp||0});
+  }
+  function svgEl(tag, attrs, text){
+    var e = document.createElementNS(NS, tag);
+    for(var k in attrs){ if(attrs[k] !== null && attrs[k] !== undefined) e.setAttribute(k, attrs[k]); }
+    if(text !== undefined) e.textContent = text;
+    return e;
+  }
+  function clear(node){ while(node.firstChild) node.removeChild(node.firstChild); }
+  // Cost-side metrics only exist school-wide. Under a class filter the API
+  // returns no costs, so profit would trace exactly over revenue -- drop them
+  // rather than draw a duplicate line that reads as 100% margin.
+  var COST_METRICS = ['teaching_cost', 'other_cost', 'profit', 'margin'];
+  function costsAvailable(){ return !state.data || state.data.costs_included; }
+  function metricUsable(m){
+    return costsAvailable() || COST_METRICS.indexOf(m.key) < 0;
+  }
+  function activeMetrics(){
+    return METRICS.filter(function(m){ return state.metrics[m.key] && metricUsable(m); });
+  }
+
+  /* ---------------- data shaping ---------------- */
+
+  function seriesValues(metric){
+    var raw = (state.data.series || []).map(function(s){ return Number(s[metric.key] || 0); });
+    if(state.cumulative && metric.axis !== 'right'){
+      // Rates and counts are not meaningful cumulatively; only money is.
+      var run = 0;
+      raw = raw.map(function(v){ run += v; return run; });
+    }
+    return raw;
+  }
+
+  function movingAverage(vals, window){
+    return vals.map(function(_, i){
+      var from = Math.max(0, i - window + 1);
+      var slice = vals.slice(from, i + 1);
+      return slice.reduce(function(a,b){ return a+b; }, 0) / slice.length;
+    });
+  }
+
+  /* ---------------- rendering ---------------- */
+
+  function renderMetricToggles(){
+    clear(el.metricToggles);
+    METRICS.forEach(function(m){
+      var usable = metricUsable(m);
+      var on = state.metrics[m.key] && usable;
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'mt' + (on ? ' is-on' : '');
+      b.style.borderColor = on ? m.color : '#e2e8f0';
+      b.disabled = !usable;
+      if(!usable){
+        b.style.opacity = '.4';
+        b.style.cursor = 'not-allowed';
+        b.title = 'ต้นทุนเป็นข้อมูลระดับโรงเรียน ใช้ไม่ได้ตอนกรองเฉพาะบางห้อง';
+      }
+      b.innerHTML = '<span class="dot" style="background:' + m.color + '"></span>' + m.label
+                    + (m.axis === 'right' ? ' <small style="opacity:.6">(แกนขวา)</small>' : '');
+      b.addEventListener('click', function(){
+        if(!usable) return;
+        state.metrics[m.key] = !state.metrics[m.key];
+        renderMetricToggles(); draw();
+      });
+      el.metricToggles.appendChild(b);
+    });
+  }
+
+  function renderKpis(){
+    var t = (state.data && state.data.totals) || {};
+    var withCosts = !state.data || state.data.costs_included;
+    var items = [{k:'รายได้รวม', v: fmt(t.revenue), cls:''}];
+    if(withCosts){
+      // Only meaningful school-wide; a class-filtered view has no cost side,
+      // so showing "profit" there would read as 100% margin and mislead.
+      items.push(
+        {k:'ต้นทุนรวม', v: fmt(t.cost), cls:''},
+        {k:'กำไร', v: fmt(t.profit), cls: (t.profit>=0?'good':'bad')},
+        {k:'อัตรากำไร', v: fmt(t.margin,1)+'%', cls: (t.margin>=0?'good':'bad')}
+      );
+    } else {
+      items.push({k:'ต้นทุน / กำไร', v:'—', cls:''});
+    }
+    items.push(
+      {k:'เรทเฉลี่ย/ชม.', v: fmt(t.avg_rate,2), cls:''},
+      {k:'ชั่วโมงสอน', v: fmt(t.hours), cls:''},
+      {k:'ครั้งที่เรียน', v: fmt(t.sessions), cls:''},
+      {k:'นักเรียน', v: fmt(t.students), cls:''}
+    );
+    el.kpis.innerHTML = items.map(function(i){
+      return '<div class="ck '+i.cls+'"><div class="k">'+i.k+'</div><div class="v">'+i.v+'</div></div>';
+    }).join('');
+  }
+
+  function niceMax(v){
+    if(v <= 0) return 1;
+    var mag = Math.pow(10, Math.floor(Math.log10(v)));
+    var n = v / mag;
+    var step = n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10;
+    return step * mag;
+  }
+
+  function draw(){
+    var svg = el.chart;
+    clear(svg);
+    var s = (state.data && state.data.series) || [];
+    if(!s.length){
+      svg.appendChild(svgEl('text', {x:500, y:190, 'text-anchor':'middle',
+        'font-size':15, 'font-weight':800, fill:'#94a3b8'}, 'ไม่มีข้อมูลในช่วงนี้'));
+      return;
+    }
+
+    var W=1000, H=380, ML=68, MR=64, MT=18, MB=48;
+    var iw = W-ML-MR, ih = H-MT-MB;
+    var mets = activeMetrics();
+    var left  = mets.filter(function(m){ return m.axis !== 'right'; });
+    var right = mets.filter(function(m){ return m.axis === 'right'; });
+
+    // Independent scales so money and rates/counts can share the plot.
+    function scaleFor(list){
+      var vals = [];
+      list.forEach(function(m){ vals = vals.concat(seriesValues(m)); });
+      if(!vals.length) return null;
+      var mx = Math.max.apply(null, vals), mn = Math.min.apply(null, vals);
+      if(state.type === 'stacked'){
+        // Stacked bars need headroom for the summed height.
+        var sums = s.map(function(_, i){
+          return STACKABLE.reduce(function(a,k){
+            return a + (state.metrics[k] ? Number(s[i][k]||0) : 0); }, 0);
+        });
+        mx = Math.max(mx, Math.max.apply(null, sums));
+      }
+      mn = Math.min(0, mn);
+      var top = niceMax(mx || 1);
+      var bot = mn < 0 ? -niceMax(Math.abs(mn)) : 0;
+      return {top: top, bot: bot,
+              y: function(v){ return MT + ih - ((v-bot)/((top-bot)||1))*ih; }};
+    }
+    var Ls = scaleFor(left), Rs = scaleFor(right);
+
+    var band = iw / s.length;
+    function cx(i){ return ML + band*i + band/2; }
+
+    // grid + left axis
+    var ticks = 5;
+    for(var g=0; g<=ticks; g++){
+      var yy = MT + ih*(g/ticks);
+      svg.appendChild(svgEl('line', {x1:ML, y1:yy, x2:ML+iw, y2:yy,
+        stroke:'#eef2f7', 'stroke-width':1}));
+      if(Ls){
+        var val = Ls.top - (Ls.top-Ls.bot)*(g/ticks);
+        svg.appendChild(svgEl('text', {x:ML-8, y:yy+4, 'text-anchor':'end',
+          'font-size':10, 'font-weight':800, fill:'#94a3b8'}, fmt(val)));
+      }
+    }
+    if(Rs){
+      for(var g2=0; g2<=ticks; g2++){
+        var yr = MT + ih*(g2/ticks);
+        var vr = Rs.top - (Rs.top-Rs.bot)*(g2/ticks);
+        svg.appendChild(svgEl('text', {x:ML+iw+8, y:yr+4, 'text-anchor':'start',
+          'font-size':10, 'font-weight':800, fill:'#c4b5fd'}, fmt(vr, vr<100?1:0)));
+      }
+    }
+    // zero line when values go negative
+    if(Ls && Ls.bot < 0){
+      svg.appendChild(svgEl('line', {x1:ML, y1:Ls.y(0), x2:ML+iw, y2:Ls.y(0),
+        stroke:'#cbd5e1', 'stroke-width':1.5, 'stroke-dasharray':'4 3'}));
+    }
+
+    // x labels (thin out when crowded)
+    var every = Math.ceil(s.length/16);
+    s.forEach(function(d,i){
+      if(i % every) return;
+      svg.appendChild(svgEl('text', {x:cx(i), y:H-MB+18, 'text-anchor':'middle',
+        'font-size':10, 'font-weight':800, fill:'#94a3b8'}, d.label));
+    });
+
+    function scaleOf(m){ return m.axis === 'right' ? Rs : Ls; }
+
+    if(state.type === 'bar' || state.type === 'stacked'){
+      var barMets = state.type === 'stacked'
+        ? mets.filter(function(m){ return STACKABLE.indexOf(m.key) >= 0; })
+        : mets.filter(function(m){ return m.axis !== 'right'; });
+      var lineMets = mets.filter(function(m){ return barMets.indexOf(m) < 0; });
+
+      if(state.type === 'stacked'){
+        s.forEach(function(d,i){
+          var acc = 0;
+          barMets.forEach(function(m){
+            var v = Number(d[m.key]||0), sc = scaleOf(m);
+            if(!sc) return;
+            var y0 = sc.y(acc), y1 = sc.y(acc+v);
+            svg.appendChild(svgEl('rect', {x:cx(i)-band*0.3, y:Math.min(y0,y1),
+              width:band*0.6, height:Math.abs(y1-y0), fill:m.color, rx:3, opacity:.9}));
+            acc += v;
+          });
+        });
+      } else {
+        var bw = (band*0.68)/Math.max(barMets.length,1);
+        s.forEach(function(d,i){
+          barMets.forEach(function(m,mi){
+            var vals = seriesValues(m), v = vals[i], sc = scaleOf(m);
+            if(!sc) return;
+            var y0 = sc.y(0), y1 = sc.y(v);
+            svg.appendChild(svgEl('rect', {x:cx(i)-band*0.34+bw*mi, y:Math.min(y0,y1),
+              width:Math.max(bw-2,1), height:Math.max(Math.abs(y1-y0),1),
+              fill:m.color, rx:2, opacity:.9}));
+          });
+        });
+      }
+      lineMets.forEach(function(m){ drawLine(svg, m, s, cx, scaleOf(m), false); });
+    } else {
+      mets.forEach(function(m){
+        drawLine(svg, m, s, cx, scaleOf(m), state.type === 'area');
+      });
+    }
+
+    // moving average overlays
+    if(state.movingAvg){
+      mets.forEach(function(m){
+        var sc = scaleOf(m); if(!sc) return;
+        var ma = movingAverage(seriesValues(m), 4);
+        var dpath = ma.map(function(v,i){ return (i?'L':'M')+cx(i)+' '+sc.y(v); }).join(' ');
+        svg.appendChild(svgEl('path', {d:dpath, fill:'none', stroke:m.color,
+          'stroke-width':1.6, 'stroke-dasharray':'6 4', opacity:.55}));
+      });
+    }
+
+    // value labels
+    if(state.showValues){
+      mets.forEach(function(m){
+        var sc = scaleOf(m); if(!sc) return;
+        var vals = seriesValues(m);
+        s.forEach(function(_,i){
+          if(i % every) return;
+          svg.appendChild(svgEl('text', {x:cx(i), y:sc.y(vals[i])-7, 'text-anchor':'middle',
+            'font-size':9, 'font-weight':1000, fill:m.color}, fmt(vals[i])));
+        });
+      });
+    }
+
+    // hover targets
+    s.forEach(function(d,i){
+      var r = svgEl('rect', {x:ML+band*i, y:MT, width:band, height:ih,
+        fill:'transparent', style:'cursor:crosshair'});
+      r.addEventListener('mouseenter', function(){ showTip(i, cx(i)); });
+      r.addEventListener('mouseleave', hideTip);
+      svg.appendChild(r);
+    });
+
+    renderLegend(mets);
+    drawRateChart();
+  }
+
+  function drawLine(svg, m, s, cx, sc, fill){
+    if(!sc) return;
+    var vals = seriesValues(m);
+    var d = vals.map(function(v,i){ return (i?'L':'M')+cx(i)+' '+sc.y(v); }).join(' ');
+    if(fill){
+      var base = sc.y(Math.max(sc.bot,0));
+      svg.appendChild(svgEl('path', {
+        d: d + ' L'+cx(vals.length-1)+' '+base + ' L'+cx(0)+' '+base+' Z',
+        fill:m.color, opacity:.13}));
+    }
+    svg.appendChild(svgEl('path', {d:d, fill:'none', stroke:m.color,
+      'stroke-width':2.6, 'stroke-linejoin':'round', 'stroke-linecap':'round'}));
+    vals.forEach(function(v,i){
+      svg.appendChild(svgEl('circle', {cx:cx(i), cy:sc.y(v), r:3,
+        fill:'#fff', stroke:m.color, 'stroke-width':2}));
+    });
+  }
+
+  function renderLegend(mets){
+    el.legend.innerHTML = mets.map(function(m){
+      return '<span><i style="background:'+m.color+'"></i>'+m.label+'</span>';
+    }).join('');
+  }
+
+  function showTip(i, x){
+    var d = state.data.series[i];
+    var rows = activeMetrics().map(function(m){
+      var v = seriesValues(m)[i];
+      var dp = (m.key==='avg_rate'||m.key==='margin') ? (m.key==='margin'?1:2) : 0;
+      return '<div class="tt-r"><span class="tt-k">'+m.label+'</span><b>'+fmt(v,dp)+'</b></div>';
+    }).join('');
+    el.tip.innerHTML = '<div class="tt-h">สัปดาห์ '+d.label+'</div>' + rows +
+      '<div class="tt-r"><span class="tt-k">ครั้งที่เรียน</span><b>'+fmt(d.sessions)+'</b></div>';
+    el.tip.hidden = false;
+    var box = el.chart.getBoundingClientRect();
+    var px = (x/1000)*box.width;
+    el.tip.style.left = Math.min(Math.max(px-70, 4), box.width-190) + 'px';
+    el.tip.style.top = '14px';
+  }
+  function hideTip(){ el.tip.hidden = true; }
+
+  function drawRateChart(){
+    var svg = el.rate; clear(svg);
+    var s = (state.data && state.data.series) || [];
+    var pts = s.filter(function(d){ return d.hours > 0; });
+    if(!pts.length){
+      svg.appendChild(svgEl('text', {x:500, y:120, 'text-anchor':'middle',
+        'font-size':14, 'font-weight':800, fill:'#94a3b8'}, 'ยังไม่มีข้อมูลเรทในช่วงนี้'));
+      el.rateNote.textContent = '';
+      return;
+    }
+    var W=1000,H=240,ML=64,MR=20,MT=16,MB=40, iw=W-ML-MR, ih=H-MT-MB;
+    var vals = s.map(function(d){ return d.avg_rate; });
+    var mx = niceMax(Math.max.apply(null, vals) || 1);
+    var y = function(v){ return MT + ih - (v/(mx||1))*ih; };
+    var band = iw/s.length, cx = function(i){ return ML+band*i+band/2; };
+
+    for(var g=0; g<=4; g++){
+      var yy = MT+ih*(g/4);
+      svg.appendChild(svgEl('line', {x1:ML,y1:yy,x2:ML+iw,y2:yy,stroke:'#eef2f7','stroke-width':1}));
+      svg.appendChild(svgEl('text', {x:ML-8,y:yy+4,'text-anchor':'end','font-size':10,
+        'font-weight':800,fill:'#94a3b8'}, fmt(mx-mx*(g/4),0)));
+    }
+
+    // School blended rate = the forecasting basis; show it as a reference line.
+    var school = Number(state.data.school_avg_rate || 0);
+    if(school > 0 && school <= mx){
+      svg.appendChild(svgEl('line', {x1:ML,y1:y(school),x2:ML+iw,y2:y(school),
+        stroke:'#8b5cf6','stroke-width':2,'stroke-dasharray':'6 4',opacity:.8}));
+      svg.appendChild(svgEl('text', {x:ML+iw, y:y(school)-7, 'text-anchor':'end',
+        'font-size':11,'font-weight':1000,fill:'#7c3aed'},
+        'เฉลี่ยทั้งโรงเรียน ' + fmt(school,2) + ' บาท/ชม.'));
+    }
+
+    s.forEach(function(d,i){
+      var h = d.hours > 0 ? ih - (y(d.avg_rate)-MT) : 0;
+      svg.appendChild(svgEl('rect', {x:cx(i)-band*0.3, y:y(d.avg_rate),
+        width:band*0.6, height:Math.max(h,0), rx:4,
+        fill: d.avg_rate >= school ? '#8b5cf6' : '#c4b5fd', opacity:.85}));
+      var t = svgEl('title', {}, 'สัปดาห์ '+d.label+' · '+fmt(d.avg_rate,2)+' บาท/ชม. · '
+                               +fmt(d.hours)+' ชม.');
+      svg.lastChild.appendChild(t);
+    });
+
+    var every = Math.ceil(s.length/16);
+    s.forEach(function(d,i){
+      if(i % every) return;
+      svg.appendChild(svgEl('text', {x:cx(i),y:H-MB+18,'text-anchor':'middle',
+        'font-size':10,'font-weight':800,fill:'#94a3b8'}, d.label));
+    });
+
+    var rates = pts.map(function(d){ return d.avg_rate; });
+    var hi = Math.max.apply(null, rates), lo = Math.min.apply(null, rates);
+    el.rateNote.innerHTML =
+      'เรทเฉลี่ยทั้งโรงเรียน <b>' + fmt(school,2) + '</b> บาท/ชม. '
+      + '(ใช้เป็นตัวตั้งเวลาคาดการณ์อนาคต) · ในช่วงนี้สูงสุด <b>' + fmt(hi,2)
+      + '</b> ต่ำสุด <b>' + fmt(lo,2) + '</b> บาท/ชม.<br>'
+      + 'แท่งสีเข้ม = สัปดาห์ที่เรทสูงกว่าค่าเฉลี่ยทั้งโรงเรียน '
+      + '(เด็กที่มาเรียนสัปดาห์นั้นซื้อแพ็กในราคาต่อชั่วโมงที่สูงกว่า)';
+  }
+
+  /* ---------------- fetch ---------------- */
+
+  function load(){
+    if(state.loading) return;
+    state.loading = true;
+    var p = new URLSearchParams();
+    p.set('weeks', state.weeks);
+    if(state.end) p.set('end', state.end);
+    p.set('spread', state.spread ? '1' : '0');
+    state.classIds.forEach(function(c){ p.append('class_id', c); });
+
+    fetch(DATA_URL + '?' + p.toString(), {headers:{'X-Requested-With':'XMLHttpRequest'}})
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if(!d || !d.ok) throw new Error('โหลดข้อมูลไม่สำเร็จ');
+        state.data = d;
+        renderKpis();
+        renderMetricToggles();  // availability depends on the cost side
+        draw();
+        var t = d.totals || {};
+        var note = 'ช่วง ' + d.start + ' ถึง ' + d.end + ' · ' + (d.series||[]).length + ' สัปดาห์';
+        if(!d.costs_included){
+          note += ' · <b>กรองเฉพาะบางห้อง จึงแสดงเฉพาะรายได้</b> '
+                + '(ต้นทุนเป็นของทั้งโรงเรียน แยกรายห้องจากข้อมูลจริงไม่ได้)';
+        }
+        if(t.estimated_sessions > 0){
+          note += ' · ⚠ มี ' + t.estimated_sessions + ' ครั้ง (' + t.estimated_pct
+                + '%) ที่ไม่พบใบเสร็จของเด็กคนนั้น ระบบใช้เรทเฉลี่ยทั้งโรงเรียนแทน';
+        }
+        el.note.innerHTML = note;
+      })
+      .catch(function(e){
+        el.note.textContent = e.message || 'โหลดข้อมูลไม่สำเร็จ';
+      })
+      .finally(function(){ state.loading = false; });
+  }
+
+  /* ---------------- wiring ---------------- */
+
+  function segGroup(id, attr, apply){
+    var box = document.getElementById(id);
+    if(!box) return;
+    box.addEventListener('click', function(e){
+      var b = e.target.closest('.seg');
+      if(!b) return;
+      [].forEach.call(box.querySelectorAll('.seg'), function(x){ x.classList.remove('is-on'); });
+      b.classList.add('is-on');
+      apply(b.getAttribute(attr));
+    });
+  }
+  segGroup('rangeBtns', 'data-weeks', function(v){ state.weeks = parseInt(v,10)||12; load(); });
+  segGroup('typeBtns', 'data-type', function(v){ state.type = v; draw(); });
+
+  el.endDate && el.endDate.addEventListener('change', function(){
+    state.end = this.value; load();
+  });
+  el.classFilter && el.classFilter.addEventListener('change', function(){
+    state.classIds = [].slice.call(this.selectedOptions).map(function(o){ return o.value; });
+    load();
+  });
+  document.getElementById('optSpread').addEventListener('change', function(){
+    state.spread = this.checked; load();
+  });
+  document.getElementById('optCumulative').addEventListener('change', function(){
+    state.cumulative = this.checked; draw();
+  });
+  document.getElementById('optAvg').addEventListener('change', function(){
+    state.movingAvg = this.checked; draw();
+  });
+  document.getElementById('optValues').addEventListener('change', function(){
+    state.showValues = this.checked; draw();
+  });
+  window.addEventListener('resize', function(){ hideTip(); });
+
+  renderMetricToggles();
+  load();
+})();
 </script>
 {% endblock %}

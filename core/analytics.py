@@ -31,6 +31,11 @@ from decimal import Decimal, ROUND_HALF_UP
 
 ZERO = Decimal("0")
 
+# Business rule: one attended session is four teaching hours. This is what
+# converts a package price into an hourly rate, so it must stay in sync with
+# how packages are actually sold.
+SESSION_HOURS = Decimal("4")
+
 
 def _d(value, default="0") -> Decimal:
     if value is None or value == "":
@@ -111,34 +116,128 @@ def suggest_student_count(tutoring_class, start: date, end: date) -> int:
     )
 
 
-def suggest_revenue_per_student_hour(tutoring_class) -> Decimal:
-    """Derive an hourly price from what students actually paid.
+# ------------------------------------------------- per-student hourly rates
 
-    net_price / sessions_total / hours_per_session, averaged over active
-    enrollments. Falls back to the class list price, then to 0.
+def build_rate_timeline(student_ids=None) -> dict[int, list[tuple[date, Decimal]]]:
+    """Each student's hourly rate history, derived from issued receipts.
+
+    A receipt grants N sessions for a net amount, and one session is
+    SESSION_HOURS hours, so:
+
+        rate = net_amount / (sessions_granted * SESSION_HOURS)
+
+    e.g. 3,990 THB for 10 sessions -> 3,990 / 40 = 99.75 THB/hour.
+
+    That rate is locked in at purchase. A student who renews later at a
+    different price gets a second entry, so revenue earned before the renewal
+    is still valued at the old rate. Returns {student_id: [(date, rate), ...]}
+    sorted by date.
+    """
+    from .models import CoursePayment
+
+    qs = (
+        CoursePayment.objects
+        .filter(status=CoursePayment.ReceiptStatus.ISSUED, sessions_granted__gt=0)
+        .values_list("student_id", "payment_date", "net_amount", "sessions_granted")
+    )
+    if student_ids is not None:
+        qs = qs.filter(student_id__in=list(student_ids))
+
+    timeline: dict[int, list[tuple[date, Decimal]]] = {}
+    for student_id, pay_date, net_amount, sessions in qs:
+        if not student_id or not sessions:
+            continue
+        amount = _d(net_amount)
+        if amount <= 0:
+            continue
+        rate = amount / (Decimal(sessions) * SESSION_HOURS)
+        timeline.setdefault(student_id, []).append((pay_date, rate))
+
+    for rows in timeline.values():
+        rows.sort(key=lambda r: r[0])
+    return timeline
+
+
+def rate_on(timeline: dict, student_id: int, on_date: date) -> Decimal | None:
+    """The rate the student was paying as of `on_date`.
+
+    Uses the most recent receipt on or before that date; if the attendance
+    predates every receipt (back-dated data), falls back to the earliest one
+    rather than dropping the revenue.
+    """
+    rows = timeline.get(student_id)
+    if not rows:
+        return None
+    chosen = None
+    for pay_date, rate in rows:
+        if pay_date and pay_date <= on_date:
+            chosen = rate
+        else:
+            break
+    return chosen if chosen is not None else rows[0][1]
+
+
+def school_average_hourly_rate(timeline: dict | None = None) -> Decimal:
+    """Blended rate across every issued receipt -- the forecasting basis.
+
+    Weighted by hours sold (total money / total hours), not a mean of rates,
+    so big packages carry proportionate weight.
+    """
+    from .models import CoursePayment
+
+    rows = (
+        CoursePayment.objects
+        .filter(status=CoursePayment.ReceiptStatus.ISSUED, sessions_granted__gt=0)
+        .values_list("net_amount", "sessions_granted")
+    )
+    total_amount = ZERO
+    total_hours = ZERO
+    for net_amount, sessions in rows:
+        amount = _d(net_amount)
+        if amount <= 0 or not sessions:
+            continue
+        total_amount += amount
+        total_hours += Decimal(sessions) * SESSION_HOURS
+    if total_hours > 0:
+        return _q(total_amount / total_hours)
+    return ZERO
+
+
+def suggest_revenue_per_student_hour(tutoring_class, timeline: dict | None = None) -> Decimal:
+    """Average locked-in hourly rate of the students in this class.
+
+    Each student contributes the rate from their own receipt; the class rate is
+    the mean of those. Students with no receipt are skipped so they cannot drag
+    the average down. Falls back to the school-wide blended rate, then to the
+    class list price.
     """
     from .models import Enrollment
 
-    hours = _d(tutoring_class.hours_per_session, "3")
-    if hours <= 0:
-        hours = Decimal("3")
+    if timeline is None:
+        timeline = build_rate_timeline()
 
-    rows = list(
+    student_ids = (
         Enrollment.objects
         .filter(tutoring_class=tutoring_class, is_active=True)
-        .values_list("net_price", "sessions_total")
+        .values_list("student_id", flat=True)
+        .distinct()
     )
-    rates = [
-        _d(price) / Decimal(sessions) / hours
-        for price, sessions in rows
-        if _d(price) > 0 and sessions
-    ]
+    today = date.today()
+    rates = []
+    for sid in student_ids:
+        r = rate_on(timeline, sid, today)
+        if r is not None and r > 0:
+            rates.append(r)
     if rates:
         return _q(sum(rates) / Decimal(len(rates)))
 
+    school = school_average_hourly_rate(timeline)
+    if school > 0:
+        return school
+
     price = _d(tutoring_class.course_price)
     if price > 0:
-        return _q(price / Decimal("10") / hours)  # assume a 10-session package
+        return _q(price / (Decimal("10") * SESSION_HOURS))
     return ZERO
 
 
@@ -500,3 +599,203 @@ def _insights(rows: list[ClassResult], totals: dict) -> list[dict]:
         })
 
     return out
+
+
+# ============================================================ weekly series
+
+def school_week_start(anchor: date) -> date:
+    """School week runs Saturday -> Friday (classes are weekend-heavy)."""
+    return anchor - timedelta(days=(anchor.weekday() - 5) % 7)
+
+
+def recognized_revenue_rows(start: date, end: date, class_ids=None) -> list[dict]:
+    """Revenue earned per attended session, valued at that student's own rate.
+
+    Revenue is recognised when a session is consumed (`deducted=True`, i.e.
+    present or no-show) -- not when the receipt is issued. That matches how the
+    service is actually delivered, and is what makes weekly revenue meaningful.
+    """
+    from .models import Attendance
+
+    qs = (
+        Attendance.objects
+        .filter(deducted=True, attendance_date__gte=start, attendance_date__lte=end)
+    )
+    if class_ids:
+        qs = qs.filter(enrollment__tutoring_class_id__in=list(class_ids))
+
+    rows = list(qs.values_list(
+        "student_id", "attendance_date",
+        "enrollment__tutoring_class_id", "enrollment__tutoring_class__name",
+    ))
+    timeline = build_rate_timeline({r[0] for r in rows if r[0]})
+    fallback = school_average_hourly_rate(timeline)
+
+    out = []
+    for student_id, att_date, cls_id, cls_name in rows:
+        rate = rate_on(timeline, student_id, att_date)
+        estimated = rate is None
+        if estimated:
+            rate = fallback
+        rate = rate or ZERO
+        out.append({
+            "student_id": student_id,
+            "date": att_date,
+            "class_id": cls_id,
+            "class_name": cls_name or "-",
+            "rate": rate,
+            "hours": SESSION_HOURS,
+            "revenue": rate * SESSION_HOURS,
+            "estimated": estimated,
+        })
+    return out
+
+
+def _weekly_costs(start: date, end: date, spread_fixed: bool) -> tuple[dict, dict]:
+    """(teaching cost by week, other expense by week).
+
+    Teaching cost comes from payroll entries; other expenses from SchoolExpense
+    rows whose category is not flagged as payroll, so nothing is double counted.
+
+    Rent-type costs land on a single day of the month, which makes raw weekly
+    profit spike. `spread_fixed` averages each month's non-payroll expenses
+    across that month's weeks instead -- usually the more readable view.
+    """
+    from .models import SchoolExpense, TutorPayrollEntry
+
+    teaching: dict[date, Decimal] = {}
+    for work_date, total in TutorPayrollEntry.objects.filter(
+        work_date__gte=start, work_date__lte=end
+    ).values_list("work_date", "total_amount"):
+        wk = school_week_start(work_date)
+        teaching[wk] = teaching.get(wk, ZERO) + _d(total)
+
+    other: dict[date, Decimal] = {}
+    expense_rows = (
+        SchoolExpense.objects
+        .select_related("category")
+        .filter(expense_date__gte=start, expense_date__lte=end)
+    )
+
+    if not spread_fixed:
+        for e in expense_rows:
+            if e.category and e.category.is_tutor_payroll:
+                continue
+            wk = school_week_start(e.expense_date)
+            other[wk] = other.get(wk, ZERO) + _d(e.amount)
+        return teaching, other
+
+    by_month: dict[tuple, Decimal] = {}
+    for e in expense_rows:
+        if e.category and e.category.is_tutor_payroll:
+            continue
+        key = (e.expense_date.year, e.expense_date.month)
+        by_month[key] = by_month.get(key, ZERO) + _d(e.amount)
+
+    weeks_in_month: dict[tuple, list] = {}
+    cur = school_week_start(start)
+    while cur <= end:
+        weeks_in_month.setdefault((cur.year, cur.month), []).append(cur)
+        cur += timedelta(days=7)
+
+    for key, amount in by_month.items():
+        weeks = weeks_in_month.get(key) or []
+        if not weeks:
+            continue
+        share = amount / Decimal(len(weeks))
+        for wk in weeks:
+            other[wk] = other.get(wk, ZERO) + share
+
+    return teaching, other
+
+
+def weekly_breakdown(start: date, end: date, class_ids=None,
+                     spread_fixed: bool = True) -> dict:
+    """Week-by-week revenue / cost / profit / blended hourly rate."""
+    revenue_rows = recognized_revenue_rows(start, end, class_ids)
+    buckets: dict = {}
+
+    def bucket(wk):
+        return buckets.setdefault(wk, {
+            "revenue": ZERO, "hours": ZERO, "sessions": 0,
+            "students": set(), "classes": set(),
+            "teaching_cost": ZERO, "other_cost": ZERO, "estimated_sessions": 0,
+        })
+
+    for r in revenue_rows:
+        b = bucket(school_week_start(r["date"]))
+        b["revenue"] += r["revenue"]
+        b["hours"] += r["hours"]
+        b["sessions"] += 1
+        b["students"].add(r["student_id"])
+        if r["class_id"]:
+            b["classes"].add(r["class_id"])
+        if r["estimated"]:
+            b["estimated_sessions"] += 1
+
+    # Costs are school-wide. Attributing them to a class-filtered view would be
+    # misleading, so only fold them in when looking at the whole school.
+    include_costs = not class_ids
+    if include_costs:
+        teaching, other = _weekly_costs(start, end, spread_fixed)
+        for wk, amount in teaching.items():
+            bucket(wk)["teaching_cost"] += amount
+        for wk, amount in other.items():
+            bucket(wk)["other_cost"] += amount
+
+    empty = {
+        "revenue": ZERO, "hours": ZERO, "sessions": 0, "students": set(),
+        "classes": set(), "teaching_cost": ZERO, "other_cost": ZERO,
+        "estimated_sessions": 0,
+    }
+
+    series = []
+    cur = school_week_start(start)
+    last = school_week_start(end)
+    while cur <= last:
+        b = buckets.get(cur, empty)
+        total_cost = b["teaching_cost"] + b["other_cost"]
+        profit = b["revenue"] - total_cost
+        avg_rate = (b["revenue"] / b["hours"]) if b["hours"] > 0 else ZERO
+        series.append({
+            "week_start": cur.isoformat(),
+            "label": cur.strftime("%d/%m"),
+            "revenue": float(_q(b["revenue"])),
+            "teaching_cost": float(_q(b["teaching_cost"])),
+            "other_cost": float(_q(b["other_cost"])),
+            "total_cost": float(_q(total_cost)),
+            "profit": float(_q(profit)),
+            "avg_rate": float(_q(avg_rate)),
+            "hours": float(_q(b["hours"])),
+            "sessions": b["sessions"],
+            "students": len(b["students"]),
+            "classes": len(b["classes"]),
+            "margin": float(_q((profit / b["revenue"] * 100) if b["revenue"] > 0 else ZERO)),
+            "estimated_sessions": b["estimated_sessions"],
+        })
+        cur += timedelta(days=7)
+
+    total_rev = sum((_d(s["revenue"]) for s in series), ZERO)
+    total_hours = sum((_d(s["hours"]) for s in series), ZERO)
+    total_cost = sum((_d(s["total_cost"]) for s in series), ZERO)
+    estimated = sum(s["estimated_sessions"] for s in series)
+    total_sessions = sum(s["sessions"] for s in series)
+
+    return {
+        "series": series,
+        "school_avg_rate": float(school_average_hourly_rate()),
+        "costs_included": include_costs,
+        "totals": {
+            "revenue": float(_q(total_rev)),
+            "cost": float(_q(total_cost)),
+            "profit": float(_q(total_rev - total_cost)),
+            "hours": float(_q(total_hours)),
+            "sessions": total_sessions,
+            "students": len({r["student_id"] for r in revenue_rows}),
+            "avg_rate": float(_q((total_rev / total_hours) if total_hours > 0 else ZERO)),
+            "margin": float(_q(((total_rev - total_cost) / total_rev * 100) if total_rev > 0 else ZERO)),
+            "estimated_sessions": estimated,
+            "estimated_pct": float(_q((Decimal(estimated) / Decimal(total_sessions) * 100)
+                                      if total_sessions else ZERO, "0.1")),
+        },
+    }

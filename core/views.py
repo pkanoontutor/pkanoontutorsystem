@@ -8418,8 +8418,11 @@ def star_quiz_scores(request: HttpRequest) -> HttpResponse:
 def revenue_analysis(request: HttpRequest) -> HttpResponse:
     """Per-class revenue / cost / profit modelling with editable assumptions."""
     from .analytics import (
+        SESSION_HOURS,
+        build_rate_timeline,
         compute_scenario,
         month_bounds,
+        school_average_hourly_rate,
         suggest_fixed_costs,
         suggest_revenue_per_student_hour,
         suggest_sessions_in_month,
@@ -8449,27 +8452,35 @@ def revenue_analysis(request: HttpRequest) -> HttpResponse:
             start, end = month_bounds(anchor)
             name = (request.POST.get("name") or "").strip() or f"วิเคราะห์ {anchor:%m/%Y}"
 
+            # Build the receipt-derived rate table once and reuse it for every
+            # class, instead of re-querying payments per class.
+            timeline = build_rate_timeline()
+            school_rate = school_average_hourly_rate(timeline)
+
             with transaction.atomic():
                 scenario = CostScenario.objects.create(
                     name=name,
                     period_month=anchor,
                     default_teaching_cost_per_hour=suggest_teaching_cost_per_hour(start, end),
-                    default_revenue_per_student_hour=Decimal("150"),
-                    default_hours_per_session=Decimal("4"),
+                    # Forward-looking default is the school-wide blended rate.
+                    default_revenue_per_student_hour=school_rate or Decimal("150"),
+                    default_hours_per_session=SESSION_HOURS,
                     default_sessions_per_month=Decimal("4"),
                 )
                 for fc in suggest_fixed_costs(start, end):
                     CostScenarioFixedCost.objects.create(
                         scenario=scenario, name=fc["name"], amount=fc["amount"]
                     )
-                for i, cls in enumerate(TutoringClass.objects.filter(is_active=True).order_by("name")):
+                for cls in TutoringClass.objects.filter(is_active=True).order_by("name"):
                     CostScenarioClass.objects.create(
                         scenario=scenario,
                         tutoring_class=cls,
                         student_count=suggest_student_count(cls, start, end),
                         sessions_per_month=suggest_sessions_in_month(cls, start, end),
-                        hours_per_session=cls.hours_per_session or Decimal("4"),
-                        revenue_per_student_hour=suggest_revenue_per_student_hour(cls) or None,
+                        hours_per_session=cls.hours_per_session or SESSION_HOURS,
+                        revenue_per_student_hour=(
+                            suggest_revenue_per_student_hour(cls, timeline) or None
+                        ),
                     )
             return _redirect(scenario.id)
 
@@ -8519,11 +8530,17 @@ def revenue_analysis(request: HttpRequest) -> HttpResponse:
 
         if action == "refill_actuals":
             start, end = month_bounds(scenario.period_month)
+            timeline = build_rate_timeline()
             for ci in scenario.class_inputs.select_related("tutoring_class"):
                 cls = ci.tutoring_class
                 ci.student_count = suggest_student_count(cls, start, end)
                 ci.sessions_per_month = suggest_sessions_in_month(cls, start, end)
-                ci.save(update_fields=["student_count", "sessions_per_month"])
+                ci.revenue_per_student_hour = (
+                    suggest_revenue_per_student_hour(cls, timeline) or None
+                )
+                ci.save(update_fields=[
+                    "student_count", "sessions_per_month", "revenue_per_student_hour",
+                ])
             return _redirect(scenario.id)
 
         return _redirect(scenario.id)
@@ -8546,4 +8563,51 @@ def revenue_analysis(request: HttpRequest) -> HttpResponse:
         "analysis": analysis,
         "allocation_choices": CostScenario.Allocation.choices,
         "default_month": default_month.strftime("%Y-%m"),
+        "school_avg_rate": school_average_hourly_rate(),
+        "session_hours": SESSION_HOURS,
+        "chart_classes": list(
+            TutoringClass.objects.filter(is_active=True).order_by("name").values("id", "name")
+        ),
     })
+
+
+@login_required
+def revenue_analysis_weekly_data(request: HttpRequest) -> JsonResponse:
+    """Weekly revenue / cost / profit / blended-rate series for the charts."""
+    from .analytics import school_week_start, weekly_breakdown
+
+    today = timezone.localdate()
+
+    def _date(param, default):
+        raw = (request.GET.get(param) or "").strip()
+        if not raw:
+            return default
+        try:
+            return datetime.strptime(raw, "%Y-%m-%d").date()
+        except ValueError:
+            return default
+
+    try:
+        weeks = max(1, min(int(request.GET.get("weeks") or 12), 104))
+    except ValueError:
+        weeks = 12
+
+    end = _date("end", today)
+    start = _date("start", school_week_start(end) - timedelta(weeks=weeks - 1))
+    if start > end:
+        start, end = end, start
+
+    class_ids = [
+        int(c) for c in request.GET.getlist("class_id") if str(c).strip().isdigit()
+    ]
+    spread_fixed = (request.GET.get("spread") or "1") not in ("0", "false", "no")
+
+    data = weekly_breakdown(start, end, class_ids or None, spread_fixed=spread_fixed)
+    data.update({
+        "ok": True,
+        "start": start.isoformat(),
+        "end": end.isoformat(),
+        "class_ids": class_ids,
+        "spread_fixed": spread_fixed,
+    })
+    return JsonResponse(data)

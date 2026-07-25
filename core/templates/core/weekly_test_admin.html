@@ -57,14 +57,11 @@
   .announce-class{border:2px solid var(--accent);border-radius:13px;overflow:hidden;background:#fff}
   .announce-class-head{background:var(--accent);color:#fff;text-align:center;padding:8px 6px;
     font-weight:1000;font-size:14px;line-height:1.25}
-  .announce-mini{display:flex;gap:4px;justify-content:center;flex-wrap:wrap;padding:6px;background:var(--soft)}
-  .announce-mini span{font-size:9px;font-weight:1000;border-radius:999px;padding:2px 6px;background:#fff;border:1px solid #e2e8f0;color:#334155}
-  .announce-mini .m-ok{background:#dcfce7;border-color:#bbf7d0;color:#166534}
-  .announce-mini .m-ex{background:#fef9c3;border-color:#fde68a;color:#854d0e}
-  .announce-mini .m-no{background:#fee2e2;border-color:#fecaca;color:#991b1b}
   .announce-row{display:grid;grid-template-columns:1fr auto;gap:5px;align-items:center;
     padding:5px 7px;border-top:1px solid #f1f5f9}
-  .announce-row:nth-child(odd){background:#fcfcfd}
+  /* Rows follow .announce-class-head, so the first one is child 2 -> stripe evens. */
+  .announce-row:nth-child(even){background:#fcfcfd}
+  .announce-class-head + .announce-row{border-top:0}
   .announce-student{font-weight:1000;font-size:12px;color:#0f172a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .announce-row .result{text-align:center;font-size:10px;font-weight:1000;border-radius:999px;padding:3px 7px;white-space:nowrap}
   .announce-foot{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;
@@ -278,9 +275,6 @@
               {% for block in section.class_blocks %}
               <div class="announce-class">
                 <div class="announce-class-head">{{ block.class.name }}</div>
-                <div class="announce-mini">
-                  <span class="m-ok">มา {{ block.present_count }}</span><span class="m-ex">ลา {{ block.excused_count }}</span><span class="m-no">ขาด {{ block.no_show_count }}</span>{% if block.not_checked_count %}<span class="m-nc">ยังไม่เช็ค {{ block.not_checked_count }}</span>{% endif %}
-                </div>
                 {% for row in block.rows %}
                 <div class="announce-row">
                   <div class="announce-student">{{ row.student.nickname|default:row.student.full_name }}</div>

@@ -30,11 +30,57 @@
   .score-full{background:#5f9b48!important;color:#fff!important}.score-great{background:#9add78!important;color:#12310f!important}.score-good{background:#c8efb2!important;color:#173b12!important}.score-medium{background:#ffe083!important;color:#4b3100!important}.score-fail{background:#e3a0a0!important;color:#5f1111!important}.score-empty{background:#f1f5f9!important;color:#64748b!important}.score-excused{background:#e5e7eb!important;color:#475569!important}.score-noshow{background:#fee2e2!important;color:#991b1b!important}.score-notchecked{background:#f8fafc!important;color:#94a3b8!important}
   .class-save{padding:12px 14px;background:#f8fafc;text-align:right;border-top:1px solid #e2e8f0}
 
-  .announce-wrap{background:linear-gradient(135deg,#f8fafc,#eef2ff);border-radius:24px;padding:16px;display:grid;gap:18px}.announce-sheet{background:#fff;border:2px solid #111827;border-radius:8px;padding:16px;max-width:1120px;margin:0 auto;box-shadow:0 12px 28px rgba(15,23,42,.12);width:100%}.announce-title{background:linear-gradient(135deg,#4f7bdc,#6d5bd0);color:#fff;text-align:center;font-size:24px;font-weight:1000;padding:11px;border:2px solid #111827;margin-bottom:14px;border-radius:2px}.announce-info{display:grid;grid-template-columns:130px 1fr 130px 1fr;border:1px solid #111827;margin-bottom:14px}.announce-info div{border:1px solid #111827;padding:8px 10px;font-weight:1000;text-align:center}.announce-info .label{background:#e5e7eb;color:#111827}.announce-grade{font-size:22px;font-weight:1000;margin:12px 0 10px;text-align:center}.announce-class-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;align-items:start}.announce-class{border:2px solid #111827;border-radius:4px;overflow:hidden;background:#fff}.announce-class-head{background:#937fc3;color:#fff;text-align:center;padding:9px;font-weight:1000;border-bottom:2px solid #111827;font-size:16px}.announce-mini{display:flex;gap:5px;justify-content:center;flex-wrap:wrap;padding:7px;background:#fafafa;border-bottom:1px solid #111827}.announce-mini span{font-size:10px;font-weight:1000;border-radius:999px;padding:3px 7px;background:#f1f5f9}.announce-row{display:grid;grid-template-columns:1.25fr .75fr;border-bottom:1px solid #111827}.announce-row:last-child{border-bottom:none}.announce-row div{padding:8px 9px;font-weight:1000}.announce-row .result{text-align:center;border-left:1px solid #111827;display:flex;align-items:center;justify-content:center}.announce-student small{font-size:11px;color:#64748b;font-weight:800;display:block;margin-top:1px}.capture-hint{text-align:center;color:#475569;font-size:12px;font-weight:900;margin-bottom:4px}
+  /* ---- Shareable summary image (one per grade, 4 classes per row) ---- */
+  .announce-wrap{background:linear-gradient(135deg,#f8fafc,#eef2ff);border-radius:24px;padding:16px;display:grid;gap:26px}
+  .announce-block{display:grid;gap:10px}
+  .announce-toolbar{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+  .announce-toolbar-label{font-weight:1000;font-size:14px;color:#0f172a}
+  .announce-toolbar-btns{display:flex;gap:7px;flex-wrap:wrap}
+  /* The sheet below is what gets rasterised: keep it self-contained and light-themed. */
+  .announce-sheet{position:relative;overflow:hidden;background:#fff;border:3px solid var(--c1);border-radius:20px;
+    padding:20px;max-width:1400px;margin:0 auto;box-shadow:0 12px 28px rgba(15,23,42,.12);width:100%}
+  .announce-deco{position:absolute;inset:0;pointer-events:none;display:flex;flex-wrap:wrap;gap:38px;
+    padding:14px;opacity:.07;font-size:36px;line-height:1;z-index:0}
+  .announce-sheet>*:not(.announce-deco){position:relative;z-index:1}
+  .announce-title{display:flex;align-items:center;justify-content:center;gap:18px;
+    background:linear-gradient(135deg,var(--c1),var(--c2));color:#fff;text-align:center;
+    padding:14px 18px;border-radius:16px;margin-bottom:14px;box-shadow:0 6px 16px rgba(15,23,42,.18)}
+  .announce-title .at-motif{font-size:32px;line-height:1}
+  .announce-title .at-line1{font-size:15px;font-weight:900;opacity:.92;letter-spacing:.04em}
+  .announce-title .at-line2{font-size:28px;font-weight:1000;line-height:1.15}
+  .announce-info{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;margin-bottom:14px}
+  .announce-info>div{background:var(--soft);border:2px solid var(--accent);border-radius:12px;
+    padding:8px 10px;text-align:center;display:grid;gap:2px}
+  .announce-info .ai-k{font-size:10px;font-weight:1000;color:var(--ink);opacity:.75;text-transform:uppercase;letter-spacing:.05em}
+  .announce-info .ai-v{font-size:14px;font-weight:1000;color:#0f172a;line-height:1.3}
+  .announce-class-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:11px;align-items:start}
+  .announce-class{border:2px solid var(--accent);border-radius:13px;overflow:hidden;background:#fff}
+  .announce-class-head{background:var(--accent);color:#fff;text-align:center;padding:8px 6px;
+    font-weight:1000;font-size:14px;line-height:1.25}
+  .announce-mini{display:flex;gap:4px;justify-content:center;flex-wrap:wrap;padding:6px;background:var(--soft)}
+  .announce-mini span{font-size:9px;font-weight:1000;border-radius:999px;padding:2px 6px;background:#fff;border:1px solid #e2e8f0;color:#334155}
+  .announce-mini .m-ok{background:#dcfce7;border-color:#bbf7d0;color:#166534}
+  .announce-mini .m-ex{background:#fef9c3;border-color:#fde68a;color:#854d0e}
+  .announce-mini .m-no{background:#fee2e2;border-color:#fecaca;color:#991b1b}
+  .announce-row{display:grid;grid-template-columns:1fr auto;gap:5px;align-items:center;
+    padding:5px 7px;border-top:1px solid #f1f5f9}
+  .announce-row:nth-child(odd){background:#fcfcfd}
+  .announce-student{font-weight:1000;font-size:12px;color:#0f172a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .announce-row .result{text-align:center;font-size:10px;font-weight:1000;border-radius:999px;padding:3px 7px;white-space:nowrap}
+  .announce-foot{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;
+    margin-top:13px;padding-top:10px;border-top:2px dashed var(--accent);
+    font-size:11px;font-weight:900;color:#64748b}
+  .announce-foot .af-brand{color:var(--ink);font-weight:1000}
   .history-table-wrap{overflow-x:auto}.history-table{width:100%;border-collapse:collapse;font-size:13px}.history-table th{background:#f8fafc;color:#64748b;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.04em;padding:9px;border-bottom:1px solid #e2e8f0}.history-table td{padding:10px 9px;border-bottom:1px solid #f1f5f9;vertical-align:top}.badge{display:inline-flex;border-radius:999px;padding:5px 10px;font-weight:1000;font-size:12px}.empty{padding:30px;text-align:center;color:#64748b;font-weight:900;background:#f8fafc;border-radius:18px;border:1px dashed #cbd5e1}
-  @media(max-width:980px){.class-grid,.announce-class-grid{grid-template-columns:1fr}.announce-info{grid-template-columns:120px 1fr}.wt-title{font-size:23px}}
-  @media(max-width:620px){.toolbar{display:grid}.field{min-width:0}.announce-title{font-size:18px}.announce-sheet{padding:10px}.pill-row{justify-content:flex-start}.score-table td{display:block}.savebar{position:static}}
+  @media(max-width:1200px){.announce-class-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+  @media(max-width:980px){.class-grid{grid-template-columns:1fr}.announce-class-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.announce-info{grid-template-columns:repeat(2,minmax(0,1fr))}.wt-title{font-size:23px}}
+  @media(max-width:620px){.toolbar{display:grid}.field{min-width:0}.announce-title .at-line2{font-size:20px}.announce-sheet{padding:12px}.pill-row{justify-content:flex-start}.score-table td{display:block}.savebar{position:static}}
+  /* Force the 4-up grid while rasterising, regardless of the viewport. */
+  .announce-sheet.is-capturing{width:1400px!important;max-width:none!important}
+  .announce-sheet.is-capturing .announce-class-grid{grid-template-columns:repeat(4,minmax(0,1fr))!important}
+  .announce-sheet.is-capturing .announce-info{grid-template-columns:repeat(4,minmax(0,1fr))!important}
 </style>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 {% endblock %}
 
 {% block content %}
@@ -194,34 +240,61 @@
   {% endif %}
 
   <div class="wt-card" id="capture-summary">
-    <div class="section-title">📸 หน้าสรุปสำหรับแคปส่งผู้ปกครอง <small>แสดง 2 ตารางต่อแถว เพื่อแคปหลาย class ได้ในภาพเดียว</small></div>
+    <div class="section-title">📸 หน้าสรุปสำหรับส่งผู้ปกครอง <small>4 ห้องต่อแถว · แต่ละระดับชั้นมีลายเฉพาะตัว · กด Copy รูป แล้ววางได้เลย</small></div>
     <div class="announce-wrap">
       {% if grade_sections %}
         {% for section in grade_sections %}
-        <div class="announce-sheet">
-          <div class="announce-title">Test ย่อยประจำสัปดาห์ {{ section.grade_label }}</div>
-          <div class="announce-info">
-            <div class="label">วันที่</div><div>{% if section.weekly_test %}{{ section.weekly_test.test_date|date:'d/m/Y' }}{% else %}{{ week_start|date:'d/m/Y' }}{% endif %}</div>
-            <div class="label">วิชา</div><div>{% if section.weekly_test %}{{ section.weekly_test.subject_display }}{% else %}-{% endif %}</div>
-            <div class="label">เรื่อง</div><div>{% if section.weekly_test %}{{ section.weekly_test.topic|default:'-' }}{% else %}-{% endif %}</div>
-            <div class="label">ระดับความยาก</div><div>{% if section.weekly_test %}{{ section.weekly_test.difficulty_stars }}{% else %}⭐⭐⭐{% endif %}</div>
+        <div class="announce-block">
+          <div class="announce-toolbar">
+            <div class="announce-toolbar-label">{{ section.theme.motif }} {{ section.grade_label }} · {{ section.class_blocks|length }} ห้อง · {{ section.count }} คน</div>
+            <div class="announce-toolbar-btns">
+              <button type="button" class="btn btn-primary js-copy-img" data-target="sheet-{{ section.grade_key }}">📋 Copy รูป</button>
+              <button type="button" class="btn btn-soft js-download-img" data-target="sheet-{{ section.grade_key }}" data-name="weekly-test-{{ section.grade_key }}-{{ week_start|date:'Y-m-d' }}">⬇️ ดาวน์โหลด PNG</button>
+              <button type="button" class="btn btn-soft js-open-img" data-target="sheet-{{ section.grade_key }}">🔍 เปิดรูป</button>
+            </div>
           </div>
-          <div class="capture-hint">เรียงผล: เต็ม → ดีมาก → ดี → ปานกลาง → ไม่ผ่าน → ยังไม่กรอก → ลา → ขาด</div>
-          <div class="announce-class-grid">
-            {% for block in section.class_blocks %}
-            <div class="announce-class">
-              <div class="announce-class-head">{{ block.class.name }}</div>
-              <div class="announce-mini">
-                <span>มา {{ block.present_count }}</span><span>ลา {{ block.excused_count }}</span><span>ขาด {{ block.no_show_count }}</span>{% if block.not_checked_count %}<span>ยังไม่เช็ค {{ block.not_checked_count }}</span>{% endif %}
+
+          <div class="announce-sheet theme-{{ section.grade_key }}" id="sheet-{{ section.grade_key }}"
+               style="--c1:{{ section.theme.c1 }};--c2:{{ section.theme.c2 }};--accent:{{ section.theme.accent }};--soft:{{ section.theme.soft }};--ink:{{ section.theme.ink }};">
+            <div class="announce-deco" aria-hidden="true">{% for i in "123456789012" %}<span>{{ section.theme.motif }}</span>{% endfor %}</div>
+
+            <div class="announce-title">
+              <div class="at-motif">{{ section.theme.motif }}</div>
+              <div class="at-main">
+                <div class="at-line1">Test ย่อยประจำสัปดาห์</div>
+                <div class="at-line2">{{ section.grade_label }}</div>
               </div>
-              {% for row in block.rows %}
-              <div class="announce-row">
-                <div class="announce-student">{{ row.student.nickname|default:row.student.full_name }} <small>{{ row.student.full_name }}</small></div>
-                <div class="result {{ row.display_class }}">{{ row.display_label }}</div>
+              <div class="at-motif">{{ section.theme.motif }}</div>
+            </div>
+
+            <div class="announce-info">
+              <div><span class="ai-k">วันที่</span><span class="ai-v">{% if section.weekly_test %}{{ section.weekly_test.test_date|date:'d/m/Y' }}{% else %}{{ week_start|date:'d/m/Y' }}{% endif %}</span></div>
+              <div><span class="ai-k">วิชา</span><span class="ai-v">{% if section.weekly_test %}{{ section.weekly_test.subject_display }}{% else %}-{% endif %}</span></div>
+              <div><span class="ai-k">เรื่อง</span><span class="ai-v">{% if section.weekly_test %}{{ section.weekly_test.topic|default:'-' }}{% else %}-{% endif %}</span></div>
+              <div><span class="ai-k">ความยาก</span><span class="ai-v">{% if section.weekly_test %}{{ section.weekly_test.difficulty_stars }}{% else %}⭐⭐⭐{% endif %}</span></div>
+            </div>
+
+            <div class="announce-class-grid">
+              {% for block in section.class_blocks %}
+              <div class="announce-class">
+                <div class="announce-class-head">{{ block.class.name }}</div>
+                <div class="announce-mini">
+                  <span class="m-ok">มา {{ block.present_count }}</span><span class="m-ex">ลา {{ block.excused_count }}</span><span class="m-no">ขาด {{ block.no_show_count }}</span>{% if block.not_checked_count %}<span class="m-nc">ยังไม่เช็ค {{ block.not_checked_count }}</span>{% endif %}
+                </div>
+                {% for row in block.rows %}
+                <div class="announce-row">
+                  <div class="announce-student">{{ row.student.nickname|default:row.student.full_name }}</div>
+                  <div class="result {{ row.display_class }}">{{ row.display_label }}</div>
+                </div>
+                {% endfor %}
               </div>
               {% endfor %}
             </div>
-            {% endfor %}
+
+            <div class="announce-foot">
+              <span>เรียงผล: เต็ม → ดีมาก → ดี → ปานกลาง → ไม่ผ่าน → ยังไม่กรอก → ลา → ขาด</span>
+              <span class="af-brand">Pkanoon Tutor</span>
+            </div>
           </div>
         </div>
         {% endfor %}
@@ -276,4 +349,88 @@
   </div>
   {% endif %}
 </div>
+
+<script>
+(function(){
+  // Rasterise a grade's summary sheet. The sheet is temporarily pinned to a
+  // fixed 1400px width so the exported image always has 4 classes per row,
+  // even when the admin is on a narrow screen.
+  function withCaptureLayout(node, fn){
+    node.classList.add('is-capturing');
+    return Promise.resolve()
+      .then(fn)
+      .finally(function(){ node.classList.remove('is-capturing'); });
+  }
+
+  function makeCanvas(node){
+    if(typeof html2canvas !== 'function'){
+      return Promise.reject(new Error('โหลดตัวสร้างรูปไม่สำเร็จ กรุณาเช็คอินเทอร์เน็ตแล้วรีเฟรชหน้าอีกครั้ง'));
+    }
+    return withCaptureLayout(node, function(){
+      return html2canvas(node, {
+        scale: 2,
+        backgroundColor: '#ffffff',
+        useCORS: true,
+        windowWidth: 1500,
+      });
+    });
+  }
+
+  function targetOf(btn){
+    return document.getElementById(btn.getAttribute('data-target'));
+  }
+
+  function busy(btn, on, original){
+    btn.disabled = on;
+    if(on){ btn.dataset.old = btn.textContent; btn.textContent = 'กำลังสร้างรูป...'; }
+    else { btn.textContent = original || btn.dataset.old || btn.textContent; }
+  }
+
+  document.addEventListener('click', function(e){
+    var btn = e.target.closest('.js-copy-img, .js-download-img, .js-open-img');
+    if(!btn) return;
+    var node = targetOf(btn);
+    if(!node) return;
+    e.preventDefault();
+
+    busy(btn, true);
+    makeCanvas(node).then(function(canvas){
+      if(btn.classList.contains('js-download-img')){
+        var a = document.createElement('a');
+        a.href = canvas.toDataURL('image/png');
+        a.download = (btn.getAttribute('data-name') || 'weekly-test') + '.png';
+        a.click();
+        return;
+      }
+      if(btn.classList.contains('js-open-img')){
+        var w = window.open();
+        if(w){ w.document.write('<img src="' + canvas.toDataURL('image/png') + '" style="max-width:100%;height:auto;">'); }
+        else { alert('เบราว์เซอร์บล็อกการเปิดแท็บใหม่ ลองใช้ปุ่มดาวน์โหลดแทนครับ'); }
+        return;
+      }
+      // Copy to clipboard
+      if(!(navigator.clipboard && window.ClipboardItem)){
+        throw new Error('เบราว์เซอร์นี้ไม่รองรับ Copy รูปโดยตรง ใช้ปุ่มดาวน์โหลด PNG แทนได้ครับ');
+      }
+      return new Promise(function(resolve, reject){
+        canvas.toBlob(function(blob){
+          if(!blob){ reject(new Error('สร้างรูปไม่สำเร็จ')); return; }
+          navigator.clipboard.write([new ClipboardItem({'image/png': blob})])
+            .then(function(){ busy(btn, false, '✅ Copy แล้ว');
+                              setTimeout(function(){ btn.textContent = '📋 Copy รูป'; }, 1800);
+                              resolve(); })
+            .catch(reject);
+        }, 'image/png');
+      });
+    })
+    .then(function(){
+      if(!btn.classList.contains('js-copy-img')) busy(btn, false);
+    })
+    .catch(function(err){
+      busy(btn, false);
+      alert(err && err.message ? err.message : 'สร้างรูปไม่สำเร็จ ลองใช้ปุ่มดาวน์โหลด PNG แทนครับ');
+    });
+  });
+})();
+</script>
 {% endblock %}

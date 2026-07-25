@@ -612,8 +612,9 @@ class SchoolExpenseAdmin(admin.ModelAdmin):
 
 @admin.register(Tutor)
 class TutorAdmin(admin.ModelAdmin):
-    list_display = ("name", "phone", "is_active", "updated_at")
-    list_filter = ("is_active",)
+    list_display = ("name", "phone", "default_special_rate_325", "is_active", "updated_at")
+    list_filter = ("is_active", "default_special_rate_325")
+    list_editable = ("default_special_rate_325",)
     search_fields = ("name", "phone", "note")
     ordering = ("name",)
 

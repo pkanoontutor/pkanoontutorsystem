@@ -14,6 +14,7 @@ from django.db import transaction
 from django.db.models import Count, Max, Q, Sum
 from django.http import JsonResponse, HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_POST, require_GET
 from django.views.decorators.clickjacking import xframe_options_sameorigin
@@ -692,6 +693,7 @@ def _sheet_inventory_context(*, q: str = "", extra: dict | None = None) -> dict:
         "spine_color_choices": _print_color_choices(),
         "default_print_due_date": timezone.localdate() + timedelta(days=3),
         "ready_to_receive_orders": _ready_to_receive_orders_with_links(),
+        "pending_print_orders": _pending_print_orders_with_links(),
     }
     if extra:
         context.update(extra)
@@ -1075,7 +1077,12 @@ def sheet_inventory_dashboard(request: HttpRequest) -> HttpResponse:
             try:
                 with transaction.atomic():
                     order = get_object_or_404(
-                        SheetPrintOrder.objects.select_for_update().select_related("sheet", "sheet__subject"),
+                        # `sheet` is nullable (custom docs), so select_related() emits a LEFT
+                        # OUTER JOIN — Postgres refuses FOR UPDATE on the nullable side of one.
+                        # Lock only the order row itself.
+                        SheetPrintOrder.objects.select_for_update(of=("self",)).select_related(
+                            "sheet", "sheet__subject"
+                        ),
                         id=order_id,
                     )
                     is_custom_doc = order.sheet_id is None
@@ -2186,6 +2193,22 @@ def _attach_inventory_file_links(orders: list) -> None:
             o.file_url_is_custom = True
 
 
+def _pending_print_orders_with_links() -> list:
+    """Orders still being printed at the shop, shown on Sheet Inventory so the
+    whole print lifecycle (order -> printing -> receive) lives on one page."""
+    today = timezone.localdate()
+    orders = list(
+        SheetPrintOrder.objects
+        .select_related("sheet", "sheet__subject", "requested_by")
+        .filter(status=SheetPrintOrder.Status.PENDING)
+        .order_by("due_date", "created_at")
+    )
+    for o in orders:
+        o.is_overdue = bool(o.due_date and o.due_date < today)
+    _attach_inventory_file_links(orders)
+    return orders
+
+
 def _ready_to_receive_orders_with_links() -> list:
     orders = list(
         SheetPrintOrder.objects
@@ -2195,6 +2218,41 @@ def _ready_to_receive_orders_with_links() -> list:
     )
     _attach_inventory_file_links(orders)
     return orders
+
+
+def print_shop_queue_preview(request: HttpRequest) -> JsonResponse:
+    """Live snapshot of what the print shop currently sees, used to render an
+    inline preview inside the 'ส่งปรินท์เรียบร้อย' popup on Sheet Inventory."""
+    pending = list(
+        SheetPrintOrder.objects
+        .select_related("sheet", "sheet__subject")
+        .filter(status=SheetPrintOrder.Status.PENDING)
+        .order_by("due_date", "created_at")
+    )
+    _attach_inventory_file_links(pending)
+    today = timezone.localdate()
+
+    rows = []
+    for o in pending[:12]:
+        rows.append({
+            "id": o.id,
+            "title": o.display_title,
+            "code": o.display_code,
+            "quantity": int(o.quantity or 0),
+            "due_date": o.due_date.strftime("%d/%m/%Y") if o.due_date else "",
+            "is_overdue": bool(o.due_date and o.due_date < today),
+            "has_file": bool(o.file_url),
+            "progress": int(getattr(o, "printed_quantity", 0) or 0),
+        })
+
+    return JsonResponse({
+        "ok": True,
+        "pending_count": len(pending),
+        "total_books": sum(int(o.quantity or 0) for o in pending),
+        "shown": len(rows),
+        "rows": rows,
+        "print_shop_url": reverse("core:print_shop_order_list"),
+    })
 
 
 def print_shop_order_list(request: HttpRequest) -> HttpResponse:
@@ -2649,16 +2707,19 @@ def export_excel(request: HttpRequest) -> HttpResponse:
         "Remaining Sessions (Active Total)",
     ])
 
+    # remaining_sessions is a property, not a column, so it cannot be aggregated
+    # in SQL (doing so raises FieldError) -- prefetch and sum in Python instead.
     students = (
         Student.objects
         .order_by("-is_active", "grade_level", "student_code")
-        .annotate(
-            active_enrollments=Count("enrollments", filter=Q(enrollments__is_active=True)),
-            remaining_total=Sum("enrollments__remaining_sessions", filter=Q(enrollments__is_active=True)),
-        )
+        .annotate(active_enrollments=Count("enrollments", filter=Q(enrollments__is_active=True)))
+        .prefetch_related("enrollments")
     )
 
     for s in students:
+        remaining_total = sum(
+            int(e.remaining_sessions or 0) for e in s.enrollments.all() if e.is_active
+        )
         ws2.append([
             s.id,
             getattr(s, "student_code", "") or "",
@@ -2667,7 +2728,7 @@ def export_excel(request: HttpRequest) -> HttpResponse:
             getattr(s, "grade_level", "") or "",
             bool(getattr(s, "is_active", False)),
             int(getattr(s, "active_enrollments", 0) or 0),
-            int(getattr(s, "remaining_total", 0) or 0),
+            remaining_total,
         ])
 
     _autosize(ws2)
@@ -2704,6 +2765,20 @@ def export_excel(request: HttpRequest) -> HttpResponse:
     buff.seek(0)
 
     filename = f"pkanoon_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    resp = HttpResponse(
+        buff.getvalue(),
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+    resp["Content-Disposition"] = f'attachment; filename="{filename}"'
+    return resp
+
+
+@login_required
+def export_full_excel(request: HttpRequest) -> HttpResponse:
+    """Download every data area in one formatted workbook (one sheet each)."""
+    from .exports import build_full_workbook
+
+    buff, filename = build_full_workbook()
     resp = HttpResponse(
         buff.getvalue(),
         content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -4648,6 +4723,20 @@ WEEKLY_TEST_ATTENDANCE_META = {
     WeeklyTestScore.AttendanceStatus.NOT_CHECKED: {"label": "ยังไม่เช็คชื่อ", "rank": 8, "class": "score-notchecked"},
 }
 
+# Each grade gets its own look on the shareable summary image so parents can
+# tell at a glance which level a screenshot belongs to.
+# c1/c2 = header gradient, accent = class header, soft = page tint, motif = repeating emoji.
+WEEKLY_TEST_GRADE_THEMES = {
+    "p4":      {"c1": "#f97316", "c2": "#fbbf24", "accent": "#fb923c", "soft": "#fff7ed", "motif": "🐣", "ink": "#7c2d12"},
+    "p5":      {"c1": "#10b981", "c2": "#5eead4", "accent": "#34d399", "soft": "#ecfdf5", "motif": "🌿", "ink": "#064e3b"},
+    "p6":      {"c1": "#3b82f6", "c2": "#60a5fa", "accent": "#60a5fa", "soft": "#eff6ff", "motif": "🚀", "ink": "#1e3a8a"},
+    "m1":      {"c1": "#8b5cf6", "c2": "#c084fc", "accent": "#a78bfa", "soft": "#f5f3ff", "motif": "⭐", "ink": "#4c1d95"},
+    "m2":      {"c1": "#ec4899", "c2": "#f9a8d4", "accent": "#f472b6", "soft": "#fdf2f8", "motif": "🌸", "ink": "#831843"},
+    "m3":      {"c1": "#06b6d4", "c2": "#67e8f9", "accent": "#22d3ee", "soft": "#ecfeff", "motif": "🐬", "ink": "#164e63"},
+    "m4":      {"c1": "#ef4444", "c2": "#fca5a5", "accent": "#f87171", "soft": "#fef2f2", "motif": "🔥", "ink": "#7f1d1d"},
+    "_default": {"c1": "#4f7bdc", "c2": "#6d5bd0", "accent": "#937fc3", "soft": "#f8fafc", "motif": "📘", "ink": "#1e293b"},
+}
+
 WEEKLY_TEST_INPUT_ATTENDANCE_ORDER = {
     WeeklyTestScore.AttendanceStatus.PRESENT: 0,
     WeeklyTestScore.AttendanceStatus.NOT_CHECKED: 1,
@@ -4956,6 +5045,9 @@ def _weekly_test_build_week_context(
             "rows": sorted(rows, key=_weekly_test_row_sort_key),
             "class_blocks": blocks,
             "count": len(rows),
+            "theme": WEEKLY_TEST_GRADE_THEMES.get(
+                grade_key, WEEKLY_TEST_GRADE_THEMES["_default"]
+            ),
         })
 
     return {
@@ -5440,13 +5532,12 @@ _ADMIN_TOOL_DEFAULTS = [
     ("private", "c-teal",  "📚", "Learning Record", "ดูประวัติวิชาเรียนราย Class ว่าแต่ละวิชาเรียนไปแล้วกี่ครั้ง ล่าสุดเรียนวันไหน ใครสอน และถึงชีทหน้า/ข้อไหน", "/learning-record/"),
     ("private", "c-sage",  "🧾", "รับชำระเงิน / ใบเสร็จ", "ออกใบเสร็จ รับชำระค่าคอร์ส และสร้าง Enrollment ได้ในหน้าเดียว", "/course-payments/"),
     ("private", "c-clay",  "🔁", "ระบบสร้างใบแจ้งต่อคอร์ส", "ดูคอร์สที่ใกล้ครบ สร้างใบแจ้งต่อคอร์ส พร้อม QR และ Copy Image ส่งผู้ปกครอง", "/course-renewal-notices/"),
-    ("private", "c-teal",  "📦", "Sheet Inventory", "สร้างชีท จัดการ stock สแกน QR ตัด/นับชีท และดูชีทที่ต้องใช้ตามรายการสมัคร/ทดลองเรียน", "/sheet-inventory/"),
+    ("private", "c-teal",  "📦", "ระบบคลังชีทและส่งปรินท์ชีท", "สร้างชีท จัดการ stock สแกน QR ตัด/นับชีท สั่งปรินท์และตรวจรับชีทจากร้านปรินท์ ครบในหน้าเดียว", "/sheet-inventory/"),
     ("private", "c-sage",  "📤", "ระบบแจกชีท", "สแกน QR เพื่อแจกชีท ตัด stock ตอนกดบันทึก และดูประวัติ Sheet Allocation รายเด็ก/ราย class", "/sheet-allocation/"),
-    ("private", "c-teal",  "🖨️", "ระบบส่งปรินท์ชีท", "สร้างรายการรอปรินท์จาก Sheet Inventory และส่ง link ให้ร้านปรินท์เข้าดูโดยไม่ต้อง login", "/sheet-print-orders/"),
     ("private", "c-sage",  "💰", "รายรับรายจ่าย", "บันทึกค่าใช้จ่าย ค่าติวเตอร์ และ Export Excel", "/school-finance/"),
     ("private", "c-rose",  "📌", "รายงานสมัคร/ทดลองเรียน", "ติดตามใบสมัคร จองทดลองเรียน และสถานะภายใน", "/admission-report/"),
     ("private", "c-stone", "⚙️", "Django Admin", "จัดการข้อมูล master data และตารางระบบ", "/adminlublub/"),
-    ("private", "c-teal",  "⬇️", "Export ข้อมูลหลัก", "Export enrollments และ students จากระบบหลัก", "/export/excel/"),
+    ("private", "c-teal",  "⬇️", "Export ข้อมูลทั้งระบบ", "Export ทุกหมวดเป็น Excel แยก sheet (นักเรียน คอร์ส ใบเสร็จ รายจ่าย ค่าสอน คลังชีท ผลเทส) และส่งเข้าอีเมลอัตโนมัติทุกวันศุกร์/อาทิตย์ 23.59 น.", "/export/excel/full/"),
     ("private", "c-lilac", "🏆", "ระบบประกาศผลการสอบ", "สร้างรอบสอบ เพิ่มวิชา เพิ่มนักเรียน กรอก/Import คะแนน และดูภาพรวมผลสอบ", "/test-score-admin/"),
     ("private", "c-sand",  "⭐", "Test ย่อยรายสัปดาห์", "บันทึกผล Test ย่อยจาก Dashboard แยกตามสัปดาห์ ห้อง และระดับชั้น พร้อมหน้าสรุปสำหรับแคปส่งผู้ปกครอง", "/weekly-tests/"),
     ("operation", "c-sky",   "🏠", "Dashboard เช็คชื่อ", "กลับหน้า Dashboard หลักสำหรับเช็คชื่อ", "/dashboard/"),
@@ -5455,6 +5546,11 @@ _ADMIN_TOOL_DEFAULTS = [
 
 _ADMIN_TOOL_COLORS = {"c-sky", "c-teal", "c-sage", "c-clay", "c-sand", "c-rose", "c-lilac", "c-stone"}
 _ADMIN_TOOL_SECTIONS = {"private", "operation"}
+
+# card url -> "+" shortcut url (rendered top-right on the card)
+_ADMIN_TOOL_QUICK_ADD = {
+    "/course-payments/": "/course-payments/new/",
+}
 
 
 def _seed_admin_tool_cards() -> None:
@@ -5466,7 +5562,9 @@ def _seed_admin_tool_cards() -> None:
         for i, (section, color, icon, name, desc, url) in enumerate(_ADMIN_TOOL_DEFAULTS):
             AdminToolCard.objects.create(
                 section=section, color=color, icon=icon,
-                name=name, desc=desc, url=url, order=(i + 1) * 10,
+                name=name, desc=desc, url=url,
+                quick_add_url=_ADMIN_TOOL_QUICK_ADD.get(url, ""),
+                order=(i + 1) * 10,
             )
 
 
@@ -5520,6 +5618,7 @@ def admin_tool_card_save(request: HttpRequest) -> JsonResponse:
     color = data.get("color") if data.get("color") in _ADMIN_TOOL_COLORS else "c-sky"
     icon = (data.get("icon") or "🔗").strip()[:16] or "🔗"
     desc = (data.get("desc") or "").strip()
+    quick_add_url = (data.get("quick_add_url") or "").strip()[:300]
 
     card_id = data.get("id")
     if card_id:
@@ -5530,6 +5629,7 @@ def admin_tool_card_save(request: HttpRequest) -> JsonResponse:
         card.name = name[:200]
         card.desc = desc
         card.url = url[:300]
+        card.quick_add_url = quick_add_url
         card.save()
     else:
         max_order = (
@@ -5538,7 +5638,8 @@ def admin_tool_card_save(request: HttpRequest) -> JsonResponse:
         )
         card = AdminToolCard.objects.create(
             section=section, color=color, icon=icon,
-            name=name[:200], desc=desc, url=url[:300], order=max_order + 10,
+            name=name[:200], desc=desc, url=url[:300],
+            quick_add_url=quick_add_url, order=max_order + 10,
         )
     return JsonResponse({"ok": True, "card": card.as_dict()})
 

@@ -94,6 +94,12 @@
   .tool-card.dragging{opacity:.4;}
   .tool-card.drop-before{box-shadow:-4px 0 0 var(--accent), var(--shadow);}
   .tool-card.drop-after{box-shadow:4px 0 0 var(--accent), var(--shadow);}
+  .card-quick-add{position:absolute;top:8px;right:8px;width:30px;height:30px;border-radius:10px;
+    border:1px solid var(--line-strong);background:var(--panel-2);color:var(--ink-soft);
+    display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:800;
+    line-height:1;cursor:pointer;transition:all .15s;z-index:2;}
+  .card-quick-add:hover{border-color:var(--accent);color:var(--accent-strong);transform:scale(1.08);}
+  .managing .card-quick-add{display:none;}
   .card-ctrls{display:none;position:absolute;top:8px;right:8px;gap:6px;}
   .managing .card-ctrls{display:flex;}
   .card-ctrls button{width:26px;height:26px;border-radius:8px;border:1px solid var(--line-strong);
@@ -324,9 +330,23 @@
         +'<button class="edit" title="แก้ไข">✎</button>'
         +'<button class="del" title="ลบ">✕</button>'
       +'</div>'
+      +((!managing && c.quick_add_url)
+        ? '<span class="card-quick-add" data-quick-url="'+esc(c.quick_add_url)+'" role="button" tabindex="0" title="สร้างรายการใหม่">+</span>'
+        : '')
       +'<div class="tool-icon '+esc(c.color)+'">'+esc(c.icon)+'</div>'
       +'<div class="tool-name">'+esc(c.name)+'</div>'
       +'<div class="tool-desc">'+esc(c.desc)+'</div>';
+    var quick=a.querySelector(".card-quick-add");
+    if(quick){
+      var goQuick=function(e){
+        e.preventDefault(); e.stopPropagation();
+        window.location.href=quick.getAttribute("data-quick-url");
+      };
+      quick.addEventListener("click",goQuick);
+      quick.addEventListener("keydown",function(e){
+        if(e.key==="Enter"||e.key===" ") goQuick(e);
+      });
+    }
     if(managing){
       a.querySelector(".edit").onclick=function(e){e.preventDefault();e.stopPropagation();openModal(c,c.section);};
       a.querySelector(".del").onclick=function(e){e.preventDefault();e.stopPropagation();delCard(c.id);};

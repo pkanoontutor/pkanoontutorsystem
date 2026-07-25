@@ -63,6 +63,7 @@ urlpatterns = [
     # Sheet print orders
     path("sheet-print-orders/", views.sheet_print_order_admin, name="sheet_print_order_admin"),
     path("print-shop/", views.print_shop_order_list, name="print_shop_order_list"),
+    path("print-shop/queue-preview/", views.print_shop_queue_preview, name="print_shop_queue_preview"),
     path("print-shop/order/<int:pk>/ready/", views.print_shop_mark_ready, name="print_shop_mark_ready"),
     path("print-shop/order/<int:pk>/update/", views.print_shop_update_order, name="print_shop_update_order"),
 
@@ -145,4 +146,5 @@ urlpatterns = [
 
     # Export
     path("export/excel/", views.export_excel, name="export_excel"),
+    path("export/excel/full/", views.export_full_excel, name="export_full_excel"),
 ]

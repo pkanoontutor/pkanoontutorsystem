@@ -39,6 +39,7 @@ urlpatterns = [
     # School overview / finance
     path("school-overview/", views.school_overview, name="school_overview"),
     path("school-finance/", views.school_finance, name="school_finance"),
+    path("revenue-analysis/", views.revenue_analysis, name="revenue_analysis"),
     path("school-finance/export/", views.school_finance_export, name="school_finance_export"),
     path("school-finance/delete-expense/<int:pk>/", views.school_expense_delete, name="school_expense_delete"),
     path("school-finance/delete-payroll/<int:pk>/", views.tutor_payroll_delete, name="tutor_payroll_delete"),

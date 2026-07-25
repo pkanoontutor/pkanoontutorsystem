@@ -5535,6 +5535,7 @@ _ADMIN_TOOL_DEFAULTS = [
     ("private", "c-teal",  "📦", "ระบบคลังชีทและส่งปรินท์ชีท", "สร้างชีท จัดการ stock สแกน QR ตัด/นับชีท สั่งปรินท์และตรวจรับชีทจากร้านปรินท์ ครบในหน้าเดียว", "/sheet-inventory/"),
     ("private", "c-sage",  "📤", "ระบบแจกชีท", "สแกน QR เพื่อแจกชีท ตัด stock ตอนกดบันทึก และดูประวัติ Sheet Allocation รายเด็ก/ราย class", "/sheet-allocation/"),
     ("private", "c-sage",  "💰", "รายรับรายจ่าย", "บันทึกค่าใช้จ่าย ค่าติวเตอร์ และ Export Excel", "/school-finance/"),
+    ("private", "c-clay",  "📊", "วิเคราะห์รายได้-ต้นทุน-กำไร", "ดูกำไรรายห้อง ปรับสมมติฐานค่าสอน/รายได้ต่อคนได้เอง ปันส่วน fixed cost หาจุดคุ้มทุน และจำลอง what-if", "/revenue-analysis/"),
     ("private", "c-rose",  "📌", "รายงานสมัคร/ทดลองเรียน", "ติดตามใบสมัคร จองทดลองเรียน และสถานะภายใน", "/admission-report/"),
     ("private", "c-stone", "⚙️", "Django Admin", "จัดการข้อมูล master data และตารางระบบ", "/adminlublub/"),
     ("private", "c-teal",  "⬇️", "Export ข้อมูลทั้งระบบ", "Export ทุกหมวดเป็น Excel แยก sheet (นักเรียน คอร์ส ใบเสร็จ รายจ่าย ค่าสอน คลังชีท ผลเทส) และส่งเข้าอีเมลอัตโนมัติทุกวันศุกร์/อาทิตย์ 23.59 น.", "/export/excel/full/"),
@@ -8407,4 +8408,142 @@ def star_quiz_scores(request: HttpRequest) -> HttpResponse:
         "grade_filter": grade_filter,
         "grade_choices": Sheet.GradeLevel.choices,
         "pending_answers": pending_answers,
+    })
+
+
+# =========================================================
+# ✅ Revenue & Cost Analysis
+# =========================================================
+@login_required
+def revenue_analysis(request: HttpRequest) -> HttpResponse:
+    """Per-class revenue / cost / profit modelling with editable assumptions."""
+    from .analytics import (
+        compute_scenario,
+        month_bounds,
+        suggest_fixed_costs,
+        suggest_revenue_per_student_hour,
+        suggest_sessions_in_month,
+        suggest_student_count,
+        suggest_teaching_cost_per_hour,
+    )
+    from .models import CostScenario, CostScenarioClass, CostScenarioFixedCost
+
+    def _redirect(scenario_id=None):
+        if scenario_id:
+            return redirect(f"{request.path}?scenario={scenario_id}")
+        return redirect(request.path)
+
+    if request.method == "POST":
+        action = (request.POST.get("action") or "").strip()
+
+        if action == "create_scenario":
+            raw_month = (request.POST.get("period_month") or "").strip()
+            try:
+                anchor = datetime.strptime(raw_month, "%Y-%m").date()
+            except ValueError:
+                # Default to last month -- "how did we do last month" is the
+                # question this page exists to answer.
+                today = timezone.localdate()
+                anchor = (today.replace(day=1) - timedelta(days=1)).replace(day=1)
+
+            start, end = month_bounds(anchor)
+            name = (request.POST.get("name") or "").strip() or f"วิเคราะห์ {anchor:%m/%Y}"
+
+            with transaction.atomic():
+                scenario = CostScenario.objects.create(
+                    name=name,
+                    period_month=anchor,
+                    default_teaching_cost_per_hour=suggest_teaching_cost_per_hour(start, end),
+                    default_revenue_per_student_hour=Decimal("150"),
+                    default_hours_per_session=Decimal("4"),
+                    default_sessions_per_month=Decimal("4"),
+                )
+                for fc in suggest_fixed_costs(start, end):
+                    CostScenarioFixedCost.objects.create(
+                        scenario=scenario, name=fc["name"], amount=fc["amount"]
+                    )
+                for i, cls in enumerate(TutoringClass.objects.filter(is_active=True).order_by("name")):
+                    CostScenarioClass.objects.create(
+                        scenario=scenario,
+                        tutoring_class=cls,
+                        student_count=suggest_student_count(cls, start, end),
+                        sessions_per_month=suggest_sessions_in_month(cls, start, end),
+                        hours_per_session=cls.hours_per_session or Decimal("4"),
+                        revenue_per_student_hour=suggest_revenue_per_student_hour(cls) or None,
+                    )
+            return _redirect(scenario.id)
+
+        scenario_id = (request.POST.get("scenario_id") or "").strip()
+        scenario = get_object_or_404(CostScenario, id=scenario_id)
+
+        if action == "delete_scenario":
+            scenario.delete()
+            return _redirect()
+
+        if action == "save_scenario":
+            scenario.name = (request.POST.get("name") or scenario.name).strip()
+            scenario.allocation_method = (
+                request.POST.get("allocation_method") or scenario.allocation_method
+            )
+            scenario.default_teaching_cost_per_hour = _money(request.POST.get("default_cost_hr"))
+            scenario.default_revenue_per_student_hour = _money(request.POST.get("default_rev_hr"))
+            scenario.default_hours_per_session = _money(request.POST.get("default_hours"))
+            scenario.default_sessions_per_month = _money(request.POST.get("default_sessions"))
+            scenario.note = (request.POST.get("note") or "").strip()
+            scenario.save()
+
+            # Fixed costs: replace wholesale, it is a short list and this keeps
+            # add/edit/delete in one round trip.
+            names = request.POST.getlist("fc_name")
+            amounts = request.POST.getlist("fc_amount")
+            scenario.fixed_costs.all().delete()
+            for i, (n, a) in enumerate(zip(names, amounts)):
+                n = (n or "").strip()
+                if not n:
+                    continue
+                CostScenarioFixedCost.objects.create(
+                    scenario=scenario, name=n, amount=_money(a), order=i
+                )
+
+            for ci in scenario.class_inputs.all():
+                pid = ci.id
+                ci.is_included = request.POST.get(f"inc_{pid}") == "yes"
+                ci.student_count = int(_money(request.POST.get(f"students_{pid}")))
+                ci.sessions_per_month = _money(request.POST.get(f"sessions_{pid}")) or None
+                ci.hours_per_session = _money(request.POST.get(f"hours_{pid}")) or None
+                ci.teaching_cost_per_hour = _money(request.POST.get(f"costhr_{pid}")) or None
+                ci.revenue_per_student_hour = _money(request.POST.get(f"revhr_{pid}")) or None
+                ci.other_variable_cost = _money(request.POST.get(f"othervar_{pid}"))
+                ci.save()
+            return _redirect(scenario.id)
+
+        if action == "refill_actuals":
+            start, end = month_bounds(scenario.period_month)
+            for ci in scenario.class_inputs.select_related("tutoring_class"):
+                cls = ci.tutoring_class
+                ci.student_count = suggest_student_count(cls, start, end)
+                ci.sessions_per_month = suggest_sessions_in_month(cls, start, end)
+                ci.save(update_fields=["student_count", "sessions_per_month"])
+            return _redirect(scenario.id)
+
+        return _redirect(scenario.id)
+
+    scenarios = list(CostScenario.objects.all())
+    selected_id = (request.GET.get("scenario") or "").strip()
+    scenario = None
+    if selected_id:
+        scenario = CostScenario.objects.filter(id=selected_id).first()
+    if scenario is None and scenarios:
+        scenario = scenarios[0]
+
+    analysis = compute_scenario(scenario) if scenario else None
+    today = timezone.localdate()
+    default_month = (today.replace(day=1) - timedelta(days=1)).replace(day=1)
+
+    return render(request, "core/revenue_analysis.html", {
+        "scenarios": scenarios,
+        "scenario": scenario,
+        "analysis": analysis,
+        "allocation_choices": CostScenario.Allocation.choices,
+        "default_month": default_month.strftime("%Y-%m"),
     })

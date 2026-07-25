@@ -1,0 +1,515 @@
+{% extends "core/base_portal.html" %}
+{% load extras %}
+{% block title %}วิเคราะห์รายได้ ต้นทุน กำไร{% endblock %}
+
+{% block head %}
+<style>
+  .ra-wrap{display:grid;gap:16px;max-width:1500px;margin:0 auto}
+  .ra-card{background:#fff;border:1px solid #e2e8f0;border-radius:20px;padding:16px;box-shadow:0 4px 14px rgba(15,23,42,.05)}
+  .ra-hero{background:linear-gradient(135deg,#0f172a,#1e40af);color:#fff;border-radius:24px;padding:20px;
+    display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;align-items:flex-end}
+  .ra-hero .title{font-size:25px;font-weight:1000}
+  .ra-hero .sub{font-size:13px;opacity:.85;margin-top:4px;line-height:1.5;max-width:760px}
+  .sec-title{font-size:15px;font-weight:1000;color:#0f172a;margin-bottom:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .sec-title small{font-size:11px;font-weight:800;color:#64748b}
+  .btn{border:0;border-radius:12px;padding:10px 14px;font-weight:1000;font-size:13px;cursor:pointer;
+    text-decoration:none;display:inline-flex;align-items:center;gap:6px;font-family:inherit}
+  .btn-primary{background:#2563eb;color:#fff}.btn-dark{background:#0f172a;color:#fff}
+  .btn-soft{background:#f1f5f9;color:#0f172a;border:1px solid #e2e8f0}
+  .btn-danger{background:#fee2e2;color:#991b1b;border:1px solid #fecaca}
+  .toolbar{display:flex;gap:9px;flex-wrap:wrap;align-items:end}
+  .field{display:grid;gap:4px}
+  .field label{font-size:10px;font-weight:1000;color:#64748b;text-transform:uppercase;letter-spacing:.05em}
+  .field input,.field select,.field textarea{border:1px solid #cbd5e1;border-radius:10px;padding:9px 10px;
+    font-family:inherit;font-size:13px;font-weight:700;min-width:130px}
+  .field input[type=number]{text-align:right}
+
+  /* KPI strip */
+  .kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+  .kpi{border-radius:16px;padding:12px 13px;border:1px solid #e2e8f0;background:#f8fafc}
+  .kpi .k{font-size:10px;font-weight:1000;color:#64748b;text-transform:uppercase;letter-spacing:.05em}
+  .kpi .v{font-size:23px;font-weight:1000;color:#0f172a;line-height:1.15;margin-top:3px}
+  .kpi .d{font-size:11px;font-weight:800;color:#64748b;margin-top:2px;line-height:1.35}
+  .kpi.good{background:#ecfdf5;border-color:#a7f3d0}.kpi.good .v{color:#047857}
+  .kpi.bad{background:#fef2f2;border-color:#fecaca}.kpi.bad .v{color:#b91c1c}
+  .kpi.warn{background:#fffbeb;border-color:#fde68a}.kpi.warn .v{color:#b45309}
+
+  /* Waterfall */
+  .wf{display:grid;gap:8px}
+  .wf-row{display:grid;grid-template-columns:230px 1fr 130px;gap:10px;align-items:center}
+  .wf-label{font-size:12px;font-weight:1000;color:#334155}
+  .wf-track{background:#f1f5f9;border-radius:8px;height:26px;overflow:hidden;position:relative}
+  .wf-bar{height:100%;border-radius:8px;transition:width .3s}
+  .wf-bar.rev{background:linear-gradient(90deg,#3b82f6,#60a5fa)}
+  .wf-bar.var{background:linear-gradient(90deg,#f59e0b,#fbbf24)}
+  .wf-bar.contrib{background:linear-gradient(90deg,#8b5cf6,#a78bfa)}
+  .wf-bar.fixed{background:linear-gradient(90deg,#64748b,#94a3b8)}
+  .wf-bar.profit{background:linear-gradient(90deg,#059669,#34d399)}
+  .wf-bar.loss{background:linear-gradient(90deg,#dc2626,#f87171)}
+  .wf-val{text-align:right;font-size:13px;font-weight:1000;color:#0f172a;font-variant-numeric:tabular-nums}
+
+  /* Class comparison bars */
+  .cmp{display:grid;gap:9px}
+  .cmp-row{display:grid;grid-template-columns:150px 1fr 120px;gap:10px;align-items:center}
+  .cmp-name{font-size:12px;font-weight:1000;color:#0f172a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .cmp-track{background:#f8fafc;border:1px solid #f1f5f9;border-radius:8px;height:22px;position:relative;overflow:hidden}
+  .cmp-bar{height:100%;border-radius:7px}
+  .cmp-bar.pos{background:linear-gradient(90deg,#059669,#6ee7b7)}
+  .cmp-bar.neg{background:linear-gradient(90deg,#dc2626,#fca5a5)}
+  .cmp-val{text-align:right;font-size:12px;font-weight:1000;font-variant-numeric:tabular-nums}
+  .cmp-val.pos{color:#047857}.cmp-val.neg{color:#b91c1c}
+
+  /* Utilization */
+  .util-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(215px,1fr));gap:10px}
+  .util{border:1px solid #e2e8f0;border-radius:14px;padding:11px;background:#fff}
+  .util-name{font-size:12px;font-weight:1000;color:#0f172a;margin-bottom:6px}
+  .util-track{background:#f1f5f9;border-radius:999px;height:11px;overflow:hidden;position:relative}
+  .util-fill{height:100%;border-radius:999px}
+  .util-fill.hi{background:linear-gradient(90deg,#059669,#34d399)}
+  .util-fill.mid{background:linear-gradient(90deg,#f59e0b,#fbbf24)}
+  .util-fill.lo{background:linear-gradient(90deg,#dc2626,#f87171)}
+  .util-meta{font-size:11px;font-weight:800;color:#64748b;margin-top:5px}
+
+  /* Tables */
+  .tbl-wrap{overflow-x:auto;border:1px solid #e2e8f0;border-radius:14px}
+  table.ra{width:100%;border-collapse:collapse;font-size:12.5px;min-width:1050px}
+  table.ra th{background:#f8fafc;color:#475569;font-size:10px;text-transform:uppercase;letter-spacing:.05em;
+    padding:9px 8px;text-align:right;font-weight:1000;border-bottom:2px solid #e2e8f0;white-space:nowrap}
+  table.ra th:first-child{text-align:left}
+  table.ra td{padding:9px 8px;border-bottom:1px solid #f1f5f9;text-align:right;font-weight:800;
+    font-variant-numeric:tabular-nums;white-space:nowrap}
+  table.ra td:first-child{text-align:left;font-weight:1000}
+  table.ra tr:hover td{background:#fafcff}
+  table.ra tfoot td{background:#f8fafc;font-weight:1000;border-top:2px solid #e2e8f0;border-bottom:0}
+  .num-pos{color:#047857}.num-neg{color:#b91c1c}
+  .chip{display:inline-block;border-radius:999px;padding:2px 8px;font-size:10px;font-weight:1000}
+  .chip.ok{background:#dcfce7;color:#166534}.chip.no{background:#fee2e2;color:#991b1b}
+  .chip.mid{background:#fef3c7;color:#92400e}
+
+  /* Input grid */
+  .cls-input{border:1px solid #e2e8f0;border-radius:14px;padding:11px;background:#fff;display:grid;gap:8px}
+  .cls-input.off{opacity:.5;background:#f8fafc}
+  .cls-head{display:flex;justify-content:space-between;gap:8px;align-items:center}
+  .cls-name{font-size:13px;font-weight:1000;color:#0f172a}
+  .cls-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:7px}
+  .cls-fields .field input{min-width:0;width:100%;box-sizing:border-box;font-size:12px;padding:7px 8px}
+  .cls-fields .field label{font-size:9px}
+  .input-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:10px}
+
+  /* Insights + flags */
+  .insight{border-radius:14px;padding:12px 13px;border-left:5px solid;margin-bottom:8px;background:#f8fafc}
+  .insight .it{font-size:13px;font-weight:1000;margin-bottom:3px}
+  .insight .ix{font-size:12.5px;font-weight:700;color:#334155;line-height:1.55}
+  .insight.danger{border-color:#dc2626;background:#fef2f2}.insight.danger .it{color:#991b1b}
+  .insight.warn{border-color:#f59e0b;background:#fffbeb}.insight.warn .it{color:#b45309}
+  .insight.success{border-color:#059669;background:#ecfdf5}.insight.success .it{color:#047857}
+  .insight.info{border-color:#2563eb;background:#eff6ff}.insight.info .it{color:#1d4ed8}
+  .flag{font-size:11px;font-weight:800;border-radius:8px;padding:5px 8px;margin-top:4px;line-height:1.45}
+  .flag.danger{background:#fef2f2;color:#991b1b}.flag.warn{background:#fffbeb;color:#b45309}
+  .flag.info{background:#eff6ff;color:#1d4ed8}
+
+  /* Sensitivity */
+  .sens{display:grid;gap:10px}
+  .sens-block{border:1px solid #e2e8f0;border-radius:14px;padding:11px}
+  .sens-name{font-size:12px;font-weight:1000;margin-bottom:7px}
+  .sens-row{display:flex;gap:6px;flex-wrap:wrap}
+  .sens-cell{border-radius:10px;padding:7px 9px;min-width:82px;text-align:center;border:1px solid #e2e8f0;background:#f8fafc}
+  .sens-cell.cur{border-color:#2563eb;border-width:2px;background:#eff6ff}
+  .sens-cell.over{opacity:.45}
+  .sens-cell .sd{font-size:10px;font-weight:1000;color:#64748b}
+  .sens-cell .sp{font-size:13px;font-weight:1000;font-variant-numeric:tabular-nums}
+  .empty{padding:32px;text-align:center;color:#64748b;font-weight:900;background:#f8fafc;
+    border-radius:16px;border:1px dashed #cbd5e1}
+  .hint{font-size:11.5px;color:#64748b;font-weight:800;line-height:1.5}
+  @media(max-width:820px){
+    .wf-row,.cmp-row{grid-template-columns:120px 1fr 96px}
+    .ra-hero .title{font-size:20px}
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="ra-wrap">
+
+  <section class="ra-hero">
+    <div>
+      <div class="title">📊 วิเคราะห์รายได้ ต้นทุน กำไร รายห้อง</div>
+      <div class="sub">
+        ปรับสมมติฐานได้ทุกตัว (ค่าสอน/ชม. · รายได้ต่อคน/ชม. · จำนวนครั้ง · จำนวนนักเรียน) ระบบดึงข้อมูลจริงมาตั้งต้นให้
+        แล้วคำนวณ contribution margin จุดคุ้มทุน และปันส่วน fixed cost ให้แต่ละห้องอัตโนมัติ
+      </div>
+    </div>
+    <div class="toolbar">
+      <a class="btn btn-soft" href="/pkanoon-admin-tool/">← Admin Tool</a>
+      <a class="btn btn-soft" href="/school-finance/">💰 รายรับรายจ่าย</a>
+    </div>
+  </section>
+
+  <!-- Scenario picker -->
+  <div class="ra-card">
+    <div class="sec-title">🗂️ Scenario</div>
+    <div class="toolbar">
+      <form method="get" class="toolbar">
+        <div class="field">
+          <label>เลือก Scenario ที่บันทึกไว้</label>
+          <select name="scenario" onchange="this.form.submit()">
+            {% for s in scenarios %}
+              <option value="{{ s.id }}" {% if scenario and scenario.id == s.id %}selected{% endif %}>
+                {{ s.name }} — {{ s.period_month|date:"m/Y" }}
+              </option>
+            {% empty %}
+              <option value="">— ยังไม่มี —</option>
+            {% endfor %}
+          </select>
+        </div>
+      </form>
+
+      <form method="post" class="toolbar">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="create_scenario">
+        <div class="field">
+          <label>สร้างใหม่จากเดือน</label>
+          <input type="month" name="period_month" value="{{ default_month }}" required>
+        </div>
+        <div class="field">
+          <label>ชื่อ (เว้นว่างได้)</label>
+          <input type="text" name="name" placeholder="เช่น วิเคราะห์ ต.ค. 2568">
+        </div>
+        <button class="btn btn-primary" type="submit">➕ สร้าง + ดึงข้อมูลจริง</button>
+      </form>
+
+      {% if scenario %}
+      <form method="post" onsubmit="return confirm('ลบ scenario นี้?');">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="delete_scenario">
+        <input type="hidden" name="scenario_id" value="{{ scenario.id }}">
+        <button class="btn btn-danger" type="submit">ลบ</button>
+      </form>
+      {% endif %}
+    </div>
+    <div class="hint" style="margin-top:8px;">
+      กด “สร้าง + ดึงข้อมูลจริง” แล้วระบบจะดึงให้อัตโนมัติ: จำนวนครั้งที่เรียนจริงจากการเช็คชื่อ · จำนวนนักเรียน active ·
+      ค่าสอนเฉลี่ยจริงจากใบจ่ายค่าสอน · fixed cost จากรายจ่ายเดือนนั้น (ไม่รวมค่าสอน เพราะนับเป็นต้นทุนผันแปรแล้ว)
+    </div>
+  </div>
+
+  {% if not scenario %}
+    <div class="empty">ยังไม่มี scenario — เลือกเดือนแล้วกด “สร้าง + ดึงข้อมูลจริง” ด้านบนเพื่อเริ่มครับ</div>
+  {% else %}
+
+  <form method="post">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="save_scenario">
+    <input type="hidden" name="scenario_id" value="{{ scenario.id }}">
+
+    <!-- Global assumptions -->
+    <div class="ra-card" style="margin-bottom:16px;">
+      <div class="sec-title">⚙️ สมมติฐานกลาง <small>ใช้กับทุกห้องที่ไม่ได้ตั้งค่าเฉพาะ</small></div>
+      <div class="toolbar">
+        <div class="field"><label>ชื่อ Scenario</label>
+          <input type="text" name="name" value="{{ scenario.name }}"></div>
+        <div class="field"><label>ค่าสอน บาท/ชม.</label>
+          <input type="number" step="0.01" min="0" name="default_cost_hr" value="{{ scenario.default_teaching_cost_per_hour|floatformat:2 }}"></div>
+        <div class="field"><label>รายได้ บาท/คน/ชม.</label>
+          <input type="number" step="0.01" min="0" name="default_rev_hr" value="{{ scenario.default_revenue_per_student_hour|floatformat:2 }}"></div>
+        <div class="field"><label>ชม./ครั้ง</label>
+          <input type="number" step="0.25" min="0" name="default_hours" value="{{ scenario.default_hours_per_session|floatformat:2 }}"></div>
+        <div class="field"><label>ครั้ง/เดือน</label>
+          <input type="number" step="0.5" min="0" name="default_sessions" value="{{ scenario.default_sessions_per_month|floatformat:2 }}"></div>
+        <div class="field"><label>ปันส่วน Fixed Cost</label>
+          <select name="allocation_method">
+            {% for val,lbl in allocation_choices %}
+              <option value="{{ val }}" {% if scenario.allocation_method == val %}selected{% endif %}>{{ lbl }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <div class="hint" style="margin-top:9px;">
+        <b>ค่าสอนคิดเป็นต้นทุนต่อครั้ง ไม่ใช่ต่อคน</b> — ครู 1 คนได้เงินเท่ากันไม่ว่าจะมีเด็ก 6 หรือ 12 คน
+        นั่นทำให้เด็กที่เพิ่มมาแต่ละคนเกือบทั้งหมดกลายเป็นกำไร และเป็นตัวแปรสำคัญที่สุดของธุรกิจนี้
+      </div>
+    </div>
+
+    <!-- Fixed costs -->
+    <div class="ra-card" style="margin-bottom:16px;">
+      <div class="sec-title">🏢 Fixed Cost รายเดือน <small>ค่าเช่า เงินเดือนธุรการ ค่าน้ำค่าไฟ ฯลฯ</small></div>
+      <div id="fcList" class="input-grid">
+        {% for fc in analysis.fixed_costs %}
+        <div class="toolbar fc-row">
+          <div class="field" style="flex:1;"><label>รายการ</label>
+            <input type="text" name="fc_name" value="{{ fc.name }}"></div>
+          <div class="field"><label>บาท/เดือน</label>
+            <input type="number" step="0.01" min="0" name="fc_amount" value="{{ fc.amount|floatformat:2 }}"></div>
+          <button type="button" class="btn btn-soft js-rm-fc">✕</button>
+        </div>
+        {% endfor %}
+      </div>
+      <div style="margin-top:9px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+        <button type="button" class="btn btn-soft" id="addFc">➕ เพิ่มรายการ</button>
+        <span class="hint">รวม Fixed Cost: <b>{{ analysis.totals.fixed_cost|floatformat:0 }}</b> บาท/เดือน
+          · ปันส่วนแบบ <b>{{ analysis.allocation_label }}</b></span>
+      </div>
+    </div>
+
+    <!-- Per-class inputs -->
+    <div class="ra-card" style="margin-bottom:16px;">
+      <div class="sec-title">🏫 ข้อมูลรายห้อง <small>เว้นว่าง = ใช้ค่ากลางด้านบน</small></div>
+      <div class="input-grid">
+        {% for ci in scenario.class_inputs.all %}
+        <div class="cls-input {% if not ci.is_included %}off{% endif %}">
+          <div class="cls-head">
+            <div class="cls-name">{{ ci.tutoring_class.name }}</div>
+            <label style="font-size:11px;font-weight:900;display:flex;gap:5px;align-items:center;cursor:pointer;">
+              <input type="checkbox" name="inc_{{ ci.id }}" value="yes" {% if ci.is_included %}checked{% endif %}> รวม
+            </label>
+          </div>
+          <div class="cls-fields">
+            <div class="field"><label>นักเรียน</label>
+              <input type="number" min="0" name="students_{{ ci.id }}" value="{{ ci.student_count }}"></div>
+            <div class="field"><label>ครั้ง/เดือน</label>
+              <input type="number" step="0.5" min="0" name="sessions_{{ ci.id }}" value="{{ ci.sessions_per_month|default_if_none:''|floatformat:2 }}"></div>
+            <div class="field"><label>ชม./ครั้ง</label>
+              <input type="number" step="0.25" min="0" name="hours_{{ ci.id }}" value="{{ ci.hours_per_session|default_if_none:''|floatformat:2 }}"></div>
+            <div class="field"><label>ค่าสอน/ชม.</label>
+              <input type="number" step="0.01" min="0" name="costhr_{{ ci.id }}" value="{{ ci.teaching_cost_per_hour|default_if_none:''|floatformat:2 }}"></div>
+            <div class="field"><label>รายได้/คน/ชม.</label>
+              <input type="number" step="0.01" min="0" name="revhr_{{ ci.id }}" value="{{ ci.revenue_per_student_hour|default_if_none:''|floatformat:2 }}"></div>
+            <div class="field"><label>ผันแปรอื่น</label>
+              <input type="number" step="0.01" min="0" name="othervar_{{ ci.id }}" value="{{ ci.other_variable_cost|floatformat:2 }}"></div>
+          </div>
+          <div class="hint">ที่นั่งทั้งหมด {{ ci.tutoring_class.total_seats }} · {{ ci.tutoring_class.time_slot|default:"ไม่ระบุรอบ" }}</div>
+        </div>
+        {% endfor %}
+      </div>
+      <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn btn-primary" type="submit">💾 บันทึกและคำนวณใหม่</button>
+      </div>
+    </div>
+  </form>
+
+  <form method="post" style="margin-bottom:16px;">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="refill_actuals">
+    <input type="hidden" name="scenario_id" value="{{ scenario.id }}">
+    <button class="btn btn-soft" type="submit">🔄 ดึงจำนวนครั้ง + จำนวนนักเรียนจากข้อมูลจริงอีกครั้ง</button>
+  </form>
+
+  <!-- ================= RESULTS ================= -->
+
+  <div class="ra-card">
+    <div class="sec-title">📈 ภาพรวมเดือน {{ scenario.period_month|date:"m/Y" }}</div>
+    <div class="kpi-grid">
+      <div class="kpi"><div class="k">รายได้รวม</div>
+        <div class="v">{{ analysis.totals.revenue|floatformat:0 }}</div><div class="d">บาท/เดือน</div></div>
+      <div class="kpi"><div class="k">Contribution Margin</div>
+        <div class="v">{{ analysis.totals.contribution|floatformat:0 }}</div>
+        <div class="d">{{ analysis.totals.contribution_ratio|floatformat:1 }}% ของรายได้</div></div>
+      <div class="kpi"><div class="k">Fixed Cost</div>
+        <div class="v">{{ analysis.totals.fixed_cost|floatformat:0 }}</div><div class="d">บาท/เดือน</div></div>
+      <div class="kpi {% if analysis.totals.net_profit >= 0 %}good{% else %}bad{% endif %}">
+        <div class="k">กำไรสุทธิ</div>
+        <div class="v">{{ analysis.totals.net_profit|floatformat:0 }}</div>
+        <div class="d">margin {{ analysis.totals.net_margin|floatformat:1 }}%</div></div>
+      <div class="kpi"><div class="k">จุดคุ้มทุน (รายได้)</div>
+        <div class="v">{{ analysis.totals.breakeven_revenue|floatformat:0 }}</div>
+        <div class="d">ห่างจากจุดคุ้มทุน {{ analysis.totals.margin_of_safety|floatformat:1 }}%</div></div>
+      <div class="kpi {% if analysis.totals.utilization < 60 %}warn{% endif %}">
+        <div class="k">ใช้ที่นั่ง</div>
+        <div class="v">{{ analysis.totals.utilization|floatformat:1 }}%</div>
+        <div class="d">{{ analysis.totals.students }} / {{ analysis.totals.seats }} ที่นั่ง</div></div>
+      <div class="kpi"><div class="k">กำไรต่อนักเรียน</div>
+        <div class="v">{{ analysis.totals.profit_per_student|floatformat:0 }}</div><div class="d">บาท/คน/เดือน</div></div>
+      <div class="kpi"><div class="k">ชั่วโมงสอนรวม</div>
+        <div class="v">{{ analysis.totals.teaching_hours|floatformat:0 }}</div>
+        <div class="d">{{ analysis.totals.class_count }} ห้อง</div></div>
+    </div>
+  </div>
+
+  {% if analysis.insights %}
+  <div class="ra-card">
+    <div class="sec-title">💡 สิ่งที่ตัวเลขกำลังบอก</div>
+    {% for ins in analysis.insights %}
+      <div class="insight {{ ins.level }}">
+        <div class="it">{{ ins.title }}</div>
+        <div class="ix">{{ ins.text }}</div>
+      </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% if analysis.waterfall %}
+  <div class="ra-card">
+    <div class="sec-title">💧 เงินหายไปไหน (Waterfall)</div>
+    <div class="wf">
+      {% for w in analysis.waterfall %}
+      <div class="wf-row">
+        <div class="wf-label">{{ w.label }}</div>
+        <div class="wf-track"><div class="wf-bar {{ w.kind }}" style="width:{{ w.pct }}%;"></div></div>
+        <div class="wf-val">{{ w.value|floatformat:0 }}</div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="ra-card">
+    <div class="sec-title">🏆 กำไรสุทธิรายห้อง <small>เรียงจากมากไปน้อย</small></div>
+    <div class="cmp">
+      {% for r in analysis.rows %}
+      <div class="cmp-row">
+        <div class="cmp-name">{{ r.name }}</div>
+        <div class="cmp-track">
+          <div class="cmp-bar {% if r.net_profit >= 0 %}pos{% else %}neg{% endif %}" style="width:{{ r.bar_profit_pct }}%;"></div>
+        </div>
+        <div class="cmp-val {% if r.net_profit >= 0 %}pos{% else %}neg{% endif %}">{{ r.net_profit|floatformat:0 }}</div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="ra-card">
+    <div class="sec-title">🪑 การใช้ที่นั่ง <small>เก้าอี้ว่าง = กำไรที่หายไปโดยที่ต้นทุนครูเท่าเดิม</small></div>
+    <div class="util-grid">
+      {% for r in analysis.rows %}
+      <div class="util">
+        <div class="util-name">{{ r.name }}</div>
+        <div class="util-track">
+          <div class="util-fill {% if r.utilization >= 80 %}hi{% elif r.utilization >= 55 %}mid{% else %}lo{% endif %}"
+               style="width:{% if r.utilization > 100 %}100{% else %}{{ r.utilization }}{% endif %}%;"></div>
+        </div>
+        <div class="util-meta">{{ r.students }} / {{ r.seats }} ที่นั่ง · {{ r.utilization|floatformat:1 }}%</div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="ra-card">
+    <div class="sec-title">📋 ตารางวิเคราะห์เต็ม</div>
+    <div class="tbl-wrap">
+      <table class="ra">
+        <thead>
+          <tr>
+            <th>ห้อง</th><th>นร.</th><th>ครั้ง</th><th>ชม.รวม</th>
+            <th>รายได้</th><th>ค่าสอน</th><th>ผันแปรรวม</th>
+            <th>Contribution</th><th>CM %</th>
+            <th>Fixed ปันส่วน</th><th>กำไรสุทธิ</th><th>Margin %</th>
+            <th>คุ้มทุนที่ (คน)</th><th>ใช้ที่นั่ง</th><th>รายได้/ที่นั่ง/ชม.</th><th>กำไร/ชม.สอน</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in analysis.rows %}
+          <tr>
+            <td>{{ r.name }}</td>
+            <td>{{ r.students }}</td>
+            <td>{{ r.sessions|floatformat:"-2" }}</td>
+            <td>{{ r.total_hours|floatformat:0 }}</td>
+            <td>{{ r.revenue|floatformat:0 }}</td>
+            <td>{{ r.teaching_cost|floatformat:0 }}</td>
+            <td>{{ r.variable_cost|floatformat:0 }}</td>
+            <td class="{% if r.contribution >= 0 %}num-pos{% else %}num-neg{% endif %}">{{ r.contribution|floatformat:0 }}</td>
+            <td>{{ r.contribution_ratio|floatformat:1 }}%</td>
+            <td>{{ r.allocated_fixed|floatformat:0 }}</td>
+            <td class="{% if r.net_profit >= 0 %}num-pos{% else %}num-neg{% endif %}">{{ r.net_profit|floatformat:0 }}</td>
+            <td>{{ r.net_margin|floatformat:1 }}%</td>
+            <td>
+              {{ r.breakeven_students|floatformat:1 }}
+              {% if r.students >= r.breakeven_students %}<span class="chip ok">ผ่าน</span>
+              {% else %}<span class="chip no">ยังไม่ถึง</span>{% endif %}
+            </td>
+            <td>
+              {% if r.utilization >= 80 %}<span class="chip ok">{{ r.utilization|floatformat:0 }}%</span>
+              {% elif r.utilization >= 55 %}<span class="chip mid">{{ r.utilization|floatformat:0 }}%</span>
+              {% else %}<span class="chip no">{{ r.utilization|floatformat:0 }}%</span>{% endif %}
+            </td>
+            <td>{{ r.revenue_per_seat_hour|floatformat:0 }}</td>
+            <td class="{% if r.profit_per_teaching_hour >= 0 %}num-pos{% else %}num-neg{% endif %}">{{ r.profit_per_teaching_hour|floatformat:0 }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+        <tfoot>
+          <tr>
+            <td>รวม</td>
+            <td>{{ analysis.totals.students }}</td><td></td>
+            <td>{{ analysis.totals.teaching_hours|floatformat:0 }}</td>
+            <td>{{ analysis.totals.revenue|floatformat:0 }}</td><td></td>
+            <td>{{ analysis.totals.variable_cost|floatformat:0 }}</td>
+            <td>{{ analysis.totals.contribution|floatformat:0 }}</td>
+            <td>{{ analysis.totals.contribution_ratio|floatformat:1 }}%</td>
+            <td>{{ analysis.totals.fixed_cost|floatformat:0 }}</td>
+            <td class="{% if analysis.totals.net_profit >= 0 %}num-pos{% else %}num-neg{% endif %}">{{ analysis.totals.net_profit|floatformat:0 }}</td>
+            <td>{{ analysis.totals.net_margin|floatformat:1 }}%</td>
+            <td></td>
+            <td>{{ analysis.totals.utilization|floatformat:0 }}%</td>
+            <td></td><td></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>
+
+  <div class="ra-card">
+    <div class="sec-title">🎯 What-if: ถ้านักเรียนเพิ่ม/ลด กำไรเปลี่ยนเท่าไร
+      <small>ตัวเลขคือกำไรสุทธิของห้องนั้น · กรอบน้ำเงิน = สถานะปัจจุบัน · จาง = เกินจำนวนที่นั่ง</small></div>
+    <div class="sens">
+      {% for r in analysis.rows %}
+      <div class="sens-block">
+        <div class="sens-name">{{ r.name }}
+          <span class="hint">· เด็กเพิ่ม 1 คน = กำไรเพิ่ม {{ r.total_hours|floatformat:0 }} ชม. × {{ r.revenue_per_student_hour|floatformat:0 }} บาท</span>
+        </div>
+        <div class="sens-row">
+          {% for s in r.sensitivity %}
+          <div class="sens-cell {% if s.is_current %}cur{% endif %} {% if s.over_capacity %}over{% endif %}">
+            <div class="sd">{{ s.students }} คน</div>
+            <div class="sp {% if s.profit >= 0 %}num-pos{% else %}num-neg{% endif %}">{{ s.profit|floatformat:0 }}</div>
+          </div>
+          {% endfor %}
+        </div>
+        {% for f in r.flags %}<div class="flag {{ f.level }}">{{ f.text }}</div>{% endfor %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="ra-card">
+    <div class="sec-title">📖 อ่านตัวเลขยังไง</div>
+    <div class="hint" style="display:grid;gap:7px;">
+      <div><b>Contribution Margin</b> = รายได้ − ต้นทุนผันแปร คือเงินที่เหลือมาช่วยจ่าย fixed cost
+        ถ้าห้องไหนติดลบตรงนี้ แปลว่ายิ่งเปิดยิ่งเสีย ควรปิดหรือขึ้นราคา</div>
+      <div><b>จุดคุ้มทุน (คน)</b> = ต้องมีนักเรียนกี่คนห้องนั้นถึงจะไม่ขาดทุนหลังรับ fixed cost ที่ปันมาแล้ว</div>
+      <div><b>รายได้ต่อที่นั่งต่อชั่วโมง</b> เป็นตัวเทียบที่ยุติธรรมที่สุดระหว่างห้องที่ขนาดและชั่วโมงต่างกัน
+        (หลักเดียวกับที่โรงแรม/ร้านอาหารใช้วัดว่าโต๊ะไหนคุ้มเวลา) ใช้ตัดสินใจว่าควรขยายห้องไหน</div>
+      <div><b>กำไรต่อชั่วโมงสอน</b> ตอบคำถามว่า “สล็อตเวลานี้ควรเปิดต่อไหม” ได้ตรงที่สุด</div>
+      <div><b>ข้อควรระวังเรื่องการปิดห้อง</b> — fixed cost ไม่ได้หายไปตามห้องที่ปิด มันจะถูกปันไปให้ห้องที่เหลือแทน
+        ห้องที่ contribution เป็นบวกแต่กำไรสุทธิติดลบ ส่วนใหญ่ “ยังควรเปิดต่อ” เพราะช่วยแบ่งเบา fixed cost อยู่</div>
+      <div><b>วิธีปันส่วน fixed cost</b> เปลี่ยนได้ด้านบน — ตามจำนวนนักเรียนคือค่าเริ่มต้น
+        แต่ถ้าห้องกินเวลาห้องเรียนไม่เท่ากัน ลองเปลี่ยนเป็น “ตามชั่วโมงสอน” จะสะท้อนการใช้ทรัพยากรจริงกว่า</div>
+    </div>
+  </div>
+
+  {% endif %}
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+  var list = document.getElementById('fcList');
+  var addBtn = document.getElementById('addFc');
+  if(addBtn && list){
+    addBtn.addEventListener('click', function(){
+      var row = document.createElement('div');
+      row.className = 'toolbar fc-row';
+      row.innerHTML =
+        '<div class="field" style="flex:1;"><label>รายการ</label>'
+        + '<input type="text" name="fc_name" placeholder="เช่น ค่าเช่าอาคาร"></div>'
+        + '<div class="field"><label>บาท/เดือน</label>'
+        + '<input type="number" step="0.01" min="0" name="fc_amount" value="0"></div>'
+        + '<button type="button" class="btn btn-soft js-rm-fc">✕</button>';
+      list.appendChild(row);
+    });
+  }
+  document.addEventListener('click', function(e){
+    var rm = e.target.closest('.js-rm-fc');
+    if(rm){ e.preventDefault(); var r = rm.closest('.fc-row'); if(r) r.remove(); }
+  });
+});
+</script>
+{% endblock %}

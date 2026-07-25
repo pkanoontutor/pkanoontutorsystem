@@ -2315,3 +2315,129 @@ class StarQuizAnswer(models.Model):
 
     def __str__(self) -> str:
         return f"{self.attempt_id} - Q{self.question_id}"
+
+
+# =========================================================
+# Revenue & Cost Analysis (วิเคราะห์รายได้ ต้นทุน กำไร รายห้อง)
+# =========================================================
+class CostScenario(models.Model):
+    """A saved what-if model for one month.
+
+    Every number here is an *assumption* the user can override. Actuals are
+    pulled from Attendance/Enrollment/SchoolExpense only to pre-fill the form,
+    so a scenario stays reproducible even after the underlying data changes.
+    """
+
+    class Allocation(models.TextChoices):
+        STUDENTS = "students", "ตามจำนวนนักเรียน (แนะนำ)"
+        HOURS = "hours", "ตามชั่วโมงสอน"
+        REVENUE = "revenue", "ตามสัดส่วนรายได้"
+        EQUAL = "equal", "หารเท่ากันทุกห้อง"
+
+    name = models.CharField("ชื่อ Scenario", max_length=150)
+    period_month = models.DateField(
+        "เดือนที่วิเคราะห์",
+        help_text="ใช้แค่เดือน/ปี (วันที่จะถูกปรับเป็นวันที่ 1 อัตโนมัติ)",
+    )
+    allocation_method = models.CharField(
+        "วิธีปันส่วน Fixed Cost",
+        max_length=20,
+        choices=Allocation.choices,
+        default=Allocation.STUDENTS,
+    )
+    default_teaching_cost_per_hour = models.DecimalField(
+        "ค่าสอนต่อชั่วโมง (ค่าเริ่มต้น)", max_digits=10, decimal_places=2, default=Decimal("300")
+    )
+    default_revenue_per_student_hour = models.DecimalField(
+        "รายได้ต่อคนต่อชั่วโมง (ค่าเริ่มต้น)", max_digits=10, decimal_places=2, default=Decimal("150")
+    )
+    default_hours_per_session = models.DecimalField(
+        "ชั่วโมงต่อครั้ง (ค่าเริ่มต้น)", max_digits=5, decimal_places=2, default=Decimal("4")
+    )
+    default_sessions_per_month = models.DecimalField(
+        "จำนวนครั้งต่อเดือน (ค่าเริ่มต้น)", max_digits=5, decimal_places=2, default=Decimal("4"),
+        help_text="ปกติ 1 สัปดาห์เรียน 1 ครั้ง",
+    )
+    note = models.TextField("บันทึก", blank=True)
+    created_at = models.DateTimeField("สร้างเมื่อ", default=timezone.now)
+    updated_at = models.DateTimeField("อัปเดตล่าสุด", auto_now=True)
+
+    class Meta:
+        verbose_name = "Cost Scenario"
+        verbose_name_plural = "Cost Scenarios"
+        ordering = ("-period_month", "-updated_at")
+
+    def save(self, *args, **kwargs):
+        if self.period_month:
+            self.period_month = self.period_month.replace(day=1)
+        super().save(*args, **kwargs)
+
+    def __str__(self) -> str:
+        return f"{self.name} ({self.period_month:%m/%Y})"
+
+    @property
+    def total_fixed_cost(self) -> Decimal:
+        return sum((f.amount for f in self.fixed_costs.all()), Decimal("0"))
+
+
+class CostScenarioFixedCost(models.Model):
+    """One monthly fixed-cost line item (rent, staff salary, utilities, ...)."""
+
+    scenario = models.ForeignKey(
+        CostScenario, on_delete=models.CASCADE, related_name="fixed_costs", verbose_name="Scenario"
+    )
+    name = models.CharField("รายการ", max_length=150)
+    amount = models.DecimalField("จำนวนเงินต่อเดือน", max_digits=12, decimal_places=2, default=0)
+    note = models.CharField("หมายเหตุ", max_length=255, blank=True)
+    order = models.IntegerField("ลำดับ", default=0)
+
+    class Meta:
+        verbose_name = "Cost Scenario Fixed Cost"
+        verbose_name_plural = "Cost Scenario Fixed Costs"
+        ordering = ("order", "id")
+
+    def __str__(self) -> str:
+        return f"{self.name} = {self.amount:,.2f}"
+
+
+class CostScenarioClass(models.Model):
+    """Per-class inputs. Blank override fields fall back to the scenario default."""
+
+    scenario = models.ForeignKey(
+        CostScenario, on_delete=models.CASCADE, related_name="class_inputs", verbose_name="Scenario"
+    )
+    tutoring_class = models.ForeignKey(
+        TutoringClass, on_delete=models.CASCADE, related_name="cost_inputs", verbose_name="Class"
+    )
+    is_included = models.BooleanField("รวมในการวิเคราะห์", default=True)
+
+    student_count = models.PositiveIntegerField("จำนวนนักเรียน", default=0)
+    sessions_per_month = models.DecimalField(
+        "จำนวนครั้งในเดือนนี้", max_digits=5, decimal_places=2, null=True, blank=True
+    )
+    hours_per_session = models.DecimalField(
+        "ชั่วโมงต่อครั้ง", max_digits=5, decimal_places=2, null=True, blank=True
+    )
+    teaching_cost_per_hour = models.DecimalField(
+        "ค่าสอนต่อชั่วโมง", max_digits=10, decimal_places=2, null=True, blank=True
+    )
+    revenue_per_student_hour = models.DecimalField(
+        "รายได้ต่อคนต่อชั่วโมง", max_digits=10, decimal_places=2, null=True, blank=True
+    )
+    other_variable_cost = models.DecimalField(
+        "ต้นทุนผันแปรอื่นต่อเดือน", max_digits=12, decimal_places=2, default=0,
+        help_text="เช่น ค่าชีท ค่าขนม เฉพาะห้องนี้",
+    )
+
+    class Meta:
+        verbose_name = "Cost Scenario Class Input"
+        verbose_name_plural = "Cost Scenario Class Inputs"
+        ordering = ("tutoring_class__name",)
+        constraints = [
+            models.UniqueConstraint(
+                fields=["scenario", "tutoring_class"], name="uniq_cost_scenario_class"
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.scenario_id} - {self.tutoring_class_id}"

@@ -40,6 +40,7 @@ urlpatterns = [
     path("school-overview/", views.school_overview, name="school_overview"),
     path("school-finance/", views.school_finance, name="school_finance"),
     path("revenue-analysis/", views.revenue_analysis, name="revenue_analysis"),
+    path("revenue-analysis/weekly-data/", views.revenue_analysis_weekly_data, name="revenue_analysis_weekly_data"),
     path("school-finance/export/", views.school_finance_export, name="school_finance_export"),
     path("school-finance/delete-expense/<int:pk>/", views.school_expense_delete, name="school_expense_delete"),
     path("school-finance/delete-payroll/<int:pk>/", views.tutor_payroll_delete, name="tutor_payroll_delete"),

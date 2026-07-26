@@ -3311,6 +3311,49 @@ def online_course_video_manage(request: HttpRequest) -> HttpResponse:
     })
 
 
+_THAI_MONTHS_FULL = ["", "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
+                     "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"]
+
+
+def _portal_attendance_rows(rows) -> list:
+    """Attach Thai date labels. LANGUAGE_CODE is en-us app-wide, so Django's
+    date filter would render "July 2026" on a page parents read in Thai."""
+    out = []
+    for a in rows:
+        d = a.attendance_date
+        a.thai_month = f"{_THAI_MONTHS_FULL[d.month]} {d.year + 543}"
+        a.thai_day = f"{d.day} {_THAI_MONTHS_ABBR[d.month]} {d.year + 543}"
+        a.thai_weekday = f"วัน{_THAI_DAYS[d.weekday()]}"
+        out.append(a)
+    return out
+
+
+def _portal_active_enrollments(enrollments) -> list:
+    """Active courses with display fields the portal template needs.
+
+    remaining_hours and the ring percentage are computed here rather than with
+    `widthratio`, which rounds to whole numbers and would misreport a class
+    with a fractional hours_per_session (e.g. 3.5).
+    """
+    rows = []
+    for e in enrollments:
+        if not e.is_active:
+            continue
+        remaining = e.remaining_sessions or 0
+        total = e.sessions_total or 0
+        hours = Decimal(str(getattr(e.tutoring_class, "hours_per_session", 0) or 0))
+        e.remaining_hours_display = _q_hours(Decimal(remaining) * hours)
+        e.ring_percent = int(round(remaining / total * 100)) if total > 0 else 0
+        rows.append(e)
+    return rows
+
+
+def _q_hours(value: Decimal) -> str:
+    """Trim trailing zeros so 12.00 shows as 12 but 10.50 stays 10.5."""
+    v = value.normalize()
+    return f"{v:f}" if v == v.to_integral_value() else f"{v}"
+
+
 def student_portal_home(request: HttpRequest) -> HttpResponse:
     student = _get_portal_student(request)
 
@@ -3353,14 +3396,32 @@ def student_portal_home(request: HttpRequest) -> HttpResponse:
 
     remaining_hours = remaining_sessions * hours_per_session
 
+    # Headline counts for the attendance summary strip.
+    attendance_list = _portal_attendance_rows(attendance_rows)
+    present_count = sum(1 for a in attendance_list if a.status == Attendance.Status.PRESENT)
+    excused_count = sum(1 for a in attendance_list if a.status == Attendance.Status.EXCUSED)
+    no_show_count = sum(1 for a in attendance_list if a.status == Attendance.Status.NO_SHOW)
+
+    used_sessions = selected_enrollment.used_sessions() if selected_enrollment else 0
+    total_sessions = selected_enrollment.sessions_total if selected_enrollment else 0
+    used_percent = round(used_sessions / total_sessions * 100) if total_sessions else 0
+
     context = {
         "student": student,
         "enrollments": enrollments,
         "selected_enrollment": selected_enrollment,
-        "attendance_rows": attendance_rows,
+        "attendance_rows": attendance_list,
         "remaining_sessions": remaining_sessions,
         "hours_per_session": hours_per_session,
         "remaining_hours": remaining_hours,
+        "present_count": present_count,
+        "excused_count": excused_count,
+        "no_show_count": no_show_count,
+        "attended_total": len(attendance_list),
+        "used_sessions": used_sessions,
+        "total_sessions": total_sessions,
+        "used_percent": used_percent,
+        "active_enrollments": _portal_active_enrollments(enrollments),
     }
 
     return render(request, "core/student_portal_home.html", context)
@@ -7965,6 +8026,8 @@ def _schedule_tutor_day_summary(schedule) -> list:
     for c in schedule.cells.select_related("tutor", "tutor__payroll_tutor").filter(tutor__isnull=False):
         by_tutor.setdefault(c.tutor, set()).add(c.time_index)
 
+    from .models import Tutor
+
     existing = {}
     payroll_ids = [t.payroll_tutor_id for t in by_tutor if t.payroll_tutor_id]
     if payroll_ids:
@@ -7973,20 +8036,41 @@ def _schedule_tutor_day_summary(schedule) -> list:
             for e in TutorPayrollEntry.objects.filter(work_date=schedule.date, tutor_id__in=payroll_ids)
         }
 
+    # Tutors that are not linked to a payroll record yet get matched by name on
+    # send, so resolve their 325 default the same way here -- otherwise the
+    # popup would preview 300 and then save 325.
+    unlinked_names = [t.name.strip() for t in by_tutor if not t.payroll_tutor_id]
+    by_name = {}
+    if unlinked_names:
+        by_name = {
+            t.name.strip(): t
+            for t in Tutor.objects.filter(name__in=unlinked_names)
+        }
+
     rows = []
     for tutor, idxs in sorted(by_tutor.items(), key=lambda kv: kv[0].name):
         taught = len(idxs)
         lo, hi = min(idxs), max(idxs)
         gap = sum(1 for i in range(lo, hi + 1) if i not in idxs and i not in break_idx)
         gap_fee = _schedule_gap_fee(taught, gap)
-        rate = TutorPayrollEntry.calculate_hourly_rate(Decimal(taught))
         entry = existing.get(tutor.payroll_tutor_id) if tutor.payroll_tutor_id else None
+
+        payroll_tutor = tutor.payroll_tutor if tutor.payroll_tutor_id else by_name.get(tutor.name.strip())
+        # An entry saved earlier wins, so re-opening the popup shows what was
+        # actually sent rather than resetting to the tutor's default.
+        if entry is not None:
+            special = bool(entry.special_rate_325)
+        else:
+            special = bool(getattr(payroll_tutor, "default_special_rate_325", False))
+
+        rate = TutorPayrollEntry.calculate_hourly_rate(Decimal(taught), special)
         rows.append({
             "tutor": tutor,
             "taught_hours": taught,
             "gap_hours": gap,
             "gap_fee": gap_fee,
             "hourly_rate": rate,
+            "special_rate_325": special,
             "teaching_fee": rate * taught,
             "has_existing": bool(entry),
             "existing_total": (entry.total_amount if entry else None),
@@ -8027,6 +8111,9 @@ def teaching_schedule_send_payroll(request: HttpRequest, pk: int) -> HttpRespons
             )
             entry.teaching_hours = Decimal(row["taught_hours"])
             entry.idle_fee = Decimal(row["gap_fee"])
+            # Checkbox is pre-ticked from the tutor's default but can be changed
+            # per send, so trust what was submitted for the approved rows.
+            entry.special_rate_325 = request.POST.get(f"special_{tid}") == "yes"
             gap_note = f"ชม.แหว่ง {row['gap_hours']} ชม. (จากตารางสอน)" if row["gap_hours"] else ""
             if gap_note and gap_note not in (entry.note or ""):
                 entry.note = f"{entry.note}\n{gap_note}".strip()
@@ -8060,6 +8147,14 @@ def teaching_schedule_tutor_profiles(request: HttpRequest) -> HttpResponse:
                 changed.append("payroll_tutor")
             if changed:
                 t.save(update_fields=changed)
+
+            # The 325 default lives on the linked payroll Tutor, so it can only
+            # be set once a link exists.
+            if new_payroll_id:
+                wants_325 = request.POST.get(f"special325_{t.id}") == "yes"
+                Tutor.objects.filter(id=new_payroll_id).exclude(
+                    default_special_rate_325=wants_325
+                ).update(default_special_rate_325=wants_325)
         return redirect(f"/teaching-schedule/tutors/?date_from={date_from.isoformat()}&date_to={date_to.isoformat()}")
 
     # Auto-match by exact name for still-unlinked tutors.

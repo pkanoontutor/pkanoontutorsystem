@@ -5,173 +5,254 @@
   <a class="btn btn-dark" href="{% url 'core:student_portal_logout' %}">ออกจากระบบ</a>
 {% endblock %}
 
+{% block head %}
+<style>
+  /* School palette, taken from base_portal:
+     sky #93d3f8 · yellow #fdd35e · green #7eb850 · brand blue #00a3ff */
+  :root{
+    --sky:#93d3f8; --sky-deep:#00a3ff; --sky-ink:#075985;
+    --sun:#fdd35e; --sun-deep:#f0a500;
+    --leaf:#7eb850; --leaf-deep:#3f7d20;
+    --ink:#0f172a; --muted:#64748b; --line:#e6eef5;
+  }
+  .sp-wrap{display:grid;gap:15px;max-width:920px;margin:0 auto}
+  .sp-card{background:#fff;border-radius:22px;padding:17px;
+    box-shadow:0 6px 18px rgba(7,89,133,.10);border:1px solid rgba(255,255,255,.9)}
+  .sp-title{font-size:16px;font-weight:900;color:var(--ink);display:flex;align-items:center;
+    gap:8px;margin-bottom:12px}
+  .sp-title .ico{width:30px;height:30px;border-radius:10px;display:grid;place-items:center;font-size:16px}
+
+  /* ---------- student header ---------- */
+  .stu-hero{background:linear-gradient(135deg,var(--sky-deep),#4cc3ff 55%,var(--sky));
+    border-radius:24px;padding:18px;color:#fff;box-shadow:0 10px 26px rgba(0,163,255,.28);
+    display:flex;gap:15px;align-items:center;flex-wrap:wrap}
+  .stu-avatar{width:66px;height:66px;border-radius:20px;background:var(--sun);color:#7a4a00;
+    display:grid;place-items:center;font-size:27px;font-weight:900;flex:none;
+    box-shadow:0 5px 14px rgba(0,0,0,.18);overflow:hidden}
+  .stu-avatar img{width:100%;height:100%;object-fit:cover}
+  .stu-meta{flex:1;min-width:190px}
+  .stu-nick{font-size:24px;font-weight:900;line-height:1.15}
+  .stu-full{font-size:13px;font-weight:700;opacity:.92;margin-top:2px}
+  .stu-chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px}
+  .stu-chips span{background:rgba(255,255,255,.22);border:1px solid rgba(255,255,255,.4);
+    border-radius:999px;padding:4px 11px;font-size:12px;font-weight:800;backdrop-filter:blur(2px)}
+
+  /* ---------- course cards ---------- */
+  .course-grid{display:grid;gap:12px}
+  .course{border-radius:22px;padding:16px;border:2px solid;position:relative;overflow:hidden;
+    display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+  .course.ok  {background:#f2fbef;border-color:var(--leaf)}
+  .course.warn{background:#fffaeb;border-color:var(--sun-deep)}
+  .course.low {background:#fef3f2;border-color:#e11d48}
+  .course-code{position:absolute;top:11px;right:13px;background:var(--ink);color:#fff;
+    font-size:10.5px;font-weight:900;padding:3px 10px;border-radius:999px;letter-spacing:.3px}
+
+  /* Progress ring: reads faster than a bar and looks better on a phone. */
+  .ring{--pct:0;width:104px;height:104px;border-radius:50%;flex:none;display:grid;place-items:center;
+    background:conic-gradient(var(--ring-c) calc(var(--pct)*1%), #e9eef3 0);position:relative}
+  .ring::after{content:"";position:absolute;inset:9px;background:#fff;border-radius:50%}
+  .ring-in{position:relative;z-index:1;text-align:center;line-height:1}
+  .ring-num{font-size:31px;font-weight:900;color:var(--ink)}
+  .ring-lbl{font-size:10.5px;font-weight:900;color:var(--muted);margin-top:2px}
+  .course.ok  .ring{--ring-c:var(--leaf)}
+  .course.warn .ring{--ring-c:var(--sun-deep)}
+  .course.low .ring{--ring-c:#e11d48}
+
+  .course-body{flex:1;min-width:180px}
+  .course-name{font-size:17px;font-weight:900;color:var(--ink);line-height:1.25;padding-right:88px}
+  .course-slot{font-size:12px;font-weight:800;color:var(--muted);margin-top:3px}
+  .course-stats{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+  .cstat{background:rgba(255,255,255,.85);border:1px solid var(--line);border-radius:12px;
+    padding:6px 11px;text-align:center;min-width:78px}
+  .cstat b{display:block;font-size:17px;font-weight:900;color:var(--ink);line-height:1.1}
+  .cstat span{font-size:10px;font-weight:800;color:var(--muted)}
+  .course-alert{margin-top:10px;background:#fff1f2;border:1px solid #fecdd3;color:#9f1239;
+    border-radius:12px;padding:8px 11px;font-size:12.5px;font-weight:800;line-height:1.45}
+
+  /* ---------- attendance ---------- */
+  .att-summary{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:13px}
+  .asum{border-radius:15px;padding:11px 8px;text-align:center;border:2px solid}
+  .asum b{display:block;font-size:22px;font-weight:900;line-height:1.1}
+  .asum span{font-size:10.5px;font-weight:900;margin-top:2px;display:block}
+  .asum.all{background:#eff6ff;border-color:#bfdbfe;color:#1d4ed8}
+  .asum.p  {background:#f2fbef;border-color:#c3e6b4;color:var(--leaf-deep)}
+  .asum.e  {background:#fffaeb;border-color:#fde68a;color:#a16207}
+  .asum.n  {background:#fef3f2;border-color:#fecdd3;color:#be123c}
+
+  .att-select{display:flex;gap:9px;align-items:center;flex-wrap:wrap}
+  .att-select select{border:2px solid var(--line);border-radius:13px;padding:10px 12px;
+    font-weight:800;font-size:14px;flex:1;min-width:210px;background:#fff;color:var(--ink)}
+
+  /* Timeline reads more naturally than a table on a phone. */
+  .tl{position:relative;padding-left:26px}
+  .tl::before{content:"";position:absolute;left:8px;top:6px;bottom:6px;width:3px;
+    background:linear-gradient(180deg,var(--sky),var(--line));border-radius:3px}
+  .tl-month{font-size:11.5px;font-weight:900;color:var(--sky-ink);background:#e6f5ff;
+    border-radius:999px;padding:4px 12px;display:inline-block;margin:12px 0 8px -26px}
+  .tl-month:first-child{margin-top:0}
+  .tl-item{position:relative;background:#fff;border:1px solid var(--line);border-radius:15px;
+    padding:11px 13px;margin-bottom:8px;display:flex;justify-content:space-between;
+    gap:11px;align-items:center;flex-wrap:wrap}
+  .tl-item::before{content:"";position:absolute;left:-22px;top:50%;transform:translateY(-50%);
+    width:13px;height:13px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 2px currentColor}
+  .tl-item.p{color:var(--leaf)}
+  .tl-item.e{color:var(--sun-deep)}
+  .tl-item.n{color:#e11d48}
+  .tl-date{font-size:14px;font-weight:900;color:var(--ink)}
+  .tl-sub{font-size:11.5px;font-weight:800;color:var(--muted);margin-top:1px}
+  .tl-badge{border-radius:999px;padding:5px 13px;font-size:12px;font-weight:900;white-space:nowrap}
+  .tl-item.p .tl-badge{background:#e7f6df;color:var(--leaf-deep)}
+  .tl-item.e .tl-badge{background:#fef3c7;color:#a16207}
+  .tl-item.n .tl-badge{background:#ffe4e6;color:#be123c}
+
+  .sp-empty{text-align:center;padding:28px 16px;color:var(--muted);font-weight:800;
+    background:#f8fbfe;border:2px dashed #cfe6f5;border-radius:16px}
+  .sp-note{font-size:11.5px;font-weight:700;color:var(--muted);line-height:1.5;margin-top:10px}
+
+  @media(max-width:560px){
+    .att-summary{grid-template-columns:repeat(2,1fr)}
+    .course{gap:12px}
+    .ring{width:88px;height:88px}
+    .ring-num{font-size:26px}
+    .course-name{padding-right:0;font-size:16px}
+    .course-code{position:static;display:inline-block;margin-bottom:7px}
+    .stu-nick{font-size:21px}
+  }
+</style>
+{% endblock %}
+
 {% block content %}
+<div class="sp-wrap">
 
-{# ============================= #}
-{# 👤 Student Info (Section แรก) #}
-{# ============================= #}
-<div class="card" style="margin-bottom:16px;">
-  <div style="font-weight:900;font-size:18px;margin-bottom:10px;">
-    ข้อมูลนักเรียน
-  </div>
-
-  <div style="display:grid;grid-template-columns:1fr;gap:6px;font-weight:800;">
-    <div>ชื่อเล่น : {{ student.nickname }}</div>
-    <div>ชื่อจริง นามสกุล : {{ student.full_name }}</div>
-    <div>ระดับชั้น : {{ student.grade_level }}</div>
-    <div>โรงเรียน : {{ student.school.name }}</div>
-    <div>รหัสนักเรียน : {{ student.student_code }}</div>
-  </div>
-</div>
-
-{# ============================= #}
-{# 🔥 Remaining Sessions (ทุกคอร์สที่ Active) #}
-{# ============================= #}
-
-{% for e in enrollments %}
-  {% if e.is_active %}
-
-    {% with remaining=e.remaining_sessions total=e.sessions_total %}
-      {% if remaining > 5 %}
-        <div style="background:#dcfce7;border:3px solid #166534;">
-      {% elif remaining >= 3 %}
-        <div style="background:#fef9c3;border:3px solid #854d0e;">
+  {# ---------------- student ---------------- #}
+  <div class="stu-hero">
+    <div class="stu-avatar">
+      {% if student.profile_image %}
+        <img src="{{ student.profile_image.url }}" alt="{{ student.nickname }}">
       {% else %}
-        <div style="background:#fee2e2;border:3px solid #991b1b;">
+        {{ student.nickname|slice:":1"|default:"?" }}
       {% endif %}
-
-      <div
-        style="
-          border-radius:22px;
-          padding:22px;
-          margin-bottom:16px;
-          text-align:center;
-          position:relative;
-        "
-      >
-
-        {# 🔖 รหัสคอร์ส (Enrollment.sale_run_no) #}
-        {% if e.sale_run_no %}
-          <div
-            style="
-              position:absolute;
-              top:12px;
-              left:14px;
-              background:#111827;
-              color:#ffffff;
-              font-size:12px;
-              font-weight:900;
-              padding:4px 10px;
-              border-radius:999px;
-              letter-spacing:.3px;
-            "
-          >
-            รหัสคอร์ส {{ e.sale_run_no }}
-          </div>
-        {% endif %}
-
-        <div style="font-size:18px;font-weight:900;margin-bottom:4px;">
-          {{ e.tutoring_class.name }}
-        </div>
-
-        <div style="font-size:14px;font-weight:800;opacity:.8;margin-bottom:8px;">
-          จำนวนครั้งคงเหลือ
-        </div>
-
-        <div style="font-size:52px;font-weight:900;line-height:1;">
-          {{ remaining }}
-        </div>
-
-        <div style="font-size:16px;font-weight:800;margin-bottom:8px;">
-          ครั้ง
-        </div>
-
-        {% if remaining <= 2 %}
-          <div style="color:#991b1b;font-weight:900;margin-bottom:8px;">
-            ⚠️ ใกล้ครบคอร์ส ทางโรงเรียนจะติดต่อผู้ปกครองเพื่อแจ้งรายละเอียดการต่อคอร์ส
-          </div>
-        {% endif %}
-
-        {# Progress Bar #}
-        {% if total > 0 %}
-          {% widthratio remaining total 100 as percent %}
-          <div style="margin-top:10px;">
-            <div style="background:#e5e7eb;border-radius:999px;height:14px;overflow:hidden;">
-              <div
-                style="
-                  height:14px;
-                  width:{{ percent }}%;
-                  background:
-                    {% if remaining > 5 %}
-                      #22c55e
-                    {% elif remaining >= 3 %}
-                      #f59e0b
-                    {% else %}
-                      #ef4444
-                    {% endif %};
-                "
-              ></div>
-            </div>
-            <div style="font-size:13px;font-weight:800;margin-top:4px;opacity:.85;">
-              เหลือ {{ remaining }} จาก {{ total }} ครั้ง
-            </div>
-          </div>
-        {% endif %}
-
+    </div>
+    <div class="stu-meta">
+      <div class="stu-nick">น้อง{{ student.nickname }}</div>
+      <div class="stu-full">{{ student.full_name }}</div>
+      <div class="stu-chips">
+        <span>📚 {{ student.grade_level }}</span>
+        {% if student.school %}<span>🏫 {{ student.school.name }}</span>{% endif %}
+        <span>🎫 {{ student.student_code }}</span>
       </div>
     </div>
-    {% endwith %}
-
-  {% endif %}
-{% endfor %}
-
-{# ============================= #}
-{# 📅 Attendance History (เลือกคอร์ส) #}
-{# ============================= #}
-<div class="card" style="margin-bottom:14px;">
-  <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center;">
-    <div style="font-weight:900;font-size:16px;">เลือกคอร์สเพื่อดูประวัติ</div>
-    <form method="get" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
-      <select
-        name="enrollment_id"
-        style="border:1px solid #e5e7eb;border-radius:10px;padding:10px 12px;font-weight:800;min-width:280px;"
-      >
-        {% for e in enrollments %}
-          <option value="{{ e.id }}" {% if selected_enrollment and e.id == selected_enrollment.id %}selected{% endif %}>
-            {{ e.tutoring_class.name }}
-          </option>
-        {% endfor %}
-      </select>
-      <button class="btn btn-blue" type="submit">ดู</button>
-    </form>
-  </div>
-</div>
-
-<div class="card">
-  <div style="font-weight:900;font-size:16px;margin-bottom:10px;">
-    ประวัติการเข้าเรียน
   </div>
 
-  <table>
-    <thead>
-      <tr>
-        <th>วันที่</th>
-        <th>สถานะ</th>
-        <th>หมายเหตุ</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for a in attendance_rows %}
-        <tr>
-          <td>{{ a.attendance_date|date:"d M Y" }}</td>
-          <td>{{ a.get_status_display }}</td>
-          <td>{% if a.deducted %}หัก 1 ครั้ง{% else %}ไม่หัก{% endif %}</td>
-        </tr>
+  {# ---------------- courses ---------------- #}
+  <div class="sp-card">
+    <div class="sp-title">
+      <span class="ico" style="background:#e6f5ff;">⏳</span> ชั่วโมงเรียนคงเหลือ
+    </div>
+
+    <div class="course-grid">
+      {% for e in active_enrollments %}
+        {% with remaining=e.remaining_sessions total=e.sessions_total %}
+        <div class="course {% if remaining > 5 %}ok{% elif remaining >= 3 %}warn{% else %}low{% endif %}">
+          {% if e.sale_run_no %}<div class="course-code">{{ e.sale_run_no }}</div>{% endif %}
+
+          <div class="ring" style="--pct:{{ e.ring_percent }};">
+            <div class="ring-in">
+              <div class="ring-num">{{ remaining }}</div>
+              <div class="ring-lbl">ครั้งเหลือ</div>
+            </div>
+          </div>
+
+          <div class="course-body">
+            <div class="course-name">{{ e.tutoring_class.name }}</div>
+            {% if e.tutoring_class.time_slot %}
+              <div class="course-slot">🕐 {{ e.tutoring_class.time_slot }}</div>
+            {% endif %}
+
+            <div class="course-stats">
+              <div class="cstat">
+                <b>{{ remaining }}</b><span>ครั้งเหลือ</span>
+              </div>
+              <div class="cstat">
+                <b>{{ e.remaining_hours_display }}</b>
+                <span>ชั่วโมงเหลือ</span>
+              </div>
+              <div class="cstat">
+                <b>{{ total }}</b><span>ครั้งทั้งหมด</span>
+              </div>
+            </div>
+
+            {% if remaining <= 2 %}
+              <div class="course-alert">
+                ⚠️ ใกล้ครบคอร์สแล้ว ทางโรงเรียนจะติดต่อผู้ปกครองเพื่อแจ้งรายละเอียดการต่อคอร์สค่ะ
+              </div>
+            {% endif %}
+          </div>
+        </div>
+        {% endwith %}
       {% empty %}
-        <tr><td colspan="3">ยังไม่มีข้อมูล</td></tr>
+        <div class="sp-empty">ยังไม่มีคอร์สที่กำลังเรียนอยู่</div>
       {% endfor %}
-    </tbody>
-  </table>
-</div>
+    </div>
+  </div>
 
+  {# ---------------- attendance ---------------- #}
+  <div class="sp-card">
+    <div class="sp-title">
+      <span class="ico" style="background:#f2fbef;">📅</span> ประวัติการมา ลา ขาด
+    </div>
+
+    {% if enrollments %}
+      <form method="get" class="att-select" style="margin-bottom:13px;">
+        <select name="enrollment_id" onchange="this.form.submit()">
+          {% for e in enrollments %}
+            <option value="{{ e.id }}" {% if selected_enrollment and e.id == selected_enrollment.id %}selected{% endif %}>
+              {{ e.tutoring_class.name }}{% if not e.is_active %} (จบแล้ว){% endif %}
+            </option>
+          {% endfor %}
+        </select>
+        <button class="btn btn-blue" type="submit">ดู</button>
+      </form>
+    {% endif %}
+
+    {% if attendance_rows %}
+      <div class="att-summary">
+        <div class="asum all"><b>{{ attended_total }}</b><span>ทั้งหมด</span></div>
+        <div class="asum p"><b>{{ present_count }}</b><span>มาเรียน</span></div>
+        <div class="asum e"><b>{{ excused_count }}</b><span>ลา</span></div>
+        <div class="asum n"><b>{{ no_show_count }}</b><span>ขาด</span></div>
+      </div>
+
+      <div class="tl">
+        {% regroup attendance_rows by thai_month as month_groups %}
+        {% for month in month_groups %}
+          <div class="tl-month">{{ month.grouper }}</div>
+          {% for a in month.list %}
+            <div class="tl-item {% if a.status == 'present' %}p{% elif a.status == 'excused' %}e{% else %}n{% endif %}">
+              <div>
+                <div class="tl-date">{{ a.thai_day }}</div>
+                <div class="tl-sub">
+                  {{ a.thai_weekday }}
+                  · {% if a.deducted %}หัก 1 ครั้ง{% else %}ไม่หักครั้ง{% endif %}
+                </div>
+              </div>
+              <div class="tl-badge">
+                {% if a.status == 'present' %}✅ มาเรียน
+                {% elif a.status == 'excused' %}📝 ลา
+                {% else %}❌ ขาด{% endif %}
+              </div>
+            </div>
+          {% endfor %}
+        {% endfor %}
+      </div>
+
+      <div class="sp-note">
+        * “ลา” จะไม่ถูกหักครั้งเรียน ส่วน “มาเรียน” และ “ขาด” จะหัก 1 ครั้งตามระเบียบของโรงเรียน
+      </div>
+    {% else %}
+      <div class="sp-empty">ยังไม่มีประวัติการเข้าเรียนของคอร์สนี้</div>
+    {% endif %}
+  </div>
+
+</div>
 {% endblock %}

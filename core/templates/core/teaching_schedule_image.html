@@ -178,12 +178,13 @@
             <th class="num">ชม.สอน</th>
             <th class="num">ชม.แหว่ง</th>
             <th class="num">ค่าแหว่ง</th>
+            <th class="num">เรทพิเศษ<br>325</th>
             <th class="num">เรท/ชม.</th>
           </tr>
         </thead>
         <tbody>
           {% for r in payroll_rows %}
-            <tr>
+            <tr data-hours="{{ r.taught_hours }}">
               <td><input type="checkbox" class="chk payrow" name="tutor_ids" value="{{ r.tutor.id }}" checked></td>
               <td>
                 <span style="font-weight:700;color:{{ r.tutor.color }};">{{ r.tutor.name }}</span>
@@ -192,11 +193,19 @@
               <td class="num">{{ r.taught_hours }}</td>
               <td class="num">{{ r.gap_hours }}</td>
               <td class="num">{{ r.gap_fee|intcomma }}</td>
-              <td class="num">{{ r.hourly_rate|floatformat:0 }}</td>
+              <td class="num">
+                <input type="checkbox" class="chk js-special" name="special_{{ r.tutor.id }}" value="yes"
+                       {% if r.special_rate_325 %}checked{% endif %}>
+              </td>
+              <td class="num js-rate">{{ r.hourly_rate|floatformat:0 }}</td>
             </tr>
           {% endfor %}
         </tbody>
       </table>
+      <p class="sub" style="margin-top:8px;">
+        เรทพิเศษ 325 บาท/ชม. จะมีผลเมื่อสอนตั้งแต่ 4 ชม.ขึ้นไป (ต่ำกว่านั้นใช้เรทปกติ 550/350 ตามชั่วโมง)
+        · ช่องนี้ติ๊กมาให้ตามค่าเริ่มต้นของติวเตอร์แต่ละคน แก้เฉพาะครั้งนี้ได้
+      </p>
       <div class="pay-actions">
         <button class="btn soft" type="button" onclick="closePay()">ยกเลิก</button>
         <button class="btn green" type="submit">✅ Approve และส่งที่เลือก</button>
@@ -209,6 +218,23 @@
     function openPay(){document.getElementById("payBg").classList.add("show");}
     function closePay(){document.getElementById("payBg").classList.remove("show");}
     function toggleAll(cb){document.querySelectorAll(".payrow").forEach(function(x){x.checked=cb.checked;});}
+
+    // Mirrors TutorPayrollEntry.calculate_hourly_rate so the previewed rate
+    // updates the moment the 325 box is ticked, before anything is submitted.
+    function rateFor(hours, special){
+      if(hours <= 0) return 0;
+      if(hours <= 1) return 550;
+      if(hours < 4) return 350;
+      return special ? 325 : 300;
+    }
+    document.querySelectorAll(".js-special").forEach(function(box){
+      box.addEventListener("change", function(){
+        var tr = box.closest("tr");
+        if(!tr) return;
+        var cell = tr.querySelector(".js-rate");
+        if(cell) cell.textContent = rateFor(parseFloat(tr.dataset.hours || "0"), box.checked);
+      });
+    });
     document.addEventListener("keydown",function(e){if(e.key==="Escape")closePay();});
     var bg=document.getElementById("payBg");
     if(bg){bg.addEventListener("click",function(e){if(e.target===bg)closePay();});}

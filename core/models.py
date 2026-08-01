@@ -648,6 +648,41 @@ class CoursePayment(models.Model):
         return self.student.display_name if self.student_id else "-"
 
 
+# -----------------------
+# Promotions: เพื่อนชวนเพื่อน (friend-refers-friend)
+# -----------------------
+class FriendReferral(models.Model):
+    """One successful referral: `referrer` brought in `referred_student`.
+
+    credit_amount is fixed at creation time (100 THB for the referrer's first
+    ever referral, 50 THB for every one after that) so the promo's payout rule
+    can change later without rewriting history.
+    """
+
+    referrer = models.ForeignKey(
+        Student, on_delete=models.PROTECT, related_name="referrals_made",
+        verbose_name="ผู้ชวน",
+    )
+    referred_student = models.ForeignKey(
+        Student, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="referred_by_entries", verbose_name="ผู้ถูกชวน (นักเรียนใหม่)",
+    )
+    receipt = models.ForeignKey(
+        CoursePayment, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="friend_referrals", verbose_name="ใบเสร็จของนักเรียนใหม่ที่บันทึกการชวนนี้",
+    )
+    credit_amount = models.DecimalField(
+        "มูลค่าเครดิตที่ผู้ชวนได้รับ", max_digits=10, decimal_places=2, default=0,
+    )
+    created_at = models.DateTimeField("วันที่ชวนสำเร็จ", default=timezone.now)
+
+    class Meta:
+        verbose_name = "Friend Referral"
+        verbose_name_plural = "Friend Referrals"
+        ordering = ("-created_at",)
+
+    def __str__(self) -> str:
+        return f"{self.referrer} ชวน {self.referred_student or '-'} (+{self.credit_amount:.0f}฿)"
 
 
 # -----------------------
@@ -754,6 +789,11 @@ class CourseRenewalNotice(models.Model):
         default="ผู้ปกครองสามารถขอชะลอจ่าย เลื่อนจ่ายเป็นสิ้นเดือนได้โดยนักเรียนไม่ต้องเว้นวรรคการเรียนครับ ติดต่อแจ้งพี่ขนุนทาง Line @ ครับ",
     )
 
+    referral_credit_used = models.DecimalField(
+        "ใช้เครดิตชวนเพื่อนเป็นส่วนลด", max_digits=10, decimal_places=2, default=0,
+        help_text="หักออกจากราคาสุทธิของทุกแพ็กเกจ/ยอดคงเหลือในใบแจ้งนี้ ไม่เกินเครดิตคงเหลือของนักเรียนคนนี้",
+    )
+
     is_sent_to_parent = models.BooleanField("ส่งแจ้งผู้ปกครองแล้ว", default=False)
     sent_to_parent_at = models.DateTimeField("วันที่ส่งแจ้งผู้ปกครอง", null=True, blank=True)
     sent_to_parent_by = models.ForeignKey(
@@ -785,13 +825,14 @@ class CourseRenewalNotice(models.Model):
         return f"{self.get_notice_type_display()} | {self.student} | {self.tutoring_class} | {self.expected_course_end_date}"
 
     def save(self, *args, **kwargs):
-        self.package_10_net_price = max((self.package_10_full_price or 0) - (self.package_10_discount or 0), Decimal("0"))
-        self.package_20_net_price = max((self.package_20_full_price or 0) - (self.package_20_discount or 0), Decimal("0"))
-        self.package_30_net_price = max((self.package_30_full_price or 0) - (self.package_30_discount or 0), Decimal("0"))
+        credit = Decimal(str(self.referral_credit_used or 0))
+        self.package_10_net_price = max((self.package_10_full_price or 0) - (self.package_10_discount or 0) - credit, Decimal("0"))
+        self.package_20_net_price = max((self.package_20_full_price or 0) - (self.package_20_discount or 0) - credit, Decimal("0"))
+        self.package_30_net_price = max((self.package_30_full_price or 0) - (self.package_30_discount or 0) - credit, Decimal("0"))
 
         if self.notice_type == self.NoticeType.INSTALLMENT:
             self.installment_remaining_amount = max(
-                (self.installment_full_amount or 0) - (self.installment_paid_amount or 0),
+                (self.installment_full_amount or 0) - (self.installment_paid_amount or 0) - credit,
                 Decimal("0"),
             )
             if not self.installment_no:

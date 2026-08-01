@@ -1,0 +1,118 @@
+{% extends "core/base.html" %}
+{% load humanize %}
+{% block title %}เพื่อนชวนเพื่อน{% endblock %}
+
+{% block head %}
+<style>
+  .promo-wrap{max-width:1200px;margin:0 auto;display:grid;gap:14px}
+  .hero{background:linear-gradient(135deg,#0f172a,#db2777,#f59e0b);color:#fff;border-radius:26px;padding:22px;box-shadow:0 14px 30px rgba(15,23,42,.20);display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;align-items:flex-start}
+  .title{font-size:25px;font-weight:1000;letter-spacing:-.03em}.sub{color:#fce7f3;font-size:13px;margin-top:5px;line-height:1.6}
+  .actions{display:flex;gap:8px;flex-wrap:wrap}.btnx{border:0;border-radius:14px;padding:10px 14px;font-weight:1000;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:7px;cursor:pointer}
+  .soft{background:#fff;color:#0f172a;border:1px solid #e2e8f0}
+  .rule-box{background:#fdf2f8;border:1px solid #fbcfe8;border-radius:18px;padding:13px 15px;font-size:12.5px;font-weight:800;color:#9d174d;line-height:1.6}
+  .panel{background:#fff;border-radius:22px;padding:16px;box-shadow:0 6px 16px rgba(15,23,42,.08);border:1px solid rgba(255,255,255,.88)}
+  .panel-title{font-size:16px;font-weight:1000;color:#0f172a;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+
+  .ref-grid{display:grid;gap:10px}
+  .ref-card{border:1px solid #e2e8f0;border-radius:18px;padding:13px;background:#fff}
+  .ref-head{display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap}
+  .ref-name{font-size:16px;font-weight:1000;color:#0f172a}
+  .ref-full{font-size:12px;color:#64748b;font-weight:800}
+  .ref-badges{display:flex;gap:6px;flex-wrap:wrap}
+  .badge{border-radius:999px;padding:4px 10px;font-size:11.5px;font-weight:1000}
+  .badge.count{background:#fdf2f8;color:#9d174d}
+  .badge.earned{background:#f0fdf4;color:#166534}
+  .badge.used{background:#fff7ed;color:#9a3412}
+  .badge.available{background:#eff6ff;color:#1d4ed8}
+  .ref-items{margin-top:10px;display:grid;gap:5px}
+  .ref-item{display:flex;justify-content:space-between;gap:8px;font-size:12px;font-weight:800;color:#334155;
+    border-top:1px dashed #f1f5f9;padding-top:5px}
+  .ref-item:first-child{border-top:0;padding-top:0}
+  .ref-item .credit{color:#db2777;font-weight:1000}
+  .toggle-items{font-size:11.5px;font-weight:900;color:#db2777;cursor:pointer;margin-top:8px;display:inline-block}
+  .recent-table{width:100%;border-collapse:collapse;font-size:13px}
+  .recent-table th{background:#fdf2f8;color:#9d174d;font-size:11px;text-transform:uppercase;padding:9px;text-align:left}
+  .recent-table td{padding:9px;border-bottom:1px solid #f1f5f9}
+  .empty{padding:28px;text-align:center;color:#64748b;font-weight:900;background:#f8fafc;border-radius:16px;border:1px dashed #cbd5e1}
+  @media(max-width:640px){.recent-table{display:none}}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="promo-wrap">
+  <section class="hero">
+    <div>
+      <div class="title">👯 เพื่อนชวนเพื่อน</div>
+      <div class="sub">การชวนสำเร็จทั้งหมด {{ total_referrals }} ครั้ง</div>
+    </div>
+    <div class="actions">
+      <a class="btnx soft" href="{% url 'core:promotions_home' %}">← ระบบโปรโมชั่น</a>
+      <a class="btnx soft" href="/course-payments/new/">+ ออกใบเสร็จ (กรอกผู้แนะนำได้ที่นี่)</a>
+    </div>
+  </section>
+
+  <div class="rule-box">
+    <b>กติกา:</b> ตอนออกใบเสร็จให้นักเรียนใหม่ ถ้ากรอกชื่อผู้แนะนำ นักเรียนใหม่จะได้ส่วนลด 100 บาททันที
+    ส่วนผู้แนะนำจะได้เครดิตสะสมไว้ใช้เป็นส่วนลดตอนต่อคอร์สของตัวเอง —
+    <b>คนแรกที่ชวนได้ 100 บาท คนถัดไปได้คนละ 50 บาท</b> เครดิตนี้จะไปโชว์ให้เลือกใช้ตอนสร้างใบแจ้งต่อคอร์สของผู้แนะนำ
+    เลือกได้ว่าจะใช้เต็มจำนวนหรือใช้บางส่วน
+  </div>
+
+  <section class="panel">
+    <div class="panel-title">🏆 ผู้ชวนทั้งหมด <small style="font-weight:800;color:#64748b;">เรียงตามจำนวนที่ชวนมากที่สุด</small></div>
+    {% if rows %}
+      <div class="ref-grid">
+        {% for r in rows %}
+          <div class="ref-card">
+            <div class="ref-head">
+              <div>
+                <div class="ref-name">{{ r.referrer.nickname|default:r.referrer.full_name }}</div>
+                <div class="ref-full">{{ r.referrer.full_name }} · ชวนล่าสุด {{ r.last_referral_at|date:"d/m/Y" }}</div>
+              </div>
+              <div class="ref-badges">
+                <span class="badge count">ชวนมาแล้ว {{ r.count }} คน</span>
+                <span class="badge earned">ได้รับ {{ r.earned|floatformat:0|intcomma }} ฿</span>
+                <span class="badge used">ใช้ไปแล้ว {{ r.used|floatformat:0|intcomma }} ฿</span>
+                <span class="badge available">คงเหลือ {{ r.available|floatformat:0|intcomma }} ฿</span>
+              </div>
+            </div>
+            <div class="ref-items">
+              {% for item in r.items %}
+                <div class="ref-item">
+                  <span>{{ item.created_at|date:"d/m/Y" }} · ชวน {{ item.referred_student.nickname|default:item.referred_student.full_name|default:"-" }}</span>
+                  <span class="credit">+{{ item.credit_amount|floatformat:0 }} ฿</span>
+                </div>
+              {% endfor %}
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="empty">ยังไม่มีการชวนเพื่อนเข้ามาในระบบ — กรอกชื่อผู้แนะนำได้ตอนออกใบเสร็จให้นักเรียนใหม่</div>
+    {% endif %}
+  </section>
+
+  <section class="panel">
+    <div class="panel-title">🕘 การชวนล่าสุด</div>
+    {% if recent %}
+      <div style="overflow-x:auto;">
+      <table class="recent-table">
+        <thead><tr><th>วันที่</th><th>ผู้ชวน</th><th>นักเรียนใหม่ที่แนะนำ</th><th>เครดิตที่ได้</th></tr></thead>
+        <tbody>
+          {% for item in recent %}
+            <tr>
+              <td>{{ item.created_at|date:"d/m/Y H:i" }}</td>
+              <td>{{ item.referrer.nickname|default:item.referrer.full_name }}</td>
+              <td>{{ item.referred_student.nickname|default:item.referred_student.full_name|default:"-" }}</td>
+              <td><b style="color:#db2777;">+{{ item.credit_amount|floatformat:0 }} ฿</b></td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      </div>
+    {% else %}
+      <div class="empty">ยังไม่มีข้อมูล</div>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

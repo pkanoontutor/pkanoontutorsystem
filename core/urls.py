@@ -80,6 +80,10 @@ urlpatterns = [
     path("course-renewal-notices/<int:pk>/mark-sent/", views.course_renewal_notice_mark_sent, name="course_renewal_notice_mark_sent"),
     path("course-renewal-notices/<int:pk>/unmark-sent/", views.course_renewal_notice_unmark_sent, name="course_renewal_notice_unmark_sent"),
 
+    # Promotions
+    path("promotions/", views.promotions_home, name="promotions_home"),
+    path("promotions/friend-referral/", views.promotions_friend_referral, name="promotions_friend_referral"),
+
     # Course payments / receipts
     path("course-payments/", views.course_payment_list, name="course_payment_list"),
     path("course-payments/new/", views.course_payment_create, name="course_payment_create"),

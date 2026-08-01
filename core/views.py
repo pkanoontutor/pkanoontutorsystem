@@ -4492,12 +4492,100 @@ def _installment_amounts_for_enrollment(enrollment: Enrollment) -> dict:
     }
 
 
+def _referral_credit_earned(student: Student) -> Decimal:
+    from .models import FriendReferral
+    total = FriendReferral.objects.filter(referrer=student).aggregate(t=Sum("credit_amount")).get("t")
+    return Decimal(str(total or 0))
+
+
+def _referral_credit_used_elsewhere(student: Student, exclude_notice_id=None) -> Decimal:
+    """Credit already spent on other renewal notices for this student."""
+    qs = CourseRenewalNotice.objects.filter(student=student)
+    if exclude_notice_id:
+        qs = qs.exclude(id=exclude_notice_id)
+    total = qs.aggregate(t=Sum("referral_credit_used")).get("t")
+    return Decimal(str(total or 0))
+
+
+def _referral_credit_available(student: Student, exclude_notice_id=None) -> Decimal:
+    """How much referral credit this student can still apply, optionally as
+    if `exclude_notice_id`'s own usage were freed up first (for editing)."""
+    earned = _referral_credit_earned(student)
+    used = _referral_credit_used_elsewhere(student, exclude_notice_id=exclude_notice_id)
+    return max(earned - used, Decimal("0"))
+
+
 def _admin_student_url(student: Student) -> str:
     return f"/adminlublub/core/student/{student.id}/change/" if student and student.id else "#"
 
 
 def _admin_enrollment_url(enrollment: Enrollment) -> str:
     return f"/adminlublub/core/enrollment/{enrollment.id}/change/" if enrollment and enrollment.id else "#"
+
+
+# =========================================================
+# ✅ Promotions module -- เพื่อนชวนเพื่อน
+# =========================================================
+@login_required
+def promotions_home(request: HttpRequest) -> HttpResponse:
+    """Landing page for the promotions module. One card per promo; today
+    only the friend-referral one exists, but this stays a listing page so
+    future promos slot in without a redesign."""
+    from .models import FriendReferral
+
+    total_referrals = FriendReferral.objects.count()
+    total_credit = FriendReferral.objects.aggregate(t=Sum("credit_amount")).get("t") or Decimal("0")
+    referrer_count = FriendReferral.objects.values("referrer_id").distinct().count()
+
+    return render(request, "core/promotions_home.html", {
+        "total_referrals": total_referrals,
+        "total_credit": total_credit,
+        "referrer_count": referrer_count,
+    })
+
+
+@login_required
+def promotions_friend_referral(request: HttpRequest) -> HttpResponse:
+    """Who has referred a friend, how many times, when, and how much credit
+    they have earned / used / have left to spend on their own renewal."""
+    from .models import FriendReferral
+
+    referrals = list(
+        FriendReferral.objects
+        .select_related("referrer", "referred_student", "receipt")
+        .order_by("referrer__nickname", "created_at")
+    )
+
+    by_referrer: dict[int, dict] = {}
+    for r in referrals:
+        bucket = by_referrer.setdefault(r.referrer_id, {
+            "referrer": r.referrer, "items": [], "earned": Decimal("0"),
+        })
+        bucket["items"].append(r)
+        bucket["earned"] += r.credit_amount
+
+    rows = []
+    for bucket in by_referrer.values():
+        used = _referral_credit_used_elsewhere(bucket["referrer"], exclude_notice_id=None)
+        earned = bucket["earned"]
+        rows.append({
+            "referrer": bucket["referrer"],
+            "count": len(bucket["items"]),
+            "earned": earned,
+            "used": used,
+            "available": max(earned - used, Decimal("0")),
+            "items": sorted(bucket["items"], key=lambda x: x.created_at, reverse=True),
+            "last_referral_at": max(x.created_at for x in bucket["items"]),
+        })
+    rows.sort(key=lambda r: (-r["count"], r["referrer"].nickname or ""))
+
+    recent = referrals[-30:][::-1]
+
+    return render(request, "core/promotions_friend_referral.html", {
+        "rows": rows,
+        "recent": recent,
+        "total_referrals": len(referrals),
+    })
 
 
 @login_required
@@ -4745,12 +4833,25 @@ def course_renewal_notice_detail(request: HttpRequest, pk: int) -> HttpResponse:
             notice.installment_sessions = notice.installment_sessions or 0
 
         notice.note_wording = (request.POST.get("note_wording") or "").strip() or notice.note_wording
+
+        # Clamp to what's actually available (recomputed as if this notice's
+        # own prior usage were freed up first, so re-saving the same amount
+        # doesn't count as "using it twice").
+        available_before_this = _referral_credit_available(notice.student, exclude_notice_id=notice.pk)
+        requested_credit = _decimal_from_post(request.POST.get("referral_credit_used"), Decimal("0"))
+        notice.referral_credit_used = max(min(requested_credit, available_before_this), Decimal("0"))
+
         notice.save()
         return redirect("core:course_renewal_notice_detail", pk=notice.pk)
 
     notice_kind = "renewal"
     if notice.notice_type == CourseRenewalNotice.NoticeType.INSTALLMENT:
         notice_kind = f"installment_{notice.installment_no or 2}"
+
+    referral_credit_available = _referral_credit_available(notice.student, exclude_notice_id=notice.pk)
+    # Including this notice's own already-applied amount, so the form shows
+    # "how much could I apply in total" rather than "how much is left over".
+    referral_credit_max = referral_credit_available + notice.referral_credit_used
 
     return render(request, "core/course_renewal_notice_detail.html", {
         "notice": notice,
@@ -4761,6 +4862,12 @@ def course_renewal_notice_detail(request: HttpRequest, pk: int) -> HttpResponse:
         "packages": _renewal_notice_packages(notice),
         "student_admin_url": _admin_student_url(notice.student),
         "enrollment_admin_url": _admin_enrollment_url(notice.enrollment),
+        "referral_credit_earned": _referral_credit_earned(notice.student),
+        "referral_credit_max": referral_credit_max,
+        "receipt_link_note": (
+            f"ใช้เครดิตชวนเพื่อน {notice.referral_credit_used:.0f} บาท "
+            f"จากใบแจ้งต่อคอร์ส เลขที่ {notice.id}"
+        ),
     })
 
 
@@ -5601,6 +5708,7 @@ _ADMIN_TOOL_DEFAULTS = [
     ("private", "c-teal",  "📚", "Learning Record", "ดูประวัติวิชาเรียนราย Class ว่าแต่ละวิชาเรียนไปแล้วกี่ครั้ง ล่าสุดเรียนวันไหน ใครสอน และถึงชีทหน้า/ข้อไหน", "/learning-record/"),
     ("private", "c-sage",  "🧾", "รับชำระเงิน / ใบเสร็จ", "ออกใบเสร็จ รับชำระค่าคอร์ส และสร้าง Enrollment ได้ในหน้าเดียว", "/course-payments/"),
     ("private", "c-clay",  "🔁", "ระบบสร้างใบแจ้งต่อคอร์ส", "ดูคอร์สที่ใกล้ครบ สร้างใบแจ้งต่อคอร์ส พร้อม QR และ Copy Image ส่งผู้ปกครอง", "/course-renewal-notices/"),
+    ("private", "c-rose",  "🎁", "ระบบโปรโมชั่น", "ดูโปรโมชั่นทั้งหมด เริ่มจากเพื่อนชวนเพื่อน ใครชวนใครบ้าง กี่คน ได้เครดิตเท่าไร", "/promotions/"),
     ("private", "c-teal",  "📦", "ระบบคลังชีทและส่งปรินท์ชีท", "สร้างชีท จัดการ stock สแกน QR ตัด/นับชีท สั่งปรินท์และตรวจรับชีทจากร้านปรินท์ ครบในหน้าเดียว", "/sheet-inventory/"),
     ("private", "c-sage",  "📤", "ระบบแจกชีท", "สแกน QR เพื่อแจกชีท ตัด stock ตอนกดบันทึก และดูประวัติ Sheet Allocation รายเด็ก/ราย class", "/sheet-allocation/"),
     ("private", "c-sage",  "💰", "รายรับรายจ่าย", "บันทึกค่าใช้จ่าย ค่าติวเตอร์ และ Export Excel", "/school-finance/"),
@@ -6205,6 +6313,14 @@ def course_payment_create(request: HttpRequest) -> HttpResponse:
                 package = "-"
                 sessions_granted = 0
 
+            # Friend-refers-friend promo: only offered when registering a
+            # brand-new student, never for an existing student's own receipt.
+            referrer_student = None
+            if student_mode == "new" and not is_other_receipt:
+                referrer_id = (post.get("referred_by_student_id") or "").strip()
+                if referrer_id:
+                    referrer_student = Student.objects.filter(id=referrer_id, is_active=True).first()
+
             if student_mode == "new":
                 nickname = (post.get("new_nickname") or "").strip()
                 full_name = (post.get("new_full_name") or "").strip()
@@ -6286,6 +6402,16 @@ def course_payment_create(request: HttpRequest) -> HttpResponse:
                     )
                     if not is_other_receipt:
                         _apply_payment_to_enrollment(payment, enrollment_action, existing_enrollment)
+                    if referrer_student is not None:
+                        from .models import FriendReferral
+                        prior_referrals = FriendReferral.objects.filter(referrer=referrer_student).count()
+                        credit = Decimal("100") if prior_referrals == 0 else Decimal("50")
+                        FriendReferral.objects.create(
+                            referrer=referrer_student,
+                            referred_student=student,
+                            receipt=payment,
+                            credit_amount=credit,
+                        )
                 return redirect("core:course_payment_detail", pk=payment.pk)
         except Exception as exc:
             errors.append(f"บันทึกไม่สำเร็จ: {exc}")

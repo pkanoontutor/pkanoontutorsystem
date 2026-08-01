@@ -1,0 +1,56 @@
+{% extends "core/base.html" %}
+{% block title %}ระบบโปรโมชั่น{% endblock %}
+
+{% block head %}
+<style>
+  .promo-wrap{max-width:1100px;margin:0 auto;display:grid;gap:14px}
+  .hero{background:linear-gradient(135deg,#0f172a,#db2777,#f59e0b);color:#fff;border-radius:26px;padding:24px;box-shadow:0 14px 30px rgba(15,23,42,.20);display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;align-items:flex-start}
+  .title{font-size:28px;font-weight:1000;letter-spacing:-.04em}.sub{color:#fce7f3;font-size:13px;margin-top:6px;line-height:1.6}
+  .actions{display:flex;gap:8px;flex-wrap:wrap}.btnx{border:0;border-radius:14px;padding:10px 14px;font-weight:1000;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:7px;cursor:pointer}
+  .soft{background:#fff;color:#0f172a;border:1px solid #e2e8f0}
+  .kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}
+  .kpi{background:#fff;border-radius:18px;padding:15px;border:1px solid #e2e8f0;box-shadow:0 4px 12px rgba(15,23,42,.06)}
+  .kpi .k{font-size:11px;color:#64748b;font-weight:1000;text-transform:uppercase}
+  .kpi .v{font-size:26px;font-weight:1000;margin-top:4px;color:#0f172a}
+  .promo-card{background:#fff;border-radius:22px;padding:18px;border:1px solid #e2e8f0;box-shadow:0 6px 16px rgba(15,23,42,.08);
+    display:flex;justify-content:space-between;gap:14px;align-items:center;flex-wrap:wrap;text-decoration:none;color:inherit}
+  .promo-card:hover{border-color:#f9a8d4;box-shadow:0 8px 22px rgba(219,39,119,.18)}
+  .promo-icon{width:54px;height:54px;border-radius:16px;background:#fdf2f8;display:grid;place-items:center;font-size:28px;flex:none}
+  .promo-name{font-size:17px;font-weight:1000;color:#0f172a}
+  .promo-desc{font-size:12.5px;color:#64748b;font-weight:800;margin-top:3px;line-height:1.5}
+  .promo-body{display:flex;gap:12px;align-items:center;flex:1;min-width:220px}
+  .promo-arrow{font-size:20px;color:#db2777;}
+  @media(max-width:640px){.hero{padding:18px}.title{font-size:22px}}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="promo-wrap">
+  <section class="hero">
+    <div>
+      <div class="title">🎁 ระบบโปรโมชั่น</div>
+      <div class="sub">รวมโปรโมชั่นทั้งหมดของโรงเรียนไว้ในที่เดียว เริ่มจากเพื่อนชวนเพื่อน</div>
+    </div>
+    <div class="actions">
+      <a class="btnx soft" href="/pkanoon-admin-tool/">← Admin Tool</a>
+    </div>
+  </section>
+
+  <div class="kpi-grid">
+    <div class="kpi"><div class="k">การชวนสำเร็จทั้งหมด</div><div class="v">{{ total_referrals }}</div></div>
+    <div class="kpi"><div class="k">ผู้ชวนทั้งหมด</div><div class="v">{{ referrer_count }}</div></div>
+    <div class="kpi"><div class="k">เครดิตที่แจกไปแล้ว</div><div class="v">{{ total_credit|floatformat:0 }} ฿</div></div>
+  </div>
+
+  <a class="promo-card" href="{% url 'core:promotions_friend_referral' %}">
+    <div class="promo-body">
+      <div class="promo-icon">👯</div>
+      <div>
+        <div class="promo-name">เพื่อนชวนเพื่อน</div>
+        <div class="promo-desc">นักเรียนใหม่ที่มีคนแนะนำได้ส่วนลด 100 บาททันที ส่วนคนชวนสะสมเครดิตไว้ใช้เป็นส่วนลดต่อคอร์สของตัวเอง — คนแรกได้ 100 บาท คนถัดไปได้ 50 บาท</div>
+      </div>
+    </div>
+    <div class="promo-arrow">→</div>
+  </a>
+</div>
+{% endblock %}

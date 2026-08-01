@@ -107,6 +107,16 @@
         <div class="field"><label>ระดับชั้น</label><input name="new_grade_level" id="newGradeLevel" placeholder="เช่น ป.6"></div>
         <div class="field"><label>โรงเรียน</label><input name="new_school_name" id="newSchoolName" placeholder="ชื่อโรงเรียน"></div>
         <div class="field"><label>เบอร์ผู้ปกครอง</label><input name="new_parent_phone" id="newParentPhone" placeholder="เบอร์ติดต่อ"></div>
+
+        <div class="field full" style="border-top:1px dashed #e2e8f0;padding-top:10px;margin-top:2px;">
+          <label>🎁 โปรโมชั่นเพื่อนชวนเพื่อน — ใครแนะนำมา (ถ้ามี)</label>
+          <input type="hidden" name="referred_by_student_id" id="referredByStudentId">
+          <input id="referredBySearch" list="referrerList" placeholder="พิมพ์ชื่อเล่นนักเรียนที่แนะนำมา แล้วเลือกจากรายการ" autocomplete="off" oninput="selectReferrerFromSearch()">
+          <datalist id="referrerList">
+            {% for s in students_lookup_json %}<option value="{{ s.label }}"></option>{% endfor %}
+          </datalist>
+          <div class="hint" id="referredByHint">กรอกถ้ามีคนแนะนำ นักเรียนใหม่จะได้ส่วนลด 100 บาท ปล่อยว่างไว้ถ้าไม่มี</div>
+        </div>
       </div>
     </section>
 
@@ -204,9 +214,23 @@ const PACKAGE_PRICE_DEFAULTS = {
   '5':  { new: {price:1995,  discount:0},    existing: {price:1945,  discount:0} },
   '6':  { new: {price:1995,  discount:0} },
   '10': { new: {price:3990,  discount:0},    existing: {price:3990,  discount:100} },
+  '12': { new: {price:3990,  discount:0},    existing: {price:0,     discount:0} },
   '20': { new: {price:7980,  discount:500},  existing: {price:7980,  discount:500} },
   '30': { new: {price:11970, discount:1000}, existing: {price:11970, discount:1000} },
 };
+
+// Extra discount that stacks on top of the package price, from two sources:
+//  - the friend-referral search box (100 THB, new students only)
+//  - a receipt created from a course-renewal notice's "ใช้เครดิตชวนเพื่อน"
+//    (fixed amount carried over via the prefill_discount query param)
+const PREFILL_EXTRA_DISCOUNT = Number(new URLSearchParams(location.search).get('prefill_discount') || 0);
+function extraDiscountTotal(){
+  const modeRadio = document.querySelector('input[name="student_mode"]:checked');
+  const mode = modeRadio ? modeRadio.value : 'existing';
+  const hasReferrer = mode === 'new' && !!document.getElementById('referredByStudentId').value;
+  return (hasReferrer ? 100 : 0) + PREFILL_EXTRA_DISCOUNT;
+}
+
 function applyPackagePriceDefault(){
   const hint = document.getElementById('packagePriceHint');
   if(isOtherReceipt()){ hint.textContent=''; return; }
@@ -215,18 +239,37 @@ function applyPackagePriceDefault(){
   const modeRadio = document.querySelector('input[name="student_mode"]:checked');
   const mode = modeRadio ? modeRadio.value : 'existing';
   const table = PACKAGE_PRICE_DEFAULTS[radio.value];
-  if(!table){ hint.textContent=''; return; } // 12 ครั้ง / กรอกเอง -> no standard price, leave as typed
+  const discountInput = document.getElementById('discountAmount');
+  const extra = extraDiscountTotal();
+
+  if(!table){
+    // "กรอกเอง" (custom) has no standard price -- leave whatever was typed,
+    // but still add/remove the extra discount using a tracked delta so we
+    // don't stomp on a manually entered number.
+    hint.textContent = '';
+    const prevExtra = Number(discountInput.dataset.extraDiscount || 0);
+    if(extra !== prevExtra){
+      const current = Number(discountInput.value || 0);
+      discountInput.value = Math.max(current - prevExtra + extra, 0);
+    }
+    discountInput.dataset.extraDiscount = extra;
+    updateSummary(true);
+    return;
+  }
+
   const entry = table[mode];
   if(!entry){
     document.getElementById('coursePrice').value = 0;
-    document.getElementById('discountAmount').value = 0;
+    discountInput.value = 0;
+    discountInput.dataset.extraDiscount = 0;
     hint.textContent = 'แพ็กนี้ไม่มีราคามาตรฐานสำหรับ' + (mode==='new' ? 'นักเรียนใหม่' : 'นักเรียนเดิม') + ' กรุณากรอกราคาเอง';
     updateSummary(true);
     return;
   }
   hint.textContent = '';
   document.getElementById('coursePrice').value = entry.price;
-  document.getElementById('discountAmount').value = entry.discount;
+  discountInput.value = entry.discount + extra;
+  discountInput.dataset.extraDiscount = extra;
   updateSummary(true);
 }
 
@@ -304,6 +347,20 @@ function fillFromAdmission(){
   document.getElementById('newSchoolName').value = a.school_name || '';
   document.getElementById('newParentPhone').value = a.parent_phone || '';
   setEnrollmentAction('new');
+}
+function selectReferrerFromSearch(){
+  const txt = document.getElementById('referredBySearch').value;
+  const hint = document.getElementById('referredByHint');
+  const s = exactFind(STUDENTS, txt);
+  document.getElementById('referredByStudentId').value = s ? s.id : '';
+  if(s){
+    hint.textContent = '✅ แนะนำโดย: ' + (s.nickname || s.full_name || '-') + ' — ส่วนลด 100 บาทถูกเพิ่มให้แล้ว';
+  }else if(txt){
+    hint.textContent = 'ไม่พบชื่อนี้ในระบบ พิมพ์ให้ตรงแล้วเลือกจากรายการที่ขึ้นมา';
+  }else{
+    hint.textContent = 'กรอกถ้ามีคนแนะนำ นักเรียนใหม่จะได้ส่วนลด 100 บาท ปล่อยว่างไว้ถ้าไม่มี';
+  }
+  applyPackagePriceDefault();
 }
 function renderEnrollmentsForStudent(studentId, autoSwitch){
   const box = document.getElementById('studentEnrollmentResults');
@@ -401,6 +458,36 @@ function updateSummary(forceAmount){
   document.getElementById('netSummary').textContent=net.toLocaleString('en-US',{maximumFractionDigits:2})+' บาท / '+sessions+' ครั้ง';
   document.getElementById('amountPaid').value=net.toFixed(2);
 }
-document.addEventListener('DOMContentLoaded',()=>{toggleStudentMode();applyPaymentTypeDefault();toggleReceiptKind();});
+function applyPrefillFromRenewalNotice(){
+  const params = new URLSearchParams(location.search);
+  const enrollmentId = params.get('prefill_enrollment_id');
+  const noteText = params.get('prefill_note');
+  if(enrollmentId){
+    const e = ENROLLMENTS.find(x => Number(x.id) === Number(enrollmentId));
+    if(e){
+      document.querySelector('input[name="student_mode"][value="existing"]').checked = true;
+      toggleStudentMode();
+      renderEnrollmentsForStudent(e.student_id, false);
+      selectEnrollmentCard(String(e.id));
+      // renderEnrollmentsForStudent(..., false) skips the auto-switch to
+      // "add_existing" (it's off so it doesn't jump to a different
+      // enrollment before we pick the specific one) -- set it explicitly now
+      // that the right card is selected, otherwise the form would submit as
+      // "create a new enrollment" and fail for lack of a Class.
+      setEnrollmentAction('add_existing');
+    }
+  }
+  if(noteText){
+    const noteField = document.querySelector('textarea[name="note"]');
+    if(noteField && !noteField.value){ noteField.value = noteText; }
+  }
+  // Re-apply so PREFILL_EXTRA_DISCOUNT (from prefill_discount) layers on top
+  // of whatever package price the enrollment/session-count selection set.
+  applyPackagePriceDefault();
+}
+document.addEventListener('DOMContentLoaded',()=>{
+  toggleStudentMode();applyPaymentTypeDefault();toggleReceiptKind();
+  applyPrefillFromRenewalNotice();
+});
 </script>
 {% endblock %}

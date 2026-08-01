@@ -87,6 +87,7 @@ urlpatterns = [
     # Course payments / receipts
     path("course-payments/", views.course_payment_list, name="course_payment_list"),
     path("course-payments/new/", views.course_payment_create, name="course_payment_create"),
+    path("course-payments/quick-pick/<int:pk>/dismiss/", views.course_payment_dismiss_quick_pick, name="course_payment_dismiss_quick_pick"),
     path("course-payments/<int:pk>/", views.course_payment_detail, name="course_payment_detail"),
     path("course-payments/<int:pk>/receipt-image/", views.course_payment_receipt_image, name="course_payment_receipt_image"),
     path("course-payments/<int:pk>/cancel/", views.course_payment_cancel, name="course_payment_cancel"),

@@ -147,17 +147,6 @@
         <button class="btn primary" type="submit">บันทึกข้อมูลใบแจ้ง</button>
       </form>
 
-      {% if notice.referral_credit_used > 0 %}
-        <a class="btn green" style="width:100%;"
-           href="/course-payments/new/?prefill_enrollment_id={{ enrollment.id }}&amp;prefill_discount={{ notice.referral_credit_used|floatformat:0 }}&amp;prefill_note={{ receipt_link_note|urlencode }}">
-          🧾 สร้างใบเสร็จจากใบแจ้งนี้ (ติดส่วนลดเครดิต {{ notice.referral_credit_used|floatformat:0 }} บาทให้อัตโนมัติ)
-        </a>
-      {% else %}
-        <a class="btn soft" style="width:100%;" href="/course-payments/new/?prefill_enrollment_id={{ enrollment.id }}">
-          🧾 สร้างใบเสร็จจากใบแจ้งนี้
-        </a>
-      {% endif %}
-
       <div class="btnrow">
         {% if notice.is_sent_to_parent %}
           <form method="post" action="{% url 'core:course_renewal_notice_unmark_sent' notice.id %}" style="flex:1;">
@@ -167,7 +156,7 @@
         {% else %}
           <form method="post" action="{% url 'core:course_renewal_notice_mark_sent' notice.id %}" style="flex:1;">
             {% csrf_token %}
-            <button class="btn green" type="submit" style="width:100%;">ส่งแจ้งผู้ปกครองแล้ว</button>
+            <button class="btn green" type="submit" style="width:100%;">ส่งแจ้งผู้ปกครองแล้ว และกลับหน้า list</button>
           </form>
         {% endif %}
       </div>

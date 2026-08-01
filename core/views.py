@@ -8092,13 +8092,25 @@ def _schedule_tutor_day_summary(schedule) -> list:
         else:
             special = bool(getattr(payroll_tutor, "default_special_rate_325", False))
 
-        rate = TutorPayrollEntry.calculate_hourly_rate(Decimal(taught), special)
+        default_rate = TutorPayrollEntry.calculate_hourly_rate(Decimal(taught), special)
+        default_travel_fee = TutorPayrollEntry.calculate_travel_fee(Decimal(taught))
+        # A previously-saved override wins over the default preview, same as
+        # special_rate_325 above -- reopening the popup shows what was sent.
+        rate_override = entry.hourly_rate_override if entry is not None else None
+        travel_override = entry.travel_fee_override if entry is not None else None
+        rate = rate_override if rate_override is not None else default_rate
+        travel_fee = travel_override if travel_override is not None else default_travel_fee
         rows.append({
             "tutor": tutor,
             "taught_hours": taught,
             "gap_hours": gap,
             "gap_fee": gap_fee,
             "hourly_rate": rate,
+            "default_hourly_rate": default_rate,
+            "hourly_rate_override": rate_override,
+            "travel_fee": travel_fee,
+            "default_travel_fee": default_travel_fee,
+            "travel_fee_override": travel_override,
             "special_rate_325": special,
             "teaching_fee": rate * taught,
             "has_existing": bool(entry),
@@ -8143,6 +8155,21 @@ def teaching_schedule_send_payroll(request: HttpRequest, pk: int) -> HttpRespons
             # Checkbox is pre-ticked from the tutor's default but can be changed
             # per send, so trust what was submitted for the approved rows.
             entry.special_rate_325 = request.POST.get(f"special_{tid}") == "yes"
+
+            # Rate / travel fee inputs are pre-filled with the computed default
+            # but editable; blank means "keep using the automatic default",
+            # a number means "override it" (persists until cleared again).
+            raw_rate = (request.POST.get(f"rate_override_{tid}") or "").strip()
+            raw_travel = (request.POST.get(f"travel_override_{tid}") or "").strip()
+            try:
+                entry.hourly_rate_override = Decimal(raw_rate) if raw_rate else None
+            except Exception:
+                entry.hourly_rate_override = None
+            try:
+                entry.travel_fee_override = Decimal(raw_travel) if raw_travel else None
+            except Exception:
+                entry.travel_fee_override = None
+
             gap_note = f"ชม.แหว่ง {row['gap_hours']} ชม. (จากตารางสอน)" if row["gap_hours"] else ""
             if gap_note and gap_note not in (entry.note or ""):
                 entry.note = f"{entry.note}\n{gap_note}".strip()

@@ -77,7 +77,7 @@
     /* ===== Payroll modal ===== */
     .pay-bg{position:fixed;inset:0;background:rgba(15,23,42,.5);display:none;align-items:center;justify-content:center;z-index:60;padding:14px;}
     .pay-bg.show{display:flex;}
-    .pay-modal{width:100%;max-width:640px;background:#fff;border-radius:20px;padding:20px;max-height:90vh;overflow:auto;box-shadow:0 20px 50px rgba(0,0,0,.3);}
+    .pay-modal{width:100%;max-width:760px;background:#fff;border-radius:20px;padding:20px;max-height:90vh;overflow:auto;box-shadow:0 20px 50px rgba(0,0,0,.3);}
     .pay-modal h3{margin:0 0 4px;font-size:19px;}
     .pay-modal .sub{color:#64748b;font-size:13px;margin:0 0 14px;}
     table.pay{width:100%;border-collapse:collapse;font-size:14px;}
@@ -170,6 +170,7 @@
       {% csrf_token %}
       <h3>💸 ส่งค่าติวเตอร์เข้าระบบรายจ่าย — {{ thai_date }}</h3>
       <p class="sub">เลือกติวเตอร์ที่ต้องการ approve แล้วกดส่ง ระบบจะบันทึกชม.สอน + ค่าชม.แหว่ง ลง Tutor Payroll ของวันนี้ (รายการที่มีอยู่แล้วจะถูกอัปเดตชม.สอนและค่าแหว่งทับ)</p>
+      <div style="overflow-x:auto;">
       <table class="pay">
         <thead>
           <tr>
@@ -179,7 +180,8 @@
             <th class="num">ชม.แหว่ง</th>
             <th class="num">ค่าแหว่ง</th>
             <th class="num">เรทพิเศษ<br>325</th>
-            <th class="num">เรท/ชม.</th>
+            <th class="num">เรท/ชม.<br><small style="font-weight:600;opacity:.7;">(แก้ไขได้)</small></th>
+            <th class="num">ค่าเดินทาง<br><small style="font-weight:600;opacity:.7;">(แก้ไขได้)</small></th>
           </tr>
         </thead>
         <tbody>
@@ -197,14 +199,28 @@
                 <input type="checkbox" class="chk js-special" name="special_{{ r.tutor.id }}" value="yes"
                        {% if r.special_rate_325 %}checked{% endif %}>
               </td>
-              <td class="num js-rate">{{ r.hourly_rate|floatformat:0 }}</td>
+              <td class="num">
+                <input type="number" step="0.01" min="0" class="js-rate-input" name="rate_override_{{ r.tutor.id }}"
+                       placeholder="{{ r.default_hourly_rate|floatformat:0 }}"
+                       {% if r.hourly_rate_override is not None %}value="{{ r.hourly_rate_override|floatformat:2 }}"{% endif %}
+                       style="width:74px;text-align:right;">
+              </td>
+              <td class="num">
+                <input type="number" step="0.01" min="0" class="js-travel-input" name="travel_override_{{ r.tutor.id }}"
+                       placeholder="{{ r.default_travel_fee|floatformat:0 }}"
+                       {% if r.travel_fee_override is not None %}value="{{ r.travel_fee_override|floatformat:2 }}"{% endif %}
+                       style="width:74px;text-align:right;">
+              </td>
             </tr>
           {% endfor %}
         </tbody>
       </table>
+      </div>
       <p class="sub" style="margin-top:8px;">
         เรทพิเศษ 325 บาท/ชม. จะมีผลเมื่อสอนตั้งแต่ 4 ชม.ขึ้นไป (ต่ำกว่านั้นใช้เรทปกติ 550/350 ตามชั่วโมง)
-        · ช่องนี้ติ๊กมาให้ตามค่าเริ่มต้นของติวเตอร์แต่ละคน แก้เฉพาะครั้งนี้ได้
+        · ช่องนี้ติ๊กมาให้ตามค่าเริ่มต้นของติวเตอร์แต่ละคน แก้เฉพาะครั้งนี้ได้<br>
+        <b>เรท/ชม.</b> และ <b>ค่าเดินทาง</b> ช่องว่าง = ใช้ค่าเริ่มต้นตามชั่วโมงสอน (เลขจาง ๆ ที่เห็นในช่อง) · กรอกตัวเลขเพื่อ override เฉพาะติวเตอร์คนนั้น
+        · ลบตัวเลขออกให้ว่างเพื่อกลับไปใช้ค่าเริ่มต้นอีกครั้ง
       </p>
       <div class="pay-actions">
         <button class="btn soft" type="button" onclick="closePay()">ยกเลิก</button>
@@ -227,12 +243,15 @@
       if(hours < 4) return 350;
       return special ? 325 : 300;
     }
+    // Keep the rate input's placeholder (the greyed-out default shown when the
+    // field is empty) in sync with the 325 checkbox -- never touch .value,
+    // since that would silently overwrite a manual override the user typed.
     document.querySelectorAll(".js-special").forEach(function(box){
       box.addEventListener("change", function(){
         var tr = box.closest("tr");
         if(!tr) return;
-        var cell = tr.querySelector(".js-rate");
-        if(cell) cell.textContent = rateFor(parseFloat(tr.dataset.hours || "0"), box.checked);
+        var input = tr.querySelector(".js-rate-input");
+        if(input) input.placeholder = rateFor(parseFloat(tr.dataset.hours || "0"), box.checked);
       });
     });
     document.addEventListener("keydown",function(e){if(e.key==="Escape")closePay();});

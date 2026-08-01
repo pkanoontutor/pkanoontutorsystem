@@ -166,6 +166,7 @@
             {% endfor %}
           </div>
           <div class="hint">ชำระเต็ม default = 10 ครั้ง / แบ่งชำระ default = 5 ครั้ง</div>
+          <div class="hint" id="packagePriceHint" style="color:#b45309;font-weight:900;margin-top:4px;"></div>
         </div>
         <div class="field hidden" id="customSessionField"><label>กรอกจำนวนครั้งเอง</label><input type="number" name="custom_sessions" id="customSessions" min="1" value="10" oninput="updateSummary(true)"></div>
 
@@ -196,6 +197,39 @@ const ADMISSIONS = JSON.parse(document.getElementById('admissions-data').textCon
 
 const DEFAULT_OTHER_AMOUNT = {{ default_other_amount|default:100 }};
 
+// Standard package pricing, keyed by session_package value -> student_mode
+// ('new' | 'existing'). A missing student_mode key (e.g. 6-session existing)
+// means there is no standard price for that combination.
+const PACKAGE_PRICE_DEFAULTS = {
+  '5':  { new: {price:1995,  discount:0},    existing: {price:1945,  discount:0} },
+  '6':  { new: {price:1995,  discount:0} },
+  '10': { new: {price:3990,  discount:0},    existing: {price:3990,  discount:100} },
+  '20': { new: {price:7980,  discount:500},  existing: {price:7980,  discount:500} },
+  '30': { new: {price:11970, discount:1000}, existing: {price:11970, discount:1000} },
+};
+function applyPackagePriceDefault(){
+  const hint = document.getElementById('packagePriceHint');
+  if(isOtherReceipt()){ hint.textContent=''; return; }
+  const radio = selectedSessionRadio();
+  if(!radio) return;
+  const modeRadio = document.querySelector('input[name="student_mode"]:checked');
+  const mode = modeRadio ? modeRadio.value : 'existing';
+  const table = PACKAGE_PRICE_DEFAULTS[radio.value];
+  if(!table){ hint.textContent=''; return; } // 12 ครั้ง / กรอกเอง -> no standard price, leave as typed
+  const entry = table[mode];
+  if(!entry){
+    document.getElementById('coursePrice').value = 0;
+    document.getElementById('discountAmount').value = 0;
+    hint.textContent = 'แพ็กนี้ไม่มีราคามาตรฐานสำหรับ' + (mode==='new' ? 'นักเรียนใหม่' : 'นักเรียนเดิม') + ' กรุณากรอกราคาเอง';
+    updateSummary(true);
+    return;
+  }
+  hint.textContent = '';
+  document.getElementById('coursePrice').value = entry.price;
+  document.getElementById('discountAmount').value = entry.discount;
+  updateSummary(true);
+}
+
 function exactFind(list, value){ return list.find(x => String(x.label) === String(value)); }
 function getStudentEnrollments(studentId){ return ENROLLMENTS.filter(e => Number(e.student_id) === Number(studentId)); }
 function isOtherReceipt(){
@@ -220,6 +254,7 @@ function toggleReceiptKind(){
   }else if(current === DEFAULT_OTHER_AMOUNT){
     priceInput.value = 0;
   }
+  if(!other){ applyPackagePriceDefault(); }
   updateSummary(true);
 }
 function onCoursePriceInput(){ updateSummary(true); }
@@ -245,6 +280,7 @@ function toggleStudentMode(){
     document.getElementById('addExistingActionRadio').disabled = false;
     renderEnrollmentsForStudent(document.getElementById('studentId').value, true);
   }
+  applyPackagePriceDefault();
 }
 function toggleEnrollmentMode(){
   const mode=document.querySelector('input[name="enrollment_action"]:checked').value;
@@ -345,6 +381,7 @@ function applySessionPackage(){
   const isCustom = radio.value === 'custom';
   customField.classList.toggle('hidden', !isCustom);
   if(!isCustom){ custom.value=radio.dataset.sessions || 10; }
+  applyPackagePriceDefault();
   updateSummary(true);
 }
 function updateSummary(forceAmount){

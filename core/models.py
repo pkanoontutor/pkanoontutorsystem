@@ -495,6 +495,10 @@ class CoursePayment(models.Model):
         ISSUED = "issued", "ออกใบเสร็จแล้ว"
         CANCELLED = "cancelled", "ยกเลิก"
 
+    class ReceiptKind(models.TextChoices):
+        COURSE = "course", "ค่าคอร์สเรียน"
+        OTHER = "other", "รายการอื่น (ไม่ผูกกับคอร์ส)"
+
     receipt_no = models.CharField(
         "เลขที่ใบเสร็จ",
         max_length=20,
@@ -504,8 +508,28 @@ class CoursePayment(models.Model):
     )
     payment_date = models.DateField("วันที่รับเงิน", default=timezone.localdate)
 
+    receipt_kind = models.CharField(
+        "ประเภทใบเสร็จ",
+        max_length=20,
+        choices=ReceiptKind.choices,
+        default=ReceiptKind.COURSE,
+    )
+    item_description = models.CharField(
+        "รายการ (สำหรับใบเสร็จที่ไม่ผูกกับคอร์ส)",
+        max_length=200,
+        blank=True,
+        help_text="เช่น ค่าชีทสำหรับทดลองเรียน",
+    )
+
     student = models.ForeignKey(Student, on_delete=models.PROTECT, related_name="course_payments")
-    tutoring_class = models.ForeignKey(TutoringClass, on_delete=models.PROTECT, related_name="course_payments")
+    tutoring_class = models.ForeignKey(
+        TutoringClass,
+        on_delete=models.PROTECT,
+        related_name="course_payments",
+        null=True,
+        blank=True,
+        help_text="เว้นว่างได้สำหรับใบเสร็จประเภทรายการอื่นที่ไม่ผูกกับคอร์ส/Enrollment",
+    )
     enrollment = models.ForeignKey(
         Enrollment,
         on_delete=models.PROTECT,

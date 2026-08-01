@@ -118,8 +118,13 @@
           <div class="item-table">
             <div class="item-head"><div>รายการ</div><div class="num">จำนวน</div><div class="num">ยอดเงิน</div></div>
             <div class="item-row">
-              <div>ค่าเรียน {{ payment.tutoring_class.name }}</div>
-              <div class="num">{{ payment.sessions_granted }} ครั้ง</div>
+              {% if payment.receipt_kind == 'other' %}
+                <div>{{ payment.item_description|default:"รายการอื่น" }}</div>
+                <div class="num">1</div>
+              {% else %}
+                <div>ค่าเรียน {{ payment.tutoring_class.name }}</div>
+                <div class="num">{{ payment.sessions_granted }} ครั้ง</div>
+              {% endif %}
               <div class="num">{{ payment.course_price|floatformat:"0g" }}</div>
             </div>
             <div class="item-total"><div>ส่วนลด</div><div></div><div class="num">{{ payment.discount_amount|floatformat:"0g" }}</div></div>

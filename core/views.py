@@ -3945,6 +3945,11 @@ COURSE_SESSION_CHOICES = [
     ("custom", "กรอกเอง", 10),
 ]
 
+# Defaults for a "receipt_kind=other" receipt (e.g. a trial-lesson sheet fee)
+# that is not tied to any class or Enrollment.
+DEFAULT_OTHER_RECEIPT_ITEM = "ค่าชีทสำหรับทดลองเรียน"
+DEFAULT_OTHER_RECEIPT_AMOUNT = Decimal("100")
+
 
 def _active_students_for_payment():
     return Student.objects.filter(is_active=True).select_related("school").order_by("grade_level", "nickname", "full_name")
@@ -4047,6 +4052,9 @@ def _default_payment_form_context(request: HttpRequest, errors: list[str] | None
         "payment_method_choices": CoursePayment.PaymentMethod.choices,
         "payment_type_choices": CoursePayment.PaymentType.choices,
         "enrollment_action_choices": CoursePayment.EnrollmentAction.choices,
+        "receipt_kind_choices": CoursePayment.ReceiptKind.choices,
+        "default_other_item_description": DEFAULT_OTHER_RECEIPT_ITEM,
+        "default_other_amount": DEFAULT_OTHER_RECEIPT_AMOUNT,
         "session_choices": COURSE_SESSION_CHOICES,
         "today": timezone.localdate(),
         "errors": errors or [],
@@ -6173,6 +6181,9 @@ def course_payment_create(request: HttpRequest) -> HttpResponse:
     if request.method == "POST":
         post = request.POST
         try:
+            receipt_kind = (post.get("receipt_kind") or CoursePayment.ReceiptKind.COURSE).strip()
+            is_other_receipt = receipt_kind == CoursePayment.ReceiptKind.OTHER
+
             student_mode = (post.get("student_mode") or "existing").strip()
             enrollment_action = (post.get("enrollment_action") or CoursePayment.EnrollmentAction.NEW).strip()
             payment_date = _parse_date(post.get("payment_date"))
@@ -6185,6 +6196,14 @@ def course_payment_create(request: HttpRequest) -> HttpResponse:
             net_amount = max(course_price - discount_amount, Decimal("0"))
             amount_paid = _money(post.get("amount_paid")) or net_amount
             note = (post.get("note") or "").strip()
+            item_description = ""
+
+            if is_other_receipt:
+                # A standalone receipt (e.g. a trial-lesson sheet fee) is not
+                # tied to any class, session count, or Enrollment.
+                item_description = (post.get("item_description") or "").strip() or DEFAULT_OTHER_RECEIPT_ITEM
+                package = "-"
+                sessions_granted = 0
 
             if student_mode == "new":
                 nickname = (post.get("new_nickname") or "").strip()
@@ -6216,7 +6235,10 @@ def course_payment_create(request: HttpRequest) -> HttpResponse:
 
             selected_class = None
             existing_enrollment = None
-            if enrollment_action == CoursePayment.EnrollmentAction.ADD_EXISTING:
+            if is_other_receipt:
+                # No class or Enrollment involved for a standalone receipt.
+                enrollment_action = CoursePayment.EnrollmentAction.NEW
+            elif enrollment_action == CoursePayment.EnrollmentAction.ADD_EXISTING:
                 existing_enrollment = Enrollment.objects.select_related("student", "tutoring_class").filter(id=post.get("existing_enrollment_id"), is_active=True).first()
                 if not existing_enrollment:
                     errors.append("กรุณาเลือก Enrollment เดิมที่จะเพิ่มจำนวนครั้ง")
@@ -6233,17 +6255,23 @@ def course_payment_create(request: HttpRequest) -> HttpResponse:
                 if not selected_class:
                     errors.append("กรุณาเลือก Class")
 
-            if sessions_granted <= 0:
+            if is_other_receipt:
+                if net_amount <= 0:
+                    errors.append("กรุณากรอกจำนวนเงินให้มากกว่า 0")
+            elif sessions_granted <= 0:
                 errors.append("จำนวนครั้งที่ให้เรียนต้องมากกว่า 0")
             if amount_paid < 0:
                 errors.append("ยอดรับชำระไม่ถูกต้อง")
 
-            if not errors and student and selected_class:
+            ready = bool(student) and (is_other_receipt or bool(selected_class))
+            if not errors and ready:
                 with transaction.atomic():
                     payment = CoursePayment.objects.create(
                         payment_date=payment_date,
                         student=student,
                         tutoring_class=selected_class,
+                        receipt_kind=receipt_kind,
+                        item_description=item_description,
                         enrollment_action=enrollment_action,
                         session_package=package,
                         sessions_granted=sessions_granted,
@@ -6256,7 +6284,8 @@ def course_payment_create(request: HttpRequest) -> HttpResponse:
                         note=note,
                         created_by=request.user if request.user.is_authenticated else None,
                     )
-                    _apply_payment_to_enrollment(payment, enrollment_action, existing_enrollment)
+                    if not is_other_receipt:
+                        _apply_payment_to_enrollment(payment, enrollment_action, existing_enrollment)
                 return redirect("core:course_payment_detail", pk=payment.pk)
         except Exception as exc:
             errors.append(f"บันทึกไม่สำเร็จ: {exc}")

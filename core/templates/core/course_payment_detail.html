@@ -51,9 +51,14 @@
       <div class="grid" style="margin-top:12px;">
         <div class="label">วันที่รับเงิน</div><div class="value">{{ payment.payment_date|date:"d/m/Y" }}</div>
         <div class="label">นักเรียน</div><div class="value">{{ payment.student.display_name }}</div>
-        <div class="label">Class</div><div class="value">{{ payment.tutoring_class.name }}</div>
-        <div class="label">Enrollment</div><div class="value">{% if payment.enrollment %}{{ payment.enrollment.sale_run_no|default:payment.enrollment_id }}{% else %}-{% endif %}</div>
-        <div class="label">จำนวนครั้ง</div><div class="value">{{ payment.sessions_granted }}</div>
+        {% if payment.receipt_kind == 'other' %}
+          <div class="label">ประเภทใบเสร็จ</div><div class="value">รายการอื่น (ไม่ผูกกับคอร์ส)</div>
+          <div class="label">รายการ</div><div class="value">{{ payment.item_description|default:"-" }}</div>
+        {% else %}
+          <div class="label">Class</div><div class="value">{{ payment.tutoring_class.name }}</div>
+          <div class="label">Enrollment</div><div class="value">{% if payment.enrollment %}{{ payment.enrollment.sale_run_no|default:payment.enrollment_id }}{% else %}-{% endif %}</div>
+          <div class="label">จำนวนครั้ง</div><div class="value">{{ payment.sessions_granted }}</div>
+        {% endif %}
         <div class="label">ราคาคอร์ส</div><div class="value">{{ payment.course_price|floatformat:"0g" }}</div>
         <div class="label">ส่วนลด</div><div class="value">{{ payment.discount_amount|floatformat:"0g" }}</div>
         <div class="label">ยอดสุทธิ</div><div class="value">{{ payment.net_amount|floatformat:"0g" }}</div>

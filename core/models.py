@@ -1502,10 +1502,18 @@ class TutorPayrollEntry(models.Model):
         help_text="ติ๊กเฉพาะติวเตอร์ที่ได้เรทพิเศษ กรณีสอน onsite ตั้งแต่ 4 ชั่วโมงขึ้นไป",
     )
     hourly_rate = models.DecimalField("เรท onsite ต่อชั่วโมง", max_digits=10, decimal_places=2, default=0)
+    hourly_rate_override = models.DecimalField(
+        "เรทค่าสอนที่กำหนดเอง", max_digits=10, decimal_places=2, null=True, blank=True,
+        help_text="เว้นว่างเพื่อใช้เรทเริ่มต้นตามชั่วโมงสอน/เรทพิเศษ 325 โดยอัตโนมัติ ใส่ตัวเลขเพื่อ override",
+    )
     teaching_fee = models.DecimalField("ค่าสอน onsite", max_digits=12, decimal_places=2, default=0)
     online_teaching_hours = models.DecimalField("จำนวนชั่วโมงสอนออนไลน์", max_digits=5, decimal_places=2, default=0)
     online_teaching_fee = models.DecimalField("ค่าสอนออนไลน์", max_digits=12, decimal_places=2, default=0)
     travel_fee = models.DecimalField("ค่าเดินทาง", max_digits=12, decimal_places=2, default=0)
+    travel_fee_override = models.DecimalField(
+        "ค่าเดินทางที่กำหนดเอง", max_digits=12, decimal_places=2, null=True, blank=True,
+        help_text="เว้นว่างเพื่อใช้ค่าเดินทางเริ่มต้นตามชั่วโมงสอนโดยอัตโนมัติ ใส่ตัวเลขเพื่อ override",
+    )
     idle_fee = models.DecimalField("ค่านั่งว่าง / ค่าอื่น ๆ", max_digits=12, decimal_places=2, default=0)
     total_amount = models.DecimalField("ยอดรวม", max_digits=12, decimal_places=2, default=0)
     note = models.TextField("หมายเหตุ", blank=True)
@@ -1552,11 +1560,22 @@ class TutorPayrollEntry(models.Model):
     def recalculate(self):
         hours = Decimal(str(self.teaching_hours or 0))
         online_hours = Decimal(str(self.online_teaching_hours or 0))
-        self.hourly_rate = self.calculate_hourly_rate(hours, self.special_rate_325)
+
+        # hourly_rate/travel_fee stay auto-calculated by default; an explicit
+        # override (set from the schedule payroll popup or elsewhere) wins.
+        self.hourly_rate = (
+            Decimal(str(self.hourly_rate_override))
+            if self.hourly_rate_override is not None
+            else self.calculate_hourly_rate(hours, self.special_rate_325)
+        )
         self.teaching_fee = hours * self.hourly_rate
         self.online_teaching_hours = online_hours
         self.online_teaching_fee = self.calculate_online_teaching_fee(online_hours)
-        self.travel_fee = self.calculate_travel_fee(hours)
+        self.travel_fee = (
+            Decimal(str(self.travel_fee_override))
+            if self.travel_fee_override is not None
+            else self.calculate_travel_fee(hours)
+        )
         self.idle_fee = Decimal(str(self.idle_fee or 0))
         self.total_amount = self.teaching_fee + self.online_teaching_fee + self.travel_fee + self.idle_fee
 

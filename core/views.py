@@ -213,6 +213,56 @@ def _ordered_grade_groups(rows: list[dict]) -> list[dict]:
     ]
 
 
+def _weekly_checkin_chart_data(anchor: date, weeks: int = 16) -> list[dict]:
+    """Saturday vs Sunday check-in ("มาเรียน" / present only) counts per school
+    week, most recent `weeks` weeks up to and including `anchor`'s week.
+    Returned as a plain list -- the template serializes it via json_script."""
+    # School week = Saturday..Sunday, matching _school_week_range elsewhere.
+    days_since_sat = (anchor.weekday() - 5) % 7
+    this_week_sat = anchor - timedelta(days=days_since_sat)
+    first_week_sat = this_week_sat - timedelta(weeks=weeks - 1)
+    range_start = first_week_sat
+    range_end = this_week_sat + timedelta(days=1)  # Sunday of the last week
+
+    rows = (
+        Attendance.objects
+        .filter(
+            status=Attendance.Status.PRESENT,
+            attendance_date__gte=range_start,
+            attendance_date__lte=range_end,
+            enrollment__tutoring_class__is_active=True,
+            student__is_active=True,
+        )
+        .values_list("attendance_date", flat=True)
+    )
+    sat_counts: dict[date, int] = {}
+    sun_counts: dict[date, int] = {}
+    for d in rows:
+        wd = d.weekday()
+        if wd == 5:
+            sat_counts[d] = sat_counts.get(d, 0) + 1
+        elif wd == 6:
+            week_sat = d - timedelta(days=1)
+            sun_counts[week_sat] = sun_counts.get(week_sat, 0) + 1
+
+    series = []
+    for i in range(weeks):
+        wk_sat = first_week_sat + timedelta(weeks=i)
+        wk_sun = wk_sat + timedelta(days=1)
+        sat = sat_counts.get(wk_sat, 0)
+        # sun_counts is keyed by that Sunday's school-week Saturday (see the
+        # loop above), not by the Sunday date itself -- look up with wk_sat.
+        sun = sun_counts.get(wk_sat, 0)
+        series.append({
+            "week_start": wk_sat.isoformat(),
+            "label": wk_sat.strftime("%d/%m"),
+            "sat": sat,
+            "sun": sun,
+            "total": sat + sun,
+        })
+    return series
+
+
 @login_required
 def dashboard(request: HttpRequest) -> HttpResponse:
     """
@@ -359,6 +409,7 @@ def dashboard(request: HttpRequest) -> HttpResponse:
 
         "near_complete": near_complete,
         "threshold": THRESHOLD,
+        "weekly_checkin_chart_json": _weekly_checkin_chart_data(selected_date),
     }
     return render(request, "core/dashboard.html", context)
 
@@ -4059,7 +4110,37 @@ def _default_payment_form_context(request: HttpRequest, errors: list[str] | None
         "today": timezone.localdate(),
         "errors": errors or [],
         "posted": posted or {},
+        "recent_renewal_notices_json": _recent_renewal_notice_quick_picks(),
     }
+
+
+def _recent_renewal_notice_quick_picks() -> list[dict]:
+    """Small cards on the receipt page: renewal notices from the last 21 days,
+    so a follow-up receipt for an existing student can be one click instead of
+    re-searching for their enrollment."""
+    cutoff = timezone.now() - timedelta(days=21)
+    notices = (
+        CourseRenewalNotice.objects
+        .select_related("student", "tutoring_class", "enrollment")
+        .filter(created_at__gte=cutoff, hide_from_quick_receipt_pick=False, enrollment__is_active=True)
+    )
+    rows = []
+    for n in notices:
+        rows.append({
+            "id": n.id,
+            "enrollment_id": n.enrollment_id,
+            "nickname": n.student.nickname or n.student.full_name or "-",
+            "full_name": n.student.full_name or "",
+            "class_name": n.tutoring_class.name if n.tutoring_class_id else "",
+            "credit_used": float(n.referral_credit_used or 0),
+            "note": (
+                f"ต่อคอร์สตามใบแจ้ง เลขที่ {n.id}"
+                + (f" · ใช้เครดิตชวนเพื่อน {n.referral_credit_used:.0f} บาท" if n.referral_credit_used else "")
+            ),
+            "created_at": n.created_at.strftime("%d/%m/%Y"),
+        })
+    rows.sort(key=lambda r: _weekly_test_thai_sort_key(r["nickname"]))
+    return rows
 
 
 def _sessions_from_package(package: str, custom_value: str | None) -> int:
@@ -4779,7 +4860,9 @@ def course_renewal_notice_mark_sent(request: HttpRequest, pk: int) -> HttpRespon
     notice.sent_to_parent_at = timezone.now()
     notice.sent_to_parent_by = request.user if request.user.is_authenticated else None
     notice.save()
-    return redirect(request.META.get("HTTP_REFERER") or "core:course_renewal_notice_list")
+    # Marking as sent is the "done, move on" action, so always return to the
+    # list rather than back to this notice's own detail page.
+    return redirect("core:course_renewal_notice_list")
 
 
 @require_POST
@@ -4864,10 +4947,6 @@ def course_renewal_notice_detail(request: HttpRequest, pk: int) -> HttpResponse:
         "enrollment_admin_url": _admin_enrollment_url(notice.enrollment),
         "referral_credit_earned": _referral_credit_earned(notice.student),
         "referral_credit_max": referral_credit_max,
-        "receipt_link_note": (
-            f"ใช้เครดิตชวนเพื่อน {notice.referral_credit_used:.0f} บาท "
-            f"จากใบแจ้งต่อคอร์ส เลขที่ {notice.id}"
-        ),
     })
 
 
@@ -6281,6 +6360,17 @@ def course_payment_list(request: HttpRequest) -> HttpResponse:
         "issued_total_display": _format_money_for_display(issued_total),
         "all_total_display": _format_money_for_display(all_total),
     })
+
+
+@require_POST
+@login_required
+def course_payment_dismiss_quick_pick(request: HttpRequest, pk: int) -> JsonResponse:
+    """Hide a renewal-notice quick-pick card from the receipt page. Does not
+    delete the CourseRenewalNotice itself -- just stops suggesting it."""
+    notice = get_object_or_404(CourseRenewalNotice, pk=pk)
+    notice.hide_from_quick_receipt_pick = True
+    notice.save(update_fields=["hide_from_quick_receipt_pick"])
+    return JsonResponse({"ok": True})
 
 
 @login_required

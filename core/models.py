@@ -794,6 +794,11 @@ class CourseRenewalNotice(models.Model):
         help_text="หักออกจากราคาสุทธิของทุกแพ็กเกจ/ยอดคงเหลือในใบแจ้งนี้ ไม่เกินเครดิตคงเหลือของนักเรียนคนนี้",
     )
 
+    hide_from_quick_receipt_pick = models.BooleanField(
+        "ซ่อนจากการ์ดลัดในหน้าออกใบเสร็จ", default=False,
+        help_text="ติ๊กเมื่อกดกากบาทลบการ์ดนี้ออกจากรายการลัดในหน้าออกใบเสร็จ (ไม่ได้ลบใบแจ้งจริง)",
+    )
+
     is_sent_to_parent = models.BooleanField("ส่งแจ้งผู้ปกครองแล้ว", default=False)
     sent_to_parent_at = models.DateTimeField("วันที่ส่งแจ้งผู้ปกครอง", null=True, blank=True)
     sent_to_parent_by = models.ForeignKey(

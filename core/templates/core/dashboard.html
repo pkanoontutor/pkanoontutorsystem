@@ -496,11 +496,22 @@
   ===================================================== */
   .dash-toolbar{
     display:grid;
-    grid-template-columns:minmax(280px, 0.95fr) minmax(420px, 1.8fr);
+    grid-template-columns:1fr 1fr;
     align-items:stretch;
   }
   .dash-toolbar > .card,
   .dash-toolbar > .summary-card{ min-width:0; }
+
+  /* Weekly check-in chart card -- sized to match .summary-card via the equal
+     grid columns above; only the internals differ. */
+  .checkin-chart-card{ padding:12px 14px; display:flex; flex-direction:column; }
+  .checkin-chart-legend{ display:flex; gap:12px; flex-wrap:wrap; margin:6px 0 4px; }
+  .checkin-chart-legend span{ font-size:11.5px; font-weight:800; color:#475569; display:flex; align-items:center; gap:5px; }
+  .checkin-chart-legend .dot{ width:10px; height:10px; border-radius:3px; display:inline-block; }
+  .checkin-chart-legend .dot-total{ border-radius:50%; }
+  .dot-sat{ background:#3b82f6; } .dot-sun{ background:#f59e0b; } .dot-total{ background:#16a34a; }
+  .checkin-chart-box{ flex:1; min-height:0; display:flex; }
+  .checkin-chart-box svg{ width:100%; height:auto; flex:1; }
 
   .weekly-bars{ grid-template-columns:1.15fr 1fr 1fr; }
   .att-bar-wrap{
@@ -781,38 +792,17 @@
 ===================================================== -->
 <div class="dash-toolbar">
 
-  <!-- Quick Actions -->
-  <div class="card" style="padding:12px 14px;">
-    <div class="section-label">Quick Actions</div>
-    <div style="display:flex; gap:8px; flex-wrap:wrap;">
-      <a class="qbtn qbtn-blue" href="/adminlublub/core/student/add/">
-        + นักเรียนใหม่
-        <small>เพิ่มในระบบ</small>
-      </a>
-      <a class="qbtn qbtn-green" href="/adminlublub/core/enrollment/add/">
-        + ขายคอร์ส
-        <small>Enrollment ใหม่</small>
-      </a>
-      <a class="qbtn qbtn-pink" href="/admission-report/">
-        📌 รายงานสมัครเรียน/ทดลองเรียน
-        <small>ดูและอัปเดตสถานะ</small>
-      </a>
-      <a class="qbtn qbtn-slate" href="/attendance-details/">
-        📋 เช็คชื่อรวม
-        <small>ตารางทุกห้อง</small>
-      </a>
-      <a class="qbtn qbtn-slate" href="/adminlublub/">
-        ⚙️ Admin
-        <small>หลังบ้าน</small>
-      </a>
-      <a class="qbtn qbtn-purple" href="#" onclick="return false;">
-        💻 ระบบเรียนออนไลน์
-        <small>เตรียมลิงก์ภายหลัง</small>
-      </a>
-      <a class="qbtn qbtn-orange" href="#" onclick="return false;">
-        📝 ระบบ E-Pretest
-        <small>เตรียมลิงก์ภายหลัง</small>
-      </a>
+  <!-- Weekly check-in chart -->
+  <div class="card checkin-chart-card">
+    {{ weekly_checkin_chart_json|json_script:"checkinChartData" }}
+    <div class="section-label">จำนวนนักเรียนที่มาเรียน (เช็คชื่อ "มา") — 16 สัปดาห์ล่าสุด</div>
+    <div class="checkin-chart-legend">
+      <span><i class="dot dot-sat"></i>เสาร์ (แท่ง)</span>
+      <span><i class="dot dot-sun"></i>อาทิตย์ (แท่ง)</span>
+      <span><i class="dot dot-total"></i>รวม (เส้น)</span>
+    </div>
+    <div class="checkin-chart-box">
+      <svg id="checkinChart" viewBox="0 0 1000 260" preserveAspectRatio="xMidYMid meet"></svg>
     </div>
   </div>
 
@@ -1475,6 +1465,90 @@
       setFilter(cid,"all");
     });
   });
+</script>
+
+<script>
+(function(){
+  // Weekly check-in chart: paired bars (เสาร์/อาทิตย์) + an overlaid line for
+  // the two-day total. Hand-rolled SVG, no external library.
+  var el = document.getElementById('checkinChart');
+  var dataEl = document.getElementById('checkinChartData');
+  if(!el || !dataEl) return;
+  var series = JSON.parse(dataEl.textContent || '[]');
+  if(!series.length) return;
+
+  var NS = 'http://www.w3.org/2000/svg';
+  function svgEl(tag, attrs){
+    var e = document.createElementNS(NS, tag);
+    for(var k in attrs){ if(attrs[k] !== null && attrs[k] !== undefined) e.setAttribute(k, attrs[k]); }
+    return e;
+  }
+  function niceMax(v){
+    if(v <= 0) return 1;
+    var mag = Math.pow(10, Math.floor(Math.log10(v)));
+    var n = v / mag;
+    var step = n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10;
+    return step * mag;
+  }
+
+  function draw(){
+    while(el.firstChild) el.removeChild(el.firstChild);
+    var box = el.getBoundingClientRect();
+    var W = 1000, H = 260, ML = 34, MR = 10, MT = 12, MB = 34;
+    var iw = W - ML - MR, ih = H - MT - MB;
+
+    var maxVal = niceMax(Math.max.apply(null, series.map(function(s){ return Math.max(s.sat, s.sun, s.total); })) || 1);
+    var y = function(v){ return MT + ih - (v / maxVal) * ih; };
+    var band = iw / series.length;
+    var cx = function(i){ return ML + band * i + band / 2; };
+
+    // gridlines + axis labels
+    for(var g = 0; g <= 4; g++){
+      var yy = MT + ih * (g / 4);
+      el.appendChild(svgEl('line', {x1: ML, y1: yy, x2: ML + iw, y2: yy, stroke: '#eef2f7', 'stroke-width': 1}));
+      el.appendChild(svgEl('text', {x: ML - 6, y: yy + 3, 'text-anchor': 'end', 'font-size': 9, 'font-weight': 800, fill: '#94a3b8'}));
+      el.lastChild.textContent = Math.round(maxVal - maxVal * (g / 4));
+    }
+
+    // paired bars
+    var barW = Math.max(band * 0.32, 2);
+    series.forEach(function(s, i){
+      var xSat = cx(i) - barW - 1.5, xSun = cx(i) + 1.5;
+      var ySat = y(s.sat), ySun = y(s.sun);
+      var rectSat = svgEl('rect', {x: xSat, y: ySat, width: barW, height: Math.max(MT + ih - ySat, 0), fill: '#3b82f6', rx: 2});
+      var rectSun = svgEl('rect', {x: xSun, y: ySun, width: barW, height: Math.max(MT + ih - ySun, 0), fill: '#f59e0b', rx: 2});
+
+      var titleSat = svgEl('title', {}); titleSat.textContent = 'สัปดาห์ ' + s.label + ' · เสาร์ ' + s.sat + ' คน';
+      rectSat.appendChild(titleSat);
+      var titleSun = svgEl('title', {}); titleSun.textContent = 'สัปดาห์ ' + s.label + ' · อาทิตย์ ' + s.sun + ' คน';
+      rectSun.appendChild(titleSun);
+
+      el.appendChild(rectSat);
+      el.appendChild(rectSun);
+    });
+
+    // total line overlay
+    var linePath = series.map(function(s, i){ return (i ? 'L' : 'M') + cx(i) + ' ' + y(s.total); }).join(' ');
+    el.appendChild(svgEl('path', {d: linePath, fill: 'none', stroke: '#16a34a', 'stroke-width': 2.4, 'stroke-linejoin': 'round', 'stroke-linecap': 'round'}));
+    series.forEach(function(s, i){
+      var c = svgEl('circle', {cx: cx(i), cy: y(s.total), r: 3, fill: '#fff', stroke: '#16a34a', 'stroke-width': 2});
+      var t = svgEl('title', {}); t.textContent = 'สัปดาห์ ' + s.label + ' · รวม ' + s.total + ' คน';
+      c.appendChild(t);
+      el.appendChild(c);
+    });
+
+    // x-axis labels, thinned out so they don't overlap over 16 weeks
+    var every = Math.ceil(series.length / 8);
+    series.forEach(function(s, i){
+      if(i % every) return;
+      el.appendChild(svgEl('text', {x: cx(i), y: H - MB + 16, 'text-anchor': 'middle', 'font-size': 9, 'font-weight': 800, fill: '#94a3b8'}));
+      el.lastChild.textContent = s.label;
+    });
+  }
+
+  draw();
+  window.addEventListener('resize', draw);
+})();
 </script>
 
 {% endblock %}

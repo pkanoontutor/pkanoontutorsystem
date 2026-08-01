@@ -37,6 +37,22 @@
   @media(max-width:900px){.session-choice-grid,.payment-method-toggle,.enrollment-list{grid-template-columns:1fr 1fr;}}
   @media(max-width:520px){.session-choice-grid,.payment-method-toggle,.enrollment-list{grid-template-columns:1fr;}}
   @media(max-width:800px){.grid{grid-template-columns:1fr}.span2{grid-column:auto}.btnx{width:100%}.hero .btnx{width:auto}.title{font-size:23px;}}
+
+  .quick-pick-grid{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:9px;}
+  .quick-pick-card{position:relative;border:1px solid #e2e8f0;background:#f8fafc;border-radius:14px;padding:10px 9px 9px;min-width:0;}
+  .quick-pick-body{cursor:pointer;}
+  .quick-pick-body:hover{opacity:.85;}
+  .quick-pick-x{position:absolute;top:4px;right:4px;width:20px;height:20px;border:0;border-radius:999px;
+    background:#fff;color:#94a3b8;font-size:11px;font-weight:1000;cursor:pointer;line-height:1;
+    box-shadow:0 1px 3px rgba(15,23,42,.15);}
+  .quick-pick-x:hover{background:#fee2e2;color:#dc2626;}
+  .quick-pick-nick{font-size:13px;font-weight:1000;color:#0f172a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-right:16px;}
+  .quick-pick-full{font-size:10.5px;font-weight:800;color:#64748b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:1px;}
+  .quick-pick-class{font-size:10.5px;font-weight:800;color:#334155;margin-top:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .quick-pick-credit{font-size:10px;font-weight:1000;color:#db2777;margin-top:4px;}
+  .quick-pick-date{font-size:9.5px;font-weight:800;color:#94a3b8;margin-top:4px;}
+  @media(max-width:1100px){.quick-pick-grid{grid-template-columns:repeat(4,minmax(0,1fr));}}
+  @media(max-width:640px){.quick-pick-grid{grid-template-columns:repeat(2,minmax(0,1fr));}}
 </style>
 {% endblock %}
 
@@ -56,6 +72,26 @@
 
   {% if errors %}
     <div class="errors">{% for e in errors %}<div>• {{ e }}</div>{% endfor %}</div>
+  {% endif %}
+
+  {% if recent_renewal_notices_json %}
+    <section class="cardx">
+      <div class="section-title">🔁 ใบแจ้งต่อคอร์สล่าสุด <small style="font-weight:800;color:#64748b;text-transform:none;letter-spacing:0;">(ไม่เกิน 21 วัน — กดเพื่อหยอดข้อมูลนักเรียนคนนี้เข้าฟอร์มด้านล่าง)</small></div>
+      <div class="quick-pick-grid" id="quickPickGrid">
+        {% for n in recent_renewal_notices_json %}
+          <div class="quick-pick-card">
+            <button type="button" class="quick-pick-x" title="ลบการ์ดนี้ออก" onclick="dismissRenewalQuickPick({{ n.id }}, this)">✕</button>
+            <div class="quick-pick-body" onclick="applyRenewalQuickPick({{ n.enrollment_id }}, {{ n.credit_used }}, '{{ n.note|escapejs }}')">
+              <div class="quick-pick-nick">{{ n.nickname }}</div>
+              <div class="quick-pick-full">{{ n.full_name }}</div>
+              <div class="quick-pick-class">{{ n.class_name }}</div>
+              {% if n.credit_used %}<div class="quick-pick-credit">🎁 เครดิต {{ n.credit_used|floatformat:0 }}฿</div>{% endif %}
+              <div class="quick-pick-date">{{ n.created_at }}</div>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    </section>
   {% endif %}
 
   <form method="post" class="wrapx" id="paymentForm">
@@ -204,6 +240,7 @@
 const STUDENTS = JSON.parse(document.getElementById('students-data').textContent || '[]');
 const ENROLLMENTS = JSON.parse(document.getElementById('enrollments-data').textContent || '[]');
 const ADMISSIONS = JSON.parse(document.getElementById('admissions-data').textContent || '[]');
+const CSRF_TOKEN = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
 
 const DEFAULT_OTHER_AMOUNT = {{ default_other_amount|default:100 }};
 
@@ -221,14 +258,14 @@ const PACKAGE_PRICE_DEFAULTS = {
 
 // Extra discount that stacks on top of the package price, from two sources:
 //  - the friend-referral search box (100 THB, new students only)
-//  - a receipt created from a course-renewal notice's "ใช้เครดิตชวนเพื่อน"
-//    (fixed amount carried over via the prefill_discount query param)
-const PREFILL_EXTRA_DISCOUNT = Number(new URLSearchParams(location.search).get('prefill_discount') || 0);
+//  - clicking a "ใบแจ้งต่อคอร์สล่าสุด" quick-pick card, which carries over
+//    that notice's "ใช้เครดิตชวนเพื่อน" amount (see applyRenewalQuickPick())
+let QUICK_PICK_EXTRA_DISCOUNT = 0;
 function extraDiscountTotal(){
   const modeRadio = document.querySelector('input[name="student_mode"]:checked');
   const mode = modeRadio ? modeRadio.value : 'existing';
   const hasReferrer = mode === 'new' && !!document.getElementById('referredByStudentId').value;
-  return (hasReferrer ? 100 : 0) + PREFILL_EXTRA_DISCOUNT;
+  return (hasReferrer ? 100 : 0) + QUICK_PICK_EXTRA_DISCOUNT;
 }
 
 function applyPackagePriceDefault(){
@@ -458,36 +495,50 @@ function updateSummary(forceAmount){
   document.getElementById('netSummary').textContent=net.toLocaleString('en-US',{maximumFractionDigits:2})+' บาท / '+sessions+' ครั้ง';
   document.getElementById('amountPaid').value=net.toFixed(2);
 }
-function applyPrefillFromRenewalNotice(){
-  const params = new URLSearchParams(location.search);
-  const enrollmentId = params.get('prefill_enrollment_id');
-  const noteText = params.get('prefill_note');
-  if(enrollmentId){
-    const e = ENROLLMENTS.find(x => Number(x.id) === Number(enrollmentId));
-    if(e){
-      document.querySelector('input[name="student_mode"][value="existing"]').checked = true;
-      toggleStudentMode();
-      renderEnrollmentsForStudent(e.student_id, false);
-      selectEnrollmentCard(String(e.id));
-      // renderEnrollmentsForStudent(..., false) skips the auto-switch to
-      // "add_existing" (it's off so it doesn't jump to a different
-      // enrollment before we pick the specific one) -- set it explicitly now
-      // that the right card is selected, otherwise the form would submit as
-      // "create a new enrollment" and fail for lack of a Class.
-      setEnrollmentAction('add_existing');
-    }
+// Clicking a "ใบแจ้งต่อคอร์สล่าสุด" quick-pick card: jump straight to that
+// student's existing enrollment, pre-filled as if searched by hand, plus
+// carry over any referral credit that notice had already applied.
+function applyRenewalQuickPick(enrollmentId, creditUsed, noteText){
+  const e = ENROLLMENTS.find(x => Number(x.id) === Number(enrollmentId));
+  if(!e){
+    alert('ไม่พบ Enrollment ที่ใช้งานอยู่ของนักเรียนคนนี้แล้ว (อาจปิดคอร์สไปแล้ว) กรุณาค้นหาด้วยตนเอง');
+    return;
   }
-  if(noteText){
-    const noteField = document.querySelector('textarea[name="note"]');
-    if(noteField && !noteField.value){ noteField.value = noteText; }
-  }
-  // Re-apply so PREFILL_EXTRA_DISCOUNT (from prefill_discount) layers on top
-  // of whatever package price the enrollment/session-count selection set.
+  document.querySelector('input[name="student_mode"][value="existing"]').checked = true;
+  toggleStudentMode();
+  renderEnrollmentsForStudent(e.student_id, false);
+  selectEnrollmentCard(String(e.id));
+  // renderEnrollmentsForStudent(..., false) skips the auto-switch to
+  // "add_existing" (kept off so it doesn't jump to a different enrollment
+  // before we pick this specific one) -- set it explicitly now, otherwise
+  // the form would submit as "create a new enrollment" and fail for lack of
+  // a Class.
+  setEnrollmentAction('add_existing');
+
+  const noteField = document.querySelector('textarea[name="note"]');
+  if(noteField && !noteField.value){ noteField.value = noteText || ''; }
+
+  QUICK_PICK_EXTRA_DISCOUNT = Number(creditUsed || 0);
+  // Re-apply so the carried-over credit layers on top of whatever package
+  // price the enrollment/session-count selection just set.
   applyPackagePriceDefault();
+
+  document.getElementById('paymentForm').scrollIntoView({behavior:'smooth', block:'start'});
 }
+
+function dismissRenewalQuickPick(noticeId, btn){
+  const card = btn.closest('.quick-pick-card');
+  fetch(`/course-payments/quick-pick/${noticeId}/dismiss/`, {
+    method:'POST',
+    headers:{'X-Requested-With':'XMLHttpRequest','X-CSRFToken':CSRF_TOKEN},
+  })
+    .then(r => r.json())
+    .then(d => { if(d && d.ok && card){ card.remove(); } })
+    .catch(() => {});
+}
+
 document.addEventListener('DOMContentLoaded',()=>{
   toggleStudentMode();applyPaymentTypeDefault();toggleReceiptKind();
-  applyPrefillFromRenewalNotice();
 });
 </script>
 {% endblock %}

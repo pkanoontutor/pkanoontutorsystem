@@ -4,37 +4,403 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>PKanoon Tutor</title>
-  <style>
-    *{box-sizing:border-box} body{margin:0;font-family:'Poppins',system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:radial-gradient(circle at 20% 0%,rgba(255,255,255,.45),transparent 25%),linear-gradient(180deg,#FDCF72,#F7B84D);color:#111827}.wrap{max-width:1180px;margin:0 auto;padding:14px 14px 22px}.logo{display:flex;justify-content:center;margin:8px 0 14px}.logo img{max-height:250px;width:auto}.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:18px}.tile{background:#fff;border-radius:18px;overflow:hidden;box-shadow:0 8px 20px rgba(0,0,0,.10);aspect-ratio:1/1}.tile img{width:100%;height:100%;object-fit:cover;display:block}.action-panel{background:rgba(255,255,255,.78);border:1px solid rgba(255,255,255,.85);box-shadow:0 14px 34px rgba(0,0,0,.12);border-radius:26px;padding:16px;margin-top:8px}.panel-head{text-align:center;margin-bottom:12px}.panel-title{font-size:24px;font-weight:1000;letter-spacing:-.03em}.panel-sub{font-size:13px;color:#475569;font-weight:800;margin-top:4px}.actions{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.btn-card{min-height:128px;border-radius:22px;text-decoration:none;color:#0f172a;background:#fff;padding:16px;box-shadow:0 8px 18px rgba(15,23,42,.10);border:1px solid #fff;display:flex;flex-direction:column;justify-content:space-between;transition:.14s}.btn-card:hover{transform:translateY(-3px);box-shadow:0 14px 28px rgba(15,23,42,.16)}.icon{width:46px;height:46px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:25px;margin-bottom:10px}.orange{background:#ffedd5}.green{background:#dcfce7}.blue{background:#dbeafe}.purple{background:#ede9fe}.amber{background:#fef9c3}.card-name{font-size:16px;font-weight:1000;line-height:1.25}.card-desc{font-size:12px;color:#64748b;font-weight:800;line-height:1.4;margin-top:4px}.hint{font-size:13px;color:#333;text-align:center;margin-top:14px;line-height:1.6;font-weight:700}@media(min-width:768px){.grid{grid-template-columns:repeat(4,1fr)}.logo img{max-height:300px}}@media(max-width:860px){.actions{grid-template-columns:repeat(2,minmax(0,1fr))}.logo img{max-height:210px}}@media(max-width:520px){.actions{grid-template-columns:1fr}.btn-card{min-height:108px}.panel-title{font-size:21px}.logo img{max-height:170px}.grid{gap:8px}}
-  </style>
+  <title>พี่ขนุนติวเตอร์ | PKanoon Tutor</title>
+  <meta name="description" content="ระบบออนไลน์สำหรับผู้ปกครองและนักเรียนพี่ขนุนติวเตอร์ — สมัครเรียน ตรวจสอบชั่วโมงคงเหลือ ดูผลสอบ เรียนออนไลน์ และทำเทสเก็บดาว" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  <style>/* PK-FONT-OVERRIDE */
-  :root{--app-font:"IBM Plex Sans Thai",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
-  html body{font-family:var(--app-font) !important}
-  button,input,select,textarea,.btn{font-family:var(--app-font) !important}
-  html body{font-size:16px;line-height:1.6}
+  <style>
+    :root{
+      --font:"IBM Plex Sans Thai",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+      --ink:#111827;          /* primary text */
+      --ink-soft:#5b6472;     /* secondary text */
+      --line:#eceef2;
+      --gold:#f0a500;
+      --gold-deep:#c97f00;
+      --cream:#fdf8ef;
+      --card:#ffffff;
+      --radius:20px;
+      --shadow-sm:0 1px 2px rgba(17,24,39,.04), 0 4px 12px rgba(17,24,39,.05);
+      --shadow-md:0 2px 6px rgba(17,24,39,.05), 0 12px 32px rgba(17,24,39,.09);
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0}
+    body{
+      font-family:var(--font);
+      font-size:16px;
+      line-height:1.6;
+      color:var(--ink);
+      background:var(--cream);
+      -webkit-font-smoothing:antialiased;
+    }
+    img{max-width:100%;display:block}
+    a{color:inherit}
+
+    .shell{max-width:1120px;margin:0 auto;padding:0 20px}
+
+    /* ---------------- header ---------------- */
+    .site-header{
+      position:sticky;top:0;z-index:50;
+      background:rgba(253,248,239,.86);
+      backdrop-filter:saturate(180%) blur(12px);
+      border-bottom:1px solid rgba(17,24,39,.06);
+    }
+    .header-inner{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 0}
+    .brand{display:flex;align-items:center;gap:12px;text-decoration:none;min-width:0}
+    .brand img{height:46px;width:auto}
+    .brand-text{display:flex;flex-direction:column;line-height:1.15;min-width:0}
+    .brand-name{font-size:17px;font-weight:700;letter-spacing:-.01em;white-space:nowrap}
+    .brand-tag{font-size:11.5px;color:var(--ink-soft);font-weight:500;white-space:nowrap}
+    .header-cta{
+      display:inline-flex;align-items:center;gap:7px;
+      background:var(--ink);color:#fff;text-decoration:none;
+      padding:9px 16px;border-radius:999px;
+      font-size:13.5px;font-weight:600;white-space:nowrap;
+      transition:transform .16s ease, box-shadow .16s ease;
+    }
+    .header-cta:hover{transform:translateY(-1px);box-shadow:var(--shadow-sm)}
+
+    /* ---------------- hero ---------------- */
+    /* Two columns on desktop: copy on the left, slider on the right. Keeps the
+       hero short enough that the service menu -- the point of the page -- is
+       at or near the fold instead of a full screen below it. */
+    .hero{padding:30px 0 8px}
+    .hero-grid{
+      display:grid;
+      grid-template-columns:minmax(0,.86fr) minmax(0,1.14fr);
+      gap:34px;align-items:center;
+    }
+    .hero-head{min-width:0}
+    .eyebrow{
+      display:inline-flex;align-items:center;gap:7px;
+      background:#fff;border:1px solid var(--line);
+      padding:5px 13px;border-radius:999px;
+      font-size:12.5px;font-weight:600;color:var(--gold-deep);
+      box-shadow:var(--shadow-sm);
+    }
+    .hero-title{
+      font-size:clamp(28px,4.6vw,44px);
+      font-weight:700;line-height:1.2;letter-spacing:-.025em;
+      margin:14px 0 0;
+    }
+    .hero-title .accent{color:var(--gold-deep)}
+    .hero-sub{
+      font-size:clamp(14px,1.6vw,16.5px);
+      color:var(--ink-soft);margin-top:10px;max-width:560px;
+    }
+
+    /* slider */
+    .slider{
+      position:relative;border-radius:var(--radius);overflow:hidden;
+      background:#e9eaee;box-shadow:var(--shadow-md);
+      aspect-ratio:16/10;
+    }
+    .slide{
+      position:absolute;inset:0;opacity:0;
+      transition:opacity .7s ease;
+      pointer-events:none;
+    }
+    .slide.is-active{opacity:1}
+    .slide img{width:100%;height:100%;object-fit:cover}
+    .slider-shade{
+      position:absolute;inset:0;pointer-events:none;
+      background:linear-gradient(to top,rgba(9,12,18,.45) 0%,rgba(9,12,18,.10) 38%,transparent 68%);
+    }
+    .slider-nav{
+      position:absolute;top:50%;transform:translateY(-50%);
+      width:38px;height:38px;border-radius:50%;border:0;cursor:pointer;
+      background:rgba(255,255,255,.9);color:var(--ink);
+      font-size:17px;line-height:1;display:grid;place-items:center;
+      box-shadow:0 2px 10px rgba(0,0,0,.16);
+      transition:background .16s ease, transform .16s ease;
+    }
+    .slider-nav:hover{background:#fff;transform:translateY(-50%) scale(1.06)}
+    .slider-nav.prev{left:12px}
+    .slider-nav.next{right:12px}
+    .slider-dots{
+      position:absolute;left:0;right:0;bottom:12px;
+      display:flex;justify-content:center;gap:7px;
+    }
+    .slider-dots button{
+      width:7px;height:7px;padding:0;border:0;border-radius:999px;cursor:pointer;
+      background:rgba(255,255,255,.5);transition:width .2s ease, background .2s ease;
+    }
+    .slider-dots button.is-active{width:22px;background:#fff}
+
+    /* thumbnail rail */
+    .thumbs{
+      display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);
+      gap:8px;margin-top:10px;
+    }
+    .thumb{
+      border:0;padding:0;cursor:pointer;background:none;
+      border-radius:11px;overflow:hidden;aspect-ratio:16/10;
+      opacity:.55;transition:opacity .18s ease, transform .18s ease, box-shadow .18s ease;
+      box-shadow:0 0 0 1px rgba(17,24,39,.06);
+    }
+    .thumb img{width:100%;height:100%;object-fit:cover}
+    .thumb:hover{opacity:.85;transform:translateY(-2px)}
+    .thumb.is-active{opacity:1;box-shadow:0 0 0 2px var(--gold)}
+
+    /* ---------------- services ---------------- */
+    .services{padding:44px 0 8px}
+    .section-head{display:flex;align-items:baseline;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:18px}
+    .section-title{font-size:clamp(20px,2.6vw,26px);font-weight:700;letter-spacing:-.02em;margin:0}
+    .section-note{font-size:13.5px;color:var(--ink-soft)}
+    .service-grid{
+      display:grid;
+      grid-template-columns:repeat(auto-fit,minmax(212px,1fr));
+      gap:14px;
+    }
+    .service{
+      display:flex;flex-direction:column;gap:10px;
+      background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+      padding:20px 18px 18px;text-decoration:none;color:inherit;
+      box-shadow:var(--shadow-sm);
+      transition:transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+    }
+    .service:hover{transform:translateY(-3px);box-shadow:var(--shadow-md);border-color:#e0e3e9}
+    .service-icon{
+      width:46px;height:46px;border-radius:14px;
+      display:grid;place-items:center;font-size:23px;
+    }
+    .i-apply{background:#fff1e2}
+    .i-hours{background:#e6f7ee}
+    .i-score{background:#efeaff}
+    .i-online{background:#e4f0ff}
+    .i-star{background:#fef6dc}
+    .service-name{font-size:16px;font-weight:700;line-height:1.3;letter-spacing:-.01em}
+    .service-desc{font-size:13px;color:var(--ink-soft);line-height:1.55;flex:1}
+    .service-go{
+      font-size:13px;font-weight:600;color:var(--gold-deep);
+      display:inline-flex;align-items:center;gap:5px;
+    }
+    .service:hover .service-go .arrow{transform:translateX(3px)}
+    .service-go .arrow{transition:transform .18s ease}
+
+    /* ---------------- footer ---------------- */
+    .site-footer{margin-top:52px;border-top:1px solid var(--line);background:#fff}
+    .footer-inner{
+      display:flex;justify-content:space-between;align-items:center;
+      gap:18px;flex-wrap:wrap;padding:24px 0;
+    }
+    .footer-brand{display:flex;align-items:center;gap:11px}
+    .footer-brand img{height:38px;width:auto}
+    .footer-name{font-size:14.5px;font-weight:700}
+    .footer-line{font-size:12.5px;color:var(--ink-soft);margin-top:2px}
+    .footer-help{font-size:12.5px;color:var(--ink-soft);line-height:1.65;text-align:right}
+    .footer-help a{color:var(--gold-deep);font-weight:600;text-decoration:none}
+    .footer-help a:hover{text-decoration:underline}
+
+    @media(max-width:900px){
+      .hero-grid{grid-template-columns:1fr;gap:20px}
+    }
+    @media(max-width:760px){
+      .shell{padding:0 16px}
+      .brand img{height:40px}
+      .brand-tag{display:none}
+      .hero{padding:20px 0 4px}
+      .slider{aspect-ratio:4/3}
+      .slider-nav{width:32px;height:32px;font-size:15px}
+      .slider-nav.prev{left:8px} .slider-nav.next{right:8px}
+      .thumbs{grid-auto-flow:row;grid-auto-columns:auto;grid-template-columns:repeat(5,1fr)}
+      .thumb:nth-child(n+6){display:none}
+      .services{padding:34px 0 4px}
+      .footer-inner{flex-direction:column;align-items:flex-start}
+      .footer-help{text-align:left}
+    }
+    @media(prefers-reduced-motion:reduce){
+      *{animation:none!important;transition:none!important}
+    }
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <div class="logo"><img src="{% static 'core/logo.png' %}" alt="PKanoon Tutor"></div>
-    <div class="grid">
-      {% for i in "12345678" %}<div class="tile"><img src="{% static 'core/home/'|add:i|add:'.jpg' %}" alt="home {{ i }}"></div>{% endfor %}
+
+  <header class="site-header">
+    <div class="shell header-inner">
+      <a class="brand" href="/">
+        <img src="{% static 'core/logo.png' %}" alt="พี่ขนุนติวเตอร์">
+        <span class="brand-text">
+          <span class="brand-name">พี่ขนุนติวเตอร์</span>
+          <span class="brand-tag">สถาบันกวดวิชา · สมุทรปราการ</span>
+        </span>
+      </a>
+      <a class="header-cta" href="https://line.me/R/ti/p/@pkanoontutor" target="_blank" rel="noopener">
+        ติดต่อทาง LINE
+      </a>
     </div>
-    <section class="action-panel">
-      <div class="panel-head"><div class="panel-title">เลือกบริการที่ต้องการใช้งาน</div><div class="panel-sub">ระบบสำหรับผู้ปกครองและนักเรียนพี่ขนุนติวเตอร์</div></div>
-      <div class="actions">
-        <a class="btn-card" href="/admission/"><div><div class="icon orange">📝</div><div class="card-name">สมัครเรียน / จองทดลองเรียน</div><div class="card-desc">กรอกข้อมูลจองรอบเรียน ทดลองเรียน หรือจองที่นั่งล่วงหน้า</div></div></a>
-        <a class="btn-card" href="/student-portal/"><div><div class="icon green">⏳</div><div class="card-name">ตรวจสอบชั่วโมงคงเหลือ</div><div class="card-desc">ดูจำนวนครั้งเรียนคงเหลือและประวัติการเข้าเรียน</div></div></a>
-        <a class="btn-card" href="/test-scores/"><div><div class="icon purple">🏆</div><div class="card-name">ระบบประกาศผลการสอบ</div><div class="card-desc">ตรวจสอบคะแนนสอบ อันดับ และสรุปผลรายบุคคล</div></div></a>
-        <a class="btn-card" href="/online-course-p6/"><div><div class="icon blue">🎓</div><div class="card-name">คอร์สติวออนไลน์ ป.6</div><div class="card-desc">เข้าเรียนออนไลน์ เอกสาร และคลิปย้อนหลัง</div></div></a>
-        <a class="btn-card" href="/star-quiz/"><div><div class="icon amber">⭐</div><div class="card-name">ระบบเทสเก็บดาว</div><div class="card-desc">ทำแบบทดสอบรายสัปดาห์ สะสมดาวไว้แลกของรางวัล</div></div></a>
+  </header>
+
+  <main>
+    <section class="hero shell">
+      <div class="hero-grid">
+      <div class="hero-head">
+        <span class="eyebrow">● ระบบออนไลน์สำหรับผู้ปกครองและนักเรียน</span>
+        <h1 class="hero-title">ยินดีต้อนรับสู่<br><span class="accent">พี่ขนุนติวเตอร์</span></h1>
+        <p class="hero-sub">
+          ตรวจสอบชั่วโมงเรียน ดูผลสอบ เข้าเรียนออนไลน์ และสมัครเรียน
+          ได้ด้วยตัวเองตลอด 24 ชั่วโมง
+        </p>
+      </div>
+
+      <div class="hero-media">
+      <div class="slider" id="slider" aria-roledescription="carousel" aria-label="บรรยากาศการเรียนที่พี่ขนุนติวเตอร์">
+        {% for i in "123456789" %}
+          <div class="slide{% if forloop.first %} is-active{% endif %}"
+               role="group" aria-roledescription="slide" aria-label="ภาพที่ {{ forloop.counter }} จาก 9">
+            <img src="{% static 'core/home/'|add:i|add:'.jpg' %}"
+                 alt="บรรยากาศการเรียนที่พี่ขนุนติวเตอร์ ภาพที่ {{ forloop.counter }}"
+                 {% if not forloop.first %}loading="lazy"{% endif %}>
+          </div>
+        {% endfor %}
+        <div class="slider-shade"></div>
+        <button class="slider-nav prev" id="slidePrev" type="button" aria-label="ภาพก่อนหน้า">‹</button>
+        <button class="slider-nav next" id="slideNext" type="button" aria-label="ภาพถัดไป">›</button>
+        <div class="slider-dots" id="sliderDots"></div>
+      </div>
+
+      <div class="thumbs" id="thumbs">
+        {% for i in "123456789" %}
+          <button class="thumb{% if forloop.first %} is-active{% endif %}" type="button"
+                  data-goto="{{ forloop.counter0 }}" aria-label="ไปที่ภาพที่ {{ forloop.counter }}">
+            <img src="{% static 'core/home/'|add:i|add:'.jpg' %}" alt="" loading="lazy">
+          </button>
+        {% endfor %}
+      </div>
+      </div>
       </div>
     </section>
-    <div class="hint">หากเข้าระบบไม่ได้ กรุณาติดต่อพี่ขนุนติวเตอร์ Line : @pkanoontutor<br>สงวนลิขสิทธิ์ : ระบบนี้ได้รับการพัฒนาโดย หจก.พี่ขนุนติวเตอร์</div>
-  </div>
+
+    <section class="services shell">
+      <div class="section-head">
+        <h2 class="section-title">เลือกบริการที่ต้องการใช้งาน</h2>
+        <span class="section-note">ใช้งานได้ทั้งบนมือถือและคอมพิวเตอร์</span>
+      </div>
+
+      <div class="service-grid">
+        <a class="service" href="/admission/">
+          <span class="service-icon i-apply">📝</span>
+          <span class="service-name">สมัครเรียน / จองทดลองเรียน</span>
+          <span class="service-desc">กรอกข้อมูลจองรอบเรียน ทดลองเรียน หรือจองที่นั่งล่วงหน้า</span>
+          <span class="service-go">เริ่มเลย <span class="arrow">→</span></span>
+        </a>
+
+        <a class="service" href="/student-portal/">
+          <span class="service-icon i-hours">⏳</span>
+          <span class="service-name">ตรวจสอบชั่วโมงคงเหลือ</span>
+          <span class="service-desc">ดูจำนวนครั้งเรียนคงเหลือและประวัติการเข้าเรียนของน้อง</span>
+          <span class="service-go">เข้าดู <span class="arrow">→</span></span>
+        </a>
+
+        <a class="service" href="/test-scores/">
+          <span class="service-icon i-score">🏆</span>
+          <span class="service-name">ระบบประกาศผลการสอบ</span>
+          <span class="service-desc">ตรวจสอบคะแนนสอบ อันดับ และสรุปผลรายบุคคล</span>
+          <span class="service-go">ดูผลสอบ <span class="arrow">→</span></span>
+        </a>
+
+        <a class="service" href="/online-course-p6/">
+          <span class="service-icon i-online">🎓</span>
+          <span class="service-name">คอร์สติวออนไลน์ ป.6</span>
+          <span class="service-desc">เข้าเรียนออนไลน์ เอกสารประกอบการเรียน และคลิปย้อนหลัง</span>
+          <span class="service-go">เข้าเรียน <span class="arrow">→</span></span>
+        </a>
+
+        <a class="service" href="/star-quiz/">
+          <span class="service-icon i-star">⭐</span>
+          <span class="service-name">ระบบเทสเก็บดาว</span>
+          <span class="service-desc">ทำแบบทดสอบรายสัปดาห์ สะสมดาวไว้แลกของรางวัล</span>
+          <span class="service-go">ทำเทส <span class="arrow">→</span></span>
+        </a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="shell footer-inner">
+      <div class="footer-brand">
+        <img src="{% static 'core/logo.png' %}" alt="">
+        <div>
+          <div class="footer-name">หจก.พี่ขนุนติวเตอร์</div>
+          <div class="footer-line">ต.สำโรงเหนือ อ.เมืองสมุทรปราการ จ.สมุทรปราการ 10270</div>
+        </div>
+      </div>
+      <div class="footer-help">
+        หากเข้าระบบไม่ได้ กรุณาติดต่อ LINE
+        <a href="https://line.me/R/ti/p/@pkanoontutor" target="_blank" rel="noopener">@pkanoontutor</a><br>
+        สงวนลิขสิทธิ์ · ระบบนี้พัฒนาโดย หจก.พี่ขนุนติวเตอร์
+      </div>
+    </div>
+  </footer>
+
+<script>
+(function(){
+  var slides = [].slice.call(document.querySelectorAll('.slide'));
+  if(slides.length < 2) return;
+
+  var dotsBox = document.getElementById('sliderDots');
+  var thumbs  = [].slice.call(document.querySelectorAll('.thumb'));
+  var slider  = document.getElementById('slider');
+  var index = 0, timer = null;
+  var AUTOPLAY_MS = 5000;
+  var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // Build dots from the actual slide count so the two can't drift apart.
+  var dots = slides.map(function(_, i){
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.setAttribute('aria-label', 'ไปที่ภาพที่ ' + (i + 1));
+    if(i === 0) b.className = 'is-active';
+    b.addEventListener('click', function(){ go(i); restart(); });
+    dotsBox.appendChild(b);
+    return b;
+  });
+
+  function go(next){
+    index = (next + slides.length) % slides.length;
+    slides.forEach(function(s, i){ s.classList.toggle('is-active', i === index); });
+    dots.forEach(function(d, i){ d.classList.toggle('is-active', i === index); });
+    thumbs.forEach(function(t, i){ t.classList.toggle('is-active', i === index); });
+  }
+  function next(){ go(index + 1); }
+  function prev(){ go(index - 1); }
+
+  function start(){ if(!reduceMotion && !timer) timer = setInterval(next, AUTOPLAY_MS); }
+  function stop(){ if(timer){ clearInterval(timer); timer = null; } }
+  function restart(){ stop(); start(); }
+
+  document.getElementById('slideNext').addEventListener('click', function(){ next(); restart(); });
+  document.getElementById('slidePrev').addEventListener('click', function(){ prev(); restart(); });
+  thumbs.forEach(function(t){
+    t.addEventListener('click', function(){ go(Number(t.dataset.goto)); restart(); });
+  });
+
+  // Pause while the pointer is over the slider, and while the tab is hidden,
+  // so it doesn't silently advance in a background tab.
+  slider.addEventListener('mouseenter', stop);
+  slider.addEventListener('mouseleave', start);
+  document.addEventListener('visibilitychange', function(){
+    document.hidden ? stop() : start();
+  });
+
+  document.addEventListener('keydown', function(e){
+    if(e.key === 'ArrowRight'){ next(); restart(); }
+    else if(e.key === 'ArrowLeft'){ prev(); restart(); }
+  });
+
+  // Swipe on touch devices.
+  var touchX = null;
+  slider.addEventListener('touchstart', function(e){ touchX = e.changedTouches[0].clientX; stop(); }, {passive:true});
+  slider.addEventListener('touchend', function(e){
+    if(touchX === null) return;
+    var dx = e.changedTouches[0].clientX - touchX;
+    if(Math.abs(dx) > 40){ dx < 0 ? next() : prev(); }
+    touchX = null;
+    start();
+  }, {passive:true});
+
+  start();
+})();
+</script>
 </body>
 </html>

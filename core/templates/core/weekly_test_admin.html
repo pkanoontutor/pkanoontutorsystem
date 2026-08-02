@@ -63,11 +63,11 @@
   /* Rows follow .announce-class-head, so the first one is child 2 -> stripe evens. */
   .announce-row:nth-child(even){background:#fafbfe}
   .announce-class-head + .announce-row{border-top:0}
-  .announce-name{min-width:0}
+  .announce-name{min-width:0;display:flex;align-items:baseline;gap:6px;overflow:hidden}
   .announce-student{font-weight:1000;font-size:24px;line-height:1.2;color:#0f172a;overflow:hidden;
-    text-overflow:ellipsis;white-space:nowrap}
-  .announce-fullname{font-weight:800;font-size:10.5px;color:#64748b;margin-top:1px;overflow:hidden;
-    text-overflow:ellipsis;white-space:nowrap}
+    text-overflow:ellipsis;white-space:nowrap;flex:0 1 auto}
+  .announce-fullname{font-weight:800;font-size:13px;color:#64748b;overflow:hidden;
+    text-overflow:ellipsis;white-space:nowrap;flex:1 1 auto;min-width:0}
   .announce-row .result{text-align:center;font-size:11px;font-weight:1000;border-radius:999px;padding:4px 9px;white-space:nowrap}
   .announce-foot{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;
     margin-top:16px;padding-top:12px;border-top:2px dashed var(--accent);
@@ -283,8 +283,8 @@
                 {% for row in block.rows %}
                 <div class="announce-row">
                   <div class="announce-name">
-                    <div class="announce-student">{{ row.student.nickname|default:row.student.full_name }}</div>
-                    {% if row.nickname_is_duplicate %}<div class="announce-fullname">{{ row.student.full_name }}</div>{% endif %}
+                    <span class="announce-student">{{ row.student.nickname|default:row.student.full_name }}</span>
+                    {% if row.nickname_is_duplicate %}<span class="announce-fullname">{{ row.student_first_name }}</span>{% endif %}
                   </div>
                   <div class="result {{ row.display_class }}">{{ row.display_label }}</div>
                 </div>

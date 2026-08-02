@@ -5297,6 +5297,10 @@ def _weekly_test_build_week_context(
             nickname_counts = Counter(r["student"].nickname for r in cls_rows)
             for r in cls_rows:
                 r["nickname_is_duplicate"] = nickname_counts[r["student"].nickname] > 1
+                # There's no separate first/last name field -- full_name is
+                # "ชื่อจริง นามสกุล", so the first whitespace-separated token
+                # is the first name shown next to the nickname.
+                r["student_first_name"] = (r["student"].full_name or "").split()[0] if r["student"].full_name else ""
             blocks.append({
                 "class": class_lookup.get(cid) or cls_rows[0]["class"],
                 "rows": sorted(cls_rows, key=_weekly_test_row_sort_key),

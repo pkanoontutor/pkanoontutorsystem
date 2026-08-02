@@ -1,5 +1,5 @@
 from __future__ import annotations
-from collections import OrderedDict, defaultdict
+from collections import Counter, OrderedDict, defaultdict
 
 import json
 import csv
@@ -5294,6 +5294,9 @@ def _weekly_test_build_week_context(
         )
         for cid in cls_ids_for_grade:
             cls_rows = [r for r in rows if r["class"].id == cid]
+            nickname_counts = Counter(r["student"].nickname for r in cls_rows)
+            for r in cls_rows:
+                r["nickname_is_duplicate"] = nickname_counts[r["student"].nickname] > 1
             blocks.append({
                 "class": class_lookup.get(cid) or cls_rows[0]["class"],
                 "rows": sorted(cls_rows, key=_weekly_test_row_sort_key),

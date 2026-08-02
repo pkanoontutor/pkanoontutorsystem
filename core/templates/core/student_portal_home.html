@@ -67,13 +67,10 @@
 
   .course-body{flex:1;min-width:0}
   .course-name{font-size:15px;font-weight:800;color:var(--ink);line-height:1.3}
-  .course-slot{font-size:11.5px;font-weight:700;color:var(--muted);margin-top:2px}
   .course-stats{display:flex;gap:14px;flex-wrap:wrap;margin-top:9px}
   .cstat b{font-size:14px;font-weight:800;color:var(--ink)}
   .cstat span{font-size:11px;font-weight:700;color:var(--muted);margin-left:3px}
   .course-code{font-size:10px;font-weight:800;color:var(--muted);letter-spacing:.02em;margin-top:7px}
-  .course-alert{margin-top:9px;background:#fff1f2;border:1px solid #fecdd3;color:#9f1239;
-    border-radius:11px;padding:7px 10px;font-size:11.5px;font-weight:700;line-height:1.45}
 
   /* ---------- attendance ---------- */
   .att-select{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
@@ -96,24 +93,18 @@
     padding:8px 11px;border-top:1px solid var(--line-soft);background:#fff}
   .att-row:first-child{border-top:0}
   .att-row:nth-child(even){background:#fcfdfe}
-  .att-main{display:flex;align-items:baseline;gap:8px;min-width:0}
-  .att-dot{width:7px;height:7px;border-radius:50%;flex:none;align-self:center}
-  .att-row.p .att-dot{background:var(--leaf)}
-  .att-row.e .att-dot{background:var(--sun-deep)}
+  .att-main{display:flex;align-items:center;gap:9px;min-width:0}
+  .att-dot{width:8px;height:8px;border-radius:50%;flex:none;align-self:center}
   .att-row.n .att-dot{background:#e11d48}
+  .att-row.e .att-dot{width:16px;height:16px;background:var(--sun)}
+  .att-row.p .att-dot{width:24px;height:24px;background:var(--leaf);display:grid;place-items:center;
+    color:#fff;font-size:11px;font-weight:800;line-height:1}
   .att-date{font-size:13px;font-weight:800;color:var(--ink);white-space:nowrap}
   .att-day{font-size:11.5px;font-weight:600;color:var(--muted);white-space:nowrap}
   .att-tag{font-size:11px;font-weight:800;border-radius:999px;padding:3px 10px;white-space:nowrap}
   .att-row.p .att-tag{background:#eaf6e1;color:var(--leaf-deep)}
   .att-row.e .att-tag{background:#fdf3d6;color:#a16207}
   .att-row.n .att-tag{background:#ffe6e9;color:#be123c}
-  .att-row.is-hidden{display:none}
-
-  .att-more{width:100%;margin-top:9px;border:1px solid var(--line);background:#fff;
-    border-radius:11px;padding:9px;font-size:12.5px;font-weight:800;color:var(--sky-ink);
-    cursor:pointer;font-family:inherit}
-  .att-more:hover{background:#f6fbff;border-color:#cfe6f5}
-
   .sp-empty{text-align:center;padding:24px 16px;color:var(--muted);font-weight:700;font-size:13px;
     background:#f9fbfd;border:1px dashed #dbe6ef;border-radius:13px}
   .sp-note{font-size:11px;font-weight:600;color:var(--muted);line-height:1.5;margin-top:9px}
@@ -169,16 +160,14 @@
           <div class="course {% if remaining > 5 %}ok{% elif remaining >= 3 %}warn{% else %}low{% endif %}">
             <div class="ring" style="--pct:{{ e.ring_percent }};">
               <div class="ring-in">
+                <div class="ring-lbl">เหลือ</div>
                 <div class="ring-num">{{ remaining }}</div>
-                <div class="ring-lbl">ครั้งเหลือ</div>
+                <div class="ring-lbl">ครั้ง</div>
               </div>
             </div>
 
             <div class="course-body">
               <div class="course-name">{{ e.tutoring_class.name }}</div>
-              {% if e.tutoring_class.time_slot %}
-                <div class="course-slot">{{ e.tutoring_class.time_slot }}</div>
-              {% endif %}
 
               <div class="course-stats">
                 <span class="cstat"><b>{{ e.remaining_hours_display }}</b><span>ชั่วโมงเหลือ</span></span>
@@ -186,12 +175,6 @@
               </div>
 
               {% if e.sale_run_no %}<div class="course-code">เลขที่ {{ e.sale_run_no }}</div>{% endif %}
-
-              {% if remaining <= 2 %}
-                <div class="course-alert">
-                  ใกล้ครบคอร์สแล้ว ทางโรงเรียนจะติดต่อผู้ปกครองเพื่อแจ้งรายละเอียดการต่อคอร์สค่ะ
-                </div>
-              {% endif %}
             </div>
           </div>
           {% endwith %}
@@ -230,9 +213,9 @@
 
         <div class="att-list" id="attList">
           {% for a in attendance_rows %}
-            <div class="att-row {% if a.status == 'present' %}p{% elif a.status == 'excused' %}e{% else %}n{% endif %}{% if forloop.counter > 10 %} att-extra is-hidden{% endif %}">
+            <div class="att-row {% if a.status == 'present' %}p{% elif a.status == 'excused' %}e{% else %}n{% endif %}">
               <span class="att-main">
-                <span class="att-dot"></span>
+                <span class="att-dot">{% if a.status == 'present' %}{{ a.present_seq }}{% endif %}</span>
                 <span class="att-date">{{ a.thai_day }}</span>
                 <span class="att-day">{{ a.thai_weekday }}</span>
               </span>
@@ -245,11 +228,6 @@
           {% endfor %}
         </div>
 
-        {% if attended_total > 10 %}
-          <button class="att-more" type="button" id="attMoreBtn"
-                  data-total="{{ attended_total }}">ดูทั้งหมด {{ attended_total }} ครั้ง</button>
-        {% endif %}
-
         <div class="sp-note">
           “ลา” ไม่ถูกหักครั้งเรียน ส่วน “มาเรียน” และ “ขาด” จะหัก 1 ครั้งตามระเบียบของโรงเรียน
         </div>
@@ -260,19 +238,4 @@
 
   </div>
 </div>
-
-<script>
-(function(){
-  var btn = document.getElementById('attMoreBtn');
-  if(!btn) return;
-  var expanded = false;
-  btn.addEventListener('click', function(){
-    expanded = !expanded;
-    document.querySelectorAll('.att-extra').forEach(function(row){
-      row.classList.toggle('is-hidden', !expanded);
-    });
-    btn.textContent = expanded ? 'ย่อรายการ' : ('ดูทั้งหมด ' + btn.dataset.total + ' ครั้ง');
-  });
-})();
-</script>
 {% endblock %}

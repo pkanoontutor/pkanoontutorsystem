@@ -3,7 +3,7 @@
 <html lang="th">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>พี่ขนุนติวเตอร์ | PKanoon Tutor</title>
   <meta name="description" content="ระบบออนไลน์สำหรับผู้ปกครองและนักเรียนพี่ขนุนติวเตอร์ — สมัครเรียน ตรวจสอบชั่วโมงคงเหลือ ดูผลสอบ เรียนออนไลน์ และทำเทสเก็บดาว" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -17,7 +17,7 @@
       --line:#eceef2;
       --gold:#f0a500;
       --gold-deep:#c97f00;
-      --cream:#fdf8ef;
+      --cream:#FDCF72;
       --card:#ffffff;
       --radius:20px;
       --shadow-sm:0 1px 2px rgba(17,24,39,.04), 0 4px 12px rgba(17,24,39,.05);
@@ -25,6 +25,7 @@
     }
     *{box-sizing:border-box}
     html,body{margin:0;padding:0}
+    html{background:var(--cream)}
     body{
       font-family:var(--font);
       font-size:16px;
@@ -32,18 +33,22 @@
       color:var(--ink);
       background:var(--cream);
       -webkit-font-smoothing:antialiased;
+      overflow-x:hidden;
     }
     img{max-width:100%;display:block}
     a{color:inherit}
 
-    .shell{max-width:1120px;margin:0 auto;padding:0 20px}
+    .shell{max-width:1120px;margin:0 auto;
+      padding:0 max(20px,env(safe-area-inset-right)) 0 max(20px,env(safe-area-inset-left))}
 
     /* ---------------- header ---------------- */
     .site-header{
       position:sticky;top:0;z-index:50;
-      background:rgba(253,248,239,.86);
+      background:rgba(253,207,114,.86);
+      -webkit-backdrop-filter:saturate(180%) blur(12px);
       backdrop-filter:saturate(180%) blur(12px);
       border-bottom:1px solid rgba(17,24,39,.06);
+      padding-top:env(safe-area-inset-top);
     }
     .header-inner{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 0}
     .brand{display:flex;align-items:center;gap:12px;text-decoration:none;min-width:0}
@@ -179,7 +184,8 @@
     .service-go .arrow{transition:transform .18s ease}
 
     /* ---------------- footer ---------------- */
-    .site-footer{margin-top:52px;border-top:1px solid var(--line);background:#fff}
+    .site-footer{margin-top:52px;border-top:1px solid var(--line);background:#fff;
+      padding-bottom:env(safe-area-inset-bottom)}
     .footer-inner{
       display:flex;justify-content:space-between;align-items:center;
       gap:18px;flex-wrap:wrap;padding:24px 0;
@@ -196,7 +202,7 @@
       .hero-grid{grid-template-columns:1fr;gap:20px}
     }
     @media(max-width:760px){
-      .shell{padding:0 16px}
+      .shell{padding:0 max(16px,env(safe-area-inset-right)) 0 max(16px,env(safe-area-inset-left))}
       .brand img{height:40px}
       .brand-tag{display:none}
       .hero{padding:20px 0 4px}
@@ -274,7 +280,6 @@
     <section class="services shell">
       <div class="section-head">
         <h2 class="section-title">เลือกบริการที่ต้องการใช้งาน</h2>
-        <span class="section-note">ใช้งานได้ทั้งบนมือถือและคอมพิวเตอร์</span>
       </div>
 
       <div class="service-grid">
@@ -322,7 +327,7 @@
         <img src="{% static 'core/logo.png' %}" alt="">
         <div>
           <div class="footer-name">หจก.พี่ขนุนติวเตอร์</div>
-          <div class="footer-line">ต.สำโรงเหนือ อ.เมืองสมุทรปราการ จ.สมุทรปราการ 10270</div>
+          <div class="footer-line">อ.เมืองสมุทรปราการ จ.สมุทรปราการ 10270</div>
         </div>
       </div>
       <div class="footer-help">

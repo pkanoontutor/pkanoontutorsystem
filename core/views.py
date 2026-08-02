@@ -3376,6 +3376,16 @@ def _portal_attendance_rows(rows) -> list:
         a.thai_day = f"{d.day} {_THAI_MONTHS_ABBR[d.month]} {d.year + 543}"
         a.thai_weekday = f"วัน{_THAI_DAYS[d.weekday()]}"
         out.append(a)
+
+    # Present visits are numbered starting at 1 from the oldest record, so
+    # parents can see "which lesson number" a given date was -- counted in
+    # chronological order regardless of the newest-first display order.
+    present_seq = 0
+    for a in sorted(out, key=lambda a: (a.attendance_date, a.checked_at or a.attendance_date)):
+        if a.status == Attendance.Status.PRESENT:
+            present_seq += 1
+            a.present_seq = present_seq
+
     return out
 
 

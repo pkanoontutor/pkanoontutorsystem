@@ -977,6 +977,9 @@
               <span class="save-state {% if s.total|default:0 > 0 %}saved{% endif %}" id="saveState-{{ cls.id }}">
                 {% if s.total|default:0 > 0 %}บันทึกแล้ว{% else %}ยังไม่บันทึก{% endif %}
               </span>
+              <button class="btn-submit-cls" style="background:#059669;" onclick="return markAllPresent({{ cls.id }})">
+                ✅ มาทั้งหมด
+              </button>
               <button class="btn-submit-cls" id="submitBtn-{{ cls.id }}" onclick="return submitClass({{ cls.id }})">
                 ✓ บันทึกห้องนี้
               </button>
@@ -1177,6 +1180,15 @@
     setBadge(eid,status);
     updateSelectionSummary(cid);
     filterRows(cid);
+    return false;
+  }
+
+  function markAllPresent(cid){
+    if(!confirm("ยืนยันว่านักเรียนทุกคนในห้องนี้มาเรียน?"))return false;
+    document.querySelectorAll(`tr[data-class="${cid}"]`).forEach(row=>{
+      const eid=row.id.replace("row-","");
+      pickStatus(cid,eid,"present");
+    });
     return false;
   }
 
@@ -1497,7 +1509,7 @@
     var W = 1000, H = 260, ML = 34, MR = 10, MT = 12, MB = 34;
     var iw = W - ML - MR, ih = H - MT - MB;
 
-    var maxVal = niceMax(Math.max.apply(null, series.map(function(s){ return Math.max(s.sat, s.sun, s.total); })) || 1);
+    var maxVal = 350;
     var y = function(v){ return MT + ih - (v / maxVal) * ih; };
     var band = iw / series.length;
     var cx = function(i){ return ML + band * i + band / 2; };

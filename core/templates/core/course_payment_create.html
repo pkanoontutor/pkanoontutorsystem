@@ -46,7 +46,9 @@
     background:#fff;color:#94a3b8;font-size:11px;font-weight:1000;cursor:pointer;line-height:1;
     box-shadow:0 1px 3px rgba(15,23,42,.15);}
   .quick-pick-x:hover{background:#fee2e2;color:#dc2626;}
-  .quick-pick-nick{font-size:13px;font-weight:1000;color:#0f172a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-right:16px;}
+  .quick-pick-nick{font-size:26px;font-weight:1000;color:#0f172a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-right:16px;}
+  .quick-pick-toggle-summary{cursor:pointer;list-style:none;}
+  .quick-pick-toggle-summary::-webkit-details-marker{display:none;}
   .quick-pick-full{font-size:10.5px;font-weight:800;color:#64748b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:1px;}
   .quick-pick-class{font-size:10.5px;font-weight:800;color:#334155;margin-top:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .quick-pick-credit{font-size:10px;font-weight:1000;color:#db2777;margin-top:4px;}
@@ -75,13 +77,13 @@
   {% endif %}
 
   {% if recent_renewal_notices_json %}
-    <section class="cardx">
-      <div class="section-title">🔁 ใบแจ้งต่อคอร์สล่าสุด <small style="font-weight:800;color:#64748b;text-transform:none;letter-spacing:0;">(ไม่เกิน 21 วัน — กดเพื่อหยอดข้อมูลนักเรียนคนนี้เข้าฟอร์มด้านล่าง)</small></div>
+    <details class="cardx" open>
+      <summary class="section-title quick-pick-toggle-summary">🔁 ใบแจ้งต่อคอร์สล่าสุด <small style="font-weight:800;color:#64748b;text-transform:none;letter-spacing:0;">(ไม่เกิน 21 วัน — กดเพื่อหยอดข้อมูลนักเรียนคนนี้เข้าฟอร์มด้านล่าง)</small></summary>
       <div class="quick-pick-grid" id="quickPickGrid">
         {% for n in recent_renewal_notices_json %}
-          <div class="quick-pick-card">
+          <div class="quick-pick-card" id="quickPickCard-{{ n.id }}">
             <button type="button" class="quick-pick-x" title="ลบการ์ดนี้ออก" onclick="dismissRenewalQuickPick({{ n.id }}, this)">✕</button>
-            <div class="quick-pick-body" onclick="applyRenewalQuickPick({{ n.enrollment_id }}, {{ n.credit_used }}, '{{ n.note|escapejs }}')">
+            <div class="quick-pick-body" onclick="applyRenewalQuickPick({{ n.id }}, {{ n.enrollment_id }}, {{ n.credit_used }}, '{{ n.note|escapejs }}')">
               <div class="quick-pick-nick">{{ n.nickname }}</div>
               <div class="quick-pick-full">{{ n.full_name }}</div>
               <div class="quick-pick-class">{{ n.class_name }}</div>
@@ -91,11 +93,12 @@
           </div>
         {% endfor %}
       </div>
-    </section>
+    </details>
   {% endif %}
 
   <form method="post" class="wrapx" id="paymentForm">
     {% csrf_token %}
+    <input type="hidden" name="quick_pick_notice_id" id="quickPickNoticeId" value="">
 
     <section class="cardx">
       <div class="section-title">1) ประเภทใบเสร็จ</div>
@@ -498,12 +501,13 @@ function updateSummary(forceAmount){
 // Clicking a "ใบแจ้งต่อคอร์สล่าสุด" quick-pick card: jump straight to that
 // student's existing enrollment, pre-filled as if searched by hand, plus
 // carry over any referral credit that notice had already applied.
-function applyRenewalQuickPick(enrollmentId, creditUsed, noteText){
+function applyRenewalQuickPick(noticeId, enrollmentId, creditUsed, noteText){
   const e = ENROLLMENTS.find(x => Number(x.id) === Number(enrollmentId));
   if(!e){
     alert('ไม่พบ Enrollment ที่ใช้งานอยู่ของนักเรียนคนนี้แล้ว (อาจปิดคอร์สไปแล้ว) กรุณาค้นหาด้วยตนเอง');
     return;
   }
+  document.getElementById('quickPickNoticeId').value = noticeId;
   document.querySelector('input[name="student_mode"][value="existing"]').checked = true;
   toggleStudentMode();
   renderEnrollmentsForStudent(e.student_id, false);
@@ -535,6 +539,8 @@ function dismissRenewalQuickPick(noticeId, btn){
     .then(r => r.json())
     .then(d => { if(d && d.ok && card){ card.remove(); } })
     .catch(() => {});
+  const noticeIdField = document.getElementById('quickPickNoticeId');
+  if(noticeIdField && Number(noticeIdField.value) === Number(noticeId)){ noticeIdField.value = ''; }
 }
 
 document.addEventListener('DOMContentLoaded',()=>{

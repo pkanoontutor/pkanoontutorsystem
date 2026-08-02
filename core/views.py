@@ -6502,6 +6502,9 @@ def course_payment_create(request: HttpRequest) -> HttpResponse:
                             receipt=payment,
                             credit_amount=credit,
                         )
+                    quick_pick_notice_id = (post.get("quick_pick_notice_id") or "").strip()
+                    if quick_pick_notice_id:
+                        CourseRenewalNotice.objects.filter(id=quick_pick_notice_id).update(hide_from_quick_receipt_pick=True)
                 return redirect("core:course_payment_detail", pk=payment.pk)
         except Exception as exc:
             errors.append(f"บันทึกไม่สำเร็จ: {exc}")

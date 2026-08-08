@@ -55,6 +55,23 @@
         <b>สถานะ:</b> {% if sheet.is_active %}ใช้งาน{% else %}ปิดใช้งาน{% endif %}
       </div>
 
+      <h3 style="margin:16px 0 8px;font-size:16px">จำนวนหน้า / จำนวนข้อ</h3>
+      {% if saved_counts %}
+        <div style="background:#dcfce7;border:1px solid #86efac;color:#166534;border-radius:12px;padding:8px 10px;font-weight:800;font-size:13px;margin-bottom:8px;">
+          บันทึกแล้ว
+        </div>
+      {% endif %}
+      <form method="post" class="settings-grid" style="border:1px solid #fde68a;border-radius:14px;padding:10px;background:#fffbeb;">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="update_sheet_counts">
+        <div class="field"><label>จำนวนหน้า (ไฟล์เนื้อหา)</label><input type="number" name="total_pages" min="0" value="{{ sheet.total_pages|default:0 }}"></div>
+        <div class="field"><label>จำนวนข้อ</label><input type="number" name="total_questions" min="0" value="{{ sheet.total_questions|default:0 }}"></div>
+        <div style="grid-column:1/-1;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <button class="btnx green" type="submit">บันทึกจำนวนหน้า/ข้อ</button>
+          <span style="font-size:12px;color:#92400e;font-weight:700;">จำนวนหน้าใช้คำนวณ % ความคืบหน้าในหน้าอัปเดตติวเตอร์</span>
+        </div>
+      </form>
+
       <h3 style="margin:16px 0 8px;font-size:16px">ตั้งค่าการส่งปรินท์</h3>
       <form method="post" action="/sheet-print-orders/" class="settings-grid" style="border:1px solid #e2e8f0;border-radius:14px;padding:10px;background:#f8fafc;">
         {% csrf_token %}

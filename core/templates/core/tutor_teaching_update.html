@@ -25,6 +25,36 @@
   .tutor-name{font-size:14px;font-weight:1000;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .tutor-count{font-size:12px;font-weight:1000;}.tutor-count b{font-size:20px;}
   .bar{height:7px;background:#e2e8f0;border-radius:999px;overflow:hidden;}.bar span{display:block;height:100%;background:#16a34a;border-radius:999px;}
+
+  /* ---- Sheet progress summary (collapsed by default) ---- */
+  .sheet-sum{background:#fff;border-radius:20px;border:1px solid rgba(255,255,255,.9);box-shadow:0 5px 14px rgba(15,23,42,.08);overflow:hidden;}
+  .sheet-sum>summary{list-style:none;cursor:pointer;padding:14px;display:flex;justify-content:space-between;
+    align-items:center;gap:10px;flex-wrap:wrap;font-weight:1000;color:#0f172a;font-size:15px;}
+  .sheet-sum>summary::-webkit-details-marker{display:none;}
+  .sheet-sum>summary:hover{background:#f8fafc;}
+  .sheet-sum .caret{font-size:12px;font-weight:1000;color:#64748b;}
+  .sheet-sum[open] .caret-closed,.sheet-sum:not([open]) .caret-open{display:none;}
+  .sheet-sum-body{padding:0 14px 14px;display:grid;gap:12px;}
+  .sheet-sum-class{border:1px solid #e2e8f0;border-radius:16px;overflow:hidden;}
+  .sheet-sum-head{background:linear-gradient(135deg,#f1f5f9,#e2e8f0);padding:9px 12px;font-weight:1000;font-size:14px;
+    display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center;}
+  .sheet-sum-head .warn-pill{font-size:11px;font-weight:1000;border-radius:999px;padding:3px 9px;background:#fef3c7;color:#92400e;}
+  .sheet-sum-row{display:grid;grid-template-columns:minmax(0,1fr) 190px;gap:10px;align-items:center;
+    padding:9px 12px;border-top:1px solid #f1f5f9;}
+  .sheet-sum-row:nth-child(even){background:#fcfdfe;}
+  .ss-subject{font-size:13px;font-weight:1000;color:#0f172a;}
+  .ss-sheet{font-size:11.5px;font-weight:800;color:#64748b;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .ss-meter{display:grid;gap:4px;}
+  .ss-nums{display:flex;justify-content:space-between;gap:8px;font-size:11.5px;font-weight:1000;}
+  .ss-pct{font-size:14px;}
+  .ss-bar{height:9px;background:#e2e8f0;border-radius:999px;overflow:hidden;}
+  .ss-bar span{display:block;height:100%;border-radius:999px;}
+  .ss-ok .ss-bar span{background:#16a34a;}   .ss-ok .ss-pct{color:#15803d;}
+  .ss-warn .ss-bar span{background:#f59e0b;} .ss-warn .ss-pct{color:#b45309;}
+  .ss-danger .ss-bar span{background:#dc2626;}.ss-danger .ss-pct{color:#b91c1c;}
+  .ss-unknown .ss-pct{color:#94a3b8;font-size:11.5px;}
+  .ss-pages{color:#475569;}
+  @media(max-width:620px){.sheet-sum-row{grid-template-columns:1fr;}}
   .slot-section{display:grid;gap:10px;}
   .slot-header{border-radius:22px;padding:14px 16px;color:#0f172a;box-shadow:0 5px 14px rgba(15,23,42,.08);border:1px solid rgba(255,255,255,.9);display:flex;justify-content:space-between;gap:10px;align-items:center;}
   .slot-header .slot-name{font-size:19px;font-weight:1000;letter-spacing:-.02em;}
@@ -88,6 +118,55 @@
     <div class="title">👩‍🏫 อัปเดตการสอนติวเตอร์</div>
     <div class="sub">สัปดาห์เรียน {{ week_start|date:"d/m/Y" }} - {{ week_end|date:"d/m/Y" }} · กดชื่อของตัวเองด้านล่างเพื่อ filter ได้เลย</div>
   </div>
+
+  <details class="sheet-sum">
+    <summary>
+      <span>📚 สรุปสถานะชีท — เรียนถึงหน้าไหนแล้ว</span>
+      <span class="caret">
+        <span class="caret-closed">แสดง ▾</span>
+        <span class="caret-open">ซ่อน ▴</span>
+      </span>
+    </summary>
+    <div class="sheet-sum-body">
+      {% for section in sheet_progress_sections %}
+        <div class="sheet-sum-class">
+          <div class="sheet-sum-head">
+            <span>{{ section.class.get_time_slot_display }} · {{ section.class.name }}</span>
+            {% if section.near_end_count %}
+              <span class="warn-pill">ใกล้จบ {{ section.near_end_count }} วิชา</span>
+            {% endif %}
+          </div>
+          {% for row in section.rows %}
+            <div class="sheet-sum-row ss-{{ row.tone }}">
+              <div>
+                <div class="ss-subject">{{ row.subject_name }}</div>
+                <div class="ss-sheet">{{ row.sheet_label }}</div>
+              </div>
+              <div class="ss-meter">
+                <div class="ss-nums">
+                  {% if row.percent is not None %}
+                    <span class="ss-pct">{{ row.percent }}%</span>
+                    <span class="ss-pages">หน้า {{ row.page }} / {{ row.total_pages }}</span>
+                  {% else %}
+                    <span class="ss-pct">ยังไม่ทราบจำนวนหน้า</span>
+                    <span class="ss-pages">
+                      {% if row.page %}ถึงหน้า {{ row.page }}{% else %}ยังไม่ระบุหน้า{% endif %}
+                    </span>
+                  {% endif %}
+                </div>
+                <div class="ss-bar"><span style="width:{{ row.bar_width }}%;"></span></div>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      {% empty %}
+        <div style="padding:16px;text-align:center;color:#64748b;font-weight:900;font-size:13px;
+                    background:#f8fafc;border:1px dashed #cbd5e1;border-radius:16px;">
+          ยังไม่มีข้อมูลความคืบหน้า — เมื่อติวเตอร์เริ่มบันทึกว่าสอนถึงหน้าไหน ระบบจะสรุปให้ตรงนี้
+        </div>
+      {% endfor %}
+    </div>
+  </details>
 
   {% if error_code == "missing_progress" %}
     <div class="error-box">กรุณากรอกทั้ง “สอนถึงหน้า” และ “สอนถึงข้อ” ก่อนบันทึก ถ้าไม่ต้องการใส่ตัวเลขให้กรอกเครื่องหมาย “-” ได้ครับ ยกเว้นกรณีติ๊ก “สัปดาห์นี้ไม่มีสอน”</div>

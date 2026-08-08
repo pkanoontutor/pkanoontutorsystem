@@ -743,10 +743,10 @@ class TeachingTutorAdmin(admin.ModelAdmin):
 
 @admin.register(TeachingClassSubjectTemplate)
 class TeachingClassSubjectTemplateAdmin(admin.ModelAdmin):
-    list_display = ("tutoring_class", "subject_name", "default_sheet_name", "display_order", "is_active")
+    list_display = ("tutoring_class", "subject_name", "default_sheet_name", "default_sheet", "display_order", "is_active")
     list_filter = ("tutoring_class", "is_active")
     search_fields = ("tutoring_class__name", "subject_name", "default_sheet_name")
-    autocomplete_fields = ("tutoring_class",)
+    autocomplete_fields = ("tutoring_class", "default_sheet")
     ordering = ("tutoring_class__name", "display_order", "subject_name")
 
 

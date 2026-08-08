@@ -1916,6 +1916,15 @@ def sheet_allocation_report(request: HttpRequest) -> HttpResponse:
 @login_required
 def sheet_inventory_profile(request: HttpRequest, pk: int) -> HttpResponse:
     sheet = get_object_or_404(Sheet.objects.select_related("subject"), pk=pk)
+
+    # Page/question counts are edited here rather than only via bulk upload,
+    # because the page count now drives the teaching-progress percentages.
+    if request.method == "POST" and request.POST.get("action") == "update_sheet_counts":
+        sheet.total_pages = max(int(request.POST.get("total_pages") or 0), 0)
+        sheet.total_questions = max(int(request.POST.get("total_questions") or 0), 0)
+        sheet.save(update_fields=["total_pages", "total_questions"])
+        return redirect(f"{request.path}?saved=counts")
+
     inventory, _ = SheetInventory.objects.get_or_create(sheet=sheet, defaults={"quantity": 0})
     movements = SheetInventoryMovement.objects.filter(sheet=sheet).select_related("created_by").order_by("-created_at")[:80]
     mappings = SheetClassMapping.objects.filter(sheet=sheet, is_active=True).select_related("tutoring_class")
@@ -1925,6 +1934,7 @@ def sheet_inventory_profile(request: HttpRequest, pk: int) -> HttpResponse:
         "inventory": inventory,
         "movements": movements,
         "mappings": mappings,
+        "saved_counts": request.GET.get("saved") == "counts",
     })
 
 
@@ -6893,6 +6903,137 @@ def _teaching_slot_groups_from_assignments(assignments, previous_updates=None, c
     return OrderedDict((k, v) for k, v in grouped_slots.items() if v["count"] > 0)
 
 
+def _sheet_lookup_by_code() -> dict[str, "Sheet"]:
+    """Sheets keyed by upper-cased code, for matching the free-text sheet name
+    a tutor typed back to the Sheet row that knows the page count."""
+    return {
+        s.code.strip().upper(): s
+        for s in Sheet.objects.select_related("subject").only(
+            "id", "code", "title", "total_pages", "grade_level", "subject__name"
+        )
+        if s.code
+    }
+
+
+def _match_sheet_from_name(sheet_name: str, sheets_by_code: dict) -> "Sheet | None":
+    """Find the Sheet a free-text "ชื่อชีท" refers to.
+
+    The picker on the tutor form inserts "<code> <title>", so the code is
+    normally the first token. Tutors who type by hand may put the code
+    anywhere (or omit it), so fall back to scanning every code-shaped token.
+    """
+    if not sheet_name:
+        return None
+    text = sheet_name.strip().upper()
+
+    first = text.split()[0].rstrip("-") if text.split() else ""
+    if first in sheets_by_code:
+        return sheets_by_code[first]
+
+    for token in re.findall(r"[A-Z0-9]+(?:-[A-Z0-9]+)+", text):
+        hit = sheets_by_code.get(token.rstrip("-"))
+        if hit is not None:
+            return hit
+    return None
+
+
+def _page_number_from_text(page_to: str) -> int | None:
+    """Last number in the free-text "สอนถึงหน้า" field.
+
+    Tutors may type "45", a range like "45-50" (taken as 50, the page actually
+    reached), or "-" / free text when not applicable -- which yields None so
+    the row is reported as "ยังไม่ระบุหน้า" instead of a misleading 0%.
+    """
+    if not page_to:
+        return None
+    numbers = re.findall(r"\d+", str(page_to))
+    if not numbers:
+        return None
+    return int(numbers[-1])
+
+
+def _sheet_progress_sections(week_start) -> list[dict]:
+    """Per class / subject / sheet reading progress for the summary panel.
+
+    Uses the latest real (non "ไม่มีสอน") progress update for each class-subject
+    regardless of week, so the bar reflects where each book actually stands
+    today rather than only what was taught in the selected week.
+    """
+    latest_by_template: dict[int, TeachingProgressUpdate] = {}
+    updates = (
+        TeachingProgressUpdate.objects
+        .select_related(
+            "assignment",
+            "assignment__tutoring_class",
+            "assignment__subject_template",
+            "assignment__subject_template__default_sheet",
+            "assignment__subject_template__default_sheet__subject",
+        )
+        .filter(no_teaching=False)
+        .order_by("assignment__subject_template_id", "-teaching_date", "-updated_at")
+    )
+    for upd in updates:
+        latest_by_template.setdefault(upd.assignment.subject_template_id, upd)
+
+    if not latest_by_template:
+        return []
+
+    sheets_by_code = _sheet_lookup_by_code()
+    slot_rank = {slot: idx for idx, slot in enumerate(TIME_SLOT_ORDER)}
+    by_class: dict[int, dict] = {}
+
+    for upd in latest_by_template.values():
+        template = upd.assignment.subject_template
+        tutoring_class = upd.assignment.tutoring_class
+
+        # An explicit default_sheet on the template wins over auto-matching, so
+        # admins can pin the right book when the typed name is ambiguous.
+        sheet = template.default_sheet or _match_sheet_from_name(upd.sheet_name, sheets_by_code)
+        total_pages = int(getattr(sheet, "total_pages", 0) or 0)
+        page = _page_number_from_text(upd.page_to)
+
+        percent = None
+        if total_pages > 0 and page is not None:
+            percent = int(round(min(page / total_pages, 1) * 100))
+
+        if percent is None:
+            tone = "unknown"
+        elif percent > 80:
+            tone = "danger"
+        elif percent >= 60:
+            tone = "warn"
+        else:
+            tone = "ok"
+
+        bucket = by_class.setdefault(tutoring_class.id, {
+            "class": tutoring_class,
+            "slot_rank": slot_rank.get(tutoring_class.time_slot, 999),
+            "rows": [],
+        })
+        bucket["rows"].append({
+            "subject_name": template.subject_name,
+            "sheet": sheet,
+            "sheet_label": (
+                f"{sheet.code} {sheet.title}" if sheet else (upd.sheet_name or "ยังไม่ระบุชีท")
+            ),
+            "page": page,
+            "total_pages": total_pages,
+            "percent": percent,
+            "bar_width": percent if percent is not None else 0,
+            "tone": tone,
+            "teaching_date": upd.teaching_date,
+            "display_order": template.display_order,
+        })
+
+    sections = sorted(by_class.values(), key=lambda b: (b["slot_rank"], b["class"].name))
+    for section in sections:
+        section["rows"].sort(key=lambda r: (r["display_order"], r["subject_name"]))
+        tracked = [r for r in section["rows"] if r["percent"] is not None]
+        section["tracked_count"] = len(tracked)
+        section["near_end_count"] = sum(1 for r in tracked if r["percent"] >= 60)
+    return sections
+
+
 def tutor_teaching_update(request: HttpRequest) -> HttpResponse:
     week_start, week_end = _teaching_week_from_request(request)
     _ensure_teaching_assignments(week_start, week_end)
@@ -7044,6 +7185,7 @@ def tutor_teaching_update(request: HttpRequest) -> HttpResponse:
         "grouped_slots": grouped_slots,
         "error_code": (request.GET.get("error") or "").strip(),
         "sheet_choices": sheet_choices,
+        "sheet_progress_sections": _sheet_progress_sections(week_start),
     })
 
 

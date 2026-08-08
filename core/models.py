@@ -208,6 +208,7 @@ class Sheet(models.Model):
         M2 = "m2", "ม.2"
         M3 = "m3", "ม.3"
         M4 = "m4", "ม.4"
+        M5 = "m5", "ม.5"
 
     code = models.CharField("รหัสชีท", max_length=50, unique=True)
     title = models.CharField("เรื่อง", max_length=255)
@@ -221,7 +222,11 @@ class Sheet(models.Model):
         help_text="ใช้จัดกลุ่มชีทใน Sheet Inventory และช่วย filter ชีทให้ตรงกับ class",
     )
 
-    total_pages = models.PositiveIntegerField("จำนวนหน้า", default=0)
+    total_pages = models.PositiveIntegerField(
+        "จำนวนหน้า",
+        default=0,
+        help_text="จำนวนหน้าของไฟล์เนื้อหา ใช้คำนวณ % ความคืบหน้าการสอนในหน้าอัปเดตติวเตอร์",
+    )
     total_questions = models.PositiveIntegerField("จำนวนข้อ", default=0)  # ถ้าไม่ใช้ ใส่ 0
 
     is_active = models.BooleanField("เปิดใช้งาน", default=True)
@@ -1671,6 +1676,18 @@ class TeachingClassSubjectTemplate(models.Model):
         max_length=255,
         blank=True,
         help_text="ใช้ prefill ให้ติวเตอร์ในแต่ละสัปดาห์",
+    )
+    default_sheet = models.ForeignKey(
+        Sheet,
+        verbose_name="ชีทในระบบ (ใช้คิด % ความคืบหน้า)",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="default_for_subject_templates",
+        help_text=(
+            "ปกติระบบจับคู่ชีทให้อัตโนมัติจากรหัสชีทที่ติวเตอร์กรอก "
+            "ตั้งค่านี้เมื่ออยากบังคับให้ใช้ชีทเล่มนี้คิด % แทนการจับคู่อัตโนมัติ"
+        ),
     )
     display_order = models.PositiveIntegerField("ลำดับแสดงผล", default=1)
     is_active = models.BooleanField("ใช้งาน", default=True)

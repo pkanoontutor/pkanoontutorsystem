@@ -7,6 +7,7 @@ import re
 from datetime import date, timedelta, datetime
 from decimal import Decimal
 from io import BytesIO
+from urllib.parse import quote
 
 from django import forms
 from django.contrib.auth.decorators import login_required
@@ -120,7 +121,7 @@ TIME_SLOT_ORDER = [
 ]
 
 
-SHEET_GRADE_ORDER = ["p4", "p5", "p6", "m1", "m2", "m3", "m4", ""]
+SHEET_GRADE_ORDER = ["p4", "p5", "p6", "m1", "m2", "m3", "m4", "m5", ""]
 
 
 def _sheet_grade_label(value: str | None) -> str:
@@ -132,6 +133,7 @@ def _sheet_grade_label(value: str | None) -> str:
         "m2": "ม.2",
         "m3": "ม.3",
         "m4": "ม.4",
+        "m5": "ม.5",
         "": "ไม่ระบุระดับชั้น",
     }
     return labels.get((value or "").strip().lower(), value or "ไม่ระบุระดับชั้น")
@@ -176,6 +178,7 @@ def _normalize_sheet_grade_level(value: str | None) -> str:
         "m2": "m2", "ม2": "m2", "มัธยม2": "m2", "ม.2": "m2",
         "m3": "m3", "ม3": "m3", "มัธยม3": "m3", "ม.3": "m3",
         "m4": "m4", "ม4": "m4", "มัธยม4": "m4", "ม.4": "m4",
+        "m5": "m5", "ม5": "m5", "มัธยม5": "m5", "ม.5": "m5",
     }
     return mapping.get(raw, "")
 
@@ -183,10 +186,10 @@ def _normalize_sheet_grade_level(value: str | None) -> str:
 def _infer_sheet_grade_level(*texts: str | None) -> str:
     combined = " ".join((t or "") for t in texts).lower()
     # Match explicit code patterns first e.g. E-P4-01 / M-M1-01.
-    for grade in ["p4", "p5", "p6", "m1", "m2", "m3", "m4"]:
+    for grade in ["p4", "p5", "p6", "m1", "m2", "m3", "m4", "m5"]:
         if re.search(rf"(^|[^a-z0-9]){grade}([^a-z0-9]|$)", combined, re.I):
             return grade
-    for value in ["ป.4", "ป4", "ป.5", "ป5", "ป.6", "ป6", "ม.1", "ม1", "ม.2", "ม2", "ม.3", "ม3", "ม.4", "ม4"]:
+    for value in ["ป.4", "ป4", "ป.5", "ป5", "ป.6", "ป6", "ม.1", "ม1", "ม.2", "ม2", "ม.3", "ม3", "ม.4", "ม4", "ม.5", "ม5"]:
         normalized = _normalize_sheet_grade_level(value)
         if value.replace(".", "") in combined.replace(".", "").replace(" ", "") and normalized:
             return normalized
@@ -580,6 +583,7 @@ def _sheet_row(sheet: Sheet) -> dict:
         "default_spine_color": _default_spine_color_for_subject(sheet.subject.name if getattr(sheet, "subject_id", None) else ""),
         "default_spine_color_label": _spine_color_label(_default_spine_color_for_subject(sheet.subject.name if getattr(sheet, "subject_id", None) else "")),
         "onedrive_url": (getattr(inv, "onedrive_url", "") or "") if inv else "",
+        "storage_location": (getattr(inv, "storage_location", "") or "") if inv else "",
     }
 
 
@@ -705,6 +709,32 @@ def _build_class_sheet_rows() -> list[dict]:
         })
 
     return rows
+
+
+def _save_sheet_locations_from_post(request: HttpRequest) -> None:
+    """Persist any "ตำแหน่งวางชีท" boxes submitted alongside a stock action.
+
+    The location lives on the same form as the stock inputs, so whichever save
+    button the counter presses also stores wherever they wrote the sheet sits.
+    """
+    for key, value in request.POST.items():
+        if not key.startswith("location_"):
+            continue
+        sheet_id = key[len("location_"):]
+        if not sheet_id.isdigit():
+            continue
+        location = (value or "").strip()[:120]
+        inventory = SheetInventory.objects.filter(sheet_id=sheet_id).first()
+        if inventory is None:
+            if not location:
+                continue
+            sheet = Sheet.objects.filter(id=sheet_id).first()
+            if sheet is None:
+                continue
+            inventory = SheetInventory.objects.create(sheet=sheet, quantity=0)
+        if (inventory.storage_location or "") != location:
+            inventory.storage_location = location
+            inventory.save(update_fields=["storage_location", "updated_at"])
 
 
 def _sheet_inventory_context(*, q: str = "", extra: dict | None = None) -> dict:
@@ -1064,6 +1094,7 @@ def _save_inventory_bulk_from_post(
 def sheet_inventory_dashboard(request: HttpRequest) -> HttpResponse:
     if request.method == "POST":
         action = (request.POST.get("action") or "").strip()
+        _save_sheet_locations_from_post(request)
 
         if action == "create_sheet":
             code = (request.POST.get("code") or "").strip().upper()
@@ -1075,6 +1106,7 @@ def sheet_inventory_dashboard(request: HttpRequest) -> HttpResponse:
             total_questions = int(request.POST.get("total_questions") or 0)
             initial_qty = int(request.POST.get("initial_qty") or 0)
             minimum_stock = int(request.POST.get("minimum_stock") or 0)
+            onedrive_url = (request.POST.get("onedrive_url") or "").strip()
 
             if code and title:
                 if subject_id:
@@ -1098,6 +1130,8 @@ def sheet_inventory_dashboard(request: HttpRequest) -> HttpResponse:
                 if created:
                     inv, _ = SheetInventory.objects.get_or_create(sheet=sheet, defaults={"quantity": 0})
                     inv.minimum_stock = max(minimum_stock, 0)
+                    if onedrive_url:
+                        inv.onedrive_url = onedrive_url
                     inv.save()
                     if initial_qty > 0:
                         _apply_sheet_inventory_movement(
@@ -1107,7 +1141,14 @@ def sheet_inventory_dashboard(request: HttpRequest) -> HttpResponse:
                             note="Initial stock from Sheet Inventory module",
                             user=request.user,
                         )
-                return redirect("core:sheet_inventory_profile", pk=sheet.pk)
+                elif onedrive_url:
+                    inv, _ = SheetInventory.objects.get_or_create(sheet=sheet, defaults={"quantity": 0})
+                    inv.onedrive_url = onedrive_url
+                    inv.save(update_fields=["onedrive_url", "updated_at"])
+
+                # Stay on this page so several sheets can be added in a row.
+                status = "created" if created else "exists"
+                return redirect(f"{request.path}?sheet_saved={status}&sheet_code={quote(sheet.code)}")
 
         elif (
             action.startswith("receive_print_order:")
@@ -1399,7 +1440,10 @@ def sheet_inventory_dashboard(request: HttpRequest) -> HttpResponse:
             return redirect("core:sheet_inventory_dashboard")
 
     q = (request.GET.get("q") or "").strip()
-    return render(request, "core/sheet_inventory.html", _sheet_inventory_context(q=q))
+    return render(request, "core/sheet_inventory.html", _sheet_inventory_context(q=q, extra={
+        "sheet_saved": (request.GET.get("sheet_saved") or "").strip(),
+        "sheet_saved_code": (request.GET.get("sheet_code") or "").strip(),
+    }))
 
 
 @login_required
@@ -1407,6 +1451,7 @@ def sheet_inventory_count(request: HttpRequest) -> HttpResponse:
     """Dedicated stock count page. It records the actual counted balance only."""
     if request.method == "POST":
         action = (request.POST.get("action") or "").strip()
+        _save_sheet_locations_from_post(request)
 
         if action.startswith("count_stock_single:"):
             sheet_id = action.split(":", 1)[1]

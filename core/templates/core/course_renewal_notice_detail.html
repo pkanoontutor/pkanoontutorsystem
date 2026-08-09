@@ -18,6 +18,13 @@
     .editor{padding:16px;display:grid;gap:12px;position:sticky;top:12px}
     .editor h1{font-size:20px;margin:0;color:#0f172a}.hint{font-size:12px;color:#64748b;line-height:1.45;font-weight:800}
     #dateAutoSaveHint{color:#16a34a;font-weight:1000;}
+    .shift-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:6px;}
+    .shift-btn{border:1px solid #bfdbfe;background:#eff6ff;color:#1d4ed8;border-radius:999px;
+      padding:5px 12px;font-size:12px;font-weight:1000;cursor:pointer;transition:.12s;font-family:inherit;}
+    .shift-btn:hover{background:#dbeafe;border-color:#60a5fa;transform:translateY(-1px);}
+    .shift-btn.minus{border-color:#e2e8f0;background:#f8fafc;color:#475569;}
+    .shift-btn.minus:hover{background:#f1f5f9;border-color:#cbd5e1;}
+    .shift-hint{font-size:11px;color:#64748b;font-weight:700;}
     .grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.field{display:flex;flex-direction:column;gap:5px}.field label{font-size:11px;font-weight:1000;color:#334155;text-transform:uppercase;letter-spacing:.04em}
     input,textarea,select{border:1px solid #e2e8f0;border-radius:13px;padding:10px;font-weight:800;background:#fff;width:100%;font-family:inherit}
     textarea{min-height:88px;resize:vertical}.pkg-edit{border:1px solid #e2e8f0;background:#f8fafc;border-radius:16px;padding:10px;display:grid;gap:8px}
@@ -74,6 +81,11 @@
           <div class="field">
             <label>วันที่คาดว่าจะครบคอร์ส</label>
             <input type="date" id="expEndDate" name="expected_course_end_date" value="{{ notice.expected_course_end_date|date:'Y-m-d' }}">
+            <div class="shift-row">
+              <button type="button" class="shift-btn" id="endDatePlus7" title="เลื่อนวันครบคอร์สออกไป 7 วัน (วันเริ่มใหม่ขยับตามเป็น +7 จากวันครบคอร์ส)">+7 วัน</button>
+              <button type="button" class="shift-btn minus" id="endDateMinus7" title="ดึงวันครบคอร์สกลับมา 7 วัน">−7 วัน</button>
+              <span class="shift-hint">เลื่อนสัปดาห์ที่หยุด — วันเริ่มใหม่ขยับตามให้อัตโนมัติ</span>
+            </div>
           </div>
           <div class="field">
             <label>วันที่เริ่มต้นใหม่ <span style="font-weight:400;color:#64748b;">(auto = ครบคอร์ส +7 วัน, แก้เองได้)</span></label>
@@ -305,6 +317,28 @@
         startView.textContent = fmtDMY(startInput.value);
         scheduleAutoSave();
       });
+
+      // Shift the whole schedule when a week is skipped. Unlike typing a date,
+      // this always re-derives the start date as end +7 -- that cascade is the
+      // point of the button, so a previously hand-edited start is realigned.
+      function shiftEndBy(days) {
+        if (!endInput.value) return;
+        const nextEnd = plusDaysISO(endInput.value, days);
+        if (!nextEnd) return;
+        endInput.value = nextEnd;
+        endView.textContent = fmtDMY(nextEnd);
+
+        const nextStart = plusDaysISO(nextEnd, 7);
+        if (nextStart) {
+          startInput.value = nextStart;
+          startView.textContent = fmtDMY(nextStart);
+          startTouchedManually = false;
+        }
+        scheduleAutoSave();
+      }
+
+      document.getElementById("endDatePlus7").addEventListener("click", function () { shiftEndBy(7); });
+      document.getElementById("endDateMinus7").addEventListener("click", function () { shiftEndBy(-7); });
     })();
 
     async function makeCanvas() {

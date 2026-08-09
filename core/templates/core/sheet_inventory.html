@@ -13,6 +13,18 @@
   input,select,textarea{border:1px solid #e2e8f0;border-radius:11px;padding:8px 9px;font-weight:800;background:#fff;min-width:0;font-size:12px;}input:focus,select:focus,textarea:focus{outline:none;border-color:#0ea5e9;box-shadow:0 0 0 3px rgba(14,165,233,.12)}
   .grade-section{border:1px solid #e2e8f0;border-radius:18px;background:#fff;overflow:hidden;margin-bottom:10px}.grade-section summary{cursor:pointer;list-style:none;padding:12px 14px;background:linear-gradient(135deg,#f8fafc,#eff6ff);display:flex;justify-content:space-between;gap:10px;align-items:center}.grade-section summary::-webkit-details-marker{display:none}.grade-name{font-size:18px;font-weight:1000;color:#0f172a}.grade-hint{font-size:11px;color:#64748b;font-weight:900}.sheet-card-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;padding:10px}.sheet-card{border:1px solid var(--subject-border,#e2e8f0);border-left:7px solid var(--subject-accent,#64748b);border-radius:17px;background:linear-gradient(180deg,var(--subject-bg,#f8fafc),#fff 70%);padding:10px;display:grid;gap:8px;min-width:0;box-shadow:0 3px 8px rgba(15,23,42,.05)}.sheet-card:hover{box-shadow:0 8px 18px rgba(15,23,42,.10);transform:translateY(-1px)}
   .sheet-top{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}.sheet-code{font-size:16px;font-weight:1000;color:#0f172a}.sheet-title{font-size:12px;font-weight:850;color:#334155;line-height:1.25;overflow-wrap:anywhere}.subject{font-size:11px;color:#475569;font-weight:1000;line-height:1.25}.qty-box{display:flex;justify-content:space-between;align-items:center;gap:8px;background:#fff;border:1px solid rgba(15,23,42,.08);border-radius:15px;padding:8px 10px}.qty-label{font-size:10px;color:#64748b;font-weight:1000;text-transform:uppercase}.qty-num{font-size:34px;line-height:1;font-weight:1000;color:var(--subject-accent,#0f172a)}.low-badge{font-size:10px;font-weight:1000;background:#fee2e2;color:#991b1b;border:1px solid #fecaca;border-radius:999px;padding:3px 7px}.ok-badge{font-size:10px;font-weight:1000;background:#dcfce7;color:#166534;border:1px solid #86efac;border-radius:999px;padding:3px 7px}
+  /* Quick jump to a grade section -- small pills, meant to stay on one line. */
+  .grade-jump{display:flex;gap:6px;flex-wrap:wrap;align-items:center;}
+  .grade-jump .jump-label{font-size:11px;font-weight:1000;color:#64748b;white-space:nowrap;}
+  .grade-jump a{font-size:12px;font-weight:1000;text-decoration:none;color:#0f172a;background:#fff;
+    border:1px solid #cbd5e1;border-radius:999px;padding:5px 11px;white-space:nowrap;transition:.12s;}
+  .grade-jump a:hover{background:#eff6ff;border-color:#60a5fa;color:#1d4ed8;transform:translateY(-1px);}
+  .grade-jump a .n{font-weight:900;color:#94a3b8;margin-left:3px;font-size:10px;}
+  /* Anchored sections sit under the sticky-ish header when jumped to. */
+  .grade-section{scroll-margin-top:12px;}
+  .loc-row{display:grid;grid-template-columns:auto 1fr;gap:6px;align-items:center;}
+  .loc-row .loc-k{font-size:10.5px;font-weight:1000;color:#334155;white-space:nowrap;}
+  .loc-input{width:100%;box-sizing:border-box;font-size:11px;padding:7px 8px;}
   .edit-panel{background:rgba(255,255,255,.78);border:1px dashed var(--subject-border,#cbd5e1);border-radius:14px;padding:8px;display:grid;gap:7px}.edit-title{font-size:11px;font-weight:1000;color:#334155}.set-row{display:grid;grid-template-columns:1fr auto;gap:6px}.adjust-row{display:grid;grid-template-columns:1fr auto auto;gap:6px}.set-row input,.adjust-row input,.note-input{width:100%;box-sizing:border-box}.note-input{font-size:11px;padding:7px 8px}.tiny-btn{border:0;border-radius:10px;padding:8px 9px;font-weight:1000;font-size:11px;cursor:pointer}.save{background:#2563eb;color:#fff}.add{background:#16a34a;color:#fff}.deduct{background:#dc2626;color:#fff}.link-row{display:flex;gap:6px;flex-wrap:wrap}.mini-link{font-size:11px;font-weight:1000;text-decoration:none;color:#1d4ed8;background:#eff6ff;border:1px solid #bfdbfe;border-radius:999px;padding:5px 8px}.last-updated{font-size:10px;color:#64748b;font-weight:800}
   .receive-panel{border:2px solid #bbf7d0;background:linear-gradient(135deg,#f0fdf4,#ecfeff);}
   .receive-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin-top:10px}
@@ -143,6 +155,15 @@
         <a class="btnx soft" href="{% url 'core:sheet_inventory_dashboard' %}">ล้าง</a>
       </form>
     </div>
+
+    {% if sheet_grade_groups %}
+      <div class="grade-jump" style="margin-top:10px;">
+        <span class="jump-label">ไปที่ระดับชั้น:</span>
+        {% for group in sheet_grade_groups %}
+          <a href="#grade-{{ group.grade|default:'none' }}">{{ group.label }}<span class="n">{{ group.count }}</span></a>
+        {% endfor %}
+      </div>
+    {% endif %}
   </section>
 
   <form method="post" id="monitorStockForm">
@@ -152,7 +173,7 @@
     </div>
 
     {% for group in sheet_grade_groups %}
-      <details class="grade-section" open>
+      <details class="grade-section" id="grade-{{ group.grade|default:'none' }}" open>
         <summary><div><div class="grade-name">{{ group.label }}</div><div class="grade-hint">{{ group.count }} เล่ม</div></div><div class="grade-hint">กดเพื่อซ่อน/แสดง</div></summary>
         <div class="sheet-card-grid">
           {% for row in group.rows %}
@@ -183,6 +204,12 @@
                   <button class="tiny-btn deduct" type="submit" name="action" value="deduct_stock_single:{{ row.sheet.id }}">- ลด</button>
                 </div>
                 <input class="note-input" type="text" name="set_note_{{ row.sheet.id }}" placeholder="หมายเหตุ (ไม่บังคับ)">
+                <div class="loc-row">
+                  <span class="loc-k">📍 ตำแหน่ง</span>
+                  <input class="loc-input" type="text" name="location_{{ row.sheet.id }}"
+                         value="{{ row.storage_location }}" maxlength="120"
+                         placeholder="เช่น ชั้น 2 ฝั่งซ้าย / กล่อง A3">
+                </div>
               </div>
 
               <div class="link-row">
@@ -311,11 +338,19 @@
     </div>
   </div>
 
-  <details class="panel">
+  <details class="panel" id="sheetTools" {% if sheet_saved %}open{% endif %}>
     <summary class="tool-title" style="cursor:pointer;">เครื่องมือเพิ่มเติม: สร้างชีท / Bulk Upload / ผูกชีทกับ class</summary>
     <div class="tools-grid" style="margin-top:12px;">
       <div class="tool-box">
         <div class="tool-title">สร้างชีทใหม่</div>
+        {% if sheet_saved %}
+          <div id="sheetSavedBanner" style="border-radius:12px;padding:8px 10px;font-weight:1000;font-size:12px;margin-bottom:8px;
+                      {% if sheet_saved == 'created' %}background:#dcfce7;border:1px solid #86efac;color:#166534;
+                      {% else %}background:#fef3c7;border:1px solid #fcd34d;color:#92400e;{% endif %}">
+            {% if sheet_saved == 'created' %}✅ บันทึกแล้ว — สร้างชีท {{ sheet_saved_code }} เรียบร้อย
+            {% else %}⚠ มีชีทรหัส {{ sheet_saved_code }} อยู่แล้ว (อัปเดตลิงก์ให้แล้ว){% endif %}
+          </div>
+        {% endif %}
         <form method="post" class="form-grid">
           {% csrf_token %}
           <input type="hidden" name="action" value="create_sheet">
@@ -324,6 +359,7 @@
           <select name="grade_level"><option value="">ระดับชั้น</option>{% for value,label in sheet_grade_choices %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</select>
           <select name="subject_id"><option value="">เลือกวิชา</option>{% for s in subjects %}<option value="{{ s.id }}">{{ s.name }}</option>{% endfor %}</select>
           <input name="new_subject" placeholder="หรือสร้างวิชาใหม่">
+          <input type="url" name="onedrive_url" placeholder="ลิงก์ไฟล์ชีท (OneDrive) สำหรับส่งร้านปรินท์">
           <input type="number" min="0" name="initial_qty" placeholder="ยอดเริ่มต้น">
           <input type="number" min="0" name="minimum_stock" placeholder="ขั้นต่ำ">
           <button class="btnx primary" type="submit">สร้างชีท</button>
@@ -629,6 +665,17 @@ document.addEventListener('DOMContentLoaded', function(){
     if(printModal && !printModal.hidden){ closePrintModal(); }
     if(successModal && !successModal.hidden){ closeSuccessModal(); }
   });
+
+  // After creating a sheet the page reloads in place, so bring the result
+  // banner into view and drop the query string to avoid a stale message.
+  var savedBanner = document.getElementById('sheetSavedBanner');
+  if(savedBanner){
+    savedBanner.scrollIntoView({behavior:'smooth', block:'center'});
+    if(window.history.replaceState){
+      var clean = window.location.pathname + window.location.hash;
+      window.history.replaceState({}, '', clean);
+    }
+  }
 });
 </script>
 

@@ -957,6 +957,12 @@ class SheetInventory(models.Model):
         blank=True,
         help_text="ลิงก์ไฟล์ชีทสำหรับส่งร้านปรินท์",
     )
+    storage_location = models.CharField(
+        "ตำแหน่งวางชีท",
+        max_length=120,
+        blank=True,
+        help_text="ตำแหน่งที่วางชีทจริงในห้องเก็บของ เช่น ชั้น 2 ฝั่งซ้าย / กล่อง A3 — ให้คนนับชีทกรอกไว้หาง่าย",
+    )
 
     is_finished = models.BooleanField("จบชีทแล้ว", default=False)
     finished_at = models.DateTimeField("วันที่จบชีท", null=True, blank=True)

@@ -175,7 +175,7 @@
                   <td>
                     <div class="sheet-cell-items">
                       {% for item in cell.items %}
-                        <span class="sheet-chip"><a class="stock-link" href="/sheet-inventory/sheet/{{ item.sheet.id }}/"><span class="code">{{ item.sheet.code }}</span><span class="qty">{{ item.quantity }}</span></a><a class="print-link" href="/sheet-print-orders/">🖨️</a></span>
+                        <span class="sheet-chip"><a class="stock-link" href="/sheet-inventory/sheet/{{ item.sheet.id }}/"><span class="code">{{ item.sheet.code }}</span><span class="qty">{{ item.quantity }}</span></a><a class="print-link" href="/sheet-inventory/">🖨️</a></span>
                       {% empty %}<span class="empty-cell">-</span>{% endfor %}
                     </div>
                   </td>
@@ -188,7 +188,7 @@
     </section>
 
     <section class="sd-card span4">
-      <div class="card-head"><div><div class="card-title">7) รายการส่งปรินท์</div><div class="muted">รอปรินท์และเสร็จแล้วพร้อมกัน</div></div><a class="btnx soft" href="/sheet-print-orders/">ปรินท์</a></div>
+      <div class="card-head"><div><div class="card-title">7) รายการส่งปรินท์</div><div class="muted">รอปรินท์และเสร็จแล้วพร้อมกัน</div></div><a class="btnx soft" href="/sheet-inventory/">ปรินท์</a></div>
       <div class="print-columns">
         <div class="print-box"><h4>รอปรินท์</h4>{% for o in print_pending %}<div class="print-item"><div class="row-title">{{ o.display_code }}</div><div class="row-meta">{{ o.display_title }}</div><div><span class="print-qty">{{ o.quantity }}</span> <span class="tiny">เล่ม · เสร็จ {{ o.printed_quantity }}/{{ o.quantity }}</span></div></div>{% empty %}<div class="muted">ไม่มีรายการรอ</div>{% endfor %}</div>
         <div class="print-box"><h4>เสร็จแล้ว</h4>{% for o in print_ready %}<div class="print-item done"><div class="row-title">{{ o.display_code }}</div><div class="row-meta">{{ o.quantity }} เล่ม</div></div>{% empty %}<div class="muted">ยังไม่มีรายการเสร็จล่าสุด</div>{% endfor %}</div>

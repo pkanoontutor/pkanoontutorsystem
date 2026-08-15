@@ -3,21 +3,31 @@
 
 {% block head %}
 <style>
-  .ex-wrap{max-width:760px;margin:0 auto;display:grid;gap:16px;}
+  .ex-wrap{max-width:900px;margin:0 auto;display:grid;gap:16px;}
   .ex-card{background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:18px;box-shadow:0 4px 10px rgba(0,0,0,.06);}
-  .ex-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;align-items:end;}
+  .ex-grid{display:grid;grid-template-columns:repeat(4,1fr) auto auto;gap:10px;align-items:end;}
   .ex-grid label{font-size:12px;font-weight:700;color:#475569;display:block;margin-bottom:4px;}
   .ex-grid input{width:100%;box-sizing:border-box;padding:9px 11px;border:1px solid #cbd5e1;border-radius:10px;font-size:14px;font-family:inherit;}
+  .day-check{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:700;color:#334155;white-space:nowrap;padding-bottom:9px;}
+  .day-check input{width:auto;accent-color:#1d4ed8;}
   .sbtn{border:0;border-radius:10px;padding:10px 15px;font-weight:700;cursor:pointer;font-size:14px;font-family:inherit;
     display:inline-flex;align-items:center;gap:6px;text-decoration:none;}
   .sbtn.blue{background:#1d4ed8;color:#fff}.sbtn.soft{background:#f1f5f9;color:#0f172a;border:1px solid #cbd5e1}
   .sbtn.red{background:#dc2626;color:#fff}
-  .ex-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:11px 14px;
-    border:1px solid #eef2f7;border-radius:12px;margin-bottom:8px;}
-  .ex-row .g{font-weight:700;font-size:16px;}
-  .ex-row .m{font-size:13px;color:#64748b;}
-  .badge{background:#e11d2a;color:#fff;border-radius:10px;padding:4px 10px;font-weight:700;font-size:13px;}
-  @media(max-width:620px){.ex-grid{grid-template-columns:1fr 1fr}}
+  /* Two countdowns side by side, one line each -- not stacked into two rows. */
+  .ex-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;}
+  .ex-row{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:11px 14px;
+    border:1px solid #eef2f7;border-radius:14px;background:#f8fafc;flex-wrap:wrap;}
+  .ex-row .info{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;min-width:0;}
+  .ex-row .g{font-weight:1000;font-size:15px;color:#0f172a;white-space:nowrap;}
+  .ex-row .m{font-size:12px;color:#64748b;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .ex-row .side{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+  .badge{background:#e11d2a;color:#fff;border-radius:10px;padding:4px 10px;font-weight:700;font-size:13px;white-space:nowrap;}
+  .day-toggle{display:flex;gap:3px;}
+  .day-btn{border:1px solid #cbd5e1;background:#fff;color:#94a3b8;border-radius:8px;padding:4px 7px;
+    font-size:11px;font-weight:1000;cursor:pointer;font-family:inherit;}
+  .day-btn.on{background:#dcfce7;border-color:#86efac;color:#166534;}
+  @media(max-width:820px){.ex-grid{grid-template-columns:1fr 1fr}.ex-list{grid-template-columns:1fr}}
 </style>
 {% endblock %}
 
@@ -33,27 +43,50 @@
       <div><label>วันสอบ</label><input type="date" name="exam_date" required></div>
       <div><label>หมายเหตุ</label><input type="text" name="note" placeholder="เช่น รอบแรก - ห้องพิเศษ"></div>
       <div><button class="sbtn blue" type="submit" style="width:100%;justify-content:center;">+ เพิ่ม</button></div>
+      <label class="day-check"><input type="checkbox" name="show_on_saturday" checked> เสาร์</label>
+      <label class="day-check"><input type="checkbox" name="show_on_sunday" checked> อาทิตย์</label>
     </form>
   </div>
 
   <div class="ex-card">
-    <h3 style="margin:0 0 12px;">รายการวันสอบ</h3>
-    {% for it in items %}
-      <div class="ex-row">
-        <div>
-          <div class="g">{{ it.grade_label }} <span class="badge">{{ it.days_to_go }} วัน</span></div>
-          <div class="m">สอบ {{ it.exam_date_th }}{% if it.note %} · {{ it.note }}{% endif %}</div>
+    <h3 style="margin:0 0 12px;">รายการวันสอบ <span style="font-weight:400;color:#64748b;font-size:12px;">— ปกติวางไว้ 2 รายการ แสดงเฉพาะตารางวันที่เลือก</span></h3>
+    <div class="ex-list">
+      {% for it in items %}
+        <div class="ex-row">
+          <div class="info">
+            <span class="g">{{ it.grade_label }}</span>
+            <span class="badge">{{ it.days_to_go }} วัน</span>
+            <span class="m">สอบ {{ it.exam_date_th }}{% if it.note %} · {{ it.note }}{% endif %}</span>
+          </div>
+          <div class="side">
+            <div class="day-toggle">
+              <form method="post" style="display:contents;">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="toggle_day">
+                <input type="hidden" name="id" value="{{ it.id }}">
+                <input type="hidden" name="day" value="saturday">
+                <button class="day-btn {% if it.show_on_saturday %}on{% endif %}" type="submit" title="แสดงในตารางวันเสาร์">เสาร์</button>
+              </form>
+              <form method="post" style="display:contents;">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="toggle_day">
+                <input type="hidden" name="id" value="{{ it.id }}">
+                <input type="hidden" name="day" value="sunday">
+                <button class="day-btn {% if it.show_on_sunday %}on{% endif %}" type="submit" title="แสดงในตารางวันอาทิตย์">อาทิตย์</button>
+              </form>
+            </div>
+            <form method="post" onsubmit="return confirm('ลบวันสอบนี้?');">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="delete">
+              <input type="hidden" name="id" value="{{ it.id }}">
+              <button class="sbtn red" type="submit" style="padding:6px 10px;">ลบ</button>
+            </form>
+          </div>
         </div>
-        <form method="post" onsubmit="return confirm('ลบวันสอบนี้?');">
-          {% csrf_token %}
-          <input type="hidden" name="action" value="delete">
-          <input type="hidden" name="id" value="{{ it.id }}">
-          <button class="sbtn red" type="submit">ลบ</button>
-        </form>
-      </div>
-    {% empty %}
-      <div class="m" style="text-align:center;padding:16px;color:#64748b;">ยังไม่มีวันสอบ</div>
-    {% endfor %}
+      {% empty %}
+        <div class="m" style="text-align:center;padding:16px;color:#64748b;grid-column:1/-1;">ยังไม่มีวันสอบ</div>
+      {% endfor %}
+    </div>
     <a class="sbtn soft" href="/teaching-schedule/" style="margin-top:8px;">← กลับหน้าตาราง</a>
   </div>
 </div>

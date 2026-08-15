@@ -14,7 +14,7 @@ so this is safe to re-run.
 
 import urllib.parse
 
-from django.db import migrations
+from django.db import migrations, models
 
 
 _BASE_ID_PREFIX = (
@@ -144,5 +144,27 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
+        # These OneDrive folder URLs embed the full nested folder path (in
+        # Thai) inside the `id` query param, so they run well past the old
+        # 1000-char cap -- the longest generated link is ~1100 chars, and
+        # future sheets with longer names could go further still.
+        migrations.AlterField(
+            model_name="sheetinventory",
+            name="onedrive_url",
+            field=models.URLField(
+                blank=True,
+                help_text="ลิงก์ไฟล์ชีทสำหรับส่งร้านปรินท์",
+                max_length=2000,
+                verbose_name="ลิงก์ไฟล์ OneDrive",
+            ),
+        ),
+        # SheetPrintOrder copies the sheet's link at order-creation time (see
+        # admin_tool_create_print_order / create_print_order_inline), so it
+        # needs the same headroom or that copy fails the same way.
+        migrations.AlterField(
+            model_name="sheetprintorder",
+            name="onedrive_url",
+            field=models.URLField(blank=True, max_length=2000, verbose_name="ลิงก์ไฟล์ OneDrive"),
+        ),
         migrations.RunPython(apply_links, noop),
     ]

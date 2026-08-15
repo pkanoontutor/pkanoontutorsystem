@@ -961,7 +961,7 @@ class SheetInventory(models.Model):
     )
     onedrive_url = models.URLField(
         "ลิงก์ไฟล์ OneDrive",
-        max_length=1000,
+        max_length=2000,
         blank=True,
         help_text="ลิงก์ไฟล์ชีทสำหรับส่งร้านปรินท์",
     )
@@ -1079,7 +1079,7 @@ class SheetPrintOrder(models.Model):
     bound_done = models.BooleanField("เย็บแล้ว", default=False)
     spine_unavailable = models.BooleanField("สันรูดหมด / รอสันรูด", default=False)
     due_date = models.DateField("วันที่ต้องส่ง", null=True, blank=True)
-    onedrive_url = models.URLField("ลิงก์ไฟล์ OneDrive", max_length=1000, blank=True)
+    onedrive_url = models.URLField("ลิงก์ไฟล์ OneDrive", max_length=2000, blank=True)
     binding_type = models.CharField(
         "ประเภทการเย็บ",
         max_length=20,

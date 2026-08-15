@@ -74,6 +74,13 @@
         <div id="classStudents" class="class-students"></div>
       </div>
 
+      <div id="gradeSheetPanel" class="hidden" style="margin-top:10px">
+        <div class="section-title" id="gradeSheetTitle" style="margin-bottom:6px">ชีทของระดับชั้น</div>
+        <div class="hint" id="gradeSheetHint">เลือกชื่อ/คลาสก่อน ระบบจะขึ้นชีทของระดับชั้นนั้นให้เลือกตัด</div>
+        <div id="gradeSheetList" class="class-students"></div>
+        <button type="button" class="btn green" id="addGradeSheetsBtn" style="margin-top:8px;width:100%">➕ เพิ่มชีทที่เลือกเข้าคิว</button>
+      </div>
+
       <div class="scan-tool-wrap">
         <div>
           <div class="section-title">3) ค้นหา / สแกนรหัสชีท</div>
@@ -115,8 +122,13 @@
   const STUDENTS = {{ students_json|safe }};
   const ADMISSIONS = {{ admissions_json|safe }};
   const CLASSES = {{ class_students_json|safe }};
+  const GRADE_CHOICES = {{ grade_choices_json|safe }};
   let RECENT_ALLOCATIONS = {{ recent_allocations_json|safe }};
   const sheetMap = new Map(SHEETS.map(s => [String(s.code).toUpperCase(), s]));
+  const gradeCodeSet = new Set(GRADE_CHOICES.map(g => g.value));
+  const gradeLabelToCode = {};
+  GRADE_CHOICES.forEach(g => { gradeLabelToCode[String(g.label||'').trim()] = g.value; });
+  const pickedGradeSheetCodes = new Set();
   let mode = 'one_person_many_sheets';
   let recipientSource = 'student';
   let queue = [];
@@ -137,6 +149,11 @@
   const classStudents = document.getElementById('classStudents');
   const classStudentFilter = document.getElementById('classStudentFilter');
   const classSelectedCount = document.getElementById('classSelectedCount');
+  const gradeSheetPanel = document.getElementById('gradeSheetPanel');
+  const gradeSheetTitle = document.getElementById('gradeSheetTitle');
+  const gradeSheetHint = document.getElementById('gradeSheetHint');
+  const gradeSheetList = document.getElementById('gradeSheetList');
+  const addGradeSheetsBtn = document.getElementById('addGradeSheetsBtn');
 
   function toast(msg, err){
     const old=document.querySelector('.toast');
@@ -169,6 +186,7 @@
       hidden.value = '';
       picked.classList.remove('selected');
       picked.textContent = cfg.emptyText;
+      if(cfg.onChange) cfg.onChange();
     }
     function choose(row){
       hidden.value = row.id;
@@ -176,6 +194,7 @@
       picked.classList.add('selected');
       picked.textContent = 'เลือกแล้ว: ' + (row.label || row.name || '');
       hideResults();
+      if(cfg.onChange) cfg.onChange();
       setTimeout(()=>scanInput.focus(),60);
     }
     function rowText(row){
@@ -224,11 +243,11 @@
 
   setupQuickSearch({
     root:'student', inputId:'studentSearchInput', hiddenId:'studentSelect', resultsId:'studentSearchResults', pickedId:'studentPickedText', clearId:'studentClearBtn',
-    rows:STUDENTS, emptyText:'พิมพ์ค้นหา แล้วกดเลือกชื่อน้องจากรายการ'
+    rows:STUDENTS, emptyText:'พิมพ์ค้นหา แล้วกดเลือกชื่อน้องจากรายการ', onChange:()=>renderGradeSheetPicker()
   });
   setupQuickSearch({
     root:'admission', inputId:'admissionSearchInput', hiddenId:'admissionSelect', resultsId:'admissionSearchResults', pickedId:'admissionPickedText', clearId:'admissionClearBtn',
-    rows:ADMISSIONS, emptyText:'พิมพ์ค้นหา แล้วกดเลือกรายการสมัคร/ทดลองเรียน'
+    rows:ADMISSIONS, emptyText:'พิมพ์ค้นหา แล้วกดเลือกรายการสมัคร/ทดลองเรียน', onChange:()=>renderGradeSheetPicker()
   });
 
   fillSelect(classSelect, CLASSES.map(c => ({id:c.id, label:c.name+' · '+(c.students||[]).length+' คน'})), 'เลือก Class');
@@ -260,7 +279,7 @@
       updateClassSelectedCount();
     }));
   }
-  classSelect.addEventListener('change', function(){ selectedClassStudentIds.clear(); classStudentFilter.value=''; renderClassStudents(); });
+  classSelect.addEventListener('change', function(){ selectedClassStudentIds.clear(); classStudentFilter.value=''; renderClassStudents(); renderGradeSheetPicker(); });
   classStudentFilter.addEventListener('input', renderClassStudents);
   renderClassStudents();
 
@@ -270,6 +289,7 @@
     mode=btn.dataset.mode;
     document.getElementById('recipientPanel').classList.toggle('hidden', mode !== 'one_person_many_sheets');
     document.getElementById('classPanel').classList.toggle('hidden', mode !== 'one_sheet_many_people');
+    renderGradeSheetPicker();
     scanInput.focus();
   }));
   document.querySelectorAll('.tab').forEach(tab => tab.addEventListener('click', () => {
@@ -279,10 +299,12 @@
     document.getElementById('studentBox').classList.toggle('hidden', recipientSource !== 'student');
     document.getElementById('admissionBox').classList.toggle('hidden', recipientSource !== 'admission');
     document.getElementById('manualBox').classList.toggle('hidden', recipientSource !== 'manual');
+    renderGradeSheetPicker();
     if(recipientSource === 'student') document.getElementById('studentSearchInput').focus();
     else if(recipientSource === 'admission') document.getElementById('admissionSearchInput').focus();
     else scanInput.focus();
   }));
+  document.getElementById('manualGrade').addEventListener('input', renderGradeSheetPicker);
 
   function currentRecipients(){
     if(mode === 'one_sheet_many_people'){
@@ -307,6 +329,86 @@
     return [{recipient_source:'unassigned', label:'ไม่ระบุชื่อ'}];
   }
 
+  function resolveGradeCode(raw){
+    const val = String(raw||'').trim();
+    if(!val) return '';
+    const lower = val.toLowerCase();
+    if(gradeCodeSet.has(lower)) return lower;
+    return gradeLabelToCode[val] || '';
+  }
+  function sheetsForGrade(code){
+    return SHEETS.filter(s => String(s.grade_level||'').toLowerCase() === code);
+  }
+  function currentGradeCode(){
+    if(mode === 'one_sheet_many_people'){
+      const cls = CLASSES.find(c => String(c.id) === String(classSelect.value));
+      if(!cls || !cls.students.length) return '';
+      const counts = {};
+      cls.students.forEach(s => {
+        const code = resolveGradeCode(s.grade_level);
+        if(code) counts[code] = (counts[code]||0) + 1;
+      });
+      let best = '', bestCount = 0;
+      Object.keys(counts).forEach(k => { if(counts[k] > bestCount){ best = k; bestCount = counts[k]; } });
+      return best;
+    }
+    if(recipientSource === 'student'){
+      const st = STUDENTS.find(s => String(s.id) === String(studentSelect.value));
+      return st ? resolveGradeCode(st.grade_level) : '';
+    }
+    if(recipientSource === 'admission'){
+      const a = ADMISSIONS.find(x => String(x.id) === String(admissionSelect.value));
+      return a ? resolveGradeCode(a.grade_level) : '';
+    }
+    if(recipientSource === 'manual'){
+      return resolveGradeCode(document.getElementById('manualGrade').value);
+    }
+    return '';
+  }
+  function renderGradeSheetPicker(){
+    const code = currentGradeCode();
+    pickedGradeSheetCodes.clear();
+    if(!code){
+      gradeSheetPanel.classList.add('hidden');
+      gradeSheetList.innerHTML = '';
+      return;
+    }
+    const rows = sheetsForGrade(code);
+    const gradeLabel = (GRADE_CHOICES.find(g => g.value === code) || {}).label || code;
+    gradeSheetTitle.textContent = 'ชีทของระดับชั้น ' + gradeLabel;
+    gradeSheetPanel.classList.remove('hidden');
+    const isSingle = mode === 'one_sheet_many_people';
+    addGradeSheetsBtn.classList.toggle('hidden', isSingle);
+    if(!rows.length){
+      gradeSheetList.innerHTML = '<div class="hint">ยังไม่มีชีทของระดับชั้นนี้</div>';
+      gradeSheetHint.textContent = 'ยังไม่มีชีทของระดับชั้นนี้ในระบบ';
+      return;
+    }
+    gradeSheetHint.textContent = isSingle
+      ? 'เลือกได้ทีละเล่ม ระบบจะเพิ่มเข้าคิวทันทีสำหรับนักเรียนที่ติ๊กไว้ด้านบน'
+      : 'ติ๊กเลือกได้หลายเล่ม แล้วกดปุ่มเพิ่มเข้าคิว';
+    const inputType = isSingle ? 'radio' : 'checkbox';
+    gradeSheetList.innerHTML = rows.map(s => (
+      '<label class="student-check"><input type="'+inputType+'" name="gradeSheetPick" class="grade-sheet-pick" value="'+escapeHtml(s.code)+'"> '
+      + escapeHtml(s.code) + ' · ' + escapeHtml(s.title)
+      + ' <span class="pill">คงเหลือ ' + (Number(s.quantity)||0) + ' เล่ม</span></label>'
+    )).join('');
+    gradeSheetList.querySelectorAll('.grade-sheet-pick').forEach(inp => inp.addEventListener('change', function(){
+      if(isSingle){
+        if(this.checked) addScanned(this.value);
+        return;
+      }
+      if(this.checked) pickedGradeSheetCodes.add(this.value);
+      else pickedGradeSheetCodes.delete(this.value);
+    }));
+  }
+  addGradeSheetsBtn.addEventListener('click', function(){
+    if(!pickedGradeSheetCodes.size){ toast('ยังไม่ได้เลือกชีท', true); return; }
+    Array.from(pickedGradeSheetCodes).forEach(code => addScanned(code));
+    pickedGradeSheetCodes.clear();
+    gradeSheetList.querySelectorAll('.grade-sheet-pick:checked').forEach(x => { x.checked = false; });
+    scanInput.focus();
+  });
 
   function setSheetInputMode(nextMode){
     inputMode = nextMode === 'scan' ? 'scan' : 'search';
@@ -424,6 +526,7 @@
   });
   renderQueue();
   renderRecentAllocations();
+  renderGradeSheetPicker();
   setSheetInputMode('search');
 })();
 </script>

@@ -1871,7 +1871,9 @@ def sheet_allocation_scan(request: HttpRequest) -> HttpResponse:
         "admissions_json": json.dumps(_allocation_admissions_json(), ensure_ascii=False),
         "class_students_json": json.dumps(_allocation_class_students_json(), ensure_ascii=False),
         "recent_allocations_json": json.dumps(_allocation_history_payload(20), ensure_ascii=False),
-        "grade_choices": Sheet.GradeLevel.choices,
+        "grade_choices_json": json.dumps(
+            [{"value": v, "label": l} for v, l in Sheet.GradeLevel.choices], ensure_ascii=False
+        ),
     })
 
 

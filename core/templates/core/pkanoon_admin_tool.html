@@ -141,6 +141,37 @@
   .emoji-pick button:hover, .emoji-pick button.sel{border-color:var(--accent);background:var(--accent-soft);}
   .pk-modal-actions{display:flex;justify-content:space-between;gap:10px;margin-top:20px;}
 
+  /* Real-time overview */
+  .rt-details{background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--accent);
+    border-radius:var(--radius-lg);box-shadow:var(--shadow);overflow:hidden;}
+  .rt-summary{cursor:pointer;list-style:none;padding:18px 22px;display:flex;align-items:center;
+    justify-content:space-between;gap:12px;flex-wrap:wrap;}
+  .rt-summary::-webkit-details-marker{display:none;}
+  .rt-summary-title{font-size:18px;font-weight:700;color:var(--ink);display:flex;align-items:center;gap:9px;}
+  .rt-summary-hint{font-size:12px;font-weight:600;color:var(--ink-faint);}
+  .rt-body{padding:0 22px 22px;display:grid;gap:18px;}
+  .rt-cols{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+  .rt-block-title{font-size:13px;font-weight:700;color:var(--ink);display:flex;align-items:center;
+    gap:7px;margin-bottom:10px;}
+  .rt-block-title .n{font-size:11px;font-weight:700;color:var(--ink-faint);background:var(--panel-2);
+    border:1px solid var(--line);border-radius:999px;padding:2px 8px;}
+  .rt-list{display:grid;gap:8px;}
+  .rt-row{display:flex;align-items:center;justify-content:space-between;gap:10px;
+    background:var(--panel-2);border:1px solid var(--line);border-radius:11px;padding:9px 11px;}
+  .rt-row-main{min-width:0;}
+  .rt-row-name{font-size:13px;font-weight:700;color:var(--ink);}
+  .rt-row-name .rt-tag{font-size:10.5px;font-weight:700;color:var(--accent-strong);
+    background:var(--accent-soft);border-radius:999px;padding:1px 8px;margin-left:6px;}
+  .rt-row-meta{font-size:11.5px;color:var(--ink-soft);margin-top:2px;}
+  .rt-row.low .rt-qty{font-size:19px;font-weight:800;color:#c0483a;line-height:1;}
+  .rt-row-clear{flex:none;border:1px solid var(--line-strong);background:var(--panel);color:var(--ink-faint);
+    border-radius:9px;width:28px;height:28px;font-size:13px;cursor:pointer;transition:.12s;
+    display:flex;align-items:center;justify-content:center;}
+  .rt-row-clear:hover{border-color:#c0483a;color:#c0483a;}
+  .rt-empty-mini{font-size:12.5px;color:var(--ink-faint);padding:12px;text-align:center;
+    border:1.5px dashed var(--line);border-radius:11px;}
+  @media(max-width:760px){.rt-cols{grid-template-columns:1fr}}
+
   @media(max-width:900px){.tool-grid{grid-template-columns:1fr 1fr}.tool-title{font-size:23px}}
   @media(max-width:620px){.tool-grid{grid-template-columns:1fr}.tool-hero{padding:22px}.pk-row{grid-template-columns:1fr}}
 </style>
@@ -161,6 +192,52 @@
       </div>
     </div>
   </div>
+
+  <details class="rt-details" open>
+    <summary class="rt-summary">
+      <span class="rt-summary-title">📡 ภาพรวมเรียลไทม์</span>
+      <span class="rt-summary-hint">นักเรียนที่จะมาเสาร์-อาทิตย์นี้ · ชีทใกล้หมด — กดเพื่อซ่อน/แสดง</span>
+    </summary>
+    <div class="rt-body">
+      <div class="rt-cols">
+        <div>
+          <div class="rt-block-title">🧒 มาทดลอง/เริ่มเรียน เสาร์-อาทิตย์นี้ <span class="n" id="rtAdmissionCount">{{ upcoming_admissions|length }}</span></div>
+          <div class="rt-list" id="rtAdmissionList">
+            {% for a in upcoming_admissions %}
+              <div class="rt-row">
+                <div class="rt-row-main">
+                  <div class="rt-row-name">{{ a.nickname }} <span class="rt-tag">{{ a.request_type_label }}</span></div>
+                  <div class="rt-row-meta">{{ a.full_name }} · {{ a.grade_label }} · {{ a.date_label }} · {{ a.time_slot_label }}</div>
+                </div>
+              </div>
+            {% empty %}
+              <div class="rt-empty-mini">ยังไม่มีนักเรียนทดลอง/เริ่มเรียนในเสาร์-อาทิตย์นี้</div>
+            {% endfor %}
+          </div>
+        </div>
+
+        <div>
+          <div class="rt-block-title">📄 ชีทใกล้หมด (เหลือน้อยกว่า 3 เล่ม) <span class="n" id="rtLowStockCount">{{ low_stock_sheets|length }}</span></div>
+          <div class="rt-list" id="rtLowStockList">
+            {% for s in low_stock_sheets %}
+              <div class="rt-row low" data-sheet-id="{{ s.sheet_id }}">
+                <div class="rt-row-main">
+                  <div class="rt-row-name">{{ s.code }} <span class="rt-tag">{{ s.grade_label }}</span></div>
+                  <div class="rt-row-meta">{{ s.title }} · {{ s.subject }}</div>
+                </div>
+                <div style="display:flex;align-items:center;gap:10px;flex:none;">
+                  <div class="rt-qty">{{ s.quantity }}</div>
+                  <button class="rt-row-clear" type="button" title="ปิดชีทนี้ (ไม่ใช้แล้ว → ปรับเป็น inactive)" data-clear-sheet="{{ s.sheet_id }}">✕</button>
+                </div>
+              </div>
+            {% empty %}
+              <div class="rt-empty-mini" id="rtLowStockEmpty">ไม่มีชีทที่ใกล้หมด</div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </details>
 
   <div class="pk-toolbar">
     <div class="pk-search">
@@ -222,7 +299,8 @@
     save: "{% url 'core:admin_tool_card_save' %}",
     del: "{% url 'core:admin_tool_card_delete' %}",
     reorder: "{% url 'core:admin_tool_card_reorder' %}",
-    reset: "{% url 'core:admin_tool_card_reset' %}"
+    reset: "{% url 'core:admin_tool_card_reset' %}",
+    dismissLowStock: "{% url 'core:admin_tool_dismiss_low_stock_sheet' %}"
   };
 </script>
 
@@ -522,6 +600,30 @@
   $("pkModalBg").onclick=function(e){ if(e.target===$("pkModalBg")) closeModal(); };
   elSearch.addEventListener("input",function(){ query=this.value.trim(); render(); });
   document.addEventListener("keydown",function(e){ if(e.key==="Escape") closeModal(); });
+
+  // ---------- Real-time overview: clear a low-stock sheet ----------
+  var lowStockList=$("rtLowStockList"), lowStockCount=$("rtLowStockCount");
+  if(lowStockList){
+    lowStockList.addEventListener("click",function(e){
+      var btn=e.target.closest("[data-clear-sheet]");
+      if(!btn) return;
+      var row=btn.closest(".rt-row");
+      var sheetId=btn.getAttribute("data-clear-sheet");
+      if(!confirm("ปิดชีทนี้ (ปรับเป็น inactive)? ชีทจะไม่ถูกนับในสต็อกอีกต่อไป")) return;
+      btn.disabled=true;
+      api(window.PK_URLS.dismissLowStock,{sheet_id:sheetId}).then(function(){
+        row.remove();
+        var remaining=lowStockList.querySelectorAll(".rt-row").length;
+        if(lowStockCount) lowStockCount.textContent=remaining;
+        if(remaining===0){
+          var empty=document.createElement("div");
+          empty.className="rt-empty-mini"; empty.id="rtLowStockEmpty";
+          empty.textContent="ไม่มีชีทที่ใกล้หมด";
+          lowStockList.appendChild(empty);
+        }
+      });
+    });
+  }
 
   buildModalPickers();
   try{ applyTheme(localStorage.getItem(LS_THEME)==="1"); }catch(e){}

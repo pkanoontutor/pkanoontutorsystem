@@ -99,6 +99,7 @@
   <form method="post" class="wrapx" id="paymentForm">
     {% csrf_token %}
     <input type="hidden" name="quick_pick_notice_id" id="quickPickNoticeId" value="">
+    <input type="hidden" name="admission_id" id="admissionIdField" value="">
 
     <section class="cardx">
       <div class="section-title">1) ประเภทใบเสร็จ</div>
@@ -554,6 +555,7 @@ function fillFromAdmissionById(id){
   document.getElementById('newSchoolName').value = a.school_name || '';
   document.getElementById('newParentPhone').value = a.parent_phone || '';
   setEnrollmentAction('new');
+  document.getElementById('admissionIdField').value = a.id;
   document.getElementById('paymentForm').scrollIntoView({behavior:'smooth', block:'start'});
 }
 

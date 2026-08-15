@@ -6756,6 +6756,15 @@ def course_payment_create(request: HttpRequest) -> HttpResponse:
                     quick_pick_notice_id = (post.get("quick_pick_notice_id") or "").strip()
                     if quick_pick_notice_id:
                         CourseRenewalNotice.objects.filter(id=quick_pick_notice_id).update(hide_from_quick_receipt_pick=True)
+                    # Came from an admission card's "สร้างใบเสร็จ" link in the
+                    # admin tool's real-time overview -- now that a receipt
+                    # has actually been issued, mark the inquiry completed so
+                    # the card drops off automatically, same as "ยกเลิก".
+                    admission_id = (post.get("admission_id") or "").strip()
+                    if admission_id:
+                        AdmissionInquiry.objects.filter(id=admission_id, is_completed=False).update(
+                            is_completed=True, completed_at=timezone.now(),
+                        )
                 return redirect("core:course_payment_detail", pk=payment.pk)
         except Exception as exc:
             errors.append(f"บันทึกไม่สำเร็จ: {exc}")

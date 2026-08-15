@@ -5863,6 +5863,66 @@ def _seed_admin_tool_cards() -> None:
             )
 
 
+def _next_two_weekend_dates(today: date) -> list[date]:
+    """The next 2 upcoming calendar dates that are Saturday or Sunday,
+    counting from today (inclusive) -- so a class starting today still shows,
+    and on any weekday this naturally lands on "this coming Sat + Sun"."""
+    out: list[date] = []
+    d = today
+    while len(out) < 2:
+        if d.weekday() in (5, 6):
+            out.append(d)
+        d += timedelta(days=1)
+    return out
+
+
+def _upcoming_weekend_admissions() -> list[dict]:
+    """Trial/new-start students arriving on the next upcoming Sat/Sun, for
+    the admin tool's real-time overview -- lets staff see who's coming
+    before the weekend without digging through the admission report."""
+    weekend_dates = _next_two_weekend_dates(timezone.localdate())
+    rows = []
+    inquiries = (
+        AdmissionInquiry.objects
+        .filter(is_completed=False, first_lesson_date__in=weekend_dates)
+        .order_by("first_lesson_date", "preferred_time_slot", "nickname")
+    )
+    for inq in inquiries:
+        rows.append({
+            "id": inq.id,
+            "nickname": inq.nickname,
+            "full_name": inq.full_name,
+            "grade_label": inq.get_grade_level_display(),
+            "request_type_label": inq.get_request_type_display(),
+            "time_slot_label": inq.get_preferred_time_slot_display(),
+            "date": inq.first_lesson_date,
+            "date_label": _thai_schedule_date(inq.first_lesson_date),
+        })
+    return rows
+
+
+def _low_stock_sheets(threshold: int = 3) -> list[dict]:
+    """Active sheets with fewer than `threshold` copies left, for the admin
+    tool's real-time overview -- surfaces reprint needs without a trip to
+    Sheet Inventory. Each row can be dismissed (marks the Sheet inactive)."""
+    rows = []
+    for inv in (
+        SheetInventory.objects
+        .filter(sheet__is_active=True, quantity__lt=threshold)
+        .select_related("sheet", "sheet__subject")
+        .order_by("quantity", "sheet__code")
+    ):
+        rows.append({
+            "sheet_id": inv.sheet_id,
+            "code": inv.sheet.code,
+            "title": inv.sheet.title,
+            "subject": inv.sheet.subject.name if inv.sheet.subject_id else "",
+            "grade_label": _sheet_grade_label(inv.sheet.grade_level),
+            "quantity": inv.quantity,
+        })
+    return rows
+
+
 def pkanoon_admin_tool(request: HttpRequest) -> HttpResponse:
     """Private landing page for sensitive school tools."""
     from .models import AdminToolCard
@@ -5872,7 +5932,25 @@ def pkanoon_admin_tool(request: HttpRequest) -> HttpResponse:
     return render(request, "core/pkanoon_admin_tool.html", {
         "cards_json": json.dumps(cards, ensure_ascii=False),
         "can_edit": can_edit,
+        "upcoming_admissions": _upcoming_weekend_admissions(),
+        "low_stock_sheets": _low_stock_sheets(),
     })
+
+
+@require_POST
+def admin_tool_dismiss_low_stock_sheet(request: HttpRequest) -> JsonResponse:
+    """"Clear" a sheet from the low-stock overview: marks it inactive, since
+    a book that's no longer being reprinted shouldn't keep nagging staff."""
+    denied = _admin_tool_staff_denied(request)
+    if denied:
+        return denied
+    sheet_id = _admin_tool_card_payload(request).get("sheet_id")
+    sheet = Sheet.objects.filter(id=sheet_id).first()
+    if not sheet:
+        return JsonResponse({"ok": False, "error": "ไม่พบชีทนี้"}, status=404)
+    sheet.is_active = False
+    sheet.save(update_fields=["is_active"])
+    return JsonResponse({"ok": True})
 
 
 def _admin_tool_card_payload(request: HttpRequest) -> dict:

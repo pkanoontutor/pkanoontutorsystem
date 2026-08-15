@@ -195,6 +195,15 @@
     font-size:12px;padding:6px 9px;border-radius:8px;border:1px solid var(--line-strong);
     background:var(--panel);color:var(--ink);}
   .rt-row.low{flex-wrap:wrap;}
+
+  /* Print-order modal choice cards (binding type / spine color). */
+  .rt-choice-row{display:flex;gap:7px;flex-wrap:wrap;}
+  .rt-radio-card{border:1px solid var(--line-strong);background:var(--panel);border-radius:11px;
+    padding:8px 11px;font-size:12.5px;font-weight:700;cursor:pointer;display:inline-flex;
+    gap:6px;align-items:center;color:var(--ink);}
+  .rt-radio-card input{width:auto;margin:0;}
+  .rt-radio-card:has(input:checked){border-color:var(--accent)!important;box-shadow:0 0 0 2px var(--accent-soft);}
+
   @media(max-width:760px){.rt-cols{grid-template-columns:1fr}}
 
   @media(max-width:900px){.tool-grid{grid-template-columns:1fr 1fr}.tool-title{font-size:23px}}
@@ -258,7 +267,8 @@
                 <div style="display:flex;align-items:center;gap:10px;flex:none;">
                   <div class="rt-qty">{{ s.quantity }}</div>
                   <button class="rt-mini-btn print" type="button" data-print-sheet="{{ s.sheet_id }}"
-                          data-has-link="{% if s.onedrive_url %}1{% else %}0{% endif %}" title="สั่งปรินท์">🖨️ สั่งปรินท์</button>
+                          data-has-link="{% if s.onedrive_url %}1{% else %}0{% endif %}"
+                          data-code="{{ s.code }}" data-title="{{ s.title }}" title="สั่งปรินท์">🖨️ สั่งปรินท์</button>
                   <button class="rt-row-clear" type="button" title="ปิดชีทนี้ (ไม่ใช้แล้ว → ปรับเป็น inactive)" data-clear-sheet="{{ s.sheet_id }}">✕</button>
                 </div>
                 {% if not s.onedrive_url %}
@@ -326,6 +336,52 @@
       <span style="flex:1"></span>
       <button class="pk-btn" id="pkModalCancel" type="button">ยกเลิก</button>
       <button class="pk-btn primary" id="pkModalSave" type="button">บันทึก</button>
+    </div>
+  </div>
+</div>
+
+<!-- Print-order modal: page-native popup for the low-stock "สั่งปรินท์" button,
+     mirroring the same fields as the Sheet Inventory print popup. -->
+<div class="pk-modal-bg" id="rtPrintModalBg">
+  <div class="pk-modal">
+    <h3>🖨️ สั่งปรินท์ <span id="rtPrintModalCode" style="color:var(--accent-strong);"></span></h3>
+    <div class="pk-field" id="rtPrintModalTitle" style="font-size:12.5px;color:var(--ink-soft);margin-top:-8px;"></div>
+    <div class="pk-row">
+      <div class="pk-field">
+        <label>จำนวนที่จะส่งปรินท์</label>
+        <input id="rtPrintQty" type="number" min="1" placeholder="เช่น 20">
+      </div>
+      <div class="pk-field">
+        <label>วันที่ต้องทำเสร็จ</label>
+        <input id="rtPrintDueDate" type="date" value="{{ default_print_due_date|date:'Y-m-d' }}">
+      </div>
+    </div>
+    <div class="pk-field">
+      <label>รูปแบบการเย็บ</label>
+      <div class="rt-choice-row" id="rtPrintBindingRow">
+        {% for value,label in binding_type_choices %}
+          <label class="rt-radio-card">
+            <input type="radio" name="rtPrintBinding" value="{{ value }}" {% if value == "side" %}checked{% endif %}>
+            {{ label }}
+          </label>
+        {% endfor %}
+      </div>
+    </div>
+    <div class="pk-field" id="rtPrintColorField">
+      <label>สีสันรูด</label>
+      <div class="rt-choice-row" id="rtPrintColorRow">
+        {% for c in spine_color_choices %}
+          <label class="rt-radio-card" style="background:{{ c.bg }};border-color:{{ c.border }};">
+            <input type="radio" name="rtPrintColor" value="{{ c.value }}">
+            {{ c.label }}
+          </label>
+        {% endfor %}
+      </div>
+    </div>
+    <div class="pk-modal-actions">
+      <span style="flex:1"></span>
+      <button class="pk-btn" id="rtPrintCancel" type="button">ยกเลิก</button>
+      <button class="pk-btn primary" id="rtPrintSubmit" type="button">ส่งปรินท์</button>
     </div>
   </div>
 </div>
@@ -643,6 +699,60 @@
   elSearch.addEventListener("input",function(){ query=this.value.trim(); render(); });
   document.addEventListener("keydown",function(e){ if(e.key==="Escape") closeModal(); });
 
+  // ---------- Real-time overview: print-order modal (page-native, not prompt()) ----------
+  var rtPrintModalBg=$("rtPrintModalBg"), rtPrintBtn=null;
+  function syncPrintColorField(){
+    var checked=document.querySelector('input[name="rtPrintBinding"]:checked');
+    var colorField=$("rtPrintColorField");
+    if(!checked||!colorField) return;
+    colorField.style.display = (checked.value==="corner") ? "none" : "";
+  }
+  function openPrintModal(printBtn){
+    rtPrintBtn=printBtn;
+    $("rtPrintModalCode").textContent=printBtn.getAttribute("data-code")||"";
+    $("rtPrintModalTitle").textContent=printBtn.getAttribute("data-title")||"";
+    $("rtPrintQty").value="";
+    var sideRadio=document.querySelector('input[name="rtPrintBinding"][value="side"]');
+    if(sideRadio) sideRadio.checked=true;
+    document.querySelectorAll('input[name="rtPrintColor"]').forEach(function(r){ r.checked=false; });
+    syncPrintColorField();
+    rtPrintModalBg.classList.add("show");
+    setTimeout(function(){ $("rtPrintQty").focus(); },30);
+  }
+  function closePrintModal(){ rtPrintModalBg.classList.remove("show"); rtPrintBtn=null; }
+  function submitPrintModal(){
+    if(!rtPrintBtn) return;
+    var qty=parseInt($("rtPrintQty").value,10);
+    if(!qty||qty<=0){ alert("กรุณากรอกจำนวนที่ถูกต้อง"); return; }
+    var sheetId=rtPrintBtn.getAttribute("data-print-sheet");
+    var binding=document.querySelector('input[name="rtPrintBinding"]:checked');
+    var color=document.querySelector('input[name="rtPrintColor"]:checked');
+    var body={
+      sheet_id: sheetId,
+      quantity: qty,
+      due_date: $("rtPrintDueDate").value||"",
+      binding_type: binding ? binding.value : "side",
+      spine_color: color ? color.value : ""
+    };
+    var submitBtn=$("rtPrintSubmit");
+    submitBtn.disabled=true; submitBtn.textContent="กำลังส่ง...";
+    api(window.PK_URLS.createPrintOrder, body).then(function(res){
+      closePrintModal();
+      alert(res.message||"ส่งปรินท์เรียบร้อยแล้ว");
+    }).finally(function(){
+      submitBtn.disabled=false; submitBtn.textContent="ส่งปรินท์";
+    });
+  }
+  if(rtPrintModalBg){
+    $("rtPrintCancel").onclick=closePrintModal;
+    $("rtPrintSubmit").onclick=submitPrintModal;
+    rtPrintModalBg.onclick=function(e){ if(e.target===rtPrintModalBg) closePrintModal(); };
+    document.querySelectorAll('input[name="rtPrintBinding"]').forEach(function(r){
+      r.addEventListener("change", syncPrintColorField);
+    });
+    document.addEventListener("keydown",function(e){ if(e.key==="Escape") closePrintModal(); });
+  }
+
   // ---------- Real-time overview: low-stock sheet actions ----------
   var lowStockList=$("rtLowStockList"), lowStockCount=$("rtLowStockCount");
   function lowStockEmptyCheck(){
@@ -678,15 +788,7 @@
           if(input2) input2.focus();
           return;
         }
-        var sheetId2=printBtn.getAttribute("data-print-sheet");
-        var qty=prompt("จะสั่งปรินท์กี่เล่ม?","10");
-        if(qty===null) return;
-        qty=parseInt(qty,10);
-        if(!qty || qty<=0){ alert("กรุณากรอกจำนวนที่ถูกต้อง"); return; }
-        printBtn.disabled=true;
-        api(window.PK_URLS.createPrintOrder,{sheet_id:sheetId2,quantity:qty}).then(function(res){
-          alert(res.message||"ส่งปรินท์เรียบร้อยแล้ว");
-        }).finally(function(){ printBtn.disabled=false; });
+        openPrintModal(printBtn);
         return;
       }
 

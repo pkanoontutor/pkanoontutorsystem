@@ -351,6 +351,25 @@
     transform: translateY(-1px);
     box-shadow: 0 2px 6px rgba(0,0,0,.08);
   }
+  .not-renew-btn:hover { background:#fee2e2; border-color:#fecaca; color:#991b1b; }
+
+  /* ---- ไม่ต่อคอร์ส confirm popup (page-native, not window.confirm) ---- */
+  .nr-modal-bg{position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:9999;
+    display:none;align-items:center;justify-content:center;padding:16px;}
+  .nr-modal-bg.show{display:flex;}
+  .nr-modal{width:100%;max-width:420px;background:#fff;border-radius:18px;
+    box-shadow:0 24px 60px rgba(15,23,42,.35);padding:20px;}
+  .nr-modal-title{font-size:17px;font-weight:1000;color:#0f172a;display:flex;align-items:center;gap:8px;}
+  .nr-modal-body{font-size:13.5px;color:#475569;line-height:1.6;margin:12px 0 4px;}
+  .nr-modal-body b{color:#0f172a;}
+  .nr-modal-note{font-size:12px;color:#92400e;background:#fffbeb;border:1px solid #fde68a;
+    border-radius:11px;padding:8px 10px;margin-top:8px;line-height:1.5;}
+  .nr-modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:18px;}
+  .nr-btn{border:0;border-radius:11px;padding:9px 15px;font-weight:1000;font-size:13px;
+    cursor:pointer;font-family:inherit;}
+  .nr-btn.soft{background:#f1f5f9;color:#0f172a;}
+  .nr-btn.danger{background:#dc2626;color:#fff;}
+  .nr-btn.danger:disabled{opacity:.6;cursor:not-allowed;}
 
   /* Status badge */
   .status-badge {
@@ -1052,6 +1071,9 @@
                           <div class="student-actions">
                             <a class="student-mini-btn" href="/adminlublub/core/student/{{ e.student_id }}/change/" title="เปิด Student Profile">👤</a>
                             <a class="student-mini-btn" href="/adminlublub/core/enrollment/{{ e.id }}/change/" title="เปิด Enrollment">📑</a>
+                            <button type="button" class="student-mini-btn not-renew-btn"
+                                    onclick="return openNotRenewModal({{ e.id }}, '{{ e.student.nickname|default:e.sale_run_no|default:"นักเรียนคนนี้"|escapejs }}');"
+                                    title="ไม่ต่อคอร์ส">🚫</button>
                           </div>
                         </div>
                       </td>
@@ -1105,6 +1127,20 @@
   <!-- ASIDE REMOVED: two-day summary is now included in the weekly bar section above -->
 
 </div><!-- /dash-body -->
+
+<div class="nr-modal-bg" id="nrModalBg">
+  <div class="nr-modal">
+    <div class="nr-modal-title">🚫 ยืนยันไม่ต่อคอร์ส</div>
+    <div class="nr-modal-body">
+      จะปิดคอร์สของ <b id="nrModalName">-</b> รายการนี้ (ไม่ต่อคอร์ส) ใช่ไหม?
+      <div class="nr-modal-note" id="nrModalNote"></div>
+    </div>
+    <div class="nr-modal-actions">
+      <button type="button" class="nr-btn soft" id="nrModalCancel">ยกเลิก</button>
+      <button type="button" class="nr-btn danger" id="nrModalConfirm">ยืนยันไม่ต่อคอร์ส</button>
+    </div>
+  </div>
+</div>
 
 <script>
   /* ================================================
@@ -1191,6 +1227,58 @@
     });
     return false;
   }
+
+  /* ================================================
+     ไม่ต่อคอร์ส (page-native confirm popup, not window.confirm)
+  ================================================ */
+  let nrPendingEnrollmentId = null;
+  function openNotRenewModal(enrollmentId, studentName){
+    nrPendingEnrollmentId = enrollmentId;
+    document.getElementById("nrModalName").textContent = studentName || "นักเรียนคนนี้";
+    document.getElementById("nrModalNote").textContent =
+      "ระบบจะปิด Enrollment รายการนี้ (ไม่นับต่อในห้อง) และถ้านักเรียนคนนี้ไม่มีคอร์สอื่นที่ยัง active อยู่ จะปิดสถานะนักเรียนไปด้วย — ถ้ายังมีคอร์สอื่น active อยู่ จะปิดเฉพาะคอร์สนี้เท่านั้น";
+    const confirmBtn = document.getElementById("nrModalConfirm");
+    confirmBtn.disabled = false;
+    confirmBtn.textContent = "ยืนยันไม่ต่อคอร์ส";
+    document.getElementById("nrModalBg").classList.add("show");
+    return false;
+  }
+  function closeNotRenewModal(){
+    document.getElementById("nrModalBg").classList.remove("show");
+    nrPendingEnrollmentId = null;
+  }
+  async function confirmNotRenew(){
+    if(!nrPendingEnrollmentId) return;
+    const confirmBtn = document.getElementById("nrModalConfirm");
+    confirmBtn.disabled = true;
+    confirmBtn.textContent = "กำลังบันทึก...";
+    try{
+      const res = await fetch("/enrollment/mark-not-renewing/", {
+        method: "POST",
+        headers: {"Content-Type":"application/json","X-CSRFToken":csrftoken,"X-Requested-With":"XMLHttpRequest"},
+        body: JSON.stringify({enrollment_id: nrPendingEnrollmentId}),
+      });
+      const data = await res.json();
+      if(!res.ok || !data.ok) throw new Error(data.error || "บันทึกไม่สำเร็จ");
+      const row = document.getElementById("row-" + nrPendingEnrollmentId);
+      const cid = row ? row.dataset.class : null;
+      if(row) row.remove();
+      if(cid){ updateSelectionSummary(cid); }
+      closeNotRenewModal();
+    }catch(err){
+      confirmBtn.disabled = false;
+      confirmBtn.textContent = "ยืนยันไม่ต่อคอร์ส";
+      alert(err.message || "บันทึกไม่สำเร็จ");
+    }
+  }
+  document.getElementById("nrModalCancel").addEventListener("click", closeNotRenewModal);
+  document.getElementById("nrModalConfirm").addEventListener("click", confirmNotRenew);
+  document.getElementById("nrModalBg").addEventListener("click", function(e){
+    if(e.target === this) closeNotRenewModal();
+  });
+  document.addEventListener("keydown", function(e){
+    if(e.key === "Escape") closeNotRenewModal();
+  });
 
   /* ================================================
      LIVE SELECTION COUNT

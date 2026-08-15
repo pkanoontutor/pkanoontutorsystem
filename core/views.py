@@ -3079,6 +3079,42 @@ def admin_dashboard(request: HttpRequest) -> HttpResponse:
     })
 
 
+@require_POST
+@login_required
+def enrollment_mark_not_renewing(request: HttpRequest) -> JsonResponse:
+    """"ไม่ต่อคอร์ส" button on the dashboard roster: closes out one
+    Enrollment. If that was the student's only active enrollment, the
+    Student is deactivated too; if they have other active enrollments
+    (e.g. two subjects), only this one closes and the student stays active.
+    """
+    try:
+        payload = json.loads(request.body.decode("utf-8"))
+    except Exception:
+        return JsonResponse({"ok": False, "error": "Invalid JSON"}, status=400)
+
+    enrollment = Enrollment.objects.select_related("student").filter(id=payload.get("enrollment_id")).first()
+    if not enrollment:
+        return JsonResponse({"ok": False, "error": "ไม่พบ Enrollment นี้"}, status=404)
+
+    with transaction.atomic():
+        enrollment.is_active = False
+        enrollment.save(update_fields=["is_active"])
+
+        student = enrollment.student
+        has_other_active = Enrollment.objects.filter(student=student, is_active=True).exclude(pk=enrollment.pk).exists()
+        student_deactivated = False
+        if not has_other_active:
+            student.is_active = False
+            student.save(update_fields=["is_active"])
+            student_deactivated = True
+
+    return JsonResponse({
+        "ok": True,
+        "enrollment_id": enrollment.id,
+        "student_deactivated": student_deactivated,
+    })
+
+
 @login_required
 def attendance_details(request: HttpRequest) -> HttpResponse:
     """
@@ -5936,6 +5972,9 @@ def pkanoon_admin_tool(request: HttpRequest) -> HttpResponse:
         "can_edit": can_edit,
         "upcoming_admissions": _upcoming_weekend_admissions(),
         "low_stock_sheets": _low_stock_sheets(),
+        "binding_type_choices": SheetPrintOrder.BindingType.choices,
+        "spine_color_choices": _print_color_choices(),
+        "default_print_due_date": timezone.localdate() + timedelta(days=3),
     })
 
 
@@ -6026,12 +6065,23 @@ def admin_tool_create_print_order(request: HttpRequest) -> JsonResponse:
         return JsonResponse({"ok": False, "error": "ชีทนี้ยังไม่มีลิงก์ไฟล์ กรุณากรอกลิงก์ก่อนสั่งปรินท์"}, status=400)
 
     default_color = _default_spine_color_for_subject(sheet.subject.name if sheet.subject_id else "")
+    binding_type = (payload.get("binding_type") or SheetPrintOrder.BindingType.SIDE).strip()
+    if binding_type not in dict(SheetPrintOrder.BindingType.choices):
+        binding_type = SheetPrintOrder.BindingType.SIDE
+    spine_color = (payload.get("spine_color") or "").strip()
+    if binding_type == SheetPrintOrder.BindingType.CORNER:
+        spine_color = ""
+    elif spine_color not in dict(SheetPrintOrder.SpineColor.choices):
+        spine_color = default_color
+    due_date = _parse_optional_date(payload.get("due_date"))
+
     SheetPrintOrder.objects.create(
         sheet=sheet,
         quantity=quantity,
+        due_date=due_date,
         onedrive_url=inventory.onedrive_url,
-        binding_type=SheetPrintOrder.BindingType.SIDE,
-        spine_color=default_color,
+        binding_type=binding_type,
+        spine_color=spine_color,
         note="สั่งปรินท์จากภาพรวมเรียลไทม์ (Admin Tool)",
         requested_by=request.user if getattr(request.user, "is_authenticated", False) else None,
     )

@@ -4781,12 +4781,31 @@ def course_renewal_notice_list(request: HttpRequest) -> HttpResponse:
 
         # Do NOT apply date filters here.
         # Main grouping must depend only on whether this enrollment has ever been marked as sent.
+        #
+        # Two things must NOT count as "already notified about THIS
+        # completion":
+        # 1) Installment notices (งวดที่ 2/3/4) -- a different purpose
+        #    (mid-course payment reminder), so sending one must never hide
+        #    the renewal card.
+        # 2) A renewal notice from a PREVIOUS top-up cycle -- once a parent
+        #    pays to add more sessions to this same Enrollment, any renewal
+        #    notice sent before that top-up is stale. Only notices created
+        #    since the most recent (non-cancelled) payment on this
+        #    enrollment are "live" for the current low-balance state.
+        last_payment = (
+            enrollment.course_payments
+            .filter(cancelled_at__isnull=True)
+            .order_by("-created_at")
+            .first()
+        )
         notices_qs = (
             CourseRenewalNotice.objects
             .select_related("student", "tutoring_class", "enrollment", "source_payment", "sent_to_parent_by")
-            .filter(enrollment=enrollment)
-            .order_by("-created_at")
+            .filter(enrollment=enrollment, notice_type=CourseRenewalNotice.NoticeType.RENEWAL)
         )
+        if last_payment:
+            notices_qs = notices_qs.filter(created_at__gte=last_payment.created_at)
+        notices_qs = notices_qs.order_by("-created_at")
 
         latest_notice = notices_qs.first()
         latest_unsent_notice = notices_qs.filter(is_sent_to_parent=False).first()

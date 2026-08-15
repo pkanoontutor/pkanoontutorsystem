@@ -170,6 +170,31 @@
   .rt-row-clear:hover{border-color:#c0483a;color:#c0483a;}
   .rt-empty-mini{font-size:12.5px;color:var(--ink-faint);padding:12px;text-align:center;
     border:1.5px dashed var(--line);border-radius:11px;}
+
+  /* Admission card: default row, "attended" recolors it while it stays put. */
+  .rt-row.admission{flex-wrap:wrap;}
+  .rt-row.admission.attended{background:var(--accent-soft);border-color:var(--accent);}
+  .rt-tag.attended-tag{background:var(--accent);color:#fff;}
+  .rt-row-actions{display:flex;gap:6px;flex-wrap:wrap;width:100%;margin-top:2px;}
+  .rt-mini-btn{border:1px solid var(--line-strong);background:var(--panel);color:var(--ink-soft);
+    border-radius:8px;padding:5px 9px;font-size:11.5px;font-weight:700;cursor:pointer;
+    text-decoration:none;display:inline-flex;align-items:center;gap:4px;font-family:inherit;
+    transition:.12s;white-space:nowrap;}
+  .rt-mini-btn:hover{border-color:var(--accent);color:var(--accent-strong);}
+  .rt-mini-btn.arrive:hover{border-color:#3f7d20;color:#3f7d20;}
+  .rt-mini-btn.cancel:hover{border-color:#c0483a;color:#c0483a;}
+  .rt-mini-btn.receipt{background:var(--accent);border-color:var(--accent);color:#fff;}
+  .rt-mini-btn.receipt:hover{background:var(--accent-strong);border-color:var(--accent-strong);color:#fff;}
+
+  /* Low-stock print / missing-link */
+  .rt-mini-btn.print[data-has-link="0"]{opacity:.6;}
+  .rt-link-fill{width:100%;display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:8px;
+    padding-top:8px;border-top:1px dashed var(--line-strong);}
+  .rt-nolink{font-size:11px;font-weight:700;color:#c0483a;white-space:nowrap;}
+  .rt-link-fill input{flex:1;min-width:160px;box-sizing:border-box;font-family:inherit;
+    font-size:12px;padding:6px 9px;border-radius:8px;border:1px solid var(--line-strong);
+    background:var(--panel);color:var(--ink);}
+  .rt-row.low{flex-wrap:wrap;}
   @media(max-width:760px){.rt-cols{grid-template-columns:1fr}}
 
   @media(max-width:900px){.tool-grid{grid-template-columns:1fr 1fr}.tool-title{font-size:23px}}
@@ -204,10 +229,15 @@
           <div class="rt-block-title">🧒 มาทดลอง/เริ่มเรียน เสาร์-อาทิตย์นี้ <span class="n" id="rtAdmissionCount">{{ upcoming_admissions|length }}</span></div>
           <div class="rt-list" id="rtAdmissionList">
             {% for a in upcoming_admissions %}
-              <div class="rt-row">
+              <div class="rt-row admission {% if a.attended_first_lesson %}attended{% endif %}" data-admission-id="{{ a.id }}">
                 <div class="rt-row-main">
-                  <div class="rt-row-name">{{ a.nickname }} <span class="rt-tag">{{ a.request_type_label }}</span></div>
+                  <div class="rt-row-name">{{ a.nickname }} <span class="rt-tag">{{ a.request_type_label }}</span>{% if a.attended_first_lesson %}<span class="rt-tag attended-tag">มาแล้ว · รอใบเสร็จ</span>{% endif %}</div>
                   <div class="rt-row-meta">{{ a.full_name }} · {{ a.grade_label }} · {{ a.date_label }} · {{ a.time_slot_label }}</div>
+                </div>
+                <div class="rt-row-actions">
+                  <button class="rt-mini-btn arrive" type="button" data-mark-attended data-admission-id="{{ a.id }}" title="มาแล้ว">✅ มาแล้ว</button>
+                  <a class="rt-mini-btn receipt" href="/course-payments/new/?admission_id={{ a.id }}" title="สร้างใบเสร็จ">🧾 สร้างใบเสร็จ</a>
+                  <button class="rt-mini-btn cancel" type="button" data-cancel-admission data-admission-id="{{ a.id }}" title="ยกเลิก">✕ ยกเลิก</button>
                 </div>
               </div>
             {% empty %}
@@ -227,8 +257,17 @@
                 </div>
                 <div style="display:flex;align-items:center;gap:10px;flex:none;">
                   <div class="rt-qty">{{ s.quantity }}</div>
+                  <button class="rt-mini-btn print" type="button" data-print-sheet="{{ s.sheet_id }}"
+                          data-has-link="{% if s.onedrive_url %}1{% else %}0{% endif %}" title="สั่งปรินท์">🖨️ สั่งปรินท์</button>
                   <button class="rt-row-clear" type="button" title="ปิดชีทนี้ (ไม่ใช้แล้ว → ปรับเป็น inactive)" data-clear-sheet="{{ s.sheet_id }}">✕</button>
                 </div>
+                {% if not s.onedrive_url %}
+                  <div class="rt-link-fill" data-link-fill="{{ s.sheet_id }}">
+                    <span class="rt-nolink">⚠ ไม่มีลิงก์ไฟล์</span>
+                    <input type="url" placeholder="วางลิงก์ไฟล์ชีท (OneDrive)" data-link-input>
+                    <button class="rt-mini-btn save" type="button" data-link-save data-sheet-id="{{ s.sheet_id }}">บันทึก</button>
+                  </div>
+                {% endif %}
               </div>
             {% empty %}
               <div class="rt-empty-mini" id="rtLowStockEmpty">ไม่มีชีทที่ใกล้หมด</div>
@@ -300,7 +339,10 @@
     del: "{% url 'core:admin_tool_card_delete' %}",
     reorder: "{% url 'core:admin_tool_card_reorder' %}",
     reset: "{% url 'core:admin_tool_card_reset' %}",
-    dismissLowStock: "{% url 'core:admin_tool_dismiss_low_stock_sheet' %}"
+    dismissLowStock: "{% url 'core:admin_tool_dismiss_low_stock_sheet' %}",
+    admissionAction: "{% url 'core:admin_tool_admission_action' %}",
+    updateSheetLink: "{% url 'core:admin_tool_update_sheet_link' %}",
+    createPrintOrder: "{% url 'core:admin_tool_create_print_order' %}"
   };
 </script>
 
@@ -601,27 +643,110 @@
   elSearch.addEventListener("input",function(){ query=this.value.trim(); render(); });
   document.addEventListener("keydown",function(e){ if(e.key==="Escape") closeModal(); });
 
-  // ---------- Real-time overview: clear a low-stock sheet ----------
+  // ---------- Real-time overview: low-stock sheet actions ----------
   var lowStockList=$("rtLowStockList"), lowStockCount=$("rtLowStockCount");
+  function lowStockEmptyCheck(){
+    var remaining=lowStockList.querySelectorAll(".rt-row").length;
+    if(lowStockCount) lowStockCount.textContent=remaining;
+    if(remaining===0 && !$("rtLowStockEmpty")){
+      var empty=document.createElement("div");
+      empty.className="rt-empty-mini"; empty.id="rtLowStockEmpty";
+      empty.textContent="ไม่มีชีทที่ใกล้หมด";
+      lowStockList.appendChild(empty);
+    }
+  }
   if(lowStockList){
     lowStockList.addEventListener("click",function(e){
-      var btn=e.target.closest("[data-clear-sheet]");
-      if(!btn) return;
-      var row=btn.closest(".rt-row");
-      var sheetId=btn.getAttribute("data-clear-sheet");
-      if(!confirm("ปิดชีทนี้ (ปรับเป็น inactive)? ชีทจะไม่ถูกนับในสต็อกอีกต่อไป")) return;
-      btn.disabled=true;
-      api(window.PK_URLS.dismissLowStock,{sheet_id:sheetId}).then(function(){
-        row.remove();
-        var remaining=lowStockList.querySelectorAll(".rt-row").length;
-        if(lowStockCount) lowStockCount.textContent=remaining;
-        if(remaining===0){
-          var empty=document.createElement("div");
-          empty.className="rt-empty-mini"; empty.id="rtLowStockEmpty";
-          empty.textContent="ไม่มีชีทที่ใกล้หมด";
-          lowStockList.appendChild(empty);
+      var clearBtn=e.target.closest("[data-clear-sheet]");
+      if(clearBtn){
+        var row=clearBtn.closest(".rt-row");
+        var sheetId=clearBtn.getAttribute("data-clear-sheet");
+        if(!confirm("ปิดชีทนี้ (ปรับเป็น inactive)? ชีทจะไม่ถูกนับในสต็อกอีกต่อไป")) return;
+        clearBtn.disabled=true;
+        api(window.PK_URLS.dismissLowStock,{sheet_id:sheetId}).then(function(){
+          row.remove();
+          lowStockEmptyCheck();
+        });
+        return;
+      }
+
+      var printBtn=e.target.closest("[data-print-sheet]");
+      if(printBtn){
+        if(printBtn.getAttribute("data-has-link")!=="1"){
+          var row2=printBtn.closest(".rt-row");
+          var input2=row2.querySelector("[data-link-input]");
+          if(input2) input2.focus();
+          return;
         }
-      });
+        var sheetId2=printBtn.getAttribute("data-print-sheet");
+        var qty=prompt("จะสั่งปรินท์กี่เล่ม?","10");
+        if(qty===null) return;
+        qty=parseInt(qty,10);
+        if(!qty || qty<=0){ alert("กรุณากรอกจำนวนที่ถูกต้อง"); return; }
+        printBtn.disabled=true;
+        api(window.PK_URLS.createPrintOrder,{sheet_id:sheetId2,quantity:qty}).then(function(res){
+          alert(res.message||"ส่งปรินท์เรียบร้อยแล้ว");
+        }).finally(function(){ printBtn.disabled=false; });
+        return;
+      }
+
+      var linkSaveBtn=e.target.closest("[data-link-save]");
+      if(linkSaveBtn){
+        var fillBox=linkSaveBtn.closest("[data-link-fill]");
+        var input=fillBox.querySelector("[data-link-input]");
+        var url=(input.value||"").trim();
+        if(!url){ alert("กรุณาวางลิงก์ก่อนบันทึก"); return; }
+        var sheetId3=linkSaveBtn.getAttribute("data-sheet-id");
+        linkSaveBtn.disabled=true;
+        api(window.PK_URLS.updateSheetLink,{sheet_id:sheetId3,onedrive_url:url}).then(function(){
+          var row3=linkSaveBtn.closest(".rt-row");
+          var printBtn3=row3.querySelector("[data-print-sheet]");
+          if(printBtn3) printBtn3.setAttribute("data-has-link","1");
+          fillBox.remove();
+        }).finally(function(){ linkSaveBtn.disabled=false; });
+      }
+    });
+  }
+
+  // ---------- Real-time overview: upcoming-admission actions ----------
+  var admissionList=$("rtAdmissionList"), admissionCount=$("rtAdmissionCount");
+  if(admissionList){
+    admissionList.addEventListener("click",function(e){
+      var arriveBtn=e.target.closest("[data-mark-attended]");
+      if(arriveBtn){
+        var row=arriveBtn.closest(".rt-row");
+        var id=arriveBtn.getAttribute("data-admission-id");
+        arriveBtn.disabled=true;
+        api(window.PK_URLS.admissionAction,{admission_id:id,"do":"mark_attended"}).then(function(){
+          row.classList.add("attended");
+          if(!row.querySelector(".attended-tag")){
+            var tag=document.createElement("span");
+            tag.className="rt-tag attended-tag";
+            tag.textContent="มาแล้ว · รอใบเสร็จ";
+            row.querySelector(".rt-row-name").appendChild(tag);
+          }
+        }).finally(function(){ arriveBtn.disabled=false; });
+        return;
+      }
+
+      var cancelBtn=e.target.closest("[data-cancel-admission]");
+      if(cancelBtn){
+        var row2=cancelBtn.closest(".rt-row");
+        var id2=cancelBtn.getAttribute("data-admission-id");
+        if(!confirm("ยกเลิกรายการนี้? การ์ดจะหายไปจากภาพรวม")) return;
+        cancelBtn.disabled=true;
+        api(window.PK_URLS.admissionAction,{admission_id:id2,"do":"cancel"}).then(function(){
+          row2.remove();
+          var remaining=admissionList.querySelectorAll(".rt-row").length;
+          if(admissionCount) admissionCount.textContent=remaining;
+          if(remaining===0){
+            var empty=document.createElement("div");
+            empty.className="rt-empty-mini";
+            empty.textContent="ยังไม่มีนักเรียนทดลอง/เริ่มเรียนในเสาร์-อาทิตย์นี้";
+            admissionList.appendChild(empty);
+          }
+        }).finally(function(){ cancelBtn.disabled=false; });
+      }
     });
   }
 

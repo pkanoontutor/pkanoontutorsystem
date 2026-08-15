@@ -1442,6 +1442,12 @@ class AdmissionInquiry(models.Model):
     )
     internal_note = models.TextField("หมายเหตุภายใน", blank=True)
 
+    attended_first_lesson = models.BooleanField(
+        "มาเรียนแล้ว (รอสร้างใบเสร็จ)",
+        default=False,
+        help_text="ติ๊กจากปุ่ม “มาแล้ว” ในภาพรวมเรียลไทม์ของ Admin Tool -- การ์ดยังอยู่ต่อจนกว่าจะสร้างใบเสร็จ",
+    )
+
     is_completed = models.BooleanField("ดำเนินการเสร็จแล้ว", default=False)
     completed_at = models.DateTimeField("วันที่ดำเนินการเสร็จ", null=True, blank=True)
 

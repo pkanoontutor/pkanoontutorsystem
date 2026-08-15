@@ -5897,6 +5897,7 @@ def _upcoming_weekend_admissions() -> list[dict]:
             "time_slot_label": inq.get_preferred_time_slot_display(),
             "date": inq.first_lesson_date,
             "date_label": _thai_schedule_date(inq.first_lesson_date),
+            "attended_first_lesson": inq.attended_first_lesson,
         })
     return rows
 
@@ -5919,6 +5920,7 @@ def _low_stock_sheets(threshold: int = 3) -> list[dict]:
             "subject": inv.sheet.subject.name if inv.sheet.subject_id else "",
             "grade_label": _sheet_grade_label(inv.sheet.grade_level),
             "quantity": inv.quantity,
+            "onedrive_url": inv.onedrive_url or "",
         })
     return rows
 
@@ -5951,6 +5953,89 @@ def admin_tool_dismiss_low_stock_sheet(request: HttpRequest) -> JsonResponse:
     sheet.is_active = False
     sheet.save(update_fields=["is_active"])
     return JsonResponse({"ok": True})
+
+
+@require_POST
+def admin_tool_admission_action(request: HttpRequest) -> JsonResponse:
+    """"มาแล้ว" / "ยกเลิก" buttons on an upcoming-admission card in the
+    real-time overview. "มาแล้ว" keeps the card (just recolors it, pending a
+    receipt); "ยกเลิก" marks it completed so it drops out of the upcoming
+    list, same as any other finished inquiry."""
+    denied = _admin_tool_staff_denied(request)
+    if denied:
+        return denied
+    payload = _admin_tool_card_payload(request)
+    action = (payload.get("do") or "").strip()
+    inquiry = AdmissionInquiry.objects.filter(id=payload.get("admission_id")).first()
+    if not inquiry:
+        return JsonResponse({"ok": False, "error": "ไม่พบรายการนี้"}, status=404)
+
+    if action == "mark_attended":
+        inquiry.attended_first_lesson = True
+        inquiry.save(update_fields=["attended_first_lesson"])
+        return JsonResponse({"ok": True, "attended_first_lesson": True})
+
+    if action == "cancel":
+        inquiry.is_completed = True
+        inquiry.completed_at = timezone.now()
+        inquiry.save(update_fields=["is_completed", "completed_at"])
+        return JsonResponse({"ok": True})
+
+    return JsonResponse({"ok": False, "error": "ไม่รู้จักคำสั่งนี้"}, status=400)
+
+
+@require_POST
+def admin_tool_update_sheet_link(request: HttpRequest) -> JsonResponse:
+    """Fill in a missing OneDrive link straight from the low-stock card, so
+    the "no link" prompt there can be resolved without a trip to Sheet
+    Inventory."""
+    denied = _admin_tool_staff_denied(request)
+    if denied:
+        return denied
+    payload = _admin_tool_card_payload(request)
+    sheet = Sheet.objects.filter(id=payload.get("sheet_id")).first()
+    if not sheet:
+        return JsonResponse({"ok": False, "error": "ไม่พบชีทนี้"}, status=404)
+    onedrive_url = (payload.get("onedrive_url") or "").strip()
+    inventory, _ = SheetInventory.objects.get_or_create(sheet=sheet, defaults={"quantity": 0})
+    inventory.onedrive_url = onedrive_url
+    inventory.save(update_fields=["onedrive_url", "updated_at"])
+    return JsonResponse({"ok": True, "onedrive_url": onedrive_url})
+
+
+@require_POST
+def admin_tool_create_print_order(request: HttpRequest) -> JsonResponse:
+    """Quick print order from the low-stock card -- quantity only, using the
+    sheet's own link plus its subject's default binding/spine color."""
+    denied = _admin_tool_staff_denied(request)
+    if denied:
+        return denied
+    payload = _admin_tool_card_payload(request)
+    sheet = Sheet.objects.filter(id=payload.get("sheet_id")).select_related("subject").first()
+    if not sheet:
+        return JsonResponse({"ok": False, "error": "ไม่พบชีทนี้"}, status=404)
+    try:
+        quantity = max(int(payload.get("quantity") or 0), 0)
+    except (TypeError, ValueError):
+        quantity = 0
+    if quantity <= 0:
+        return JsonResponse({"ok": False, "error": "กรุณากรอกจำนวนที่จะสั่งปรินท์"}, status=400)
+
+    inventory, _ = SheetInventory.objects.get_or_create(sheet=sheet, defaults={"quantity": 0})
+    if not inventory.onedrive_url:
+        return JsonResponse({"ok": False, "error": "ชีทนี้ยังไม่มีลิงก์ไฟล์ กรุณากรอกลิงก์ก่อนสั่งปรินท์"}, status=400)
+
+    default_color = _default_spine_color_for_subject(sheet.subject.name if sheet.subject_id else "")
+    SheetPrintOrder.objects.create(
+        sheet=sheet,
+        quantity=quantity,
+        onedrive_url=inventory.onedrive_url,
+        binding_type=SheetPrintOrder.BindingType.SIDE,
+        spine_color=default_color,
+        note="สั่งปรินท์จากภาพรวมเรียลไทม์ (Admin Tool)",
+        requested_by=request.user if getattr(request.user, "is_authenticated", False) else None,
+    )
+    return JsonResponse({"ok": True, "message": f"ส่งปรินท์ {sheet.code} จำนวน {quantity} เล่มแล้ว"})
 
 
 def _admin_tool_card_payload(request: HttpRequest) -> dict:

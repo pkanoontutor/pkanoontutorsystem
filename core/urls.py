@@ -19,6 +19,9 @@ urlpatterns = [
     path("pkanoon-admin-tool/cards/reorder/", views.admin_tool_card_reorder, name="admin_tool_card_reorder"),
     path("pkanoon-admin-tool/cards/reset/", views.admin_tool_card_reset, name="admin_tool_card_reset"),
     path("pkanoon-admin-tool/low-stock-sheets/dismiss/", views.admin_tool_dismiss_low_stock_sheet, name="admin_tool_dismiss_low_stock_sheet"),
+    path("pkanoon-admin-tool/admissions/action/", views.admin_tool_admission_action, name="admin_tool_admission_action"),
+    path("pkanoon-admin-tool/low-stock-sheets/update-link/", views.admin_tool_update_sheet_link, name="admin_tool_update_sheet_link"),
+    path("pkanoon-admin-tool/low-stock-sheets/print/", views.admin_tool_create_print_order, name="admin_tool_create_print_order"),
     path("learning-record/", views.learning_record, name="learning_record"),
 
     # Attendance

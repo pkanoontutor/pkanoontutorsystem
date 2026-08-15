@@ -563,10 +563,26 @@ def _class_matches_inquiry(tutoring_class: TutoringClass, inquiry: AdmissionInqu
 def _demand_count_for_class(tutoring_class: TutoringClass, pending_inquiries: list[AdmissionInquiry]) -> int:
     return sum(1 for i in pending_inquiries if _class_matches_inquiry(tutoring_class, i))
 
-def _sheet_row(sheet: Sheet) -> dict:
+def _pending_print_qty_by_sheet() -> dict[int, int]:
+    """Total quantity currently queued (status=PENDING) per sheet, used to
+    compute how much more should be sent to print."""
+    return {
+        item["sheet_id"]: item["qty"] or 0
+        for item in (
+            SheetPrintOrder.objects
+            .filter(status=SheetPrintOrder.Status.PENDING, sheet__isnull=False)
+            .values("sheet_id")
+            .annotate(qty=Sum("quantity"))
+        )
+    }
+
+
+def _sheet_row(sheet: Sheet, pending_by_sheet: dict[int, int] | None = None) -> dict:
     inv = _inventory_for_sheet(sheet)
     qty = int(inv.quantity or 0) if inv else 0
     minimum = int(getattr(inv, "minimum_stock", 0) or 0) if inv else 0
+    target_stock = int(getattr(inv, "target_stock", 0) or 0) if inv else 0
+    pending_qty = int((pending_by_sheet or {}).get(sheet.id, 0) or 0)
     last_updated_at = getattr(inv, "updated_at", None) if inv else None
     subject_style = _sheet_subject_style(sheet.subject.name if getattr(sheet, "subject_id", None) else "")
     return {
@@ -574,6 +590,9 @@ def _sheet_row(sheet: Sheet) -> dict:
         "inventory": inv,
         "quantity": qty,
         "minimum_stock": minimum,
+        "target_stock": target_stock,
+        "pending_print_qty": pending_qty,
+        "suggested_print_qty": max(target_stock - qty - pending_qty, 0),
         "grade_level": getattr(sheet, "grade_level", "") or "",
         "grade_label": _sheet_grade_label(getattr(sheet, "grade_level", "") or ""),
         "is_low": minimum > 0 and qty <= minimum,
@@ -584,6 +603,7 @@ def _sheet_row(sheet: Sheet) -> dict:
         "default_spine_color_label": _spine_color_label(_default_spine_color_for_subject(sheet.subject.name if getattr(sheet, "subject_id", None) else "")),
         "onedrive_url": (getattr(inv, "onedrive_url", "") or "") if inv else "",
         "storage_location": (getattr(inv, "storage_location", "") or "") if inv else "",
+        "cover_image_url": (sheet.cover_image.url if getattr(sheet, "cover_image", None) else ""),
     }
 
 
@@ -737,7 +757,7 @@ def _save_sheet_locations_from_post(request: HttpRequest) -> None:
             inventory.save(update_fields=["storage_location", "updated_at"])
 
 
-def _sheet_inventory_context(*, q: str = "", extra: dict | None = None) -> dict:
+def _sheet_inventory_context(*, q: str = "", extra: dict | None = None, request: HttpRequest | None = None) -> dict:
     sheets_qs = Sheet.objects.select_related("subject").all()
     if q:
         grade_q = _normalize_sheet_grade_level(q)
@@ -751,9 +771,11 @@ def _sheet_inventory_context(*, q: str = "", extra: dict | None = None) -> dict:
         sheets_qs = sheets_qs.filter(query)
 
     sheets = list(sheets_qs.order_by("grade_level", "subject__name", "code"))
-    sheet_rows = [_sheet_row(s) for s in sheets]
+    pending_by_sheet = _pending_print_qty_by_sheet()
+    sheet_rows = [_sheet_row(s, pending_by_sheet) for s in sheets]
     all_sheets = Sheet.objects.select_related("subject").filter(is_active=True).order_by("grade_level", "subject__name", "code")
     active_classes = TutoringClass.objects.filter(is_active=True).order_by("time_slot", "name")
+    shop_url = request.build_absolute_uri("/print-shop/") if request else "/print-shop/"
     context = {
         "q": q,
         "sheet_rows": sheet_rows,
@@ -775,6 +797,7 @@ def _sheet_inventory_context(*, q: str = "", extra: dict | None = None) -> dict:
         "default_print_due_date": timezone.localdate() + timedelta(days=3),
         "ready_to_receive_orders": _ready_to_receive_orders_with_links(),
         "pending_print_orders": _pending_print_orders_with_links(),
+        "shop_url": shop_url,
     }
     if extra:
         context.update(extra)
@@ -1150,6 +1173,86 @@ def sheet_inventory_dashboard(request: HttpRequest) -> HttpResponse:
                 status = "created" if created else "exists"
                 return redirect(f"{request.path}?sheet_saved={status}&sheet_code={quote(sheet.code)}")
 
+        elif action.startswith("update_sheet_link:"):
+            # Pencil-toggle link editor on each sheet card -- single field,
+            # AJAX only, so the card can update in place without a reload.
+            sheet_id = action.split(":", 1)[1]
+            is_ajax = request.headers.get("x-requested-with") == "XMLHttpRequest"
+            sheet = Sheet.objects.filter(id=sheet_id).first()
+            if not sheet:
+                if is_ajax:
+                    return JsonResponse({"ok": False, "message": "ไม่พบชีทนี้"}, status=404)
+                return redirect("core:sheet_inventory_dashboard")
+            onedrive_url = (request.POST.get("onedrive_url") or "").strip()
+            inventory, _ = SheetInventory.objects.get_or_create(sheet=sheet, defaults={"quantity": 0})
+            inventory.onedrive_url = onedrive_url
+            inventory.save(update_fields=["onedrive_url", "updated_at"])
+            if is_ajax:
+                return JsonResponse({"ok": True, "onedrive_url": onedrive_url, "sheet_id": sheet.id})
+            return redirect("core:sheet_inventory_dashboard")
+
+        elif action.startswith("update_sheet_target:"):
+            # Also accepts an optional onedrive_url so the sheet-profile page's
+            # single "ตั้งค่าการส่งปรินท์" form can save both in one submit.
+            # AJAX-friendly too: the per-card "เป้าคลัง" box on the main grid
+            # can't be its own <form> (it lives inside the page-wide stock
+            # form), so it saves via fetch like the link/cover controls.
+            is_ajax = request.headers.get("x-requested-with") == "XMLHttpRequest"
+            sheet_id = action.split(":", 1)[1]
+            sheet = Sheet.objects.filter(id=sheet_id).first()
+            if not sheet:
+                if is_ajax:
+                    return JsonResponse({"ok": False, "message": "ไม่พบชีทนี้"}, status=404)
+                return redirect("core:sheet_inventory_dashboard")
+            target_stock = max(int(request.POST.get("target_stock") or 0), 0)
+            inventory, _ = SheetInventory.objects.get_or_create(sheet=sheet, defaults={"quantity": 0})
+            inventory.target_stock = target_stock
+            update_fields = ["target_stock", "updated_at"]
+            if "onedrive_url" in request.POST:
+                inventory.onedrive_url = (request.POST.get("onedrive_url") or "").strip()
+                update_fields.append("onedrive_url")
+            inventory.save(update_fields=update_fields)
+            if is_ajax:
+                pending_qty = _pending_print_qty_by_sheet().get(sheet.id, 0)
+                qty = int(inventory.quantity or 0)
+                suggested = max(target_stock - qty - pending_qty, 0)
+                return JsonResponse({"ok": True, "sheet_id": sheet.id, "target_stock": target_stock, "suggested_print_qty": suggested})
+            next_url = request.POST.get("next") or ""
+            if next_url.startswith("/"):
+                return redirect(next_url)
+            return redirect("core:sheet_inventory_dashboard")
+
+        elif action == "create_custom_print_order":
+            # For files that aren't in Sheet Inventory at all (announcements,
+            # answer keys, special exam sets) -- no Sheet/stock involved.
+            custom_title = (request.POST.get("custom_title") or "").strip()
+            quantity = max(int(request.POST.get("quantity") or 0), 0)
+            due_date = _parse_optional_date(request.POST.get("due_date"))
+            onedrive_url = (request.POST.get("onedrive_url") or "").strip()
+            note = (request.POST.get("note") or "").strip()
+            binding_type = (request.POST.get("binding_type") or SheetPrintOrder.BindingType.SIDE).strip()
+            if binding_type not in dict(SheetPrintOrder.BindingType.choices):
+                binding_type = SheetPrintOrder.BindingType.SIDE
+            spine_color = (request.POST.get("spine_color") or "").strip()
+            if binding_type == SheetPrintOrder.BindingType.CORNER:
+                spine_color = ""
+            elif spine_color not in dict(SheetPrintOrder.SpineColor.choices):
+                spine_color = ""
+
+            if custom_title and quantity > 0 and onedrive_url:
+                SheetPrintOrder.objects.create(
+                    sheet=None,
+                    custom_title=custom_title,
+                    quantity=quantity,
+                    due_date=due_date,
+                    onedrive_url=onedrive_url,
+                    binding_type=binding_type,
+                    spine_color=spine_color,
+                    note=note,
+                    requested_by=request.user if getattr(request.user, "is_authenticated", False) else None,
+                )
+            return redirect("core:sheet_inventory_dashboard")
+
         elif (
             action.startswith("receive_print_order:")
             or action.startswith("receive_print_order_full:")
@@ -1440,7 +1543,7 @@ def sheet_inventory_dashboard(request: HttpRequest) -> HttpResponse:
             return redirect("core:sheet_inventory_dashboard")
 
     q = (request.GET.get("q") or "").strip()
-    return render(request, "core/sheet_inventory.html", _sheet_inventory_context(q=q, extra={
+    return render(request, "core/sheet_inventory.html", _sheet_inventory_context(q=q, request=request, extra={
         "sheet_saved": (request.GET.get("sheet_saved") or "").strip(),
         "sheet_saved_code": (request.GET.get("sheet_code") or "").strip(),
     }))
@@ -1983,6 +2086,28 @@ def sheet_inventory_profile(request: HttpRequest, pk: int) -> HttpResponse:
     })
 
 
+@require_POST
+@login_required
+def sheet_inventory_cover_upload(request: HttpRequest, pk: int) -> JsonResponse:
+    """Cover photo for a sheet. Accepts a normal file input or a pasted
+    clipboard image -- both arrive as the same multipart 'cover_image' field,
+    the JS side just builds the FormData differently."""
+    sheet = get_object_or_404(Sheet, pk=pk)
+    upload = request.FILES.get("cover_image")
+    if not upload:
+        return JsonResponse({"ok": False, "message": "ไม่พบไฟล์รูปที่ส่งมา"}, status=400)
+    if not (upload.content_type or "").startswith("image/"):
+        return JsonResponse({"ok": False, "message": "ไฟล์นี้ไม่ใช่รูปภาพ"}, status=400)
+    if upload.size > 8 * 1024 * 1024:
+        return JsonResponse({"ok": False, "message": "ไฟล์รูปใหญ่เกิน 8MB"}, status=400)
+
+    ext = ".png" if upload.content_type == "image/png" else ".jpg"
+    if sheet.cover_image:
+        sheet.cover_image.delete(save=False)
+    sheet.cover_image.save(f"{sheet.code or sheet.id}{ext}", upload, save=True)
+    return JsonResponse({"ok": True, "url": sheet.cover_image.url})
+
+
 @login_required
 def sheet_inventory_export(request: HttpRequest) -> HttpResponse:
     wb = Workbook()
@@ -2110,171 +2235,12 @@ def _parse_optional_datetime(value: str | None):
     return timezone.make_aware(naive) if timezone.is_naive(naive) else naive
 
 
-def _print_order_dashboard_rows() -> list[dict]:
-    pending_by_sheet = {
-        item["sheet_id"]: item["qty"] or 0
-        for item in (
-            SheetPrintOrder.objects
-            .filter(status=SheetPrintOrder.Status.PENDING, sheet__isnull=False)
-            .values("sheet_id")
-            .annotate(qty=Sum("quantity"))
-        )
-    }
-
-    rows = []
-    sheets = Sheet.objects.select_related("subject").filter(is_active=True).order_by("grade_level", "subject__name", "code")
-    for sheet in sheets:
-        inv = _inventory_for_sheet(sheet)
-        current_qty = int(inv.quantity or 0) if inv else 0
-        target_stock = int(getattr(inv, "target_stock", 0) or 0) if inv else 0
-        onedrive_url = (getattr(inv, "onedrive_url", "") or "") if inv else ""
-        pending_qty = int(pending_by_sheet.get(sheet.id, 0) or 0)
-        shortage = max(target_stock - current_qty, 0)
-        suggested_print_qty = max(target_stock - current_qty - pending_qty, 0)
-        default_color = _default_spine_color_for_subject(sheet.subject.name if sheet.subject_id else "")
-        rows.append({
-            "sheet": sheet,
-            "inventory": inv,
-            "current_qty": current_qty,
-            "target_stock": target_stock,
-            "onedrive_url": onedrive_url,
-            "pending_print_qty": pending_qty,
-            "shortage": shortage,
-            "suggested_print_qty": suggested_print_qty,
-            "default_spine_color": default_color,
-            "default_spine_color_label": _spine_color_label(default_color),
-        })
-    return rows
-
-
-def _print_order_grade_groups(rows: list[dict]) -> list[dict]:
-    buckets = {g: [] for g in SHEET_GRADE_ORDER}
-    for row in rows:
-        grade = (getattr(row.get("sheet"), "grade_level", "") or "").lower()
-        if grade not in buckets:
-            buckets.setdefault(grade, [])
-        buckets[grade].append(row)
-    return [
-        {"grade": grade, "label": _sheet_grade_label(grade), "rows": buckets.get(grade, []), "count": len(buckets.get(grade, []))}
-        for grade in SHEET_GRADE_ORDER
-        if buckets.get(grade)
-    ]
-
-
 @login_required
 def sheet_print_order_admin(request: HttpRequest) -> HttpResponse:
-    if request.method == "POST":
-        action = (request.POST.get("action") or "").strip()
-
-        if action == "update_sheet_print_setting":
-            sheet = get_object_or_404(Sheet, id=request.POST.get("sheet_id"))
-            target_stock = max(int(request.POST.get("target_stock") or 0), 0)
-            onedrive_url = (request.POST.get("onedrive_url") or "").strip()
-            inventory, _ = SheetInventory.objects.get_or_create(sheet=sheet, defaults={"quantity": 0})
-            inventory.target_stock = target_stock
-            inventory.onedrive_url = onedrive_url
-            inventory.save()
-            return redirect("core:sheet_print_order_admin")
-
-        if action == "create_print_order":
-            sheet = get_object_or_404(Sheet.objects.select_related("subject"), id=request.POST.get("sheet_id"))
-            quantity = max(int(request.POST.get("quantity") or 0), 0)
-            due_date = _parse_optional_date(request.POST.get("due_date"))
-            onedrive_url = (request.POST.get("onedrive_url") or "").strip()
-            note = (request.POST.get("note") or "").strip()
-            binding_type = (request.POST.get("binding_type") or SheetPrintOrder.BindingType.SIDE).strip()
-            if binding_type not in dict(SheetPrintOrder.BindingType.choices):
-                binding_type = SheetPrintOrder.BindingType.SIDE
-            spine_color = (request.POST.get("spine_color") or "").strip()
-            if binding_type == SheetPrintOrder.BindingType.CORNER:
-                spine_color = ""
-            elif spine_color not in dict(SheetPrintOrder.SpineColor.choices):
-                spine_color = _default_spine_color_for_subject(sheet.subject.name if sheet.subject_id else "")
-
-            if quantity > 0:
-                inventory, _ = SheetInventory.objects.get_or_create(sheet=sheet, defaults={"quantity": 0})
-                if onedrive_url:
-                    # Keep SheetInventory as the single source of truth: any
-                    # link entered while creating an order also updates the
-                    # sheet's stored link, so every past/future order for this
-                    # sheet (and the print-shop page) picks it up too.
-                    if inventory.onedrive_url != onedrive_url:
-                        inventory.onedrive_url = onedrive_url
-                        inventory.save(update_fields=["onedrive_url"])
-                else:
-                    onedrive_url = inventory.onedrive_url or ""
-
-                SheetPrintOrder.objects.create(
-                    sheet=sheet,
-                    quantity=quantity,
-                    due_date=due_date,
-                    onedrive_url=onedrive_url,
-                    binding_type=binding_type,
-                    spine_color=spine_color,
-                    note=note,
-                    requested_by=request.user if getattr(request.user, "is_authenticated", False) else None,
-                )
-                return redirect("core:print_shop_order_list")
-
-            return redirect("core:sheet_print_order_admin")
-
-        if action == "create_custom_print_order":
-            custom_title = (request.POST.get("custom_title") or "").strip()
-            quantity = max(int(request.POST.get("quantity") or 0), 0)
-            due_date = _parse_optional_date(request.POST.get("due_date"))
-            onedrive_url = (request.POST.get("onedrive_url") or "").strip()
-            note = (request.POST.get("note") or "").strip()
-            binding_type = (request.POST.get("binding_type") or SheetPrintOrder.BindingType.SIDE).strip()
-            if binding_type not in dict(SheetPrintOrder.BindingType.choices):
-                binding_type = SheetPrintOrder.BindingType.SIDE
-            spine_color = (request.POST.get("spine_color") or "").strip()
-            if binding_type == SheetPrintOrder.BindingType.CORNER:
-                spine_color = ""
-            elif spine_color not in dict(SheetPrintOrder.SpineColor.choices):
-                spine_color = ""
-
-            if custom_title and quantity > 0 and onedrive_url:
-                SheetPrintOrder.objects.create(
-                    sheet=None,
-                    custom_title=custom_title,
-                    quantity=quantity,
-                    due_date=due_date,
-                    onedrive_url=onedrive_url,
-                    binding_type=binding_type,
-                    spine_color=spine_color,
-                    note=note,
-                    requested_by=request.user if getattr(request.user, "is_authenticated", False) else None,
-                )
-                return redirect("core:print_shop_order_list")
-
-            return redirect("core:sheet_print_order_admin")
-
-    pending_orders = list(
-        SheetPrintOrder.objects
-        .select_related("sheet", "sheet__subject", "requested_by")
-        .filter(status=SheetPrintOrder.Status.PENDING)
-        .order_by("due_date", "created_at")
-    )
-    ready_orders = list(
-        SheetPrintOrder.objects
-        .select_related("sheet", "sheet__subject", "requested_by")
-        .filter(status=SheetPrintOrder.Status.READY)
-        .order_by("-completed_at", "-updated_at")[:80]
-    )
-    _attach_inventory_file_links(pending_orders)
-    _attach_inventory_file_links(ready_orders)
-    rows = _print_order_dashboard_rows()
-
-    return render(request, "core/sheet_print_order_admin.html", {
-        "rows": rows,
-        "grade_groups": _print_order_grade_groups(rows),
-        "pending_orders": pending_orders,
-        "ready_orders": ready_orders,
-        "default_due_date": timezone.localdate() + timedelta(days=3),
-        "shop_url": request.build_absolute_uri("/print-shop/"),
-        "binding_type_choices": SheetPrintOrder.BindingType.choices,
-        "spine_color_choices": _print_color_choices(),
-    })
+    """Sheet Inventory now covers sending things to print (see
+    sheet_inventory_dashboard) -- this URL is kept alive only so old
+    bookmarks/links land somewhere useful instead of 404ing."""
+    return redirect("core:sheet_inventory_dashboard")
 
 
 def _attach_inventory_file_links(orders: list) -> None:
@@ -8319,8 +8285,12 @@ def teaching_schedule_image(request: HttpRequest, pk: int) -> HttpResponse:
                 c = rc.get("cell")
                 rc["progress"] = progress.get(c.subject_template_id) if (c and c.subject_template_id) else None
 
+    is_saturday_schedule = schedule.date.weekday() == 5
+    countdown_qs = ScheduleExamCountdown.objects.filter(is_active=True)
+    countdown_qs = countdown_qs.filter(show_on_saturday=True) if is_saturday_schedule else countdown_qs.filter(show_on_sunday=True)
+
     countdowns = []
-    for e in ScheduleExamCountdown.objects.filter(is_active=True):
+    for e in countdown_qs:
         countdowns.append({
             "grade_label": e.grade_label,
             "days": (e.exam_date - schedule.date).days,
@@ -8364,9 +8334,18 @@ def teaching_schedule_exam_dates(request: HttpRequest) -> HttpResponse:
                     exam_date=_parse_date(exam_date),
                     note=(request.POST.get("note") or "").strip(),
                     display_order=(ScheduleExamCountdown.objects.count() + 1) * 10,
+                    show_on_saturday=bool(request.POST.get("show_on_saturday")),
+                    show_on_sunday=bool(request.POST.get("show_on_sunday")),
                 )
         elif action == "delete":
             ScheduleExamCountdown.objects.filter(id=request.POST.get("id")).delete()
+        elif action == "toggle_day":
+            item = ScheduleExamCountdown.objects.filter(id=request.POST.get("id")).first()
+            day = request.POST.get("day")
+            if item and day in ("saturday", "sunday"):
+                field = f"show_on_{day}"
+                setattr(item, field, not getattr(item, field))
+                item.save(update_fields=[field])
         return redirect("/teaching-schedule/exam-dates/")
 
     items = list(ScheduleExamCountdown.objects.all())

@@ -25,6 +25,40 @@
   .loc-row{display:grid;grid-template-columns:auto 1fr;gap:6px;align-items:center;}
   .loc-row .loc-k{font-size:10.5px;font-weight:1000;color:#334155;white-space:nowrap;}
   .loc-input{width:100%;box-sizing:border-box;font-size:11px;padding:7px 8px;}
+
+  /* Cover photo -- click to choose a file, or click then Ctrl+V to paste a
+     screenshot straight from the clipboard. */
+  .cover-box{width:46px;height:46px;flex:none;border-radius:12px;border:2px dashed #cbd5e1;background:#f8fafc;
+    display:grid;place-items:center;cursor:pointer;overflow:hidden;transition:.12s;position:relative;}
+  .cover-box:hover{border-color:#94a3b8}
+  .cover-box.is-armed{border-color:#0ea5e9;border-style:solid;box-shadow:0 0 0 3px rgba(14,165,233,.18);}
+  .cover-box img{width:100%;height:100%;object-fit:cover;display:block;}
+  .cover-box .cover-ph{font-size:18px;opacity:.55;}
+  .cover-box .cover-spin{position:absolute;inset:0;background:rgba(255,255,255,.75);display:none;place-items:center;font-size:11px;font-weight:1000;color:#0ea5e9;}
+  .cover-box.is-busy .cover-spin{display:grid;}
+
+  /* Link status pill + pencil-toggle editor. */
+  .link-status-row{display:flex;align-items:center;gap:6px;}
+  .link-pill{flex:1;min-width:0;display:flex;align-items:center;gap:5px;border-radius:11px;padding:7px 9px;
+    font-size:11px;font-weight:1000;text-decoration:none;border:1px solid;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .link-pill.has-link{background:#dcfce7;border-color:#86efac;color:#166534;cursor:pointer;}
+  .link-pill.has-link:hover{background:#bbf7d0;}
+  .link-pill.no-link{background:#f1f5f9;border-color:#e2e8f0;color:#94a3b8;cursor:default;}
+  .pencil-btn{flex:none;border:1px solid #e2e8f0;background:#fff;border-radius:11px;width:32px;height:32px;
+    font-size:13px;cursor:pointer;display:grid;place-items:center;}
+  .pencil-btn:hover{background:#f8fafc;}
+  .link-edit-box{display:flex;gap:6px;margin-top:6px;}
+  .link-edit-box[hidden]{display:none;}
+  .link-edit-box input{flex:1;min-width:0;font-size:11px;padding:7px 8px;}
+
+  /* Target stock + suggested-print hint, compact row above the edit panel. */
+  .target-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+  .target-box{display:flex;align-items:center;gap:5px;background:#fff;border:1px solid rgba(15,23,42,.08);
+    border-radius:11px;padding:6px 9px;flex:1;min-width:0;}
+  .target-box .k{font-size:10px;color:#64748b;font-weight:1000;text-transform:uppercase;white-space:nowrap;}
+  .target-box input{border:0;padding:0;font-size:13px;font-weight:1000;width:44px;background:transparent;}
+  .target-box button{flex:none;border:0;background:none;color:#0ea5e9;font-weight:1000;font-size:11px;cursor:pointer;padding:2px 4px;}
+  .need-pill{font-size:10px;font-weight:1000;background:#ffedd5;color:#9a3412;border:1px solid #fed7aa;border-radius:999px;padding:5px 8px;white-space:nowrap;}
   .edit-panel{background:rgba(255,255,255,.78);border:1px dashed var(--subject-border,#cbd5e1);border-radius:14px;padding:8px;display:grid;gap:7px}.edit-title{font-size:11px;font-weight:1000;color:#334155}.set-row{display:grid;grid-template-columns:1fr auto;gap:6px}.adjust-row{display:grid;grid-template-columns:1fr auto auto;gap:6px}.set-row input,.adjust-row input,.note-input{width:100%;box-sizing:border-box}.note-input{font-size:11px;padding:7px 8px}.tiny-btn{border:0;border-radius:10px;padding:8px 9px;font-weight:1000;font-size:11px;cursor:pointer}.save{background:#2563eb;color:#fff}.add{background:#16a34a;color:#fff}.deduct{background:#dc2626;color:#fff}.link-row{display:flex;gap:6px;flex-wrap:wrap}.mini-link{font-size:11px;font-weight:1000;text-decoration:none;color:#1d4ed8;background:#eff6ff;border:1px solid #bfdbfe;border-radius:999px;padding:5px 8px}.last-updated{font-size:10px;color:#64748b;font-weight:800}
   .receive-panel{border:2px solid #bbf7d0;background:linear-gradient(135deg,#f0fdf4,#ecfeff);}
   .receive-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin-top:10px}
@@ -34,10 +68,15 @@
   .print-icon-btn{border:0;cursor:pointer;font-family:inherit}.print-modal-backdrop{position:fixed;inset:0;background:rgba(15,23,42,.58);z-index:9998;display:flex;align-items:center;justify-content:center;padding:16px}.print-modal-backdrop[hidden]{display:none!important}.print-modal-card{width:min(560px,100%);background:#fff;border-radius:24px;box-shadow:0 24px 70px rgba(15,23,42,.34);border:1px solid #e2e8f0;overflow:hidden}.print-modal-head{background:linear-gradient(135deg,#0f172a,#0ea5e9);color:#fff;padding:16px 18px;display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.print-modal-title{font-size:20px;font-weight:1000}.print-modal-sub{font-size:12px;color:#e0f2fe;line-height:1.45;margin-top:3px}.print-modal-close{border:0;background:rgba(255,255,255,.15);color:#fff;border-radius:999px;width:36px;height:36px;font-size:20px;font-weight:1000;cursor:pointer}.print-modal-body{padding:14px;display:grid;gap:10px}.print-field{display:grid;gap:5px}.print-field label{font-size:11px;font-weight:1000;color:#334155;text-transform:uppercase;letter-spacing:.04em}.print-stock-box{display:flex;justify-content:space-between;align-items:center;gap:10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:16px;padding:10px 12px}.print-stock-num{font-size:34px;line-height:1;font-weight:1000;color:#0ea5e9}.print-grid2{display:grid;grid-template-columns:1fr 1fr;gap:9px}.print-choice-row{display:flex;gap:8px;flex-wrap:wrap}.print-radio-card{border:1px solid #e2e8f0;background:#f8fafc;border-radius:14px;padding:9px 11px;font-size:12px;font-weight:1000;cursor:pointer;display:flex;gap:6px;align-items:center}.print-radio-card:has(input:checked){border-color:#0ea5e9!important;background:#e0f2fe!important;color:#0369a1}.color-card{min-width:78px;justify-content:center}.print-actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;border-top:1px solid #e2e8f0;padding:12px 14px;background:#f8fafc}@media(max-width:560px){.print-grid2{grid-template-columns:1fr}.print-actions .btnx{width:100%}.print-modal-card{border-radius:18px}}
   .print-shop-preview{border:1px solid #e2e8f0;border-radius:14px;background:#f8fafc;padding:10px;max-height:260px;overflow:auto}.preview-loading,.preview-empty{font-size:12px;font-weight:800;color:#64748b;text-align:center;padding:12px}.preview-head{font-size:12px;font-weight:1000;color:#0f172a;margin-bottom:8px}.preview-rows{display:grid;gap:6px}.preview-row{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:7px 9px}.preview-row.overdue{border-color:#fecaca;background:#fef2f2}.pv-main{font-size:12px;font-weight:900;color:#0f172a;line-height:1.35}.pv-code{color:#0369a1}.pv-title{color:#334155;font-weight:700}.pv-meta{font-size:11px;font-weight:700;color:#64748b;margin-top:2px}.preview-more{font-size:11px;font-weight:800;color:#64748b;text-align:center;padding-top:8px}
 
+  .section-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:10px}
+  .copy-link{display:grid;grid-template-columns:1fr auto;gap:8px}
+  .custom-grid{display:grid;grid-template-columns:1.5fr 1.5fr 90px 140px 130px 140px auto;gap:8px;align-items:end}
+  .custom-grid .field{display:flex;flex-direction:column;gap:4px}
+  .custom-grid .field label{font-size:10px;font-weight:1000;color:#334155;text-transform:uppercase;letter-spacing:.04em}
   .tools-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.tool-box{border:1px solid #e2e8f0;border-radius:16px;background:#f8fafc;padding:11px;display:grid;gap:8px}.tool-title{font-size:14px;font-weight:1000;color:#0f172a}.form-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.class-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.class-card{border:1px solid #e2e8f0;border-radius:17px;padding:11px;background:#fff;display:grid;gap:8px}.class-card.short{border-color:#fecaca;background:#fff7f7}.class-title{font-size:15px;font-weight:1000;color:#0f172a;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}.sheet-need{border-radius:13px;background:#f8fafc;border:1px solid #e2e8f0;padding:8px;display:grid;gap:5px}.pill{border-radius:999px;padding:4px 8px;font-size:11px;font-weight:1000;border:1px solid #e2e8f0;background:#f8fafc;color:#334155}.low{background:#fee2e2;color:#991b1b;border-color:#fecaca}.ok{background:#dcfce7;color:#166534;border-color:#86efac}.blue{background:#eff6ff;color:#1d4ed8;border-color:#bfdbfe}.orange{background:#ffedd5;color:#9a3412;border-color:#fed7aa}.bulk-result{border-radius:15px;padding:10px;border:1px solid #bae6fd;background:#f0f9ff;color:#0c4a6e;font-weight:900;display:grid;gap:6px}.error-list{margin:0;padding-left:18px;font-size:11px;line-height:1.4}
-  @media(max-width:1200px){.sheet-card-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.receive-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.tools-grid,.class-grid{grid-template-columns:1fr}.form-grid{grid-template-columns:1fr 1fr}}
+  @media(max-width:1200px){.sheet-card-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.receive-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.tools-grid,.class-grid{grid-template-columns:1fr}.form-grid{grid-template-columns:1fr 1fr}.custom-grid{grid-template-columns:1fr 1fr}}
   @media(max-width:820px){.sheet-card-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.hero .btnx{width:100%}.search-row input{min-width:0;width:100%}.monitor-head{display:grid}.search-row{display:grid}.form-grid{grid-template-columns:1fr}}
-  @media(max-width:560px){.sheet-card-grid{grid-template-columns:1fr}.title{font-size:22px}.qty-num{font-size:38px}.set-row,.adjust-row{grid-template-columns:1fr}.tiny-btn{width:100%}}
+  @media(max-width:560px){.sheet-card-grid{grid-template-columns:1fr}.title{font-size:22px}.qty-num{font-size:38px}.set-row,.adjust-row{grid-template-columns:1fr}.tiny-btn{width:100%}.copy-link{grid-template-columns:1fr}.custom-grid{grid-template-columns:1fr}.custom-grid .btnx{width:100%}}
 </style>
 {% endblock %}
 
@@ -50,6 +89,7 @@
     </div>
     <div class="actions">
       <a class="btnx soft" href="/pkanoon-admin-tool/">← Admin Tool</a>
+      <button class="btnx primary" type="button" id="openCreateSheetBtn">➕ สร้างชีทใหม่</button>
       <a class="btnx soft" href="{% url 'core:sheet_inventory_count' %}">🧮 ระบบนับสต๊อกชีท</a>
       <a class="btnx soft" href="{% url 'core:sheet_inventory_movements' %}">🕘 Movement ชีท</a>
       <a class="btnx soft" href="{% url 'core:print_shop_order_list' %}" target="_blank">🖨️ หน้าร้านปรินท์</a>
@@ -65,6 +105,32 @@
       {% if bulk_result.errors %}<ul class="error-list">{% for e in bulk_result.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
     </div>
   {% endif %}
+
+  <section class="panel">
+    <div class="section-head">
+      <div>
+        <div class="tool-title">📌 Link สำหรับร้านปรินท์</div>
+        <div class="hint">ส่ง link นี้ให้ร้านปรินท์เปิดดูรายการรอปรินท์ได้โดยไม่ต้อง login</div>
+      </div>
+    </div>
+    <div class="copy-link"><input value="{{ shop_url }}" readonly onclick="this.select()"><button class="btnx soft" type="button" onclick="navigator.clipboard && navigator.clipboard.writeText('{{ shop_url }}')">Copy</button></div>
+  </section>
+
+  <details class="panel">
+    <summary class="tool-title" style="cursor:pointer;">➕ สั่งปรินท์เอกสารอื่นที่ไม่ใช่ชีท <span style="font-weight:700;color:#64748b;font-size:11px;">เช่น เอกสารประกาศ เฉลย ชุดข้อสอบ ที่ยังไม่ได้ขึ้น Sheet Inventory</span></summary>
+    <form method="post" class="custom-grid" style="margin-top:12px;">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="create_custom_print_order">
+      <div class="field"><label>ชื่อเอกสาร</label><input name="custom_title" placeholder="เช่น ข้อสอบ Pretest ป.6" required></div>
+      <div class="field"><label>Link ไฟล์</label><input name="onedrive_url" placeholder="OneDrive link" required></div>
+      <div class="field"><label>จำนวน</label><input name="quantity" type="number" min="1" value="1" required></div>
+      <div class="field"><label>วันที่ต้องส่ง</label><input name="due_date" type="date" value="{{ default_print_due_date|date:'Y-m-d' }}"></div>
+      <div class="field"><label>ประเภทการเย็บ</label><select name="binding_type"><option value="side" selected>เย็บข้าง</option><option value="corner">เย็บมุม</option></select></div>
+      <div class="field"><label>สีสันรูด</label><select name="spine_color"><option value="">ไม่ระบุสี</option>{% for c in spine_color_choices %}<option value="{{ c.value }}">{{ c.label }}</option>{% endfor %}</select></div>
+      <div class="field"><label>&nbsp;</label><button class="btnx dark" type="submit">ส่งปรินท์</button></div>
+      <div class="field" style="grid-column:1/-1"><label>หมายเหตุ</label><input name="note" placeholder="รายละเอียดเพิ่มเติมถึงร้านปรินท์"></div>
+    </form>
+  </details>
 
   {% if ready_to_receive_orders %}
     <section class="panel receive-panel">
@@ -179,7 +245,17 @@
           {% for row in group.rows %}
             <article class="sheet-card" data-stock-sheet-id="{{ row.sheet.id }}" style="{{ row.subject_style }}">
               <div class="sheet-top">
-                <div>
+                <div class="cover-box" data-cover-box data-sheet-id="{{ row.sheet.id }}" tabindex="0"
+                     title="คลิกแล้ววาง (Ctrl+V) เพื่อใส่รูปปก หรือคลิกเพื่อเลือกไฟล์">
+                  {% if row.cover_image_url %}
+                    <img src="{{ row.cover_image_url }}" alt="" data-cover-img>
+                  {% else %}
+                    <span class="cover-ph" data-cover-ph>🖼️</span>
+                  {% endif %}
+                  <div class="cover-spin" data-cover-spin>...</div>
+                  <input type="file" accept="image/*" class="cover-file-input" data-cover-file hidden>
+                </div>
+                <div style="flex:1;min-width:0;">
                   <div class="sheet-code">{{ row.sheet.code }}</div>
                   <div class="sheet-title">{{ row.sheet.title }}</div>
                   <div class="subject">{{ row.sheet.subject.name }}</div>
@@ -190,6 +266,15 @@
               <div class="qty-box">
                 <div><div class="qty-label">คงเหลือ</div><div class="last-updated">ล่าสุด: {% if row.last_updated_at %}{{ row.last_updated_at|date:"d/m/y H:i" }}{% else %}-{% endif %}</div></div>
                 <div class="qty-num">{{ row.quantity }}</div>
+              </div>
+
+              <div class="target-row">
+                <div class="target-box" data-target-box data-sheet-id="{{ row.sheet.id }}">
+                  <span class="k">เป้าคลัง</span>
+                  <input type="number" min="0" data-target-input value="{{ row.target_stock }}">
+                  <button type="button" data-target-save data-sheet-id="{{ row.sheet.id }}">บันทึก</button>
+                </div>
+                <span class="need-pill" data-need-pill {% if not row.suggested_print_qty %}hidden{% endif %}>ควรสั่งเพิ่ม <span data-need-num>{{ row.suggested_print_qty }}</span></span>
               </div>
 
               <div class="edit-panel">
@@ -210,6 +295,19 @@
                          value="{{ row.storage_location }}" maxlength="120"
                          placeholder="เช่น ชั้น 2 ฝั่งซ้าย / กล่อง A3">
                 </div>
+              </div>
+
+              <div class="link-status-row">
+                {% if row.onedrive_url %}
+                  <a class="link-pill has-link" href="{{ row.onedrive_url }}" target="_blank" data-link-pill data-sheet-id="{{ row.sheet.id }}">🔗 มีลิงก์แล้ว</a>
+                {% else %}
+                  <span class="link-pill no-link" data-link-pill data-sheet-id="{{ row.sheet.id }}">🔗 ยังไม่มีลิงก์</span>
+                {% endif %}
+                <button class="pencil-btn" type="button" data-link-edit-toggle data-sheet-id="{{ row.sheet.id }}" title="แก้ไขลิงก์">✏️</button>
+              </div>
+              <div class="link-edit-box" data-link-edit-box hidden>
+                <input type="url" class="link-edit-input" data-link-input value="{{ row.onedrive_url }}" placeholder="วางลิงก์ไฟล์ชีท (OneDrive)">
+                <button class="tiny-btn save" type="button" data-link-save data-sheet-id="{{ row.sheet.id }}">บันทึก</button>
               </div>
 
               <div class="link-row">
@@ -338,34 +436,46 @@
     </div>
   </div>
 
-  <details class="panel" id="sheetTools" {% if sheet_saved %}open{% endif %}>
-    <summary class="tool-title" style="cursor:pointer;">เครื่องมือเพิ่มเติม: สร้างชีท / Bulk Upload / ผูกชีทกับ class</summary>
-    <div class="tools-grid" style="margin-top:12px;">
-      <div class="tool-box">
-        <div class="tool-title">สร้างชีทใหม่</div>
-        {% if sheet_saved %}
-          <div id="sheetSavedBanner" style="border-radius:12px;padding:8px 10px;font-weight:1000;font-size:12px;margin-bottom:8px;
-                      {% if sheet_saved == 'created' %}background:#dcfce7;border:1px solid #86efac;color:#166534;
-                      {% else %}background:#fef3c7;border:1px solid #fcd34d;color:#92400e;{% endif %}">
-            {% if sheet_saved == 'created' %}✅ บันทึกแล้ว — สร้างชีท {{ sheet_saved_code }} เรียบร้อย
-            {% else %}⚠ มีชีทรหัส {{ sheet_saved_code }} อยู่แล้ว (อัปเดตลิงก์ให้แล้ว){% endif %}
-          </div>
-        {% endif %}
-        <form method="post" class="form-grid">
-          {% csrf_token %}
-          <input type="hidden" name="action" value="create_sheet">
-          <input name="code" placeholder="รหัสชีท เช่น M-P6-01" required>
-          <input name="title" placeholder="ชื่อชีท" required>
-          <select name="grade_level"><option value="">ระดับชั้น</option>{% for value,label in sheet_grade_choices %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</select>
-          <select name="subject_id"><option value="">เลือกวิชา</option>{% for s in subjects %}<option value="{{ s.id }}">{{ s.name }}</option>{% endfor %}</select>
-          <input name="new_subject" placeholder="หรือสร้างวิชาใหม่">
-          <input type="url" name="onedrive_url" placeholder="ลิงก์ไฟล์ชีท (OneDrive) สำหรับส่งร้านปรินท์">
-          <input type="number" min="0" name="initial_qty" placeholder="ยอดเริ่มต้น">
-          <input type="number" min="0" name="minimum_stock" placeholder="ขั้นต่ำ">
-          <button class="btnx primary" type="submit">สร้างชีท</button>
-        </form>
+  <div id="createSheetModal" class="print-modal-backdrop" hidden>
+    <div class="print-modal-card" role="dialog" aria-modal="true">
+      <div class="print-modal-head">
+        <div>
+          <div class="print-modal-title">➕ สร้างชีทใหม่</div>
+          <div class="print-modal-sub">กรอกข้อมูลชีท แล้วกดสร้างได้เลย ทำต่อได้หลายเล่มติดกัน</div>
+        </div>
+        <button type="button" class="print-modal-close" id="createSheetClose" aria-label="Close">×</button>
       </div>
+      <form method="post" class="print-modal-body">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="create_sheet">
+        <div class="print-grid2">
+          <div class="print-field"><label>รหัสชีท</label><input name="code" placeholder="เช่น M-P6-01" required></div>
+          <div class="print-field"><label>ชื่อชีท</label><input name="title" placeholder="ชื่อชีท" required></div>
+        </div>
+        <div class="print-grid2">
+          <div class="print-field"><label>ระดับชั้น</label><select name="grade_level"><option value="">ระดับชั้น</option>{% for value,label in sheet_grade_choices %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</select></div>
+          <div class="print-field"><label>จำนวนหน้า</label><input type="number" min="0" name="total_pages" placeholder="เช่น 180"></div>
+        </div>
+        <div class="print-grid2">
+          <div class="print-field"><label>เลือกวิชา</label><select name="subject_id"><option value="">เลือกวิชา</option>{% for s in subjects %}<option value="{{ s.id }}">{{ s.name }}</option>{% endfor %}</select></div>
+          <div class="print-field"><label>หรือสร้างวิชาใหม่</label><input name="new_subject" placeholder="ชื่อวิชาใหม่"></div>
+        </div>
+        <div class="print-field"><label>ลิงก์ไฟล์ (OneDrive)</label><input type="url" name="onedrive_url" placeholder="สำหรับส่งร้านปรินท์"></div>
+        <div class="print-grid2">
+          <div class="print-field"><label>ยอดเริ่มต้น</label><input type="number" min="0" name="initial_qty" placeholder="0"></div>
+          <div class="print-field"><label>ขั้นต่ำที่ควรมี</label><input type="number" min="0" name="minimum_stock" placeholder="0"></div>
+        </div>
+        <div class="print-actions" style="margin:0 -14px -14px;">
+          <button type="button" class="btnx soft" id="createSheetCancel">ยกเลิก</button>
+          <button class="btnx primary" type="submit">สร้างชีท</button>
+        </div>
+      </form>
+    </div>
+  </div>
 
+  <details class="panel">
+    <summary class="tool-title" style="cursor:pointer;">เครื่องมือเพิ่มเติม: Bulk Upload / ผูกชีทกับ class</summary>
+    <div class="tools-grid" style="margin-top:12px;">
       <div class="tool-box">
         <div class="tool-title">Bulk upload</div>
         <form method="post" enctype="multipart/form-data" action="{% url 'core:sheet_inventory_bulk_upload' %}" class="form-grid">
@@ -414,6 +524,11 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function(){
+  function csrfToken(){
+    const el = document.querySelector('[name=csrfmiddlewaretoken]');
+    return el ? el.value : '';
+  }
+
   function toast(message, isError){
     const old = document.querySelector('.receive-toast');
     if(old) old.remove();
@@ -660,22 +775,179 @@ document.addEventListener('DOMContentLoaded', function(){
   successCloseTop && successCloseTop.addEventListener('click', closeSuccessModal);
   printModal && printModal.addEventListener('click', function(e){ if(e.target === printModal){ closePrintModal(); } });
   successModal && successModal.addEventListener('click', function(e){ if(e.target === successModal){ closeSuccessModal(); } });
+
+  // --- Create-sheet modal ---
+  const createModal = document.getElementById('createSheetModal');
+  function openCreateModal(){ if(createModal){ createModal.hidden = false; } }
+  function closeCreateModal(){ if(createModal){ createModal.hidden = true; } }
+  const openCreateBtn = document.getElementById('openCreateSheetBtn');
+  openCreateBtn && openCreateBtn.addEventListener('click', openCreateModal);
+  document.getElementById('createSheetClose') && document.getElementById('createSheetClose').addEventListener('click', closeCreateModal);
+  document.getElementById('createSheetCancel') && document.getElementById('createSheetCancel').addEventListener('click', closeCreateModal);
+  createModal && createModal.addEventListener('click', function(e){ if(e.target === createModal){ closeCreateModal(); } });
+
   document.addEventListener('keydown', function(e){
     if(e.key !== 'Escape') return;
     if(printModal && !printModal.hidden){ closePrintModal(); }
     if(successModal && !successModal.hidden){ closeSuccessModal(); }
+    if(createModal && !createModal.hidden){ closeCreateModal(); }
   });
 
-  // After creating a sheet the page reloads in place, so bring the result
-  // banner into view and drop the query string to avoid a stale message.
-  var savedBanner = document.getElementById('sheetSavedBanner');
-  if(savedBanner){
-    savedBanner.scrollIntoView({behavior:'smooth', block:'center'});
+  // After creating a sheet the page reloads in place, so surface the result
+  // as a toast and drop the query string to avoid a stale message on refresh.
+  {% if sheet_saved %}
+    toast(
+      {% if sheet_saved == 'created' %}'✅ บันทึกแล้ว — สร้างชีท {{ sheet_saved_code|escapejs }} เรียบร้อย'
+      {% else %}'⚠ มีชีทรหัส {{ sheet_saved_code|escapejs }} อยู่แล้ว (อัปเดตลิงก์ให้แล้ว)'{% endif %},
+      {% if sheet_saved == 'created' %}false{% else %}true{% endif %}
+    );
     if(window.history.replaceState){
-      var clean = window.location.pathname + window.location.hash;
-      window.history.replaceState({}, '', clean);
+      window.history.replaceState({}, '', window.location.pathname + window.location.hash);
     }
+  {% endif %}
+
+  // --- Link pencil-toggle: reveal an inline editor, save via AJAX, then
+  // swap the pill between "green / has a link" and "grey / no link". ---
+  document.addEventListener('click', function(e){
+    const toggleBtn = e.target.closest('[data-link-edit-toggle]');
+    if(toggleBtn){
+      const card = toggleBtn.closest('.sheet-card');
+      const box = card && card.querySelector('[data-link-edit-box]');
+      if(box){
+        box.hidden = !box.hidden;
+        if(!box.hidden){ const inp = box.querySelector('[data-link-input]'); inp && inp.focus(); }
+      }
+      return;
+    }
+    const saveBtn = e.target.closest('[data-link-save]');
+    if(saveBtn){
+      const sheetId = saveBtn.dataset.sheetId;
+      const card = saveBtn.closest('.sheet-card');
+      const input = card.querySelector('[data-link-input]');
+      const url = (input.value || '').trim();
+      const fd = new FormData();
+      fd.set('csrfmiddlewaretoken', csrfToken());
+      fd.set('action', 'update_sheet_link:' + sheetId);
+      fd.set('onedrive_url', url);
+      const oldText = saveBtn.textContent;
+      saveBtn.disabled = true; saveBtn.textContent = '...';
+      fetch(window.location.pathname, {method:'POST', body: fd, headers:{'X-Requested-With':'XMLHttpRequest'}})
+        .then(function(r){ return r.json(); })
+        .then(function(data){
+          if(!data.ok) throw new Error(data.message || 'บันทึกลิงก์ไม่สำเร็จ');
+          const pillWrap = card.querySelector('[data-link-pill]');
+          if(pillWrap){
+            if(url){
+              const a = document.createElement('a');
+              a.href = url; a.target = '_blank'; a.className = 'link-pill has-link';
+              a.setAttribute('data-link-pill',''); a.setAttribute('data-sheet-id', sheetId);
+              a.textContent = '🔗 มีลิงก์แล้ว';
+              pillWrap.replaceWith(a);
+            }else{
+              const span = document.createElement('span');
+              span.className = 'link-pill no-link';
+              span.setAttribute('data-link-pill',''); span.setAttribute('data-sheet-id', sheetId);
+              span.textContent = '🔗 ยังไม่มีลิงก์';
+              pillWrap.replaceWith(span);
+            }
+          }
+          const printBtn = card.querySelector('[data-print-open]');
+          if(printBtn){ printBtn.dataset.onedriveUrl = url; }
+          card.querySelector('[data-link-edit-box]').hidden = true;
+          toast('บันทึกลิงก์แล้ว', false);
+        })
+        .catch(function(err){ toast(err.message, true); })
+        .finally(function(){ saveBtn.disabled = false; saveBtn.textContent = oldText; });
+      return;
+    }
+    const targetSaveBtn = e.target.closest('[data-target-save]');
+    if(targetSaveBtn){
+      const sheetId = targetSaveBtn.dataset.sheetId;
+      const card = targetSaveBtn.closest('.sheet-card');
+      const input = card.querySelector('[data-target-input]');
+      const fd = new FormData();
+      fd.set('csrfmiddlewaretoken', csrfToken());
+      fd.set('action', 'update_sheet_target:' + sheetId);
+      fd.set('target_stock', input.value || '0');
+      const oldText = targetSaveBtn.textContent;
+      targetSaveBtn.disabled = true; targetSaveBtn.textContent = '...';
+      fetch(window.location.pathname, {method:'POST', body: fd, headers:{'X-Requested-With':'XMLHttpRequest'}})
+        .then(function(r){ return r.json(); })
+        .then(function(data){
+          if(!data.ok) throw new Error(data.message || 'บันทึกเป้าคลังไม่สำเร็จ');
+          const needPill = card.querySelector('[data-need-pill]');
+          if(needPill){
+            if(data.suggested_print_qty > 0){
+              needPill.hidden = false;
+              needPill.querySelector('[data-need-num]').textContent = data.suggested_print_qty;
+            }else{
+              needPill.hidden = true;
+            }
+          }
+          toast('บันทึกเป้าคลังแล้ว', false);
+        })
+        .catch(function(err){ toast(err.message, true); })
+        .finally(function(){ targetSaveBtn.disabled = false; targetSaveBtn.textContent = oldText; });
+    }
+  });
+
+  // --- Cover photo: click to arm + open a file picker, or click then
+  // paste (Ctrl+V) a screenshot straight from the clipboard. ---
+  let armedCoverBox = null;
+  function setCoverImage(box, url){
+    box.querySelectorAll('[data-cover-img],[data-cover-ph]').forEach(function(n){ n.remove(); });
+    const img = document.createElement('img');
+    img.src = url; img.setAttribute('data-cover-img','');
+    box.insertBefore(img, box.querySelector('[data-cover-spin]'));
   }
+  function uploadCover(box, file){
+    if(!file || !(file.type || '').startsWith('image/')) return;
+    const sheetId = box.dataset.sheetId;
+    const fd = new FormData();
+    fd.set('csrfmiddlewaretoken', csrfToken());
+    fd.set('cover_image', file, file.name || 'cover.png');
+    box.classList.add('is-busy');
+    fetch('/sheet-inventory/sheet/' + sheetId + '/cover/', {
+      method: 'POST', body: fd, headers: {'X-Requested-With':'XMLHttpRequest'}
+    })
+      .then(function(r){ return r.json(); })
+      .then(function(data){
+        if(!data.ok) throw new Error(data.message || 'อัปโหลดรูปไม่สำเร็จ');
+        setCoverImage(box, data.url);
+        toast('บันทึกรูปปกแล้ว', false);
+      })
+      .catch(function(err){ toast(err.message, true); })
+      .finally(function(){ box.classList.remove('is-busy'); });
+  }
+  document.querySelectorAll('[data-cover-box]').forEach(function(box){
+    const fileInput = box.querySelector('[data-cover-file]');
+    // A click arms the box for pasting (Ctrl+V) *and* opens the file picker,
+    // so browsing works too -- cancelling the dialog still leaves it armed.
+    box.addEventListener('click', function(){
+      armedCoverBox = box;
+      document.querySelectorAll('[data-cover-box]').forEach(function(b){ b.classList.remove('is-armed'); });
+      box.classList.add('is-armed');
+      box.focus();
+      fileInput.click();
+    });
+    box.addEventListener('focus', function(){ armedCoverBox = box; });
+    fileInput.addEventListener('click', function(e){ e.stopPropagation(); });
+    fileInput.addEventListener('change', function(){
+      if(fileInput.files && fileInput.files[0]) uploadCover(box, fileInput.files[0]);
+      fileInput.value = '';
+    });
+  });
+  document.addEventListener('paste', function(e){
+    if(!armedCoverBox) return;
+    const items = (e.clipboardData && e.clipboardData.items) || [];
+    for(let i = 0; i < items.length; i++){
+      if(items[i].type && items[i].type.indexOf('image/') === 0){
+        const file = items[i].getAsFile();
+        if(file){ e.preventDefault(); uploadCover(armedCoverBox, file); }
+        break;
+      }
+    }
+  });
 });
 </script>
 

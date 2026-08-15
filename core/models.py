@@ -229,6 +229,14 @@ class Sheet(models.Model):
     )
     total_questions = models.PositiveIntegerField("จำนวนข้อ", default=0)  # ถ้าไม่ใช้ ใส่ 0
 
+    cover_image = models.ImageField(
+        "รูปหน้าปก",
+        upload_to="sheet_covers/",
+        blank=True,
+        null=True,
+        help_text="วางรูป (Ctrl+V) หรืออัปโหลดได้จากหน้า Sheet Inventory",
+    )
+
     is_active = models.BooleanField("เปิดใช้งาน", default=True)
 
     class Meta:
@@ -2137,6 +2145,8 @@ class ScheduleExamCountdown(models.Model):
     note = models.CharField("หมายเหตุ (เช่น รอบแรก - ห้องพิเศษ)", max_length=120, blank=True)
     display_order = models.PositiveIntegerField("ลำดับ", default=1)
     is_active = models.BooleanField("แสดงบนตาราง", default=True)
+    show_on_saturday = models.BooleanField("แสดงในตารางวันเสาร์", default=True)
+    show_on_sunday = models.BooleanField("แสดงในตารางวันอาทิตย์", default=True)
 
     class Meta:
         verbose_name = "Schedule Exam Countdown"

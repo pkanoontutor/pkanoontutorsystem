@@ -1,0 +1,251 @@
+{% extends "core/base.html" %}
+{% block title %}Remaining Attendance{% endblock %}
+
+{% block head %}
+<style>
+  .ra-wrap{max-width:900px;margin:0 auto;display:grid;gap:12px;}
+  .hero{background:linear-gradient(135deg,#0f172a,#334155,#64748b);color:#fff;border-radius:24px;padding:18px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;box-shadow:0 12px 24px rgba(15,23,42,.18)}
+  .title{font-size:26px;font-weight:1000;letter-spacing:-.04em}.sub{font-size:12px;color:#e2e8f0;margin-top:4px;line-height:1.5}
+  .actions{display:flex;gap:7px;flex-wrap:wrap}.btn{border:0;border-radius:13px;padding:10px 13px;font-weight:1000;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;font-size:13px}.soft{background:#fff;color:#0f172a;border:1px solid #e2e8f0}
+
+  .panel{background:#fff;border-radius:20px;padding:16px;box-shadow:0 5px 14px rgba(15,23,42,.08);border:1px solid rgba(255,255,255,.88)}
+  .section-title{font-size:16px;font-weight:1000;color:#0f172a;display:flex;align-items:center;gap:7px}
+  .hint{font-size:12px;color:#64748b;font-weight:800;line-height:1.45;margin-top:3px}
+
+  .search-wrap{position:relative;margin-top:8px}
+  .search-input{height:46px;border:2px solid #bfdbfe;background:#fff;font-size:15px;font-weight:950;border-radius:14px;padding:0 14px;width:100%;box-sizing:border-box;font-family:inherit}
+  .search-input:focus{outline:none;border-color:#2563eb;box-shadow:0 0 0 4px rgba(37,99,235,.12)}
+  .search-results{position:absolute;left:0;right:0;top:calc(100% + 6px);z-index:80;background:#fff;border:1px solid #cbd5e1;border-radius:15px;box-shadow:0 16px 34px rgba(15,23,42,.18);overflow:hidden;max-height:280px;overflow-y:auto}
+  .result-item{width:100%;border:0;background:#fff;text-align:left;padding:11px 12px;cursor:pointer;font-family:inherit;font-size:13px;font-weight:900;color:#0f172a;border-bottom:1px solid #eef2f7;line-height:1.35}
+  .result-item:last-child{border-bottom:0}.result-item:hover,.result-item:focus{background:#eff6ff;outline:none}
+  .result-empty{padding:12px;font-size:12px;font-weight:900;color:#64748b;background:#f8fafc}
+
+  .enroll-select{margin-top:10px}
+  .enroll-select select{border:1px solid #e2e8f0;border-radius:12px;padding:9px 11px;font-weight:850;background:#fff;width:100%;box-sizing:border-box;font-family:inherit;font-size:13px}
+
+  .stu-head{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+  .stu-avatar{width:52px;height:52px;border-radius:15px;background:#eef2ff;color:#3730a3;display:grid;place-items:center;font-size:21px;font-weight:900;flex:none}
+  .stu-nick{font-size:19px;font-weight:1000;color:#0f172a}
+  .stu-full{font-size:12px;font-weight:800;color:#64748b;margin-top:1px}
+  .stu-chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+  .stu-chips span{background:#f1f5f9;border:1px solid #e2e8f0;border-radius:999px;padding:3px 9px;font-size:11px;font-weight:900;color:#334155}
+
+  .stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  .stat{border-radius:16px;padding:14px;border:1px solid #e2e8f0;background:#f8fafc;text-align:center}
+  .stat b{display:block;font-size:26px;font-weight:1000;color:#0f172a;line-height:1.15}
+  .stat span{font-size:11px;font-weight:900;color:#64748b;display:block;margin-top:3px}
+  .stat.low{background:#fff5f6;border-color:#f7cdd3}.stat.low b{color:#be123c}
+  .stat.warn{background:#fffbf0;border-color:#f6dfa6}.stat.warn b{color:#a16207}
+  .stat.ok{background:#f4faf0;border-color:#d6e9c8}.stat.ok b{color:#3f7d20}
+  .stat.eta b{font-size:16px;color:#1d4ed8}.stat.eta{background:#eff6ff;border-color:#bfdbfe}
+
+  details.panel{padding:0;overflow:hidden}
+  details.panel summary{list-style:none;cursor:pointer;padding:15px 16px;display:flex;align-items:center;justify-content:space-between;gap:10px}
+  details.panel summary::-webkit-details-marker{display:none}
+  details.panel summary .chev{transition:transform .15s ease;color:#94a3b8;font-weight:1000}
+  details.panel[open] summary .chev{transform:rotate(90deg)}
+  details.panel .body{padding:0 16px 16px}
+
+  .att-list{border:1px solid #e2e8f0;border-radius:13px;overflow:hidden}
+  .att-row{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;padding:9px 12px;border-top:1px solid #f1f5f9;background:#fff}
+  .att-row:first-child{border-top:0}.att-row:nth-child(even){background:#fcfdfe}
+  .att-date{font-size:13px;font-weight:900;color:#0f172a}
+  .att-day{font-size:11px;font-weight:700;color:#64748b;margin-left:6px}
+  .att-tag{font-size:11px;font-weight:900;border-radius:999px;padding:3px 10px;white-space:nowrap}
+  .att-row.p .att-tag{background:#eaf6e1;color:#3f7d20}
+  .att-row.e .att-tag{background:#fdf3d6;color:#a16207}
+  .att-row.n .att-tag{background:#ffe6e9;color:#be123c}
+
+  .pay-table{width:100%;border-collapse:collapse;font-size:12.5px}
+  .pay-table th{text-align:left;font-size:10.5px;font-weight:1000;color:#64748b;text-transform:uppercase;letter-spacing:.03em;padding:0 10px 8px;border-bottom:2px solid #e2e8f0}
+  .pay-table td{padding:9px 10px;border-bottom:1px solid #f1f5f9;font-weight:800;color:#0f172a}
+  .pay-table tr:last-child td{border-bottom:0}
+  .pay-table a{color:#2563eb;text-decoration:none}
+  .pay-table a:hover{text-decoration:underline}
+  .pay-money{color:#166534;font-weight:1000}
+
+  .empty{text-align:center;padding:26px 16px;color:#64748b;font-weight:850;font-size:13px;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:16px}
+
+  @media(max-width:640px){.stat-grid{grid-template-columns:1fr}.hero .btn{width:100%}.pay-table{display:block;overflow-x:auto}}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="ra-wrap">
+  <section class="hero">
+    <div>
+      <div class="title">🔎 Remaining Attendance</div>
+      <div class="sub">เสิร์ชชื่อนักเรียน ดูว่าคงเหลือครั้งเรียนกี่ครั้ง คาดว่าจะครบคอร์สวันไหน พร้อมประวัติการเข้าเรียนและการชำระเงิน</div>
+    </div>
+    <div class="actions"><a class="btn soft" href="{% url 'core:pkanoon_admin_tool' %}">← Admin Tool</a></div>
+  </section>
+
+  <section class="panel">
+    <div class="section-title">ค้นหานักเรียน</div>
+    <div class="search-wrap" id="searchRoot">
+      <input id="studentSearchInput" class="search-input" placeholder="พิมพ์ชื่อเล่น / ชื่อจริง / รหัสนักเรียน" autocomplete="off" inputmode="search" value="{% if student %}{{ student.nickname }} | {{ student.full_name }}{% endif %}">
+      <div id="searchResults" class="search-results" hidden></div>
+    </div>
+
+    {% if student and enrollments|length > 1 %}
+      <div class="enroll-select">
+        <select id="enrollmentSelect">
+          {% for e in enrollments %}
+            <option value="{{ e.id }}" {% if selected_enrollment and e.id == selected_enrollment.id %}selected{% endif %}>
+              {{ e.tutoring_class.name }}{% if not e.is_active %} (จบแล้ว){% endif %} · เลขที่ {{ e.sale_run_no|default:e.id }}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+    {% endif %}
+  </section>
+
+  {% if student %}
+    {% if selected_enrollment %}
+      <section class="panel">
+        <div class="stu-head">
+          <div class="stu-avatar">{{ student.nickname|slice:":1"|default:"?" }}</div>
+          <div>
+            <div class="stu-nick">น้อง{{ student.nickname }}</div>
+            <div class="stu-full">{{ student.full_name }}</div>
+            <div class="stu-chips">
+              <span>{{ student.grade_level|default:"-" }}</span>
+              <span>รหัส {{ student.student_code }}</span>
+              <span>{{ selected_enrollment.tutoring_class.name }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="stat-grid">
+          <div class="stat {% if remaining_sessions <= 2 %}low{% elif remaining_sessions <= 5 %}warn{% else %}ok{% endif %}">
+            <b>{{ remaining_sessions }}</b><span>ครั้งที่เหลือ</span>
+          </div>
+          <div class="stat">
+            <b>{{ remaining_hours_display }}</b><span>ชั่วโมงที่เหลือ</span>
+          </div>
+          <div class="stat eta">
+            <b>{{ expected_completion_label }}</b><span>คาดว่าจะครบคอร์ส</span>
+          </div>
+        </div>
+      </section>
+
+      <details class="panel">
+        <summary>
+          <span class="section-title">📅 การเข้าเรียนล่าสุด 15 ครั้ง</span>
+          <span class="chev">▸</span>
+        </summary>
+        <div class="body">
+          {% if attendance_rows %}
+            <div class="att-list">
+              {% for a in attendance_rows %}
+                <div class="att-row {% if a.status == 'present' %}p{% elif a.status == 'excused' %}e{% else %}n{% endif %}">
+                  <span><span class="att-date">{{ a.thai_day }}</span><span class="att-day">{{ a.thai_weekday }}</span></span>
+                  <span class="att-tag">
+                    {% if a.status == 'present' %}มาเรียน
+                    {% elif a.status == 'excused' %}ลา
+                    {% else %}ขาด{% endif %}
+                  </span>
+                </div>
+              {% endfor %}
+            </div>
+          {% else %}
+            <div class="empty">ยังไม่มีประวัติการเข้าเรียนของคอร์สนี้</div>
+          {% endif %}
+        </div>
+      </details>
+
+      <details class="panel">
+        <summary>
+          <span class="section-title">💰 ประวัติการชำระเงิน</span>
+          <span class="chev">▸</span>
+        </summary>
+        <div class="body">
+          {% if payment_rows %}
+            <table class="pay-table">
+              <thead>
+                <tr><th>วันที่จ่าย</th><th>เลขที่ใบเสร็จ</th><th>จำนวนเงิน</th><th>ได้เพิ่ม</th></tr>
+              </thead>
+              <tbody>
+                {% for p in payment_rows %}
+                  <tr>
+                    <td>{{ p.payment_date_label }}</td>
+                    <td><a href="{% url 'core:course_payment_detail' pk=p.id %}" target="_blank" rel="noopener">{{ p.receipt_no|default:"-" }}</a></td>
+                    <td class="pay-money">{{ p.amount_paid|floatformat:0 }} บาท</td>
+                    <td>{{ p.sessions_granted }} ครั้ง</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          {% else %}
+            <div class="empty">ยังไม่มีประวัติการชำระเงินของคอร์สนี้</div>
+          {% endif %}
+        </div>
+      </details>
+    {% else %}
+      <div class="panel"><div class="empty">นักเรียนคนนี้ยังไม่มี Enrollment</div></div>
+    {% endif %}
+  {% endif %}
+</div>
+
+<script>
+(function(){
+  const STUDENTS = {{ students_json|safe }};
+  const input = document.getElementById('studentSearchInput');
+  const results = document.getElementById('searchResults');
+  const enrollmentSelect = document.getElementById('enrollmentSelect');
+  let timer = null;
+
+  function normalize(s){ return String(s||'').toLowerCase().replace(/\s+/g,''); }
+  function escapeHtml(s){
+    return String(s||'').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+  }
+  function rowText(row){
+    return normalize([row.label, row.student_code, row.nickname, row.full_name, row.grade_level].join(' '));
+  }
+  function hideResults(){ results.hidden = true; results.innerHTML = ''; }
+  function goToStudent(id){
+    window.location.href = '{% url "core:remaining_attendance_search" %}?student_id=' + encodeURIComponent(id);
+  }
+  function render(term){
+    const needle = normalize(term);
+    if(!needle){ hideResults(); return; }
+    const rows = STUDENTS.filter(r => rowText(r).includes(needle)).slice(0, 14);
+    if(!rows.length){
+      results.innerHTML = '<div class="result-empty">ไม่พบชื่อที่ตรงกับคำค้นหา</div>';
+      results.hidden = false;
+      return;
+    }
+    results.innerHTML = '';
+    rows.forEach(row => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'result-item';
+      btn.textContent = row.label || '';
+      btn.addEventListener('click', () => goToStudent(row.id));
+      results.appendChild(btn);
+    });
+    results.hidden = false;
+  }
+  input.addEventListener('input', function(){
+    clearTimeout(timer);
+    const term = input.value.trim();
+    if(term.length < 1){ hideResults(); return; }
+    timer = setTimeout(() => render(term), 120);
+  });
+  input.addEventListener('focus', function(){
+    const term = input.value.trim();
+    if(term.length >= 1) render(term);
+  });
+  document.addEventListener('click', function(event){
+    if(!event.target.closest('#searchRoot')) hideResults();
+  });
+
+  if(enrollmentSelect){
+    enrollmentSelect.addEventListener('change', function(){
+      const studentId = '{{ student.id|default:"" }}';
+      window.location.href = '{% url "core:remaining_attendance_search" %}?student_id=' + encodeURIComponent(studentId) + '&enrollment_id=' + encodeURIComponent(this.value);
+    });
+  }
+})();
+</script>
+{% endblock %}

@@ -3187,6 +3187,87 @@ def attendance_details(request: HttpRequest) -> HttpResponse:
 
 
 # =========================================================
+# ✅ Remaining Attendance (ค้นหาเด็ก ดูครั้งเรียนคงเหลือ)
+# =========================================================
+@login_required
+def remaining_attendance_search(request: HttpRequest) -> HttpResponse:
+    """Search a student and see remaining sessions, expected completion
+    date, a compact recent-attendance list, and the full payment history
+    for their currently-selected enrollment."""
+    student = None
+    enrollments: list[Enrollment] = []
+    selected_enrollment = None
+    attendance_rows: list = []
+    payment_rows: list[dict] = []
+    remaining_sessions = 0
+    hours_per_session = 0.0
+    remaining_hours_display = "0"
+    expected_completion_label = ""
+
+    student_id = (request.GET.get("student_id") or "").strip()
+    if student_id:
+        student = Student.objects.filter(id=student_id).select_related("school").first()
+
+    if student:
+        enrollments = list(
+            Enrollment.objects
+            .select_related("tutoring_class")
+            .filter(student=student)
+            .order_by("-is_active", "-created_at")
+        )
+        selected_enrollment_id = (request.GET.get("enrollment_id") or "").strip()
+        if selected_enrollment_id:
+            selected_enrollment = next(
+                (e for e in enrollments if str(e.id) == selected_enrollment_id), None
+            )
+        if not selected_enrollment and enrollments:
+            selected_enrollment = enrollments[0]
+
+        if selected_enrollment:
+            remaining_sessions = int(selected_enrollment.remaining_sessions or 0)
+            hours_per_session = float(selected_enrollment.tutoring_class.hours_per_session or 0)
+            remaining_hours_display = _q_hours(Decimal(remaining_sessions) * Decimal(str(hours_per_session)))
+            completion = _expected_course_completion_date(selected_enrollment)
+            expected_completion_label = _thai_schedule_date(completion) if completion else "ครบคอร์สแล้ว"
+
+            attendance_qs = (
+                Attendance.objects
+                .filter(student=student, enrollment=selected_enrollment)
+                .order_by("-attendance_date", "-checked_at")[:15]
+            )
+            attendance_rows = _portal_attendance_rows(list(attendance_qs))
+
+            payments = (
+                CoursePayment.objects
+                .filter(enrollment=selected_enrollment, cancelled_at__isnull=True)
+                .order_by("-payment_date", "-created_at")
+            )
+            payment_rows = [
+                {
+                    "id": p.id,
+                    "receipt_no": p.receipt_no,
+                    "payment_date_label": _thai_schedule_date(p.payment_date) if p.payment_date else "-",
+                    "amount_paid": p.amount_paid,
+                    "sessions_granted": p.sessions_granted,
+                }
+                for p in payments
+            ]
+
+    return render(request, "core/remaining_attendance_search.html", {
+        "students_json": json.dumps(_allocation_students_json(), ensure_ascii=False),
+        "student": student,
+        "enrollments": enrollments,
+        "selected_enrollment": selected_enrollment,
+        "remaining_sessions": remaining_sessions,
+        "hours_per_session": hours_per_session,
+        "remaining_hours_display": remaining_hours_display,
+        "expected_completion_label": expected_completion_label,
+        "attendance_rows": attendance_rows,
+        "payment_rows": payment_rows,
+    })
+
+
+# =========================================================
 # ✅ Student Portal (ผู้ปกครอง)
 # =========================================================
 class StudentPortalLoginForm(forms.Form):
@@ -3464,6 +3545,8 @@ def _portal_active_enrollments(enrollments) -> list:
         hours = Decimal(str(getattr(e.tutoring_class, "hours_per_session", 0) or 0))
         e.remaining_hours_display = _q_hours(Decimal(remaining) * hours)
         e.ring_percent = int(round(remaining / total * 100)) if total > 0 else 0
+        completion = _expected_course_completion_date(e)
+        e.expected_completion_label = _thai_schedule_date(completion) if completion else ""
         rows.append(e)
     return rows
 
@@ -4580,6 +4663,32 @@ def _default_renewal_dates(enrollment: Enrollment) -> tuple[date, date]:
     expected_end = today + timedelta(days=days_ahead)
     next_start = expected_end + timedelta(days=7)
     return expected_end, next_start
+
+
+def _expected_course_completion_date(enrollment: Enrollment | None) -> date | None:
+    """Estimated date an enrollment's remaining sessions run out.
+
+    A class meets once a week on a fixed weekday (Sat or Sun, per its
+    time_slot), so remaining sessions play out one every 7 days starting
+    from that class's next upcoming meeting date. Returns None once the
+    course is already complete (remaining <= 0) or has no class.
+    """
+    if not enrollment or not enrollment.tutoring_class_id:
+        return None
+    remaining = int(enrollment.remaining_sessions or 0)
+    if remaining <= 0:
+        return None
+
+    today = timezone.localdate()
+    time_slot = enrollment.tutoring_class.time_slot
+    target_weekday = 6 if time_slot in (
+        TutoringClass.TimeSlot.SUN_MORNING,
+        TutoringClass.TimeSlot.SUN_AFTERNOON,
+    ) else 5  # Saturday
+
+    days_ahead = (target_weekday - today.weekday()) % 7
+    next_session_date = today + timedelta(days=days_ahead)
+    return next_session_date + timedelta(days=7 * (remaining - 1))
 
 
 def _decimal_from_post(value, default: Decimal) -> Decimal:
@@ -5885,6 +5994,7 @@ _ADMIN_TOOL_DEFAULTS = [
     ("private", "c-rose",  "🎁", "ระบบโปรโมชั่น", "ดูโปรโมชั่นทั้งหมด เริ่มจากเพื่อนชวนเพื่อน ใครชวนใครบ้าง กี่คน ได้เครดิตเท่าไร", "/promotions/"),
     ("private", "c-teal",  "📦", "ระบบคลังชีทและส่งปรินท์ชีท", "สร้างชีท จัดการ stock สแกน QR ตัด/นับชีท สั่งปรินท์และตรวจรับชีทจากร้านปรินท์ ครบในหน้าเดียว", "/sheet-inventory/"),
     ("private", "c-sage",  "📤", "ระบบแจกชีท", "สแกน QR เพื่อแจกชีท ตัด stock ตอนกดบันทึก และดูประวัติ Sheet Allocation รายเด็ก/ราย class", "/sheet-allocation/"),
+    ("private", "c-stone", "🔎", "Remaining Attendance", "เสิร์ชชื่อเด็ก ดูครั้งเรียนคงเหลือ คาดว่าจะครบคอร์สวันไหน ประวัติมา/ลา/ขาดล่าสุด และประวัติการชำระเงินต่อคอร์ส", "/remaining-attendance/"),
     ("private", "c-sage",  "💰", "รายรับรายจ่าย", "บันทึกค่าใช้จ่าย ค่าติวเตอร์ และ Export Excel", "/school-finance/"),
     ("private", "c-clay",  "📊", "วิเคราะห์รายได้-ต้นทุน-กำไร", "ดูกำไรรายห้อง ปรับสมมติฐานค่าสอน/รายได้ต่อคนได้เอง ปันส่วน fixed cost หาจุดคุ้มทุน และจำลอง what-if", "/revenue-analysis/"),
     ("private", "c-rose",  "📌", "รายงานสมัคร/ทดลองเรียน", "ติดตามใบสมัคร จองทดลองเรียน และสถานะภายใน", "/admission-report/"),

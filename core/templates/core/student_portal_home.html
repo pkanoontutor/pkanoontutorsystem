@@ -70,6 +70,8 @@
   .course-stats{display:flex;gap:14px;flex-wrap:wrap;margin-top:9px}
   .cstat b{font-size:14px;font-weight:800;color:var(--ink)}
   .cstat span{font-size:11px;font-weight:700;color:var(--muted);margin-left:3px}
+  .course-eta{font-size:11px;font-weight:800;color:var(--sky-ink);background:#eef7ff;border:1px solid #d7e9fb;
+    border-radius:9px;padding:4px 9px;margin-top:9px;display:inline-block}
   .course-code{font-size:10px;font-weight:800;color:var(--muted);letter-spacing:.02em;margin-top:7px}
 
   /* ---------- attendance ---------- */
@@ -174,6 +176,9 @@
                 <span class="cstat"><b>{{ total }}</b><span>ครั้งทั้งหมด</span></span>
               </div>
 
+              {% if e.expected_completion_label %}
+                <div class="course-eta">คาดว่าจะครบคอร์ส: {{ e.expected_completion_label }}</div>
+              {% endif %}
               {% if e.sale_run_no %}<div class="course-code">เลขที่ {{ e.sale_run_no }}</div>{% endif %}
             </div>
           </div>

@@ -309,18 +309,19 @@
   .stu-card.is-excused { background:#fffbeb; border-color:#fcd34d; }
   .stu-card.is-no_show { background:#fef2f2; border-color:#fca5a5; }
 
-  /* The photo doubles as the "มา" button. */
+  /* The photo doubles as the "มา" button. No hover styling: tapping a face
+     is the primary action, so it should feel like a direct hit rather than
+     something that lights up first. */
   .stu-photo {
     border: 0; padding: 0; background: transparent; cursor: pointer;
     line-height: 0; border-radius: 999px; font-family: inherit;
+    width: 100%; display: flex; justify-content: center;
   }
-  .stu-photo:hover .avatar { border-color:#10b981; box-shadow:0 0 0 3px rgba(16,185,129,.22); }
-  .stu-photo:focus-visible { outline:2px solid #059669; outline-offset:2px; }
+  .stu-photo:focus-visible { outline:2px solid #64748b; outline-offset:2px; }
 
   .stu-nick {
-    font-size: 13px; font-weight: 900; color:#111827; line-height:1.2;
-    text-align:center; width:100%;
-    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+    font-size: 26px; font-weight: 900; color:#111827; line-height:1.1;
+    text-align:center; width:100%; overflow-wrap:anywhere;
   }
   .stu-nick.danger { color:#b91c1c; }
   .stu-full {
@@ -352,21 +353,21 @@
   .stu-dot.btn-yellow.active-btn { color:#d97706; }
   .stu-dot.btn-red.active-btn    { color:#dc2626; }
 
-  /* Avatar */
+  /* Avatar. Sized fluidly against the card rather than fixed, so it stays
+     as large as the column allows without spilling on narrower desktops. */
   .avatar {
-    width: 53px; height: 53px;
+    width: 100%; max-width: 76px; aspect-ratio: 1 / 1;
     border-radius: 999px;
     overflow: hidden;
     border: 1px solid #e5e7eb;
     background: #f3f4f6;
-    flex: 0 0 auto;
-    transition: border-color .12s, box-shadow .12s;
+    display: block;
   }
-  .avatar img { width: 53px; height: 53px; object-fit: cover; display: block; }
+  .avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
   .avatar-fallback {
-    width: 53px; height: 53px;
+    width: 100%; height: 100%;
     display: flex; align-items: center; justify-content: center;
-    font-weight: 900; font-size: 21px; color: #9ca3af;
+    font-weight: 900; font-size: 30px; color: #9ca3af;
   }
 
   /* Student / Enrollment mini action buttons.
@@ -695,9 +696,9 @@
   @media (max-width:760px){
     .stu-grid{ grid-template-columns:repeat(5, minmax(0,1fr)); gap:6px; }
     .stu-card{ padding:7px 2px 6px; border-radius:13px; gap:3px; }
-    .avatar,.avatar img,.avatar-fallback{ width:38px; height:38px; }
-    .avatar-fallback{ font-size:15px; }
-    .stu-nick{ font-size:11px; }
+    .avatar{ max-width:52px; }
+    .avatar-fallback{ font-size:21px; }
+    .stu-nick{ font-size:22px; }
     .stu-full{ font-size:8px; }
     .stu-remain{ font-size:16px; }
     .stu-total{ font-size:9px; }

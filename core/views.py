@@ -48,6 +48,7 @@ from .models import (
     CoursePayment,
     CourseRenewalNotice,
     TeachingTutor,
+    TutorSheetProgress,
     TeachingClassSubjectTemplate,
     TeachingWeeklyAssignment,
     TeachingProgressUpdate,
@@ -3544,6 +3545,273 @@ def remaining_attendance_search(request: HttpRequest) -> HttpResponse:
 
 
 # =========================================================
+# ✅ ระบบชีทสำหรับติวเตอร์ (PDF reader)
+# =========================================================
+_TUTOR_SHEET_SESSION_KEY = "tutor_sheet_tutor_id"
+
+
+def _get_sheet_tutor(request: HttpRequest) -> TeachingTutor | None:
+    tid = request.session.get(_TUTOR_SHEET_SESSION_KEY)
+    if not tid:
+        return None
+    return TeachingTutor.objects.filter(id=tid, is_active=True).first()
+
+
+def tutor_sheet_login(request: HttpRequest) -> HttpResponse:
+    """Pick your name, then a 6-digit PIN. Deliberately not tied to a Django
+    user: tutors are staff on the floor, not system accounts."""
+    error = ""
+    selected_id = (request.POST.get("tutor_id") or request.GET.get("tutor_id") or "").strip()
+
+    if request.method == "POST":
+        tutor = TeachingTutor.objects.filter(id=_id_or_none(selected_id), is_active=True).first()
+        pin = (request.POST.get("pin") or "").strip()
+        if not tutor:
+            error = "กรุณาเลือกชื่อติวเตอร์"
+        elif not pin.isdigit() or len(pin) != 6:
+            error = "PIN ต้องเป็นตัวเลข 6 หลัก"
+        elif not tutor.check_sheet_pin(pin):
+            error = "PIN ไม่ถูกต้อง"
+        else:
+            request.session[_TUTOR_SHEET_SESSION_KEY] = tutor.id
+            return redirect("core:tutor_sheet_home")
+
+    return render(request, "core/tutor_sheet_login.html", {
+        "tutors": TeachingTutor.objects.filter(is_active=True).order_by("name"),
+        "selected_id": selected_id,
+        "error": error,
+    })
+
+
+def tutor_sheet_logout(request: HttpRequest) -> HttpResponse:
+    request.session.pop(_TUTOR_SHEET_SESSION_KEY, None)
+    return redirect("core:tutor_sheet_login")
+
+
+@require_POST
+def tutor_sheet_change_pin(request: HttpRequest) -> JsonResponse:
+    tutor = _get_sheet_tutor(request)
+    if not tutor:
+        return JsonResponse({"ok": False, "message": "กรุณาเข้าสู่ระบบใหม่"}, status=403)
+    current = (request.POST.get("current_pin") or "").strip()
+    new_pin = (request.POST.get("new_pin") or "").strip()
+    if not tutor.check_sheet_pin(current):
+        return JsonResponse({"ok": False, "message": "PIN เดิมไม่ถูกต้อง"}, status=400)
+    if not new_pin.isdigit() or len(new_pin) != 6:
+        return JsonResponse({"ok": False, "message": "PIN ใหม่ต้องเป็นตัวเลข 6 หลัก"}, status=400)
+    tutor.set_sheet_pin(new_pin)
+    tutor.save(update_fields=["sheet_pin_hash", "updated_at"])
+    return JsonResponse({"ok": True, "message": "เปลี่ยน PIN แล้ว"})
+
+
+def tutor_sheet_home(request: HttpRequest) -> HttpResponse:
+    """This week's classes for the signed-in tutor."""
+    tutor = _get_sheet_tutor(request)
+    if not tutor:
+        return redirect("core:tutor_sheet_login")
+
+    week_start, week_end = _teaching_week_range(timezone.localdate())
+    assignments = (
+        TeachingWeeklyAssignment.objects
+        .select_related("tutoring_class", "subject_template")
+        .filter(week_start_date=week_start, tutor=tutor, is_teaching=True)
+        .order_by("tutoring_class__time_slot", "tutoring_class__name", "subject_template__display_order")
+    )
+
+    by_class: dict[int, dict] = OrderedDict()
+    for a in assignments:
+        cls = a.tutoring_class
+        row = by_class.setdefault(cls.id, {
+            "class": cls,
+            "grade_label": _grade_from_class_name(cls.name),
+            "time_slot": cls.get_time_slot_display(),
+            "subjects": [],
+        })
+        row["subjects"].append(a.subject_template.subject_name)
+
+    return render(request, "core/tutor_sheet_home.html", {
+        "tutor": tutor,
+        "week_start": week_start,
+        "week_end": week_end,
+        "class_rows": list(by_class.values()),
+    })
+
+
+def tutor_sheet_shelf(request: HttpRequest, class_id: int) -> HttpResponse:
+    """Bookshelf: every sheet for this class's grade, grouped by subject."""
+    tutor = _get_sheet_tutor(request)
+    if not tutor:
+        return redirect("core:tutor_sheet_login")
+
+    cls = get_object_or_404(TutoringClass, pk=class_id)
+    grade_code = _grade_code_from_class_name(cls.name)
+
+    sheets_qs = (
+        Sheet.objects
+        .select_related("subject")
+        .filter(is_active=True)
+        .order_by("subject__name", "code")
+    )
+    if grade_code:
+        sheets_qs = sheets_qs.filter(grade_level=grade_code)
+    sheets = list(sheets_qs)
+
+    # Which sheets actually have something to read, and where each class left off.
+    doc_counts: dict[int, dict[str, int]] = defaultdict(lambda: {"content": 0, "answer": 0})
+    for d in SheetDocument.objects.filter(sheet__in=sheets).values("sheet_id", "kind"):
+        if d["kind"] in ("content", "answer"):
+            doc_counts[d["sheet_id"]][d["kind"]] += 1
+    progress_map = {
+        p.sheet_id: p
+        for p in TutorSheetProgress.objects.filter(tutoring_class=cls, sheet__in=sheets)
+    }
+
+    groups: dict[str, list] = OrderedDict()
+    for s in sheets:
+        counts = doc_counts.get(s.id, {"content": 0, "answer": 0})
+        prog = progress_map.get(s.id)
+        s.content_count = counts["content"]
+        s.answer_count = counts["answer"]
+        s.has_files = bool(counts["content"] or counts["answer"])
+        s.resume_page = prog.last_page if prog else 0
+        s.resume_at = prog.updated_at if prog else None
+        groups.setdefault(s.subject.name if s.subject_id else "ไม่ระบุวิชา", []).append(s)
+
+    return render(request, "core/tutor_sheet_shelf.html", {
+        "tutor": tutor,
+        "cls": cls,
+        "grade_label": _grade_from_class_name(cls.name) or "ไม่ระบุระดับชั้น",
+        "groups": groups.items(),
+        "sheet_count": len(sheets),
+    })
+
+
+def tutor_sheet_read(request: HttpRequest, class_id: int, sheet_id: int) -> HttpResponse:
+    """The reader itself: one page at a time, เนื้อหา/เฉลย toggle, thumbnails."""
+    tutor = _get_sheet_tutor(request)
+    if not tutor:
+        return redirect("core:tutor_sheet_login")
+
+    cls = get_object_or_404(TutoringClass, pk=class_id)
+    sheet = get_object_or_404(Sheet.objects.select_related("subject"), pk=sheet_id)
+
+    docs = list(
+        SheetDocument.objects
+        .filter(sheet=sheet, kind__in=[SheetDocument.Kind.CONTENT, SheetDocument.Kind.ANSWER])
+        .order_by("kind", "display_order", "id")
+    )
+    docs_json = [
+        {
+            "id": d.id,
+            "kind": d.kind,
+            "name": d.display_name,
+            "url": d.pdf.url if d.pdf else "",
+            "page_count": int(d.page_count or 0),
+        }
+        for d in docs
+    ]
+
+    progress = TutorSheetProgress.objects.filter(tutoring_class=cls, sheet=sheet).first()
+
+    return render(request, "core/tutor_sheet_read.html", {
+        "tutor": tutor,
+        "cls": cls,
+        "sheet": sheet,
+        "docs_json": json.dumps(docs_json, ensure_ascii=False),
+        "resume": json.dumps({
+            "document_id": progress.document_id if progress else None,
+            "page": int(progress.last_page or 1) if progress else 1,
+            "question": progress.last_question if progress else "",
+        }, ensure_ascii=False),
+        "progress": progress,
+        "subject_options": _tutor_sheet_subject_options(cls, tutor),
+    })
+
+
+def _tutor_sheet_subject_options(cls: TutoringClass, tutor: TeachingTutor) -> list[dict]:
+    """This week's subjects for this tutor+class -- the assignment the
+    end-of-class save writes its progress against."""
+    week_start, _ = _teaching_week_range(timezone.localdate())
+    rows = (
+        TeachingWeeklyAssignment.objects
+        .select_related("subject_template")
+        .filter(week_start_date=week_start, tutoring_class=cls, tutor=tutor, is_teaching=True)
+        .order_by("subject_template__display_order", "subject_template__subject_name")
+    )
+    return [{"id": a.id, "name": a.subject_template.subject_name} for a in rows]
+
+
+@require_POST
+def tutor_sheet_save_progress(request: HttpRequest) -> JsonResponse:
+    """จบคาบ: record page/question against the tutor's weekly assignment so
+    it lands in the existing sheet-update report, and remember where this
+    class stopped so the next session resumes there."""
+    tutor = _get_sheet_tutor(request)
+    if not tutor:
+        return JsonResponse({"ok": False, "message": "กรุณาเข้าสู่ระบบใหม่"}, status=403)
+
+    cls = TutoringClass.objects.filter(id=_id_or_none(request.POST.get("class_id"))).first()
+    sheet = Sheet.objects.filter(id=_id_or_none(request.POST.get("sheet_id"))).first()
+    if not cls or not sheet:
+        return JsonResponse({"ok": False, "message": "ไม่พบคลาสหรือชีทนี้"}, status=404)
+
+    try:
+        page = max(int(request.POST.get("page") or 1), 1)
+    except (TypeError, ValueError):
+        page = 1
+    question = (request.POST.get("question") or "").strip()[:50]
+    if not question:
+        return JsonResponse({"ok": False, "message": "กรุณากรอกเลขข้อที่สอนถึง"}, status=400)
+
+    document = SheetDocument.objects.filter(
+        id=_id_or_none(request.POST.get("document_id")), sheet=sheet
+    ).first()
+
+    assignment = (
+        TeachingWeeklyAssignment.objects
+        .filter(id=_id_or_none(request.POST.get("assignment_id")), tutor=tutor, tutoring_class=cls)
+        .select_related("subject_template")
+        .first()
+    )
+
+    with transaction.atomic():
+        TutorSheetProgress.objects.update_or_create(
+            tutoring_class=cls,
+            sheet=sheet,
+            defaults={
+                "document": document,
+                "last_page": page,
+                "last_question": question,
+                "updated_by_name": tutor.name,
+            },
+        )
+
+        saved_to_report = False
+        if assignment:
+            TeachingProgressUpdate.objects.update_or_create(
+                assignment=assignment,
+                teaching_date=timezone.localdate(),
+                defaults={
+                    "sheet_name": f"{sheet.code} {sheet.title}".strip(),
+                    "page_to": str(page),
+                    "question_to": question,
+                    "no_teaching": False,
+                    "updated_by_name": tutor.name,
+                },
+            )
+            saved_to_report = True
+
+    return JsonResponse({
+        "ok": True,
+        "saved_to_report": saved_to_report,
+        "message": (
+            "บันทึกเข้าระบบอัปเดตชีทแล้ว" if saved_to_report
+            else "บันทึกหน้าที่สอนค้างไว้แล้ว (สัปดาห์นี้ยังไม่มี assignment วิชานี้ จึงยังไม่เข้ารายงาน)"
+        ),
+    })
+
+
+# =========================================================
 # ✅ Student Portal (ผู้ปกครอง)
 # =========================================================
 class StudentPortalLoginForm(forms.Form):
@@ -6270,6 +6538,7 @@ _ADMIN_TOOL_DEFAULTS = [
     ("private", "c-rose",  "🎁", "ระบบโปรโมชั่น", "ดูโปรโมชั่นทั้งหมด เริ่มจากเพื่อนชวนเพื่อน ใครชวนใครบ้าง กี่คน ได้เครดิตเท่าไร", "/promotions/"),
     ("private", "c-teal",  "📦", "ระบบคลังชีทและส่งปรินท์ชีท", "สร้างชีท จัดการ stock สแกน QR ตัด/นับชีท สั่งปรินท์และตรวจรับชีทจากร้านปรินท์ ครบในหน้าเดียว", "/sheet-inventory/"),
     ("private", "c-sage",  "📤", "ระบบแจกชีท", "สแกน QR เพื่อแจกชีท ตัด stock ตอนกดบันทึก และดูประวัติ Sheet Allocation รายเด็ก/ราย class", "/sheet-allocation/"),
+    ("private", "c-teal",  "📖", "ระบบชีทสำหรับติวเตอร์", "ติวเตอร์เข้าด้วย PIN เปิดชีท PDF ทีละหน้า สลับเนื้อหา/เฉลย และกดจบคาบเพื่อบันทึกหน้า/ข้อเข้าระบบอัปเดตชีท", "/tutor-sheets/"),
     ("private", "c-lilac", "📚", "คลังหนังสือ", "บันทึกโปรไฟล์หนังสือต้นทางที่ใช้ทำชีท ชื่อ/รหัส/วิชา/ระดับชั้น ลิงก์ไฟล์ และรูปปก", "/books/"),
     ("private", "c-stone", "🔎", "Remaining Attendance", "เสิร์ชชื่อเด็ก ดูครั้งเรียนคงเหลือ คาดว่าจะครบคอร์สวันไหน ประวัติมา/ลา/ขาดล่าสุด และประวัติการชำระเงินต่อคอร์ส", "/remaining-attendance/"),
     ("private", "c-sage",  "💰", "รายรับรายจ่าย", "บันทึกค่าใช้จ่าย ค่าติวเตอร์ และ Export Excel", "/school-finance/"),
@@ -8582,6 +8851,19 @@ def _grade_from_class_name(name: str) -> str:
     """Extract a grade label like 'ม.1' / 'ป.6' from a class name."""
     m = re.search(r"(ม\.|ป\.)\s*(\d+)", name or "")
     return f"{m.group(1)}{m.group(2)}" if m else ""
+
+
+def _grade_code_from_class_name(name: str) -> str:
+    """Class name -> Sheet.grade_level code ('ป.6 ห้อง A' -> 'p6').
+
+    TutoringClass has no grade field, so the shelf derives it from the name
+    the same way the schedule module already does.
+    """
+    label = _grade_from_class_name(name)
+    if not label:
+        return ""
+    prefix, _, number = label.partition(".")
+    return f"{'p' if prefix == 'ป' else 'm'}{number}"
 
 
 def _schedule_half(time_index: int) -> str:

@@ -1,0 +1,119 @@
+{% extends "core/base.html" %}
+{% block title %}คลาสสัปดาห์นี้ · {{ tutor.name }}{% endblock %}
+
+{% block head %}
+<style>
+  .ts-wrap{max-width:880px;margin:0 auto;display:grid;gap:13px}
+  .ts-hero{background:linear-gradient(135deg,#0f172a,#0d9488,#14b8a6);color:#fff;border-radius:22px;padding:18px 20px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center;box-shadow:0 12px 26px rgba(15,23,42,.2)}
+  .ts-hero .t{font-size:22px;font-weight:1000;letter-spacing:-.03em}
+  .ts-hero .s{font-size:12.5px;color:#ccfbf1;margin-top:4px;line-height:1.5}
+  .acts{display:flex;gap:7px;flex-wrap:wrap}
+  .btn{border:0;border-radius:12px;padding:9px 13px;font-weight:1000;font-size:12.5px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;font-family:inherit}
+  .soft{background:#fff;color:#0f172a;border:1px solid #e2e8f0}
+  .teal{background:#0d9488;color:#fff}
+  .panel{background:#fff;border-radius:20px;padding:16px;box-shadow:0 5px 14px rgba(15,23,42,.08);border:1px solid #eef2f7}
+  .section-title{font-size:16px;font-weight:1000;color:#0f172a}
+  .hint{font-size:12px;color:#64748b;font-weight:800;line-height:1.45;margin-top:3px}
+  .cls-grid{display:grid;gap:10px;margin-top:12px}
+  .cls{display:flex;justify-content:space-between;align-items:center;gap:12px;border:1px solid #e2e8f0;border-radius:16px;padding:13px 14px;background:#f8fafc;text-decoration:none;transition:.14s}
+  .cls:hover{border-color:#5eead4;background:#f0fdfa;transform:translateY(-1px);box-shadow:0 5px 14px rgba(13,148,136,.13)}
+  .cls-main{min-width:0}
+  .cls-name{font-size:16px;font-weight:1000;color:#0f172a}
+  .cls-meta{font-size:12px;font-weight:800;color:#64748b;margin-top:3px;line-height:1.45}
+  .chips{display:flex;gap:4px;flex-wrap:wrap;margin-top:6px}
+  .chip{font-size:10.5px;font-weight:900;border-radius:999px;padding:2px 9px;background:#ccfbf1;color:#0f766e;border:1px solid #99f6e4}
+  .go{font-size:20px;color:#0d9488;flex:none}
+  .empty{text-align:center;padding:28px 16px;color:#64748b;font-weight:850;font-size:13px;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:16px;margin-top:12px}
+
+  .modal-bg{position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:9999;display:none;align-items:center;justify-content:center;padding:18px}
+  .modal-bg.show{display:flex}
+  .modal{width:100%;max-width:380px;background:#fff;border-radius:20px;padding:20px;box-shadow:0 24px 60px rgba(15,23,42,.35)}
+  .modal h3{margin:0 0 14px;font-size:17px;font-weight:1000;color:#0f172a}
+  .modal .field{display:flex;flex-direction:column;gap:5px;margin-bottom:11px}
+  .modal label{font-size:11px;font-weight:1000;color:#334155;text-transform:uppercase;letter-spacing:.04em}
+  .modal input{border:1px solid #e2e8f0;border-radius:12px;padding:11px;font-weight:900;font-size:16px;letter-spacing:.3em;text-align:center;font-family:inherit;width:100%;box-sizing:border-box}
+  .modal input:focus{outline:none;border-color:#0d9488;box-shadow:0 0 0 4px rgba(13,148,136,.12)}
+  .modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:15px}
+  .msg{font-size:12.5px;font-weight:900;margin-top:8px;min-height:16px}
+  .msg.ok{color:#0f766e}.msg.err{color:#b91c1c}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="ts-wrap">
+  <div class="ts-hero">
+    <div>
+      <div class="t">สวัสดี {{ tutor.name }}</div>
+      <div class="s">คลาสที่ต้องสอนสัปดาห์นี้ ({{ week_start|date:"d/m" }} – {{ week_end|date:"d/m/Y" }}) · กดที่คลาสเพื่อเปิดชั้นวางชีท</div>
+    </div>
+    <div class="acts">
+      <button class="btn soft" type="button" onclick="openPinModal()">🔑 เปลี่ยน PIN</button>
+      <a class="btn soft" href="{% url 'core:tutor_sheet_logout' %}">ออกจากระบบ</a>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="section-title">📅 คลาสสัปดาห์นี้</div>
+    <div class="hint">แสดงเฉพาะคลาสที่คุณถูกจัดให้สอนในสัปดาห์นี้</div>
+
+    <div class="cls-grid">
+      {% for row in class_rows %}
+        <a class="cls" href="{% url 'core:tutor_sheet_shelf' row.class.id %}">
+          <div class="cls-main">
+            <div class="cls-name">{{ row.class.name }}</div>
+            <div class="cls-meta">{{ row.time_slot }}{% if row.grade_label %} · {{ row.grade_label }}{% endif %}</div>
+            <div class="chips">
+              {% for s in row.subjects %}<span class="chip">{{ s }}</span>{% endfor %}
+            </div>
+          </div>
+          <span class="go">›</span>
+        </a>
+      {% empty %}
+        <div class="empty">สัปดาห์นี้ยังไม่มีคลาสที่จัดให้คุณสอน<br>ถ้าคิดว่าผิด ให้แจ้งแอดมินตรวจหน้า “อัปเดตการสอนติวเตอร์”</div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="pinModalBg">
+  <div class="modal">
+    <h3>🔑 เปลี่ยน PIN</h3>
+    <div class="field"><label>PIN เดิม</label><input type="tel" inputmode="numeric" maxlength="6" id="curPin" placeholder="······"></div>
+    <div class="field"><label>PIN ใหม่ (6 หลัก)</label><input type="tel" inputmode="numeric" maxlength="6" id="newPin" placeholder="······"></div>
+    <div class="field"><label>ยืนยัน PIN ใหม่</label><input type="tel" inputmode="numeric" maxlength="6" id="newPin2" placeholder="······"></div>
+    <div class="msg" id="pinMsg"></div>
+    <div class="modal-actions">
+      <button class="btn soft" type="button" onclick="closePinModal()">ยกเลิก</button>
+      <button class="btn teal" type="button" onclick="submitPin()">บันทึก PIN ใหม่</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const bg=document.getElementById('pinModalBg');
+  const msg=document.getElementById('pinMsg');
+  window.openPinModal=()=>{ msg.textContent=''; msg.className='msg';
+    ['curPin','newPin','newPin2'].forEach(i=>document.getElementById(i).value='');
+    bg.classList.add('show'); };
+  window.closePinModal=()=>bg.classList.remove('show');
+
+  window.submitPin=async function(){
+    const cur=document.getElementById('curPin').value.trim();
+    const n1=document.getElementById('newPin').value.trim();
+    const n2=document.getElementById('newPin2').value.trim();
+    if(n1!==n2){ msg.textContent='PIN ใหม่สองช่องไม่ตรงกัน'; msg.className='msg err'; return; }
+    const fd=new FormData(); fd.append('current_pin',cur); fd.append('new_pin',n1);
+    try{
+      const res=await fetch("{% url 'core:tutor_sheet_change_pin' %}",
+        {method:'POST',headers:{'X-CSRFToken':'{{ csrf_token }}'},body:fd});
+      const data=await res.json();
+      msg.textContent=data.message||''; msg.className='msg '+(data.ok?'ok':'err');
+      if(data.ok) setTimeout(closePinModal,1100);
+    }catch(e){ msg.textContent='บันทึกไม่สำเร็จ'; msg.className='msg err'; }
+  };
+  bg.addEventListener('click',e=>{ if(e.target===bg) closePinModal(); });
+  document.addEventListener('keydown',e=>{ if(e.key==='Escape') closePinModal(); });
+})();
+</script>
+{% endblock %}

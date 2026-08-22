@@ -123,7 +123,8 @@
     <h3 style="margin:0 0 4px;font-size:16px">📄 ไฟล์ PDF ของชีท</h3>
     <div class="meta" style="margin-bottom:10px">
       อัปโหลดปก 1 ไฟล์ (ใช้เป็นรูปประจำชีท) ส่วนเนื้อหาและเฉลยใส่ได้มากกว่า 1 ไฟล์ ·
-      ร้านปรินท์จะโหลดไฟล์เนื้อหาจากตรงนี้แทนการเปิดลิงก์
+      ร้านปรินท์จะโหลดไฟล์เนื้อหาจากตรงนี้แทนการเปิดลิงก์ ·
+      <b>ไม่จำกัดขนาดไฟล์</b> — ไฟล์ใหญ่จะใช้เวลาอัปโหลดนาน ระบบจะแสดง % ให้ระหว่างรอ
     </div>
     <div id="docGroups" class="doc-groups"></div>
   </section>
@@ -217,8 +218,14 @@
     p, new Promise(res => setTimeout(() => res(null), ms)),
   ]);
 
+  // Reading a file for its thumbnail pulls the whole thing into browser
+  // memory. Uploads themselves are unlimited, but past this size the preview
+  // is not worth risking the tab over, so the file is sent as-is.
+  const THUMB_MAX_BYTES = 120 * 1024 * 1024;
+
   async function firstPageThumb(file){
     if(!window.pdfjsLib) return {blob:null, pages:0};
+    if(file.size > THUMB_MAX_BYTES) return {blob:null, pages:0, skipped:true};
     let pages = 0;
     try{
       const buf = await withTimeout(file.arrayBuffer(), 10000);
@@ -256,8 +263,9 @@
     if(!file){ status.textContent = 'ยังไม่ได้เลือกไฟล์'; status.className='doc-status err'; return; }
     if(!/\.pdf$/i.test(file.name)){ status.textContent='รองรับเฉพาะไฟล์ PDF'; status.className='doc-status err'; return; }
 
-    status.textContent = 'กำลังอ่านไฟล์...'; status.className='doc-status';
-    const {blob, pages} = await firstPageThumb(file);
+    const mb = (file.size / 1024 / 1024).toFixed(1);
+    status.textContent = 'กำลังอ่านไฟล์... (' + mb + ' MB)'; status.className='doc-status';
+    const {blob, pages, skipped} = await firstPageThumb(file);
 
     const fd = new FormData();
     fd.append('kind', kind);
@@ -267,18 +275,35 @@
     fd.append('source_url', groups.querySelector(`[data-url="${kind}"]`).value || '');
     if(blob) fd.append('thumbnail', blob, 'thumb.png');
 
-    status.textContent = 'กำลังอัปโหลด...';
+    // XHR rather than fetch: a big PDF takes a while and the only honest
+    // thing to show meanwhile is real progress.
     try{
-      const res = await fetch(`/sheet-inventory/sheet/${SHEET_ID}/documents/upload/`, {
-        method:'POST', headers:{'X-CSRFToken':CSRF}, body:fd,
+      const data = await new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', `/sheet-inventory/sheet/${SHEET_ID}/documents/upload/`);
+        xhr.setRequestHeader('X-CSRFToken', CSRF);
+        xhr.upload.addEventListener('progress', e => {
+          if(!e.lengthComputable) return;
+          const pct = Math.round(e.loaded / e.total * 100);
+          status.textContent = `กำลังอัปโหลด ${pct}% (${mb} MB)`;
+        });
+        xhr.addEventListener('load', () => {
+          let parsed = {};
+          try{ parsed = JSON.parse(xhr.responseText || '{}'); }catch(e){}
+          if(xhr.status >= 200 && xhr.status < 300 && parsed.ok) resolve(parsed);
+          else reject(new Error(parsed.message || `อัปโหลดไม่สำเร็จ (${xhr.status})`));
+        });
+        xhr.addEventListener('error', () => reject(new Error('เชื่อมต่อไม่สำเร็จระหว่างอัปโหลด')));
+        xhr.addEventListener('abort', () => reject(new Error('ยกเลิกการอัปโหลด')));
+        xhr.send(fd);
       });
-      const data = await res.json();
-      if(!res.ok || !data.ok) throw new Error(data.message || 'อัปโหลดไม่สำเร็จ');
+
       if(kind === 'cover') DOCS.cover = [data.document];
       else DOCS[kind] = (DOCS[kind]||[]).concat([data.document]);
       render();
       const s2 = groups.querySelector(`[data-status="${kind}"]`);
-      s2.textContent = 'อัปโหลดแล้ว'; s2.className = 'doc-status ok';
+      s2.textContent = skipped ? 'อัปโหลดแล้ว (ไฟล์ใหญ่ ข้ามการสร้างรูปตัวอย่าง)' : 'อัปโหลดแล้ว';
+      s2.className = 'doc-status ok';
     }catch(err){
       status.textContent = err.message || 'อัปโหลดไม่สำเร็จ';
       status.className = 'doc-status err';

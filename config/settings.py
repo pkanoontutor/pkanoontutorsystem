@@ -163,6 +163,19 @@ MEDIA_URL = os.getenv("MEDIA_URL", "/media/")
 # ให้ตั้ง Render env: MEDIA_ROOT=/var/data/media
 MEDIA_ROOT = os.getenv("MEDIA_ROOT", str(BASE_DIR / "media"))
 
+# Uploads larger than FILE_UPLOAD_MAX_MEMORY_SIZE are streamed to a temp file
+# before being moved into MEDIA_ROOT. Keeping that temp dir on the same
+# volume as MEDIA_ROOT makes the final step a rename instead of copying the
+# whole file across filesystems -- which for a large sheet PDF would double
+# the transfer time and briefly need twice the space, on a /tmp that is not
+# the disk the space was bought for.
+FILE_UPLOAD_TEMP_DIR = os.getenv("FILE_UPLOAD_TEMP_DIR") or os.path.join(MEDIA_ROOT, "_upload_tmp")
+try:
+    os.makedirs(FILE_UPLOAD_TEMP_DIR, exist_ok=True)
+except OSError:
+    # Read-only or missing volume: fall back to the system temp dir.
+    FILE_UPLOAD_TEMP_DIR = None
+
 
 # -------------------------------------------------------------------
 # DEFAULT PRIMARY KEY

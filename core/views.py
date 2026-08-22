@@ -2149,9 +2149,6 @@ def sheet_inventory_profile(request: HttpRequest, pk: int) -> HttpResponse:
     })
 
 
-_MAX_SHEET_PDF_MB = 60
-
-
 def _id_or_none(raw) -> int | None:
     """Form selects post "" for "no selection", which blows up a pk filter."""
     try:
@@ -2181,10 +2178,6 @@ def sheet_document_upload(request: HttpRequest, pk: int) -> JsonResponse:
     name_lower = (upload.name or "").lower()
     if not (name_lower.endswith(".pdf") or (upload.content_type or "") == "application/pdf"):
         return JsonResponse({"ok": False, "message": "รองรับเฉพาะไฟล์ PDF"}, status=400)
-    if upload.size > _MAX_SHEET_PDF_MB * 1024 * 1024:
-        return JsonResponse(
-            {"ok": False, "message": f"ไฟล์ใหญ่เกิน {_MAX_SHEET_PDF_MB}MB"}, status=400
-        )
 
     book = Book.objects.filter(id=_id_or_none(request.POST.get("source_book_id"))).first()
     try:

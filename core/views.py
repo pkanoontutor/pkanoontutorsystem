@@ -2223,7 +2223,34 @@ def sheet_document_upload(request: HttpRequest, pk: int) -> JsonResponse:
         doc.thumbnail.open("rb")
         sheet.cover_image.save(f"{sheet.code or sheet.id}.png", doc.thumbnail.file, save=True)
 
-    return JsonResponse({"ok": True, "document": _sheet_document_payload(doc)})
+    # The uploaded content file is now the authoritative page count -- it is
+    # the thing tutors actually page through -- so the sheet's own total is
+    # brought in line with it. Several content files add up.
+    sheet_pages = _sync_sheet_total_pages(sheet)
+
+    return JsonResponse({
+        "ok": True,
+        "document": _sheet_document_payload(doc),
+        "sheet_total_pages": sheet_pages,
+    })
+
+
+def _sync_sheet_total_pages(sheet: Sheet) -> int:
+    """Set Sheet.total_pages from its uploaded content PDFs.
+
+    Returns the sheet's page total (unchanged if nothing countable was
+    uploaded, so a PDF whose page count could not be read never wipes a
+    figure that was entered by hand).
+    """
+    total = (
+        SheetDocument.objects
+        .filter(sheet=sheet, kind=SheetDocument.Kind.CONTENT)
+        .aggregate(n=Sum("page_count")).get("n") or 0
+    )
+    if total and total != int(sheet.total_pages or 0):
+        sheet.total_pages = total
+        sheet.save(update_fields=["total_pages"])
+    return int(sheet.total_pages or 0)
 
 
 @require_POST
@@ -2232,11 +2259,14 @@ def sheet_document_delete(request: HttpRequest, pk: int) -> JsonResponse:
     doc = SheetDocument.objects.filter(pk=pk).select_related("sheet").first()
     if not doc:
         return JsonResponse({"ok": False, "message": "ไม่พบไฟล์นี้"}, status=404)
+    sheet = doc.sheet
+    was_content = doc.kind == SheetDocument.Kind.CONTENT
     doc.pdf.delete(save=False)
     if doc.thumbnail:
         doc.thumbnail.delete(save=False)
     doc.delete()
-    return JsonResponse({"ok": True})
+    sheet_pages = _sync_sheet_total_pages(sheet) if was_content else int(sheet.total_pages or 0)
+    return JsonResponse({"ok": True, "sheet_total_pages": sheet_pages})
 
 
 def _sheet_document_payload(doc: SheetDocument) -> dict:

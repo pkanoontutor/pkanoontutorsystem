@@ -50,7 +50,7 @@
         <b>รหัส:</b> {{ sheet.code }}<br>
         <b>ชื่อชีท:</b> {{ sheet.title }}<br>
         <b>ระดับชั้น:</b> {{ sheet.get_grade_level_display|default:"ไม่ระบุระดับชั้น" }} · <b>วิชา:</b> {{ sheet.subject.name }}<br>
-        <b>จำนวนหน้า:</b> {{ sheet.total_pages }} · <b>จำนวนข้อ:</b> {{ sheet.total_questions }}<br>
+        <b>จำนวนหน้า:</b> <span id="sheetTotalPages">{{ sheet.total_pages }}</span> · <b>จำนวนข้อ:</b> {{ sheet.total_questions }}<br>
         <b>สถานะ:</b> {% if sheet.is_active %}ใช้งาน{% else %}ปิดใช้งาน{% endif %}
       </div>
 
@@ -63,7 +63,7 @@
       <form method="post" class="settings-grid" style="border:1px solid #fde68a;border-radius:14px;padding:10px;background:#fffbeb;">
         {% csrf_token %}
         <input type="hidden" name="action" value="update_sheet_counts">
-        <div class="field"><label>จำนวนหน้า (ไฟล์เนื้อหา)</label><input type="number" name="total_pages" min="0" value="{{ sheet.total_pages|default:0 }}"></div>
+        <div class="field"><label>จำนวนหน้า (ไฟล์เนื้อหา)</label><input type="number" name="total_pages" id="totalPagesInput" min="0" value="{{ sheet.total_pages|default:0 }}"></div>
         <div class="field"><label>จำนวนข้อ</label><input type="number" name="total_questions" min="0" value="{{ sheet.total_questions|default:0 }}"></div>
         <div style="grid-column:1/-1;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
           <button class="btnx green" type="submit">บันทึกจำนวนหน้า/ข้อ</button>
@@ -167,6 +167,16 @@
   const groups = document.getElementById('docGroups');
 
   function esc(s){ return String(s==null?'':s).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c])); }
+
+  // Keep the sheet's page-count display and its edit box in step with what
+  // the uploaded content files add up to, without needing a reload.
+  function applySheetPages(total){
+    if(total === undefined || total === null) return;
+    const label = document.getElementById('sheetTotalPages');
+    const input = document.getElementById('totalPagesInput');
+    if(label) label.textContent = total;
+    if(input) input.value = total;
+  }
 
   function render(){
     groups.innerHTML = KINDS.map(k => {
@@ -301,8 +311,11 @@
       if(kind === 'cover') DOCS.cover = [data.document];
       else DOCS[kind] = (DOCS[kind]||[]).concat([data.document]);
       render();
+      applySheetPages(data.sheet_total_pages);
       const s2 = groups.querySelector(`[data-status="${kind}"]`);
-      s2.textContent = skipped ? 'อัปโหลดแล้ว (ไฟล์ใหญ่ ข้ามการสร้างรูปตัวอย่าง)' : 'อัปโหลดแล้ว';
+      let okText = skipped ? 'อัปโหลดแล้ว (ไฟล์ใหญ่ ข้ามการสร้างรูปตัวอย่าง)' : 'อัปโหลดแล้ว';
+      if(kind === 'content' && data.sheet_total_pages) okText += ` · อัปเดตจำนวนหน้าชีทเป็น ${data.sheet_total_pages}`;
+      s2.textContent = okText;
       s2.className = 'doc-status ok';
     }catch(err){
       status.textContent = err.message || 'อัปโหลดไม่สำเร็จ';
@@ -319,6 +332,7 @@
     if(!res.ok || !data.ok){ alert(data.message || 'ลบไม่สำเร็จ'); return; }
     for(const k of Object.keys(DOCS)) DOCS[k] = (DOCS[k]||[]).filter(d => String(d.id) !== String(id));
     render();
+    applySheetPages(data.sheet_total_pages);
   }
 
   render();

@@ -7,7 +7,11 @@ services:
       pip install -r requirements.txt
       python manage.py collectstatic --no-input
       python manage.py migrate
-    startCommand: gunicorn config.wsgi:application
+    # Sheet PDFs are uploaded without a size cap, and a sync worker counts
+    # as "busy" for the whole time it is reading the request body -- on
+    # gunicorn's default 30s timeout a large upload gets the worker killed
+    # mid-transfer and the browser sees a 502. Allow long uploads instead.
+    startCommand: gunicorn config.wsgi:application --timeout 1800 --graceful-timeout 60
 
   # Full-system Excel export emailed to pkanoontutor@gmail.com.
   # Schedules are UTC; the site runs on Asia/Bangkok (UTC+7), so 23:59 local

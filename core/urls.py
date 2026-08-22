@@ -70,6 +70,15 @@ urlpatterns = [
 
     # Book library (คลังหนังสือ)
     path("books/", views.book_list, name="book_list"),
+
+    # ระบบชีทสำหรับติวเตอร์ (PDF reader)
+    path("tutor-sheets/", views.tutor_sheet_login, name="tutor_sheet_login"),
+    path("tutor-sheets/logout/", views.tutor_sheet_logout, name="tutor_sheet_logout"),
+    path("tutor-sheets/change-pin/", views.tutor_sheet_change_pin, name="tutor_sheet_change_pin"),
+    path("tutor-sheets/home/", views.tutor_sheet_home, name="tutor_sheet_home"),
+    path("tutor-sheets/shelf/<int:class_id>/", views.tutor_sheet_shelf, name="tutor_sheet_shelf"),
+    path("tutor-sheets/read/<int:class_id>/<int:sheet_id>/", views.tutor_sheet_read, name="tutor_sheet_read"),
+    path("tutor-sheets/save-progress/", views.tutor_sheet_save_progress, name="tutor_sheet_save_progress"),
     path("sheet-allocation/", views.sheet_allocation_scan, name="sheet_allocation_scan"),
     path("sheet-allocation/save/", views.sheet_allocation_save, name="sheet_allocation_save"),
     path("sheet-allocation/report/", views.sheet_allocation_report, name="sheet_allocation_report"),

@@ -1,0 +1,339 @@
+{% extends "core/base.html" %}
+{% block title %}{{ sheet.code }} · {{ cls.name }}{% endblock %}
+
+{% block head %}
+<style>
+  .rd-wrap{max-width:1280px;margin:0 auto;display:grid;gap:11px}
+  .rd-bar{background:linear-gradient(135deg,#0f172a,#0d9488);color:#fff;border-radius:18px;padding:12px 15px;display:flex;justify-content:space-between;gap:11px;flex-wrap:wrap;align-items:center}
+  .rd-bar .t{font-size:16.5px;font-weight:1000;letter-spacing:-.02em}
+  .rd-bar .s{font-size:11.5px;color:#ccfbf1;margin-top:2px}
+  .btn{border:0;border-radius:11px;padding:8px 12px;font-weight:1000;font-size:12.5px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;font-family:inherit}
+  .soft{background:#fff;color:#0f172a;border:1px solid #e2e8f0}
+  .teal{background:#0d9488;color:#fff}.teal:hover{background:#0f766e}
+  .amber{background:#f59e0b;color:#111827}.amber:hover{background:#d97706;color:#fff}
+  .acts{display:flex;gap:7px;flex-wrap:wrap}
+
+  .kind-tabs{display:flex;gap:7px;flex-wrap:wrap}
+  .ktab{border:1px solid #e2e8f0;background:#fff;color:#334155;border-radius:999px;padding:8px 15px;font-size:13px;font-weight:1000;cursor:pointer;font-family:inherit}
+  .ktab.active{background:#0f172a;color:#fff;border-color:#0f172a}
+  .ktab.answer.active{background:#b45309;border-color:#b45309}
+  .file-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+  .ftab{border:1px solid #e2e8f0;background:#f8fafc;color:#475569;border-radius:10px;padding:6px 11px;font-size:11.5px;font-weight:900;cursor:pointer;font-family:inherit}
+  .ftab.active{background:#ccfbf1;border-color:#5eead4;color:#0f766e}
+
+  .reader{display:grid;grid-template-columns:168px 1fr;gap:11px;align-items:start}
+  .thumbs{background:#fff;border:1px solid #eef2f7;border-radius:16px;padding:9px;max-height:78vh;overflow-y:auto;display:grid;gap:7px}
+  .thumb{border:2px solid #e2e8f0;border-radius:9px;overflow:hidden;cursor:pointer;background:#f8fafc;position:relative;line-height:0}
+  .thumb.active{border-color:#0d9488;box-shadow:0 0 0 3px rgba(13,148,136,.18)}
+  .thumb canvas{width:100%;height:auto;display:block}
+  .thumb .num{position:absolute;left:4px;bottom:4px;background:rgba(15,23,42,.78);color:#fff;font-size:10px;font-weight:900;border-radius:5px;padding:1px 6px}
+  .thumb-ph{height:150px;display:grid;place-items:center;font-size:11px;font-weight:900;color:#94a3b8}
+
+  .stage{background:#fff;border:1px solid #eef2f7;border-radius:16px;padding:11px;display:flex;flex-direction:column;gap:9px;min-height:60vh}
+  .canvas-box{flex:1;display:grid;place-items:center;background:#f1f5f9;border-radius:12px;padding:9px;overflow:auto}
+  #pageCanvas{max-width:100%;height:auto;box-shadow:0 5px 18px rgba(15,23,42,.18);border-radius:4px;background:#fff}
+  .pager{display:flex;justify-content:center;align-items:center;gap:11px;flex-wrap:wrap}
+  .pbtn{border:1px solid #e2e8f0;background:#fff;border-radius:11px;padding:9px 17px;font-weight:1000;font-size:14px;cursor:pointer;font-family:inherit;color:#0f172a}
+  .pbtn:hover:not(:disabled){background:#f1f5f9;border-color:#cbd5e1}
+  .pbtn:disabled{opacity:.35;cursor:not-allowed}
+  .pnum{font-size:14px;font-weight:1000;color:#0f172a}
+  .pnum input{width:56px;text-align:center;border:1px solid #e2e8f0;border-radius:9px;padding:6px;font-weight:1000;font-family:inherit;font-size:14px}
+  .loading{font-size:12.5px;font-weight:900;color:#64748b;text-align:center;padding:26px}
+  .empty{text-align:center;padding:34px 16px;color:#64748b;font-weight:850;font-size:13px;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:16px}
+  .resume-note{background:#ecfeff;border:1px solid #a5f3fc;color:#155e75;border-radius:12px;padding:8px 11px;font-size:12px;font-weight:900}
+
+  .modal-bg{position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:9999;display:none;align-items:center;justify-content:center;padding:18px}
+  .modal-bg.show{display:flex}
+  .modal{width:100%;max-width:420px;background:#fff;border-radius:20px;padding:20px;box-shadow:0 24px 60px rgba(15,23,42,.35)}
+  .modal h3{margin:0 0 6px;font-size:17px;font-weight:1000;color:#0f172a}
+  .modal .sub{font-size:12px;color:#64748b;font-weight:800;line-height:1.5;margin-bottom:13px}
+  .modal .field{display:flex;flex-direction:column;gap:5px;margin-bottom:11px}
+  .modal label{font-size:11px;font-weight:1000;color:#334155;text-transform:uppercase;letter-spacing:.04em}
+  .modal input,.modal select{border:1px solid #e2e8f0;border-radius:12px;padding:11px;font-weight:900;font-size:15px;font-family:inherit;width:100%;box-sizing:border-box}
+  .modal input:focus,.modal select:focus{outline:none;border-color:#0d9488;box-shadow:0 0 0 4px rgba(13,148,136,.12)}
+  .modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:15px}
+  .msg{font-size:12.5px;font-weight:900;min-height:16px}
+  .msg.ok{color:#0f766e}.msg.err{color:#b91c1c}
+
+  @media(max-width:820px){
+    .reader{grid-template-columns:1fr}
+    .thumbs{display:flex;overflow-x:auto;max-height:none;padding:8px}
+    .thumb{flex:0 0 84px}
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="rd-wrap">
+  <div class="rd-bar">
+    <div>
+      <div class="t">{{ sheet.code }} · {{ sheet.title }}</div>
+      <div class="s">{{ cls.name }} · {{ sheet.subject.name }} · ผู้สอน {{ tutor.name }}</div>
+    </div>
+    <div class="acts">
+      <button class="btn amber" type="button" id="endClassBtn">✅ จบคาบ บันทึกสถานะการสอนเข้าระบบ</button>
+      <a class="btn soft" href="{% url 'core:tutor_sheet_shelf' cls.id %}">← ชั้นวางชีท</a>
+    </div>
+  </div>
+
+  <div class="panel" style="background:#fff;border:1px solid #eef2f7;border-radius:16px;padding:12px">
+    <div class="kind-tabs" id="kindTabs"></div>
+    <div class="file-tabs" id="fileTabs"></div>
+    <div id="resumeNote" style="margin-top:9px"></div>
+  </div>
+
+  <div id="readerRoot"></div>
+</div>
+
+<div class="modal-bg" id="endModalBg">
+  <div class="modal">
+    <h3>✅ จบคาบ บันทึกสถานะการสอน</h3>
+    <div class="sub">เลขหน้าดึงมาจากหน้าที่เปิดอยู่ตอนนี้ · เลขข้อกรอกเอง</div>
+    {% if subject_options %}
+      <div class="field">
+        <label>วิชา (assignment สัปดาห์นี้)</label>
+        <select id="assignmentSel">
+          {% for a in subject_options %}<option value="{{ a.id }}">{{ a.name }}</option>{% endfor %}
+        </select>
+      </div>
+    {% else %}
+      <div class="sub" style="color:#b45309;background:#fffbeb;border:1px solid #fde68a;border-radius:11px;padding:8px 10px">
+        สัปดาห์นี้ยังไม่มี assignment ของคุณในคลาสนี้ — ระบบจะจำหน้าที่ค้างไว้ให้ แต่จะยังไม่เข้ารายงานอัปเดตชีท
+      </div>
+    {% endif %}
+    <div class="field"><label>สอนถึงหน้า</label><input type="number" min="1" id="endPage"></div>
+    <div class="field"><label>สอนถึงข้อ *</label><input type="text" id="endQuestion" placeholder="เช่น 24"></div>
+    <div class="msg" id="endMsg"></div>
+    <div class="modal-actions">
+      <button class="btn soft" type="button" id="endCancel">ยกเลิก</button>
+      <button class="btn teal" type="button" id="endSave">บันทึกเข้าระบบ</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+<script>
+(function(){
+  const DOCS = {{ docs_json|safe }};
+  const RESUME = {{ resume|safe }};
+  const CSRF = "{{ csrf_token }}";
+  const CLASS_ID = {{ cls.id }};
+  const SHEET_ID = {{ sheet.id }};
+
+  if(window.pdfjsLib){
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+  }
+
+  const root = document.getElementById('readerRoot');
+  if(!DOCS.length){
+    root.innerHTML = '<div class="empty">ชีทเล่มนี้ยังไม่มีไฟล์ PDF ในระบบ<br>ให้แอดมินอัปโหลดที่หน้า Sheet Inventory ก่อน</div>';
+    document.getElementById('endClassBtn').disabled = true;
+    return;
+  }
+
+  root.innerHTML =
+    '<div class="reader">' +
+      '<div class="thumbs" id="thumbs"></div>' +
+      '<div class="stage">' +
+        '<div class="canvas-box"><canvas id="pageCanvas"></canvas><div class="loading" id="stageLoading">กำลังเปิดไฟล์...</div></div>' +
+        '<div class="pager">' +
+          '<button class="pbtn" id="prevBtn">‹ ก่อนหน้า</button>' +
+          '<span class="pnum">หน้า <input type="number" id="pageInput" min="1" value="1"> / <span id="pageTotal">–</span></span>' +
+          '<button class="pbtn" id="nextBtn">ถัดไป ›</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+
+  const kindTabs=document.getElementById('kindTabs');
+  const fileTabs=document.getElementById('fileTabs');
+  const thumbsEl=document.getElementById('thumbs');
+  const canvas=document.getElementById('pageCanvas');
+  const stageLoading=document.getElementById('stageLoading');
+  const prevBtn=document.getElementById('prevBtn');
+  const nextBtn=document.getElementById('nextBtn');
+  const pageInput=document.getElementById('pageInput');
+  const pageTotal=document.getElementById('pageTotal');
+  const resumeNote=document.getElementById('resumeNote');
+
+  const KIND_LABEL={content:'📘 เนื้อหา', answer:'✅ เฉลย'};
+  let kind='content', docId=null, pdf=null, page=1, total=0, renderToken=0;
+
+  const docsOf = k => DOCS.filter(d=>d.kind===k);
+  const esc = s => String(s==null?'':s).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+
+  function renderKindTabs(){
+    const kinds=['content','answer'].filter(k=>docsOf(k).length);
+    kindTabs.innerHTML=kinds.map(k=>
+      `<button class="ktab ${k} ${k===kind?'active':''}" data-kind="${k}">${KIND_LABEL[k]} (${docsOf(k).length})</button>`).join('');
+    kindTabs.querySelectorAll('[data-kind]').forEach(b=>b.addEventListener('click',()=>{
+      if(b.dataset.kind===kind) return;
+      kind=b.dataset.kind;
+      const first=docsOf(kind)[0];
+      if(first) openDoc(first.id, 1);
+    }));
+  }
+
+  function renderFileTabs(){
+    const list=docsOf(kind);
+    // A single file per kind needs no file picker.
+    fileTabs.innerHTML = list.length<2 ? '' : list.map(d=>
+      `<button class="ftab ${d.id===docId?'active':''}" data-doc="${d.id}">${esc(d.name)}</button>`).join('');
+    fileTabs.querySelectorAll('[data-doc]').forEach(b=>b.addEventListener('click',()=>{
+      const id=Number(b.dataset.doc);
+      if(id!==docId) openDoc(id,1);
+    }));
+  }
+
+  async function openDoc(id, startPage){
+    const doc=DOCS.find(d=>d.id===id);
+    if(!doc) return;
+    docId=id; kind=doc.kind;
+    renderKindTabs(); renderFileTabs();
+    stageLoading.style.display=''; stageLoading.textContent='กำลังเปิดไฟล์...';
+    canvas.style.display='none';
+    thumbsEl.innerHTML='<div class="thumb-ph">กำลังโหลด...</div>';
+    try{
+      pdf=await pdfjsLib.getDocument(doc.url).promise;
+      total=pdf.numPages;
+      pageTotal.textContent=total;
+      pageInput.max=total;
+      // Thumbnails are built alongside the main page rather than after it,
+      // so a slow first render never leaves the strip empty.
+      goTo(Math.min(Math.max(startPage||1,1), total));
+      buildThumbs();
+    }catch(e){
+      stageLoading.textContent='เปิดไฟล์ไม่สำเร็จ: '+(e.message||e);
+      thumbsEl.innerHTML='';
+    }
+  }
+
+  async function goTo(n){
+    if(!pdf) return;
+    page=Math.min(Math.max(n,1),total);
+    pageInput.value=page;
+    prevBtn.disabled=(page<=1);
+    nextBtn.disabled=(page>=total);
+    markThumb();                 // highlight follows the click, not the paint
+    const token=++renderToken;
+    try{
+      const p=await pdf.getPage(page);
+      const base=p.getViewport({scale:1});
+      const box=canvas.parentElement.clientWidth-24;
+      const scale=Math.max(Math.min((box||820)/base.width, 2.2), 0.3);
+      const vp=p.getViewport({scale});
+      canvas.width=Math.round(vp.width); canvas.height=Math.round(vp.height);
+      // Bounded so a page that will not paint reports back instead of
+      // leaving the tutor staring at a spinner mid-lesson.
+      const done=await Promise.race([
+        p.render({canvasContext:canvas.getContext('2d'), viewport:vp}).promise.then(()=>true),
+        new Promise(res=>setTimeout(()=>res(false),20000)),
+      ]);
+      if(token!==renderToken) return;   // a newer page won the race
+      if(done){ canvas.style.display=''; stageLoading.style.display='none'; }
+      else{ stageLoading.style.display=''; stageLoading.textContent='แสดงหน้านี้ไม่ได้ ลองกดหน้าถัดไปหรือเปิดใหม่อีกครั้ง'; }
+    }catch(e){
+      if(token===renderToken){ stageLoading.style.display=''; stageLoading.textContent='แสดงหน้านี้ไม่ได้'; }
+    }
+  }
+
+  async function buildThumbs(){
+    const doc=pdf, n=total, token=renderToken;
+    // Every tile is placed (and clickable) before any drawing starts, so the
+    // tutor can jump pages immediately and one unrenderable page cannot stop
+    // the rest of the strip from filling in.
+    thumbsEl.innerHTML='';
+    const canvases=[];
+    for(let i=1;i<=n;i++){
+      const wrap=document.createElement('div');
+      wrap.className='thumb'+(i===page?' active':'');
+      wrap.dataset.page=i;
+      const c=document.createElement('canvas');
+      c.width=104; c.height=140;
+      wrap.appendChild(c);
+      const num=document.createElement('span'); num.className='num'; num.textContent=i;
+      wrap.appendChild(num);
+      wrap.addEventListener('click',()=>goTo(i));
+      thumbsEl.appendChild(wrap);
+      canvases.push(c);
+    }
+    for(let i=1;i<=n;i++){
+      if(doc!==pdf) return;          // switched file while drawing
+      try{
+        const p=await doc.getPage(i);
+        const base=p.getViewport({scale:1});
+        const vp=p.getViewport({scale:140/base.width});
+        const c=canvases[i-1];
+        c.width=Math.round(vp.width); c.height=Math.round(vp.height);
+        await Promise.race([
+          p.render({canvasContext:c.getContext('2d'), viewport:vp}).promise,
+          new Promise(res=>setTimeout(res,8000)),
+        ]);
+      }catch(e){ /* a thumbnail that will not draw should not stop the rest */ }
+    }
+  }
+
+  function markThumb(){
+    thumbsEl.querySelectorAll('.thumb').forEach(t=>
+      t.classList.toggle('active', Number(t.dataset.page)===page));
+    const active=thumbsEl.querySelector('.thumb.active');
+    if(active) active.scrollIntoView({block:'nearest', inline:'nearest'});
+  }
+
+  prevBtn.addEventListener('click',()=>goTo(page-1));
+  nextBtn.addEventListener('click',()=>goTo(page+1));
+  pageInput.addEventListener('change',()=>goTo(Number(pageInput.value)||1));
+  document.addEventListener('keydown',e=>{
+    if(document.querySelector('.modal-bg.show')) return;
+    if(e.target.tagName==='INPUT'||e.target.tagName==='SELECT') return;
+    if(e.key==='ArrowRight'||e.key==='PageDown'){ e.preventDefault(); goTo(page+1); }
+    if(e.key==='ArrowLeft'||e.key==='PageUp'){ e.preventDefault(); goTo(page-1); }
+  });
+
+  /* ---------- จบคาบ ---------- */
+  const bg=document.getElementById('endModalBg');
+  const endMsg=document.getElementById('endMsg');
+  document.getElementById('endClassBtn').addEventListener('click',()=>{
+    document.getElementById('endPage').value=page;                 // default from the open page
+    document.getElementById('endQuestion').value=RESUME.question||'';
+    endMsg.textContent=''; endMsg.className='msg';
+    bg.classList.add('show');
+    setTimeout(()=>document.getElementById('endQuestion').focus(),80);
+  });
+  const closeEnd=()=>bg.classList.remove('show');
+  document.getElementById('endCancel').addEventListener('click',closeEnd);
+  bg.addEventListener('click',e=>{ if(e.target===bg) closeEnd(); });
+
+  document.getElementById('endSave').addEventListener('click',async function(){
+    const q=document.getElementById('endQuestion').value.trim();
+    if(!q){ endMsg.textContent='กรุณากรอกเลขข้อที่สอนถึง'; endMsg.className='msg err'; return; }
+    const fd=new FormData();
+    fd.append('class_id',CLASS_ID); fd.append('sheet_id',SHEET_ID);
+    fd.append('document_id',docId||''); fd.append('question',q);
+    fd.append('page',document.getElementById('endPage').value||page);
+    const sel=document.getElementById('assignmentSel');
+    if(sel) fd.append('assignment_id',sel.value);
+    this.disabled=true; endMsg.textContent='กำลังบันทึก...'; endMsg.className='msg';
+    try{
+      const res=await fetch("{% url 'core:tutor_sheet_save_progress' %}",
+        {method:'POST',headers:{'X-CSRFToken':CSRF},body:fd});
+      const data=await res.json();
+      endMsg.textContent=data.message||''; endMsg.className='msg '+(data.ok?'ok':'err');
+      if(data.ok) setTimeout(()=>{ closeEnd();
+        window.location.href="{% url 'core:tutor_sheet_shelf' cls.id %}"; },1200);
+    }catch(e){ endMsg.textContent='บันทึกไม่สำเร็จ'; endMsg.className='msg err'; }
+    finally{ this.disabled=false; }
+  });
+
+  /* ---------- resume where this class left off ---------- */
+  const resumeDoc = RESUME.document_id && DOCS.find(d=>d.id===RESUME.document_id);
+  const startDoc = resumeDoc || docsOf('content')[0] || DOCS[0];
+  const startPage = resumeDoc ? (RESUME.page||1) : 1;
+  if(resumeDoc){
+    resumeNote.innerHTML='<div class="resume-note">↩ กลับมาต่อจากหน้า '+(RESUME.page||1)+
+      (RESUME.question?(' ข้อ '+esc(RESUME.question)):'')+' ที่บันทึกไว้ครั้งก่อน</div>';
+  }
+  openDoc(startDoc.id, startPage);
+})();
+</script>
+{% endblock %}

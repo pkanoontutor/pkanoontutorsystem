@@ -1814,7 +1814,15 @@ class TutorPayrollEntry(models.Model):
 # Tutor Teaching Update Module (Independent from old ClassSubject)
 # =========================================================
 class TeachingTutor(models.Model):
+    DEFAULT_SHEET_PIN = "123456"
+
     name = models.CharField("ชื่อติวเตอร์", max_length=120, unique=True)
+    sheet_pin_hash = models.CharField(
+        "รหัส PIN ระบบชีท (เข้ารหัส)",
+        max_length=255,
+        blank=True,
+        help_text="ว่าง = ยังไม่เคยตั้ง PIN ระบบจะใช้ค่าเริ่มต้น 123456",
+    )
     phone = models.CharField("เบอร์ติดต่อ", max_length=50, blank=True)
     color = models.CharField("สีประจำตัว (ใช้บนตารางเรียน)", max_length=20, default="#1d4ed8")
     payroll_tutor = models.ForeignKey(
@@ -1834,6 +1842,72 @@ class TeachingTutor(models.Model):
 
     def __str__(self) -> str:
         return self.name
+
+    def check_sheet_pin(self, raw: str) -> bool:
+        """PINs are hashed. A tutor who has never set one keeps the shared
+        default, so the reader is usable the day it ships."""
+        from django.contrib.auth.hashers import check_password
+        raw = (raw or "").strip()
+        if not self.sheet_pin_hash:
+            return raw == self.DEFAULT_SHEET_PIN
+        return check_password(raw, self.sheet_pin_hash)
+
+    def set_sheet_pin(self, raw: str) -> None:
+        from django.contrib.auth.hashers import make_password
+        self.sheet_pin_hash = make_password((raw or "").strip())
+
+    @property
+    def sheet_pin_is_default(self) -> bool:
+        return not self.sheet_pin_hash
+
+
+class TutorSheetProgress(models.Model):
+    """Where a class got to in a given sheet.
+
+    Keyed by class rather than tutor: two classes work through the same
+    sheet at their own pace, and whoever teaches next should pick up where
+    that class stopped, not where that tutor stopped.
+    """
+
+    tutoring_class = models.ForeignKey(
+        TutoringClass,
+        verbose_name="คลาส",
+        on_delete=models.CASCADE,
+        related_name="tutor_sheet_progress",
+    )
+    sheet = models.ForeignKey(
+        Sheet,
+        verbose_name="ชีท",
+        on_delete=models.CASCADE,
+        related_name="tutor_progress",
+    )
+    document = models.ForeignKey(
+        "SheetDocument",
+        verbose_name="ไฟล์ที่เปิดค้างไว้",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="tutor_progress",
+    )
+    last_page = models.PositiveIntegerField("หน้าล่าสุด", default=1)
+    last_question = models.CharField("ข้อล่าสุด", max_length=50, blank=True)
+    updated_by_name = models.CharField("ผู้บันทึกล่าสุด", max_length=120, blank=True)
+    updated_at = models.DateTimeField("อัปเดตล่าสุด", auto_now=True)
+    created_at = models.DateTimeField("วันที่สร้าง", default=timezone.now)
+
+    class Meta:
+        verbose_name = "Tutor Sheet Progress"
+        verbose_name_plural = "Tutor Sheet Progress"
+        ordering = ("-updated_at",)
+        constraints = [
+            models.UniqueConstraint(
+                fields=["tutoring_class", "sheet"],
+                name="uniq_tutor_sheet_progress_per_class_sheet",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.tutoring_class} | {self.sheet.code} | หน้า {self.last_page}"
 
 
 class TeachingClassSubjectTemplate(models.Model):

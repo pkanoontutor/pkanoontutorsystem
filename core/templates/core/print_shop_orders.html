@@ -123,11 +123,22 @@
 
           <div class="progress"><div style="width:{{ o.print_progress_percent }}%"></div></div>
 
-          <div class="link-box {% if not o.file_url %}missing{% endif %}" data-link-box="{{ o.id }}">
+          <div class="link-box {% if not o.file_url and not o.pdf_docs %}missing{% endif %}" data-link-box="{{ o.id }}">
+            {% if o.pdf_docs %}
+              {# Uploaded PDFs win over the link: the shop downloads straight from the system. #}
+              <div class="link-row">
+                <div class="link-label">📄 ไฟล์ PDF ในระบบ ({{ o.pdf_docs|length }} ไฟล์) — กดโหลดได้เลย</div>
+              </div>
+              <div class="link-row" style="flex-wrap:wrap">
+                {% for d in o.pdf_docs %}
+                  <a class="btn blue" href="{{ d.url }}" download>⬇ {{ d.name }}{% if d.page_count %} ({{ d.page_count }} หน้า){% endif %}</a>
+                {% endfor %}
+              </div>
+            {% endif %}
             <div class="link-row">
-              <div class="link-label">{% if o.file_url %}📎 ไฟล์ต้นฉบับพร้อมแล้ว{% if not o.file_url_is_custom %} (จาก Sheet Inventory){% endif %}{% else %}⚠ ยังไม่มีลิงก์ไฟล์ต้นฉบับ{% endif %}</div>
+              <div class="link-label">{% if o.file_url %}📎 ลิงก์ไฟล์ต้นฉบับ{% if not o.file_url_is_custom %} (จาก Sheet Inventory){% endif %}{% elif not o.pdf_docs %}⚠ ยังไม่มีไฟล์หรือลิงก์ต้นฉบับ{% else %}ลิงก์สำรอง{% endif %}</div>
               {% if o.file_url %}
-                <a class="btn blue" href="{{ o.file_url }}" target="_blank">เปิดไฟล์</a>
+                <a class="btn {% if o.pdf_docs %}soft{% else %}blue{% endif %}" href="{{ o.file_url }}" target="_blank">เปิดไฟล์</a>
                 <button class="btn soft" type="button" data-copy-link="{{ o.file_url }}">📋 คัดลอกลิงก์</button>
               {% endif %}
               <button class="btn soft" type="button" data-toggle-link="{{ o.id }}">{% if o.file_url %}แก้ไขลิงก์{% else %}+ เพิ่มลิงก์ไฟล์{% endif %}</button>

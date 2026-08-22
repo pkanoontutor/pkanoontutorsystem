@@ -1,0 +1,259 @@
+{% extends "core/base.html" %}
+{% block title %}คลังหนังสือ{% endblock %}
+
+{% block head %}
+<style>
+  .bk-wrap{max-width:1180px;margin:0 auto;display:grid;gap:12px;}
+  .hero{background:linear-gradient(135deg,#0f172a,#7c3aed,#a855f7);color:#fff;border-radius:24px;padding:18px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;box-shadow:0 12px 24px rgba(15,23,42,.18)}
+  .title{font-size:26px;font-weight:1000;letter-spacing:-.04em}
+  .sub{font-size:12px;color:#ede9fe;margin-top:4px;line-height:1.5}
+  .actions{display:flex;gap:7px;flex-wrap:wrap}
+  .btn{border:0;border-radius:13px;padding:10px 13px;font-weight:1000;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;font-size:13px;font-family:inherit}
+  .soft{background:#fff;color:#0f172a;border:1px solid #e2e8f0}
+  .primary{background:#7c3aed;color:#fff}.green{background:#16a34a;color:#fff}.red{background:#dc2626;color:#fff}
+  .panel{background:#fff;border-radius:20px;padding:16px;box-shadow:0 5px 14px rgba(15,23,42,.08);border:1px solid rgba(255,255,255,.88)}
+  .section-title{font-size:16px;font-weight:1000;color:#0f172a}
+  .hint{font-size:12px;color:#64748b;font-weight:800;line-height:1.45;margin-top:3px}
+
+  .filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+  input,select,textarea{border:1px solid #e2e8f0;border-radius:12px;padding:9px 11px;font-weight:850;background:#fff;font-family:inherit;font-size:13px;box-sizing:border-box;width:100%}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:#7c3aed;box-shadow:0 0 0 4px rgba(124,58,237,.10)}
+  .filters input,.filters select{width:auto;min-width:150px}
+
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px;margin-top:12px}
+  .card{border:1px solid #e2e8f0;border-radius:18px;background:#fff;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 3px 8px rgba(15,23,42,.05)}
+  .cover{aspect-ratio:3/4;background:#f1f5f9;display:grid;place-items:center;overflow:hidden}
+  .cover img{width:100%;height:100%;object-fit:cover;display:block}
+  .cover .ph{font-size:34px;color:#cbd5e1}
+  .card-body{padding:10px;display:grid;gap:4px;flex:1}
+  .bk-code{font-size:10.5px;font-weight:1000;color:#7c3aed;letter-spacing:.03em}
+  .bk-title{font-size:13.5px;font-weight:1000;color:#0f172a;line-height:1.3}
+  .bk-meta{font-size:11px;font-weight:800;color:#64748b;line-height:1.45}
+  .chips{display:flex;gap:4px;flex-wrap:wrap;margin-top:3px}
+  .chip{font-size:10px;font-weight:900;border-radius:999px;padding:2px 8px;background:#f1f5f9;color:#334155;border:1px solid #e2e8f0}
+  .chip.sep{background:#fef3c7;color:#92400e;border-color:#fde68a}
+  .chip.inc{background:#dcfce7;color:#166534;border-color:#bbf7d0}
+  .chip.off{background:#fee2e2;color:#991b1b;border-color:#fecaca}
+  .card-actions{display:flex;gap:5px;padding:0 10px 10px}
+  .mini{flex:1;font-size:11.5px;padding:7px 8px;border-radius:10px;text-align:center;font-weight:900;text-decoration:none;border:1px solid #e2e8f0;background:#f8fafc;color:#334155;cursor:pointer;font-family:inherit}
+  .mini:hover{background:#eef2ff;border-color:#c7d2fe}
+  .mini.danger:hover{background:#fee2e2;border-color:#fecaca;color:#991b1b}
+
+  .modal-bg{position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:9999;display:none;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto}
+  .modal-bg.show{display:flex}
+  .modal{width:100%;max-width:620px;background:#fff;border-radius:20px;box-shadow:0 24px 60px rgba(15,23,42,.35);padding:20px;margin:auto}
+  .modal h3{font-size:18px;font-weight:1000;color:#0f172a;margin:0 0 14px}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .field{display:flex;flex-direction:column;gap:5px}
+  .field label{font-size:11px;font-weight:1000;color:#334155;text-transform:uppercase;letter-spacing:.04em}
+  .field.full{grid-column:1/-1}
+  .modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
+  .radio-row{display:flex;gap:8px;flex-wrap:wrap}
+  .radio-card{border:1px solid #e2e8f0;background:#f8fafc;border-radius:13px;padding:9px 12px;font-weight:900;font-size:12.5px;display:flex;gap:7px;align-items:center;cursor:pointer}
+  .radio-card:has(input:checked){background:#f5f3ff;border-color:#c4b5fd;color:#6d28d9}
+  .radio-card input{width:auto}
+  .empty{text-align:center;padding:30px 16px;color:#64748b;font-weight:850;font-size:13px;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:16px;margin-top:12px}
+  .err{background:#fee2e2;color:#991b1b;border:1px solid #fecaca;border-radius:14px;padding:10px 12px;font-weight:900;font-size:12.5px;margin-top:10px}
+  @media(max-width:640px){.row{grid-template-columns:1fr}.hero .btn{width:100%}}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="bk-wrap">
+  <section class="hero">
+    <div>
+      <div class="title">📚 คลังหนังสือ</div>
+      <div class="sub">เก็บโปรไฟล์หนังสือต้นทางที่ใช้ทำชีท — ชื่อ รหัส วิชา ระดับชั้น ลิงก์ไฟล์ และรูปปก</div>
+    </div>
+    <div class="actions">
+      <a class="btn soft" href="{% url 'core:sheet_inventory_dashboard' %}">← Sheet Inventory</a>
+      <button class="btn green" type="button" onclick="openBookModal()">+ เพิ่มหนังสือ</button>
+    </div>
+  </section>
+
+  {% if error == 'duplicate' %}<div class="err">รหัสหนังสือนี้มีอยู่แล้ว กรุณาใช้รหัสอื่น</div>{% endif %}
+  {% if error == 'required' %}<div class="err">ต้องกรอกรหัสหนังสือและชื่อหนังสือ</div>{% endif %}
+  {% if error == 'cover' %}<div class="err">ไฟล์ปกต้องเป็นรูปภาพ (JPG หรือ PNG) เท่านั้น</div>{% endif %}
+
+  <section class="panel">
+    <div class="section-title">ค้นหา</div>
+    <form method="get" class="filters">
+      <input type="text" name="q" value="{{ q }}" placeholder="ค้นหารหัส / ชื่อหนังสือ / วิชา">
+      <select name="grade">
+        <option value="">ทุกระดับชั้น</option>
+        {% for value, label in grade_choices %}
+          <option value="{{ value }}" {% if grade == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+      <button class="btn primary" type="submit">Filter</button>
+      <a class="btn soft" href="{% url 'core:book_list' %}">Clear</a>
+      <span class="hint">ทั้งหมด {{ books|length }} เล่ม</span>
+    </form>
+
+    {% if books %}
+      <div class="grid">
+        {% for b in books %}
+          <div class="card" id="book-{{ b.id }}">
+            <div class="cover">
+              {% if b.cover_image %}
+                <img src="{{ b.cover_image.url }}" alt="{{ b.title }}">
+              {% else %}
+                <span class="ph">📕</span>
+              {% endif %}
+            </div>
+            <div class="card-body">
+              <div class="bk-code">{{ b.code }}</div>
+              <div class="bk-title">{{ b.title }}</div>
+              <div class="bk-meta">
+                {{ b.subject.name|default:"ไม่ระบุวิชา" }} · {{ b.grade_label }}
+              </div>
+              <div class="chips">
+                {% if b.answer_location == 'separate' %}
+                  <span class="chip sep">เฉลยแยกเล่ม</span>
+                {% else %}
+                  <span class="chip inc">รวมเฉลย</span>
+                {% endif %}
+                {% if b.sheet_count %}<span class="chip">ใช้ทำชีท {{ b.sheet_count }}</span>{% endif %}
+                {% if not b.is_active %}<span class="chip off">ปิดใช้งาน</span>{% endif %}
+              </div>
+            </div>
+            <div class="card-actions">
+              {% if b.file_url %}<a class="mini" href="{{ b.file_url }}" target="_blank" rel="noopener">📄 ไฟล์</a>{% endif %}
+              {% if b.answer_location == 'separate' and b.answer_url %}
+                <a class="mini" href="{{ b.answer_url }}" target="_blank" rel="noopener">✅ เฉลย</a>
+              {% endif %}
+              <button class="mini" type="button"
+                      data-edit-book
+                      data-book='{{ b.id }}'
+                      data-code="{{ b.code }}"
+                      data-title="{{ b.title }}"
+                      data-subject="{{ b.subject_id|default:'' }}"
+                      data-grade="{{ b.grade_level }}"
+                      data-file-url="{{ b.file_url }}"
+                      data-answer-location="{{ b.answer_location }}"
+                      data-answer-url="{{ b.answer_url }}"
+                      data-note="{{ b.note }}"
+                      data-active="{{ b.is_active|yesno:'1,0' }}">✏️ แก้ไข</button>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="empty">ยังไม่มีหนังสือในคลัง — กด “+ เพิ่มหนังสือ” เพื่อเริ่มบันทึกเล่มแรก</div>
+    {% endif %}
+  </section>
+</div>
+
+<div class="modal-bg" id="bookModalBg">
+  <div class="modal">
+    <h3 id="bookModalTitle">เพิ่มหนังสือ</h3>
+    <form method="post" enctype="multipart/form-data" id="bookForm">
+      {% csrf_token %}
+      <input type="hidden" name="book_id" id="bookId" value="">
+      <div class="row">
+        <div class="field"><label>รหัสหนังสือ *</label><input type="text" name="code" id="bkCode" required placeholder="เช่น BK-M-001"></div>
+        <div class="field"><label>ชื่อหนังสือ *</label><input type="text" name="title" id="bkTitle" required placeholder="เช่น คณิตศาสตร์ ป.6 เล่ม 1"></div>
+        <div class="field">
+          <label>วิชา</label>
+          <select name="subject_id" id="bkSubject">
+            <option value="">— ไม่ระบุ —</option>
+            {% for s in subjects %}<option value="{{ s.id }}">{{ s.name }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="field">
+          <label>ระดับชั้น</label>
+          <select name="grade_level" id="bkGrade">
+            <option value="">— ไม่ระบุ —</option>
+            {% for value, label in grade_choices %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="field full"><label>ลิงก์ไฟล์หนังสือ</label><input type="url" name="file_url" id="bkFileUrl" placeholder="https://..."></div>
+
+        <div class="field full">
+          <label>เฉลย</label>
+          <div class="radio-row">
+            {% for value, label in answer_choices %}
+              <label class="radio-card">
+                <input type="radio" name="answer_location" value="{{ value }}" {% if forloop.first %}checked{% endif %} onchange="toggleAnswerUrl()"> {{ label }}
+              </label>
+            {% endfor %}
+          </div>
+        </div>
+        <div class="field full hidden" id="answerUrlField" style="display:none">
+          <label>ลิงก์ไฟล์เฉลย</label>
+          <input type="url" name="answer_url" id="bkAnswerUrl" placeholder="https://...">
+        </div>
+
+        <div class="field full"><label>รูปปก (JPG / PNG)</label><input type="file" name="cover_image" accept="image/png,image/jpeg"></div>
+        <div class="field full"><label>หมายเหตุ</label><textarea name="note" id="bkNote" rows="2"></textarea></div>
+        <div class="field full">
+          <label class="radio-card" style="width:max-content">
+            <input type="checkbox" name="is_active" id="bkActive" checked> ใช้งานอยู่
+          </label>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn red" type="button" id="bkDeleteBtn" style="display:none" onclick="deleteBook()">ลบเล่มนี้</button>
+        <button class="btn soft" type="button" onclick="closeBookModal()">ยกเลิก</button>
+        <button class="btn green" type="submit">บันทึก</button>
+      </div>
+    </form>
+    <form method="post" id="bookDeleteForm" style="display:none">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="delete">
+      <input type="hidden" name="book_id" id="deleteBookId">
+    </form>
+  </div>
+</div>
+
+<script>
+(function(){
+  const bg = document.getElementById('bookModalBg');
+
+  window.openBookModal = function(){
+    document.getElementById('bookModalTitle').textContent = 'เพิ่มหนังสือ';
+    document.getElementById('bookForm').reset();
+    document.getElementById('bookId').value = '';
+    document.getElementById('bkActive').checked = true;
+    document.getElementById('bkDeleteBtn').style.display = 'none';
+    toggleAnswerUrl();
+    bg.classList.add('show');
+  };
+  window.closeBookModal = function(){ bg.classList.remove('show'); };
+  window.toggleAnswerUrl = function(){
+    const sep = document.querySelector('input[name="answer_location"]:checked')?.value === 'separate';
+    document.getElementById('answerUrlField').style.display = sep ? '' : 'none';
+  };
+  window.deleteBook = function(){
+    const id = document.getElementById('bookId').value;
+    if(!id) return;
+    if(!confirm('ลบหนังสือเล่มนี้ออกจากคลัง? ชีทที่อ้างอิงเล่มนี้จะไม่ถูกลบ แต่จะไม่มีเล่มต้นทางแล้ว')) return;
+    document.getElementById('deleteBookId').value = id;
+    document.getElementById('bookDeleteForm').submit();
+  };
+
+  document.querySelectorAll('[data-edit-book]').forEach(btn => btn.addEventListener('click', () => {
+    const d = btn.dataset;
+    document.getElementById('bookModalTitle').textContent = 'แก้ไขหนังสือ';
+    document.getElementById('bookId').value = d.book;
+    document.getElementById('bkCode').value = d.code || '';
+    document.getElementById('bkTitle').value = d.title || '';
+    document.getElementById('bkSubject').value = d.subject || '';
+    document.getElementById('bkGrade').value = d.grade || '';
+    document.getElementById('bkFileUrl').value = d.fileUrl || '';
+    document.getElementById('bkAnswerUrl').value = d.answerUrl || '';
+    document.getElementById('bkNote').value = d.note || '';
+    document.getElementById('bkActive').checked = d.active === '1';
+    const radio = document.querySelector(`input[name="answer_location"][value="${d.answerLocation}"]`);
+    if(radio) radio.checked = true;
+    toggleAnswerUrl();
+    document.getElementById('bkDeleteBtn').style.display = '';
+    bg.classList.add('show');
+  }));
+
+  bg.addEventListener('click', e => { if(e.target === bg) closeBookModal(); });
+  document.addEventListener('keydown', e => { if(e.key === 'Escape') closeBookModal(); });
+  toggleAnswerUrl();
+})();
+</script>
+{% endblock %}

@@ -65,6 +65,11 @@ urlpatterns = [
     path("sheet-inventory/export/", views.sheet_inventory_export, name="sheet_inventory_export"),
     path("sheet-inventory/sheet/<int:pk>/", views.sheet_inventory_profile, name="sheet_inventory_profile"),
     path("sheet-inventory/sheet/<int:pk>/cover/", views.sheet_inventory_cover_upload, name="sheet_inventory_cover_upload"),
+    path("sheet-inventory/sheet/<int:pk>/documents/upload/", views.sheet_document_upload, name="sheet_document_upload"),
+    path("sheet-inventory/documents/<int:pk>/delete/", views.sheet_document_delete, name="sheet_document_delete"),
+
+    # Book library (คลังหนังสือ)
+    path("books/", views.book_list, name="book_list"),
     path("sheet-allocation/", views.sheet_allocation_scan, name="sheet_allocation_scan"),
     path("sheet-allocation/save/", views.sheet_allocation_save, name="sheet_allocation_save"),
     path("sheet-allocation/report/", views.sheet_allocation_report, name="sheet_allocation_report"),

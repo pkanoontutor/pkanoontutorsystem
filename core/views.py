@@ -266,6 +266,33 @@ def _weekly_checkin_chart_data(anchor: date, weeks: int = 16) -> list[dict]:
     return series
 
 
+_THAI_LEADING_VOWELS = "เแโใไ"
+
+
+def _thai_name_sort_key(name: str | None) -> str:
+    """Sort key that files Thai names the way a person reads them.
+
+    Thai writes the leading vowels เ แ โ ใ ไ *before* their consonant but
+    sounds them after it, so an ordinary codepoint sort files "แพร" after
+    "ฮันนี่" instead of under พ. Swapping each leading vowel with the
+    character it precedes fixes the order. Database collation can't be
+    relied on here -- SQLite has none, and Postgres depends on the
+    cluster's locale -- so the roster is ordered in Python instead.
+    """
+    s = (name or "").strip()
+    out = []
+    i = 0
+    while i < len(s):
+        if s[i] in _THAI_LEADING_VOWELS and i + 1 < len(s):
+            out.append(s[i + 1])
+            out.append(s[i])
+            i += 2
+        else:
+            out.append(s[i])
+            i += 1
+    return "".join(out).casefold()
+
+
 @login_required
 def dashboard(request: HttpRequest) -> HttpResponse:
     """
@@ -394,12 +421,24 @@ def dashboard(request: HttpRequest) -> HttpResponse:
     THRESHOLD = 2
     near_complete = [e for e in enrollments if (e.remaining_sessions or 0) < THRESHOLD]
 
+    # The roster renders one card per student, sorted by nickname. Done here
+    # rather than in the queryset so Thai leading vowels order correctly --
+    # see _thai_name_sort_key. (The aggregation loop above still needs the
+    # queryset, so this list is only built once that work is finished.)
+    roster = sorted(
+        enrollments,
+        key=lambda e: (
+            _thai_name_sort_key(e.student.nickname),
+            _thai_name_sort_key(e.student.full_name),
+        ),
+    )
+
     context = {
         "selected_date": selected_date,
         "classes": classes,
         "classes_by_time_slot": classes_by_time_slot,
 
-        "enrollments": enrollments,
+        "enrollments": roster,
         "att_map": att_map,
         "summary_by_class_id": summary_by_class_id,
         "seats_summary_by_class_id": seats_summary_by_class_id,

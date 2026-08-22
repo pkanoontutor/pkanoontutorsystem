@@ -282,32 +282,75 @@
   }
 
   /* =====================================================
-     ATTENDANCE TABLE
+     ATTENDANCE ROSTER -- one rounded card per student.
+     10 per row on desktop, 5 per row on mobile.
   ===================================================== */
-  .att-table-wrap { overflow-x: auto; margin-top: 10px; }
-  .att-table {
-    width: 100%;
-    border-collapse: separate;
-    border-spacing: 0;
-    font-size: 13px;
+  .att-table-wrap { margin-top: 10px; }
+  .stu-grid {
+    display: grid;
+    grid-template-columns: repeat(10, minmax(0, 1fr));
+    gap: 8px;
   }
-  .att-table thead th {
-    position: sticky;
-    top: 0;
+  .stu-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 9px 4px 8px;
+    border: 2px solid #e5e7eb;
+    border-radius: 16px;
     background: #fff;
-    z-index: 2;
-    border-bottom: 1px solid #e5e7eb;
-    padding: 9px 10px;
-    font-size: 11px;
-    color: #64748b;
-    text-transform: uppercase;
-    letter-spacing: .04em;
-    font-weight: 700;
-    white-space: nowrap;
+    min-width: 0;
+    transition: background .14s, border-color .14s, box-shadow .14s;
   }
-  .att-table td { padding: 9px 10px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
-  .att-table tr:hover td { background: #fafafa; }
-  .cell-tight { white-space: nowrap; }
+  /* Status tint: pale fill + matching border, no wording needed. */
+  .stu-card.is-present { background:#ecfdf5; border-color:#6ee7b7; }
+  .stu-card.is-excused { background:#fffbeb; border-color:#fcd34d; }
+  .stu-card.is-no_show { background:#fef2f2; border-color:#fca5a5; }
+
+  /* The photo doubles as the "มา" button. */
+  .stu-photo {
+    border: 0; padding: 0; background: transparent; cursor: pointer;
+    line-height: 0; border-radius: 999px; font-family: inherit;
+  }
+  .stu-photo:hover .avatar { border-color:#10b981; box-shadow:0 0 0 3px rgba(16,185,129,.22); }
+  .stu-photo:focus-visible { outline:2px solid #059669; outline-offset:2px; }
+
+  .stu-nick {
+    font-size: 13px; font-weight: 900; color:#111827; line-height:1.2;
+    text-align:center; width:100%;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  .stu-nick.danger { color:#b91c1c; }
+  .stu-full {
+    font-size: 9.5px; font-weight: 700; color:#64748b; line-height:1.25;
+    text-align:center; width:100%;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  .stu-sessions { line-height:1; text-align:center; margin-top:1px; }
+  .stu-remain { font-size:20px; font-weight:1000; color:#0f172a; }
+  .stu-remain.danger { color:#b91c1c; }
+  .stu-total { font-size:10px; font-weight:800; color:#94a3b8; }
+  .stu-last { font-size:9px; font-weight:700; color:#94a3b8; text-align:center; min-height:11px; }
+
+  /* Round status buttons -- colour only, no label. */
+  .stu-picker { display:flex; gap:4px; justify-content:center; }
+  .stu-dot {
+    width:20px; height:20px; flex:0 0 auto;
+    border-radius:999px; border:2px solid transparent;
+    cursor:pointer; padding:0; font-size:0; line-height:0;
+    transition: transform .12s, box-shadow .12s, opacity .12s;
+  }
+  .stu-dot:hover { transform: scale(1.14); }
+  .stu-dot.btn-green  { background:#10b981; }
+  .stu-dot.btn-yellow { background:#f59e0b; }
+  .stu-dot.btn-red    { background:#ef4444; }
+  .stu-dot.btn-dim    { opacity:.28; }
+  .stu-dot.active-btn { box-shadow:0 0 0 3px #fff, 0 0 0 5px currentColor; }
+  .stu-dot.btn-green.active-btn  { color:#059669; }
+  .stu-dot.btn-yellow.active-btn { color:#d97706; }
+  .stu-dot.btn-red.active-btn    { color:#dc2626; }
 
   /* Avatar */
   .avatar {
@@ -317,6 +360,7 @@
     border: 1px solid #e5e7eb;
     background: #f3f4f6;
     flex: 0 0 auto;
+    transition: border-color .12s, box-shadow .12s;
   }
   .avatar img { width: 53px; height: 53px; object-fit: cover; display: block; }
   .avatar-fallback {
@@ -325,25 +369,31 @@
     font-weight: 900; font-size: 21px; color: #9ca3af;
   }
 
-  /* Student / Enrollment mini action buttons */
+  /* Student / Enrollment mini action buttons.
+     Desktop shows all three inline at the foot of the card; the ⋯ trigger
+     is phone-only (see the max-width:760px block). */
+  .stu-more-wrap { position:relative; width:100%; }
+  .stu-more-btn { display:none; }
   .student-actions {
     display: flex;
-    flex-direction: column;
-    gap: 5px;
-    flex: 0 0 auto;
+    gap: 3px;
+    justify-content: center;
   }
   .student-mini-btn {
-    width: 28px;
-    height: 28px;
+    width: 24px;
+    height: 24px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    border-radius: 9px;
+    border-radius: 8px;
     text-decoration: none;
-    font-size: 14px;
+    font-size: 12px;
     background: #f8fafc;
     border: 1px solid #e2e8f0;
     color: #334155;
+    cursor: pointer;
+    padding: 0;
+    font-family: inherit;
     transition: background .12s, transform .12s, box-shadow .12s;
   }
   .student-mini-btn:hover {
@@ -371,64 +421,8 @@
   .nr-btn.danger{background:#dc2626;color:#fff;}
   .nr-btn.danger:disabled{opacity:.6;cursor:not-allowed;}
 
-  /* Status badge */
-  .status-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    padding: 3px 9px;
-    border-radius: 999px;
-    font-size: 12px;
-    font-weight: 900;
-    border: 1px solid #e5e7eb;
-    background: #fff;
-    white-space: nowrap;
-  }
-  .sb-present { border-color: #bbf7d0; background: #f0fdf4; color: #166534; }
-  .sb-excused { border-color: #fde68a; background: #fffbeb; color: #92400e; }
-  .sb-no-show { border-color: #fecaca; background: #fef2f2; color: #991b1b; }
-  .sb-none    { color: #6b7280; background: #f9fafb; }
-
-  /* Segmented attendance buttons */
-  .segwrap {
-    display: inline-flex;
-    border: 1px solid #e5e7eb;
-    border-radius: 10px;
-    overflow: hidden;
-    background: #fff;
-  }
-  .segbtn {
-    border: 0 !important;
-    border-right: 1px solid #e5e7eb !important;
-    border-radius: 0 !important;
-    padding: 8px 13px !important;
-    min-width: 50px;
-    font-weight: 900 !important;
-    font-size: 13px !important;
-    cursor: pointer;
-    color: #fff !important;
-    transition: opacity .12s;
-  }
-  .segbtn:last-child { border-right: 0 !important; }
-  .btn-green  { background: #16a34a !important; }
-  .btn-yellow { background: #eab308 !important; }
-  .btn-red    { background: #dc2626 !important; }
-  .active-btn { outline: 2px solid #000 !important; outline-offset: 1px; }
-  .btn-dim    { opacity: .3 !important; filter: saturate(.5); }
-
   /* Danger text */
   .danger { color: #b91c1c; font-weight: 900; }
-  .badge {
-    display: inline-block;
-    padding: 2px 7px;
-    border-radius: 999px;
-    font-size: 11px;
-    background: #fee2e2;
-    color: #b91c1c;
-    border: 1px solid #fecaca;
-    margin-left: 5px;
-    font-weight: 800;
-  }
   .muted { color: #6b7280; font-size: 12px; }
 
   /* Aside quick links */
@@ -502,8 +496,6 @@
   .class-checked summary { background:#dcfce7; }
   .class-unchecked summary { background:#fef3c7; }
 
-  .student-line-1 { font-weight:900; color:#111827; }
-  .student-line-2 { margin-top:2px; color:#475569; font-size:12px; font-weight:700; }
 
   .qbtn-purple { background: linear-gradient(135deg,#7c3aed,#5b21b6); }
   .qbtn-orange { background: linear-gradient(135deg,#f97316,#c2410c); }
@@ -695,11 +687,38 @@
     .btn-submit-cls{ min-height:42px; padding:10px 16px; }
     .slot-class-chip{ grid-template-columns:1fr; align-items:flex-start; }
     .slot-mini-stats{ justify-content:flex-start; }
-    .att-table{ min-width:760px; }
-    .student-line-1{ font-size:13px; }
-    .student-line-2{ font-size:11px; }
-    .avatar,.avatar img,.avatar-fallback{ width:46px; height:46px; }
     .segbtn{ padding:9px 14px !important; min-width:56px; }
+  }
+
+  /* Phone roster: 5 cards per row, so everything shrinks and the three
+     Student/Enrollment/ไม่ต่อคอร์ส buttons collapse behind a ⋯ popover. */
+  @media (max-width:760px){
+    .stu-grid{ grid-template-columns:repeat(5, minmax(0,1fr)); gap:6px; }
+    .stu-card{ padding:7px 2px 6px; border-radius:13px; gap:3px; }
+    .avatar,.avatar img,.avatar-fallback{ width:38px; height:38px; }
+    .avatar-fallback{ font-size:15px; }
+    .stu-nick{ font-size:11px; }
+    .stu-full{ font-size:8px; }
+    .stu-remain{ font-size:16px; }
+    .stu-total{ font-size:9px; }
+    .stu-last{ font-size:8px; }
+    .stu-dot{ width:15px; height:15px; }
+    .stu-picker{ gap:2px; }
+
+    .student-actions{ display:none; }
+    .stu-more-wrap{ position:absolute; top:2px; right:2px; width:auto; }
+    .stu-more-btn{
+      display:block;
+      width:19px; height:19px; border-radius:999px; border:1px solid #e2e8f0;
+      background:#f8fafc; color:#475569; font-size:11px; font-weight:900;
+      line-height:1; cursor:pointer; padding:0; font-family:inherit;
+    }
+    .stu-more-wrap.open .student-actions{
+      display:flex; position:absolute; top:23px; right:0; z-index:20;
+      background:#fff; border:1px solid #e2e8f0; border-radius:11px;
+      padding:5px; gap:5px; box-shadow:0 8px 20px rgba(15,23,42,.18);
+    }
+    .stu-more-wrap.open .student-mini-btn{ width:30px; height:30px; font-size:15px; }
   }
 
 
@@ -1022,99 +1041,68 @@
             </div>
           </div>
 
-          <!-- Attendance table -->
+          <!-- Attendance roster (card grid) -->
           <div class="att-table-wrap">
-            <table class="att-table" data-class="{{ cls.id }}">
-              <thead>
-                <tr>
-                  <th>นักเรียน</th>
-                  <th class="cell-tight">ทั้งหมด</th>
-                  <th class="cell-tight">คงเหลือ</th>
-                  <th class="cell-tight">บันทึกล่าสุด</th>
-                  <th class="cell-tight">สถานะ</th>
-                  <th class="cell-tight">เช็คชื่อ</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for e in enrollments %}
-                  {% if e.tutoring_class_id == cls.id %}
-                    {% with a=att_map|get_item:e.id %}
-                    <tr id="row-{{ e.id }}"
-                        data-class="{{ cls.id }}"
-                        data-status="{% if a and a.status %}{{ a.status }}{% else %}none{% endif %}"
-                        data-search="{{ e.sale_run_no|default:'' }} {{ e.student.nickname|default:'' }} {{ e.student.full_name|default:'' }} {{ e.student.grade_level|default:'' }}">
+            <div class="stu-grid" data-class="{{ cls.id }}">
+              {% for e in enrollments %}
+                {% if e.tutoring_class_id == cls.id %}
+                  {% with a=att_map|get_item:e.id %}
+                  <div class="stu-card {% if a and a.status == 'present' %}is-present{% elif a and a.status == 'excused' %}is-excused{% elif a and a.status == 'no_show' %}is-no_show{% endif %}"
+                       id="row-{{ e.id }}"
+                       data-att-row
+                       data-class="{{ cls.id }}"
+                       data-status="{% if a and a.status %}{{ a.status }}{% else %}none{% endif %}"
+                       data-search="{{ e.sale_run_no|default:'' }} {{ e.student.nickname|default:'' }} {{ e.student.full_name|default:'' }} {{ e.student.grade_level|default:'' }}">
 
-                      <!-- Student name -->
-                      <td>
-                        <div style="display:flex; align-items:center; gap:10px;">
-                          <div class="avatar">
-                            {% if e.student.profile_image %}
-                              <img src="{{ e.student.profile_image.url }}" alt="profile">
-                            {% else %}
-                              <div class="avatar-fallback">{{ e.student.nickname|first|upper|default:"?" }}</div>
-                            {% endif %}
-                          </div>
-                          <div style="flex:1; min-width:0;">
-                            <div class="student-line-1 {% if e.remaining_sessions <= 0 %}danger{% endif %}">
-                              {{ e.sale_run_no|default:"-" }}{% if e.student.nickname %} | {{ e.student.nickname }}{% endif %}
-                              {% if e.remaining_sessions <= 0 %}<span class="badge">ครบคอร์ส</span>{% endif %}
-                            </div>
-                            <div class="student-line-2">
-                              {{ e.student.full_name|default:"-" }}{% if e.student.grade_level %} | {{ e.student.grade_level }}{% endif %}
-                            </div>
-                            <div class="muted" style="margin-top:2px;">
-                              {% with seq=course_seq_by_enrollment_id|get_item:e.id %}{% with total=course_total_by_student|get_item:e.student_id %}
-                                คอร์สที่ {{ seq|default:"-" }} / {{ total|default:"-" }}
-                              {% endwith %}{% endwith %}
-                            </div>
-                          </div>
-                          <div class="student-actions">
-                            <a class="student-mini-btn" href="/adminlublub/core/student/{{ e.student_id }}/change/" title="เปิด Student Profile">👤</a>
-                            <a class="student-mini-btn" href="/adminlublub/core/enrollment/{{ e.id }}/change/" title="เปิด Enrollment">📑</a>
-                            <button type="button" class="student-mini-btn not-renew-btn"
-                                    onclick="return openNotRenewModal({{ e.id }}, '{{ e.student.nickname|default:e.sale_run_no|default:"นักเรียนคนนี้"|escapejs }}');"
-                                    title="ไม่ต่อคอร์ส">🚫</button>
-                          </div>
-                        </div>
-                      </td>
-
-                      <td class="cell-tight"><b>{{ e.sessions_total }}</b></td>
-                      <td class="cell-tight">
-                        <b id="remaining-{{ e.id }}" class="{% if e.remaining_sessions <= 0 %}danger{% endif %}">{{ e.remaining_sessions }}</b>
-                      </td>
-                      <td class="muted cell-tight" id="last-{{ e.id }}">
-                        {% if a and a.checked_at %}{{ a.checked_at|date:"d/m H:i" }}{% else %}—{% endif %}
-                      </td>
-
-                      <td class="cell-tight">
-                        {% if a and a.status == 'present' %}
-                          <span class="status-badge sb-present" id="badge-{{ e.id }}">● มา</span>
-                        {% elif a and a.status == 'excused' %}
-                          <span class="status-badge sb-excused" id="badge-{{ e.id }}">● ลา</span>
-                        {% elif a and a.status == 'no_show' %}
-                          <span class="status-badge sb-no-show" id="badge-{{ e.id }}">● ขาด</span>
+                    <button type="button" class="stu-photo" title="กดเพื่อเช็คชื่อ: มา"
+                            onclick="return pickStatus({{ cls.id }},{{ e.id }},'present');">
+                      <span class="avatar">
+                        {% if e.student.profile_image %}
+                          <img src="{{ e.student.profile_image.url }}" alt="{{ e.student.nickname }}">
                         {% else %}
-                          <span class="status-badge sb-none" id="badge-{{ e.id }}">— ยังไม่เช็ค</span>
+                          <span class="avatar-fallback">{{ e.student.nickname|first|upper|default:"?" }}</span>
                         {% endif %}
-                      </td>
+                      </span>
+                    </button>
 
-                      <td class="cell-tight">
-                        <div class="segwrap">
-                          <button class="btn segbtn btn-green {% if a and a.status == 'present' %}active-btn{% endif %}"
-                                  onclick="return pickStatus({{ cls.id }},{{ e.id }},'present');">มา</button>
-                          <button class="btn segbtn btn-yellow {% if a and a.status == 'excused' %}active-btn{% endif %}"
-                                  onclick="return pickStatus({{ cls.id }},{{ e.id }},'excused');">ลา</button>
-                          <button class="btn segbtn btn-red {% if a and a.status == 'no_show' %}active-btn{% endif %}"
-                                  onclick="return pickStatus({{ cls.id }},{{ e.id }},'no_show');">ขาด</button>
-                        </div>
-                      </td>
+                    <div class="stu-nick {% if e.remaining_sessions <= 0 %}danger{% endif %}" title="{{ e.student.nickname|default:'-' }}">
+                      {{ e.student.nickname|default:"-" }}
+                    </div>
+                    <div class="stu-full" title="{{ e.student.full_name|default:'-' }}">{{ e.student.full_name|default:"-" }}</div>
 
-                    </tr>
-                    {% endwith %}
-                  {% endif %}
-                {% endfor %}
-              </tbody>
-            </table>
+                    <div class="stu-sessions">
+                      <span id="remaining-{{ e.id }}" class="stu-remain {% if e.remaining_sessions <= 0 %}danger{% endif %}">{{ e.remaining_sessions }}</span><span class="stu-total">/{{ e.sessions_total }}</span>
+                    </div>
+
+                    <div class="stu-last" id="last-{{ e.id }}">
+                      {% if a and a.checked_at %}{{ a.checked_at|date:"d/m H:i" }}{% else %}—{% endif %}
+                    </div>
+
+                    <div class="stu-picker">
+                      <button class="stu-dot btn-green {% if a and a.status == 'present' %}active-btn{% endif %}"
+                              title="มา" onclick="return pickStatus({{ cls.id }},{{ e.id }},'present');">มา</button>
+                      <button class="stu-dot btn-yellow {% if a and a.status == 'excused' %}active-btn{% endif %}"
+                              title="ลา" onclick="return pickStatus({{ cls.id }},{{ e.id }},'excused');">ลา</button>
+                      <button class="stu-dot btn-red {% if a and a.status == 'no_show' %}active-btn{% endif %}"
+                              title="ขาด" onclick="return pickStatus({{ cls.id }},{{ e.id }},'no_show');">ขาด</button>
+                    </div>
+
+                    <div class="stu-more-wrap">
+                      <button type="button" class="stu-more-btn" title="เมนูเพิ่มเติม"
+                              onclick="return toggleCardMenu(this);">⋯</button>
+                      <div class="student-actions">
+                        <a class="student-mini-btn" href="/adminlublub/core/student/{{ e.student_id }}/change/" title="เปิด Student Profile">👤</a>
+                        <a class="student-mini-btn" href="/adminlublub/core/enrollment/{{ e.id }}/change/" title="เปิด Enrollment">📑</a>
+                        <button type="button" class="student-mini-btn not-renew-btn"
+                                onclick="return openNotRenewModal({{ e.id }}, '{{ e.student.nickname|default:e.sale_run_no|default:"นักเรียนคนนี้"|escapejs }}');"
+                                title="ไม่ต่อคอร์ส">🚫</button>
+                      </div>
+                    </div>
+                  </div>
+                  {% endwith %}
+                {% endif %}
+              {% endfor %}
+            </div>
           </div>
 
         </details>
@@ -1181,16 +1169,6 @@
   /* ================================================
      BADGE & BUTTONS
   ================================================ */
-  function setBadge(eid,status){
-    const b=document.getElementById("badge-"+eid);
-    if(!b)return;
-    b.className="status-badge";
-    if(status==="present"){b.classList.add("sb-present");b.textContent="● มา";}
-    else if(status==="excused"){b.classList.add("sb-excused");b.textContent="● ลา";}
-    else if(status==="no_show"){b.classList.add("sb-no-show");b.textContent="● ขาด";}
-    else{b.classList.add("sb-none");b.textContent="— ยังไม่เช็ค";}
-  }
-
   function markButtons(eid,status){
     const row=document.getElementById("row-"+eid);
     if(!row)return;
@@ -1205,7 +1183,27 @@
       active.classList.add("active-btn");
       btns.forEach(b=>{if(b!==active)b.classList.add("btn-dim");});
     }
+    // Tint the whole card so the status reads at a glance without wording.
+    row.classList.remove("is-present","is-excused","is-no_show");
+    if(status==="present"||status==="excused"||status==="no_show"){
+      row.classList.add("is-"+status);
+    }
   }
+
+  /* ⋯ menu on phone-sized cards (desktop shows the buttons inline). */
+  function toggleCardMenu(btn){
+    const wrap=btn.closest(".stu-more-wrap");
+    if(!wrap)return false;
+    const wasOpen=wrap.classList.contains("open");
+    document.querySelectorAll(".stu-more-wrap.open").forEach(w=>w.classList.remove("open"));
+    if(!wasOpen)wrap.classList.add("open");
+    return false;
+  }
+  document.addEventListener("click",function(ev){
+    if(!ev.target.closest(".stu-more-wrap")){
+      document.querySelectorAll(".stu-more-wrap.open").forEach(w=>w.classList.remove("open"));
+    }
+  });
 
   function pickStatus(cid,eid,status){
     ensureClass(cid);
@@ -1213,7 +1211,6 @@
     const row=document.getElementById("row-"+eid);
     if(row)row.dataset.status=status;
     markButtons(eid,status);
-    setBadge(eid,status);
     updateSelectionSummary(cid);
     filterRows(cid);
     return false;
@@ -1221,7 +1218,7 @@
 
   function markAllPresent(cid){
     if(!confirm("ยืนยันว่านักเรียนทุกคนในห้องนี้มาเรียน?"))return false;
-    document.querySelectorAll(`tr[data-class="${cid}"]`).forEach(row=>{
+    document.querySelectorAll(`.stu-card[data-class="${cid}"]`).forEach(row=>{
       const eid=row.id.replace("row-","");
       pickStatus(cid,eid,"present");
     });
@@ -1285,7 +1282,7 @@
   ================================================ */
   function getSelectionCounts(cid){
     const counts={present:0,excused:0,no_show:0,none:0,total:0};
-    document.querySelectorAll(`tr[data-class="${cid}"]`).forEach(row=>{
+    document.querySelectorAll(`.stu-card[data-class="${cid}"]`).forEach(row=>{
       const st=row.dataset.status||"none";
       if(st==="present"||st==="excused"||st==="no_show"){
         counts[st]+=1;
@@ -1429,7 +1426,7 @@
     const textEl=document.getElementById("search-"+cid);
     classFilters[cid].text=(textEl?textEl.value:"").toLowerCase().trim();
     const fT=classFilters[cid].text,fS=classFilters[cid].status;
-    document.querySelectorAll(`tr[data-class="${cid}"]`).forEach(row=>{
+    document.querySelectorAll(`.stu-card[data-class="${cid}"]`).forEach(row=>{
       const okT=!fT||(row.dataset.search||"").toLowerCase().includes(fT);
       const okS=fS==="all"||row.dataset.status===fS;
       row.style.display=(okT&&okS)?"":"none";
@@ -1506,7 +1503,6 @@
         if(lastEl)lastEl.textContent=serverNow;
         const row=document.getElementById("row-"+it.enrollment_id);
         if(row)row.dataset.status=it.status;
-        setBadge(it.enrollment_id,it.status);
         markButtons(it.enrollment_id,it.status);
       }
 
@@ -1549,13 +1545,12 @@
       }
     }
     // init button states
-    document.querySelectorAll("tr[id^='row-']").forEach(row=>{
+    document.querySelectorAll(".stu-card[id^='row-']").forEach(row=>{
       const eid=row.id.replace("row-","");
       const g=row.querySelector(".btn-green"),y=row.querySelector(".btn-yellow"),r=row.querySelector(".btn-red");
-      if(g&&g.classList.contains("active-btn")){markButtons(eid,"present");setBadge(eid,"present");}
-      else if(y&&y.classList.contains("active-btn")){markButtons(eid,"excused");setBadge(eid,"excused");}
-      else if(r&&r.classList.contains("active-btn")){markButtons(eid,"no_show");setBadge(eid,"no_show");}
-      else setBadge(eid,"none");
+      if(g&&g.classList.contains("active-btn"))markButtons(eid,"present");
+      else if(y&&y.classList.contains("active-btn"))markButtons(eid,"excused");
+      else if(r&&r.classList.contains("active-btn"))markButtons(eid,"no_show");
     });
     recomputeSlotTotals();
     document.querySelectorAll("details[id^='classCard-']").forEach(det=>{

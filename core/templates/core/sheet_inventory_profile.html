@@ -90,11 +90,42 @@
         <div style="grid-column:1/-1"><button class="btnx dark" type="submit">สร้างรายการรอปรินท์ (ไปที่ Sheet Inventory)</button></div>
       </form>
 
+      <h3 style="margin:16px 0 8px;font-size:16px">สร้างจากหนังสือเล่มไหน</h3>
+      {% if saved_book %}
+        <div style="background:#dcfce7;border:1px solid #86efac;color:#166534;border-radius:12px;padding:8px 10px;font-weight:800;font-size:13px;margin-bottom:8px;">บันทึกแล้ว</div>
+      {% endif %}
+      <form method="post" class="settings-grid" style="border:1px solid #ddd6fe;border-radius:14px;padding:10px;background:#f5f3ff;">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="update_source_book">
+        <div class="field" style="grid-column:1/-1">
+          <label>หนังสือต้นทาง</label>
+          <select name="source_book_id" style="border:1px solid #e2e8f0;border-radius:11px;padding:8px 9px;font-weight:800;background:#fff;width:100%;font-size:12px;font-family:inherit;">
+            <option value="">— ไม่ระบุ —</option>
+            {% for b in books %}
+              <option value="{{ b.id }}" {% if sheet.source_book_id == b.id %}selected{% endif %}>{{ b.code }} · {{ b.title }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div style="grid-column:1/-1;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <button class="btnx green" type="submit">บันทึกหนังสือต้นทาง</button>
+          <a class="btnx soft" href="{% url 'core:book_list' %}">เปิดคลังหนังสือ</a>
+        </div>
+      </form>
+
       <h3 style="margin:16px 0 8px;font-size:16px">Class ที่ผูกแบบ Manual</h3>
       <div class="pillrow">
         {% for m in mappings %}<span class="pill">{{ m.tutoring_class.get_time_slot_display }} · {{ m.tutoring_class.name }} · ต่อคน {{ m.quantity_per_student }}</span>{% empty %}<span class="pill">ยังไม่มี manual mapping</span>{% endfor %}
       </div>
     </div>
+  </section>
+
+  <section class="panel">
+    <h3 style="margin:0 0 4px;font-size:16px">📄 ไฟล์ PDF ของชีท</h3>
+    <div class="meta" style="margin-bottom:10px">
+      อัปโหลดปก 1 ไฟล์ (ใช้เป็นรูปประจำชีท) ส่วนเนื้อหาและเฉลยใส่ได้มากกว่า 1 ไฟล์ ·
+      ร้านปรินท์จะโหลดไฟล์เนื้อหาจากตรงนี้แทนการเปิดลิงก์
+    </div>
+    <div id="docGroups" class="doc-groups"></div>
   </section>
 
   <section class="panel">
@@ -110,7 +141,186 @@
   </section>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
 <script>
   new QRCode(document.getElementById("qrcode"), {text: "{{ sheet.code|escapejs }}", width: 190, height: 190, correctLevel: QRCode.CorrectLevel.M});
 </script>
+
+<script>
+(function(){
+  const CSRF = "{{ csrf_token }}";
+  const SHEET_ID = {{ sheet.id }};
+  const BOOKS = [{% for b in books %}{id:{{ b.id }},label:"{{ b.code|escapejs }} · {{ b.title|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}];
+  let DOCS = {{ documents_json|safe }};
+
+  if(window.pdfjsLib){
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+  }
+
+  const KINDS = [
+    {key:'cover',   label:'ปก',     hint:'1 ไฟล์ · หน้าแรกจะถูกใช้เป็นรูปประจำชีท', single:true},
+    {key:'content', label:'เนื้อหา', hint:'ใส่ได้หลายไฟล์',                          single:false},
+    {key:'answer',  label:'เฉลย',   hint:'ใส่ได้หลายไฟล์',                          single:false},
+  ];
+  const groups = document.getElementById('docGroups');
+
+  function esc(s){ return String(s==null?'':s).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c])); }
+
+  function render(){
+    groups.innerHTML = KINDS.map(k => {
+      const rows = (DOCS[k.key]||[]);
+      const list = rows.length ? rows.map(d => `
+        <div class="doc-row">
+          ${d.thumbnail ? `<img class="doc-thumb" src="${esc(d.thumbnail)}" alt="">` : `<span class="doc-thumb ph">PDF</span>`}
+          <div class="doc-main">
+            <a class="doc-name" href="${esc(d.url)}" target="_blank" rel="noopener">${esc(d.name)}</a>
+            <div class="doc-meta">
+              ${d.page_count ? d.page_count + ' หน้า' : ''}${d.book ? ' · จาก ' + esc(d.book) : ''}
+              ${d.source_url ? ` · <a href="${esc(d.source_url)}" target="_blank" rel="noopener">ลิงก์อ้างอิง</a>` : ''}
+            </div>
+          </div>
+          <button type="button" class="doc-del" data-del="${d.id}" title="ลบไฟล์นี้">✕</button>
+        </div>`).join('')
+        : `<div class="doc-empty">ยังไม่มีไฟล์${k.label}</div>`;
+
+      return `
+        <div class="doc-group">
+          <div class="doc-head">
+            <div><b>${k.label}</b><div class="doc-hint">${k.hint}</div></div>
+            <span class="doc-count">${rows.length}</span>
+          </div>
+          ${list}
+          <div class="doc-form">
+            <input type="file" accept="application/pdf" data-file="${k.key}">
+            <select data-book="${k.key}">
+              <option value="">— มาจากหนังสือเล่มไหน (ไม่ระบุ) —</option>
+              ${BOOKS.map(b=>`<option value="${b.id}">${esc(b.label)}</option>`).join('')}
+            </select>
+            <input type="url" placeholder="ลิงก์อ้างอิง (ถ้ามี)" data-url="${k.key}">
+            <button type="button" class="btnx green" data-upload="${k.key}">อัปโหลด${k.label}</button>
+            <span class="doc-status" data-status="${k.key}"></span>
+          </div>
+        </div>`;
+    }).join('');
+
+    groups.querySelectorAll('[data-upload]').forEach(b => b.addEventListener('click', () => upload(b.dataset.upload)));
+    groups.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', () => removeDoc(b.dataset.del)));
+  }
+
+  // Render page 1 to a PNG so the bookshelf never has to rasterise a PDF.
+  // The thumbnail is a convenience, never a gate: every step is bounded by a
+  // timeout so a slow or unrenderable PDF still uploads, just without a
+  // preview image. Page count is reported separately and survives a failed
+  // render.
+  const withTimeout = (p, ms) => Promise.race([
+    p, new Promise(res => setTimeout(() => res(null), ms)),
+  ]);
+
+  async function firstPageThumb(file){
+    if(!window.pdfjsLib) return {blob:null, pages:0};
+    let pages = 0;
+    try{
+      const buf = await withTimeout(file.arrayBuffer(), 10000);
+      if(!buf) return {blob:null, pages:0};
+      const pdf = await withTimeout(pdfjsLib.getDocument({data:buf}).promise, 20000);
+      if(!pdf) return {blob:null, pages:0};
+      pages = pdf.numPages;
+
+      const page = await withTimeout(pdf.getPage(1), 10000);
+      if(!page) return {blob:null, pages};
+      const base = page.getViewport({scale:1});
+      const viewport = page.getViewport({scale: Math.min(700/base.width, 2)});
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(viewport.width);
+      canvas.height = Math.round(viewport.height);
+      const rendered = await withTimeout(
+        page.render({canvasContext: canvas.getContext('2d'), viewport}).promise.then(() => true),
+        15000,
+      );
+      if(!rendered) return {blob:null, pages};
+      const blob = await withTimeout(
+        new Promise(r => canvas.toBlob(r, 'image/png', 0.92)), 10000,
+      );
+      return {blob, pages};
+    }catch(e){
+      console.warn('thumbnail failed', e);
+      return {blob:null, pages};
+    }
+  }
+
+  async function upload(kind){
+    const fileEl = groups.querySelector(`[data-file="${kind}"]`);
+    const status = groups.querySelector(`[data-status="${kind}"]`);
+    const file = fileEl.files && fileEl.files[0];
+    if(!file){ status.textContent = 'ยังไม่ได้เลือกไฟล์'; status.className='doc-status err'; return; }
+    if(!/\.pdf$/i.test(file.name)){ status.textContent='รองรับเฉพาะไฟล์ PDF'; status.className='doc-status err'; return; }
+
+    status.textContent = 'กำลังอ่านไฟล์...'; status.className='doc-status';
+    const {blob, pages} = await firstPageThumb(file);
+
+    const fd = new FormData();
+    fd.append('kind', kind);
+    fd.append('pdf', file);
+    fd.append('page_count', pages || 0);
+    fd.append('source_book_id', groups.querySelector(`[data-book="${kind}"]`).value || '');
+    fd.append('source_url', groups.querySelector(`[data-url="${kind}"]`).value || '');
+    if(blob) fd.append('thumbnail', blob, 'thumb.png');
+
+    status.textContent = 'กำลังอัปโหลด...';
+    try{
+      const res = await fetch(`/sheet-inventory/sheet/${SHEET_ID}/documents/upload/`, {
+        method:'POST', headers:{'X-CSRFToken':CSRF}, body:fd,
+      });
+      const data = await res.json();
+      if(!res.ok || !data.ok) throw new Error(data.message || 'อัปโหลดไม่สำเร็จ');
+      if(kind === 'cover') DOCS.cover = [data.document];
+      else DOCS[kind] = (DOCS[kind]||[]).concat([data.document]);
+      render();
+      const s2 = groups.querySelector(`[data-status="${kind}"]`);
+      s2.textContent = 'อัปโหลดแล้ว'; s2.className = 'doc-status ok';
+    }catch(err){
+      status.textContent = err.message || 'อัปโหลดไม่สำเร็จ';
+      status.className = 'doc-status err';
+    }
+  }
+
+  async function removeDoc(id){
+    if(!confirm('ลบไฟล์นี้ออกจากระบบ?')) return;
+    const res = await fetch(`/sheet-inventory/documents/${id}/delete/`, {
+      method:'POST', headers:{'X-CSRFToken':CSRF},
+    });
+    const data = await res.json().catch(()=>({}));
+    if(!res.ok || !data.ok){ alert(data.message || 'ลบไม่สำเร็จ'); return; }
+    for(const k of Object.keys(DOCS)) DOCS[k] = (DOCS[k]||[]).filter(d => String(d.id) !== String(id));
+    render();
+  }
+
+  render();
+})();
+</script>
+
+<style>
+  .doc-groups{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:10px}
+  .doc-group{border:1px solid #e2e8f0;border-radius:16px;padding:11px;background:#f8fafc;display:flex;flex-direction:column;gap:7px}
+  .doc-head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+  .doc-head b{font-size:14px;color:#0f172a}
+  .doc-hint{font-size:11px;color:#64748b;font-weight:700;margin-top:2px}
+  .doc-count{font-size:11px;font-weight:1000;background:#e2e8f0;color:#334155;border-radius:999px;padding:2px 9px}
+  .doc-row{display:flex;gap:9px;align-items:center;background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:7px}
+  .doc-thumb{width:34px;height:44px;object-fit:cover;border-radius:6px;border:1px solid #e2e8f0;flex:none;background:#f1f5f9}
+  .doc-thumb.ph{display:grid;place-items:center;font-size:9px;font-weight:1000;color:#94a3b8}
+  .doc-main{flex:1;min-width:0}
+  .doc-name{font-size:12.5px;font-weight:900;color:#1d4ed8;text-decoration:none;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .doc-name:hover{text-decoration:underline}
+  .doc-meta{font-size:10.5px;color:#64748b;font-weight:700;margin-top:2px}
+  .doc-del{border:1px solid #e2e8f0;background:#fff;color:#94a3b8;border-radius:8px;width:24px;height:24px;cursor:pointer;font-weight:900;flex:none;font-family:inherit}
+  .doc-del:hover{background:#fee2e2;border-color:#fecaca;color:#dc2626}
+  .doc-empty{font-size:11.5px;color:#94a3b8;font-weight:800;padding:9px;text-align:center;border:1px dashed #cbd5e1;border-radius:11px;background:#fff}
+  .doc-form{display:grid;gap:6px;margin-top:3px}
+  .doc-form input,.doc-form select{border:1px solid #e2e8f0;border-radius:10px;padding:7px 8px;font-size:11.5px;font-weight:800;background:#fff;font-family:inherit;width:100%;box-sizing:border-box}
+  .doc-status{font-size:11px;font-weight:900;color:#64748b;min-height:14px}
+  .doc-status.ok{color:#166534}
+  .doc-status.err{color:#b91c1c}
+</style>
 {% endblock %}

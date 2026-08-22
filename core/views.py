@@ -28,6 +28,8 @@ from .models import (
     School,
     Subject,
     Sheet,
+    Book,
+    SheetDocument,
     ClassSubject,
     Attendance,
     Enrollment,
@@ -2114,9 +2116,25 @@ def sheet_inventory_profile(request: HttpRequest, pk: int) -> HttpResponse:
         sheet.save(update_fields=["total_pages", "total_questions"])
         return redirect(f"{request.path}?saved=counts")
 
+    if request.method == "POST" and request.POST.get("action") == "update_source_book":
+        sheet.source_book = Book.objects.filter(id=_id_or_none(request.POST.get("source_book_id"))).first()
+        sheet.save(update_fields=["source_book"])
+        return redirect(f"{request.path}?saved=book")
+
     inventory, _ = SheetInventory.objects.get_or_create(sheet=sheet, defaults={"quantity": 0})
     movements = SheetInventoryMovement.objects.filter(sheet=sheet).select_related("created_by").order_by("-created_at")[:80]
     mappings = SheetClassMapping.objects.filter(sheet=sheet, is_active=True).select_related("tutoring_class")
+
+    docs = list(
+        SheetDocument.objects.filter(sheet=sheet)
+        .select_related("source_book")
+        .order_by("kind", "display_order", "id")
+    )
+    docs_by_kind = {
+        "cover": [_sheet_document_payload(d) for d in docs if d.kind == SheetDocument.Kind.COVER],
+        "content": [_sheet_document_payload(d) for d in docs if d.kind == SheetDocument.Kind.CONTENT],
+        "answer": [_sheet_document_payload(d) for d in docs if d.kind == SheetDocument.Kind.ANSWER],
+    }
 
     return render(request, "core/sheet_inventory_profile.html", {
         "sheet": sheet,
@@ -2124,6 +2142,207 @@ def sheet_inventory_profile(request: HttpRequest, pk: int) -> HttpResponse:
         "movements": movements,
         "mappings": mappings,
         "saved_counts": request.GET.get("saved") == "counts",
+        "saved_book": request.GET.get("saved") == "book",
+        "documents_json": json.dumps(docs_by_kind, ensure_ascii=False),
+        "books": Book.objects.filter(is_active=True).order_by("grade_level", "code"),
+    })
+
+
+_MAX_SHEET_PDF_MB = 60
+
+
+def _id_or_none(raw) -> int | None:
+    """Form selects post "" for "no selection", which blows up a pk filter."""
+    try:
+        return int(str(raw).strip())
+    except (TypeError, ValueError):
+        return None
+
+
+@require_POST
+@login_required
+def sheet_document_upload(request: HttpRequest, pk: int) -> JsonResponse:
+    """Attach a PDF (ปก / เนื้อหา / เฉลย) to a sheet.
+
+    A sheet keeps at most one cover, so re-uploading one replaces the
+    previous file; content and answer PDFs accumulate. The cover's PNG
+    thumbnail is rendered from page 1 by pdf.js in the browser and posted
+    alongside, which avoids putting a PDF rasteriser on the server.
+    """
+    sheet = get_object_or_404(Sheet, pk=pk)
+    kind = (request.POST.get("kind") or "").strip()
+    if kind not in dict(SheetDocument.Kind.choices):
+        return JsonResponse({"ok": False, "message": "ประเภทไฟล์ไม่ถูกต้อง"}, status=400)
+
+    upload = request.FILES.get("pdf")
+    if not upload:
+        return JsonResponse({"ok": False, "message": "ไม่พบไฟล์ PDF"}, status=400)
+    name_lower = (upload.name or "").lower()
+    if not (name_lower.endswith(".pdf") or (upload.content_type or "") == "application/pdf"):
+        return JsonResponse({"ok": False, "message": "รองรับเฉพาะไฟล์ PDF"}, status=400)
+    if upload.size > _MAX_SHEET_PDF_MB * 1024 * 1024:
+        return JsonResponse(
+            {"ok": False, "message": f"ไฟล์ใหญ่เกิน {_MAX_SHEET_PDF_MB}MB"}, status=400
+        )
+
+    book = Book.objects.filter(id=_id_or_none(request.POST.get("source_book_id"))).first()
+    try:
+        page_count = max(int(request.POST.get("page_count") or 0), 0)
+    except (TypeError, ValueError):
+        page_count = 0
+
+    if kind == SheetDocument.Kind.COVER:
+        # One cover per sheet: drop the old row (and its files) first.
+        for old in SheetDocument.objects.filter(sheet=sheet, kind=SheetDocument.Kind.COVER):
+            old.pdf.delete(save=False)
+            if old.thumbnail:
+                old.thumbnail.delete(save=False)
+            old.delete()
+        next_order = 1
+    else:
+        next_order = (
+            SheetDocument.objects.filter(sheet=sheet, kind=kind)
+            .aggregate(m=Max("display_order")).get("m") or 0
+        ) + 1
+
+    doc = SheetDocument.objects.create(
+        sheet=sheet,
+        kind=kind,
+        title=(request.POST.get("title") or "").strip()[:255],
+        pdf=upload,
+        page_count=page_count,
+        source_book=book,
+        source_url=(request.POST.get("source_url") or "").strip()[:2000],
+        display_order=next_order,
+        uploaded_by=request.user if request.user.is_authenticated else None,
+    )
+
+    thumb = request.FILES.get("thumbnail")
+    if thumb and (thumb.content_type or "").startswith("image/"):
+        doc.thumbnail.save(f"{sheet.code or sheet.id}-{doc.id}.png", thumb, save=True)
+
+    # The cover thumbnail doubles as the sheet's profile picture, so the
+    # bookshelf and Sheet Inventory show the same image.
+    if kind == SheetDocument.Kind.COVER and doc.thumbnail:
+        if sheet.cover_image:
+            sheet.cover_image.delete(save=False)
+        doc.thumbnail.open("rb")
+        sheet.cover_image.save(f"{sheet.code or sheet.id}.png", doc.thumbnail.file, save=True)
+
+    return JsonResponse({"ok": True, "document": _sheet_document_payload(doc)})
+
+
+@require_POST
+@login_required
+def sheet_document_delete(request: HttpRequest, pk: int) -> JsonResponse:
+    doc = SheetDocument.objects.filter(pk=pk).select_related("sheet").first()
+    if not doc:
+        return JsonResponse({"ok": False, "message": "ไม่พบไฟล์นี้"}, status=404)
+    doc.pdf.delete(save=False)
+    if doc.thumbnail:
+        doc.thumbnail.delete(save=False)
+    doc.delete()
+    return JsonResponse({"ok": True})
+
+
+def _sheet_document_payload(doc: SheetDocument) -> dict:
+    return {
+        "id": doc.id,
+        "kind": doc.kind,
+        "kind_label": doc.get_kind_display(),
+        "name": doc.display_name,
+        "url": doc.pdf.url if doc.pdf else "",
+        "thumbnail": doc.thumbnail.url if doc.thumbnail else "",
+        "page_count": int(doc.page_count or 0),
+        "book": doc.source_book.title if doc.source_book_id else "",
+        "source_url": doc.source_url or "",
+    }
+
+
+@login_required
+def book_list(request: HttpRequest) -> HttpResponse:
+    """คลังหนังสือ -- profiles of the source books sheets are built from."""
+    if request.method == "POST":
+        action = (request.POST.get("action") or "").strip()
+
+        if action == "delete":
+            book = Book.objects.filter(id=_id_or_none(request.POST.get("book_id"))).first()
+            if book:
+                if book.cover_image:
+                    book.cover_image.delete(save=False)
+                book.delete()
+            return redirect("core:book_list")
+
+        code = (request.POST.get("code") or "").strip()
+        title = (request.POST.get("title") or "").strip()
+        if not code or not title:
+            return redirect(f"{reverse('core:book_list')}?error=required")
+
+        book = Book.objects.filter(id=_id_or_none(request.POST.get("book_id"))).first()
+        if book is None:
+            if Book.objects.filter(code__iexact=code).exists():
+                return redirect(f"{reverse('core:book_list')}?error=duplicate")
+            book = Book(code=code)
+        elif book.code.lower() != code.lower():
+            if Book.objects.filter(code__iexact=code).exclude(id=book.id).exists():
+                return redirect(f"{reverse('core:book_list')}?error=duplicate")
+            book.code = code
+
+        answer_location = (request.POST.get("answer_location") or "").strip()
+        if answer_location not in dict(Book.AnswerLocation.choices):
+            answer_location = Book.AnswerLocation.INCLUDED
+
+        book.title = title
+        book.subject = Subject.objects.filter(id=_id_or_none(request.POST.get("subject_id"))).first()
+        grade = (request.POST.get("grade_level") or "").strip()
+        book.grade_level = grade if grade in dict(Sheet.GradeLevel.choices) else ""
+        book.file_url = (request.POST.get("file_url") or "").strip()[:2000]
+        book.answer_location = answer_location
+        # A book that bundles its answers has no separate answer link to keep.
+        book.answer_url = (
+            (request.POST.get("answer_url") or "").strip()[:2000]
+            if answer_location == Book.AnswerLocation.SEPARATE else ""
+        )
+        book.note = (request.POST.get("note") or "").strip()
+        book.is_active = request.POST.get("is_active") == "on"
+        book.save()
+
+        cover = request.FILES.get("cover_image")
+        if cover:
+            if (cover.content_type or "").startswith("image/"):
+                if book.cover_image:
+                    book.cover_image.delete(save=False)
+                ext = ".png" if cover.content_type == "image/png" else ".jpg"
+                book.cover_image.save(f"{book.code}{ext}", cover, save=True)
+            else:
+                return redirect(f"{reverse('core:book_list')}?error=cover")
+
+        return redirect(f"{reverse('core:book_list')}?saved={book.id}")
+
+    q = (request.GET.get("q") or "").strip()
+    grade = (request.GET.get("grade") or "").strip()
+    books_qs = Book.objects.select_related("subject").all()
+    if q:
+        books_qs = books_qs.filter(
+            Q(code__icontains=q) | Q(title__icontains=q) | Q(subject__name__icontains=q)
+        )
+    if grade:
+        books_qs = books_qs.filter(grade_level=grade)
+
+    books = list(books_qs)
+    for b in books:
+        b.grade_label = _sheet_grade_label(b.grade_level)
+        b.sheet_count = b.sheets.count()
+
+    return render(request, "core/book_list.html", {
+        "books": books,
+        "subjects": Subject.objects.filter(is_active=True).order_by("name"),
+        "grade_choices": Sheet.GradeLevel.choices,
+        "answer_choices": Book.AnswerLocation.choices,
+        "q": q,
+        "grade": grade,
+        "error": request.GET.get("error", ""),
+        "saved_id": request.GET.get("saved", ""),
     })
 
 
@@ -2290,20 +2509,38 @@ def _attach_inventory_file_links(orders: list) -> None:
     order instead of relying on the order's own onedrive_url snapshot, which
     can go stale if the inventory link is added/changed after the order was
     created. Custom (non-inventory) documents have no Sheet to pull from, so
-    they keep using their own onedrive_url."""
+    they keep using their own onedrive_url.
+
+    Uploaded content PDFs (Sheet Inventory > ไฟล์ PDF ของชีท) are attached
+    too and take precedence in the UI: the shop downloads the file directly
+    instead of opening a link. The link stays as the fallback for sheets
+    that have not been uploaded yet."""
     sheet_ids = [o.sheet_id for o in orders if o.sheet_id]
     inv_map = {}
+    docs_by_sheet: dict[int, list] = defaultdict(list)
     if sheet_ids:
         inv_map = dict(
             SheetInventory.objects.filter(sheet_id__in=sheet_ids).values_list("sheet_id", "onedrive_url")
         )
+        for doc in (
+            SheetDocument.objects
+            .filter(sheet_id__in=sheet_ids, kind=SheetDocument.Kind.CONTENT)
+            .order_by("display_order", "id")
+        ):
+            docs_by_sheet[doc.sheet_id].append({
+                "name": doc.display_name,
+                "url": doc.pdf.url if doc.pdf else "",
+                "page_count": int(doc.page_count or 0),
+            })
     for o in orders:
         if o.sheet_id:
             o.file_url = inv_map.get(o.sheet_id) or ""
             o.file_url_is_custom = False
+            o.pdf_docs = docs_by_sheet.get(o.sheet_id, [])
         else:
             o.file_url = o.onedrive_url or ""
             o.file_url_is_custom = True
+            o.pdf_docs = []
 
 
 def _pending_print_orders_with_links() -> list:
@@ -6033,6 +6270,7 @@ _ADMIN_TOOL_DEFAULTS = [
     ("private", "c-rose",  "🎁", "ระบบโปรโมชั่น", "ดูโปรโมชั่นทั้งหมด เริ่มจากเพื่อนชวนเพื่อน ใครชวนใครบ้าง กี่คน ได้เครดิตเท่าไร", "/promotions/"),
     ("private", "c-teal",  "📦", "ระบบคลังชีทและส่งปรินท์ชีท", "สร้างชีท จัดการ stock สแกน QR ตัด/นับชีท สั่งปรินท์และตรวจรับชีทจากร้านปรินท์ ครบในหน้าเดียว", "/sheet-inventory/"),
     ("private", "c-sage",  "📤", "ระบบแจกชีท", "สแกน QR เพื่อแจกชีท ตัด stock ตอนกดบันทึก และดูประวัติ Sheet Allocation รายเด็ก/ราย class", "/sheet-allocation/"),
+    ("private", "c-lilac", "📚", "คลังหนังสือ", "บันทึกโปรไฟล์หนังสือต้นทางที่ใช้ทำชีท ชื่อ/รหัส/วิชา/ระดับชั้น ลิงก์ไฟล์ และรูปปก", "/books/"),
     ("private", "c-stone", "🔎", "Remaining Attendance", "เสิร์ชชื่อเด็ก ดูครั้งเรียนคงเหลือ คาดว่าจะครบคอร์สวันไหน ประวัติมา/ลา/ขาดล่าสุด และประวัติการชำระเงินต่อคอร์ส", "/remaining-attendance/"),
     ("private", "c-sage",  "💰", "รายรับรายจ่าย", "บันทึกค่าใช้จ่าย ค่าติวเตอร์ และ Export Excel", "/school-finance/"),
     ("private", "c-clay",  "📊", "วิเคราะห์รายได้-ต้นทุน-กำไร", "ดูกำไรรายห้อง ปรับสมมติฐานค่าสอน/รายได้ต่อคนได้เอง ปันส่วน fixed cost หาจุดคุ้มทุน และจำลอง what-if", "/revenue-analysis/"),

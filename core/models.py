@@ -237,6 +237,16 @@ class Sheet(models.Model):
         help_text="วางรูป (Ctrl+V) หรืออัปโหลดได้จากหน้า Sheet Inventory",
     )
 
+    source_book = models.ForeignKey(
+        "Book",
+        verbose_name="สร้างจากหนังสือเล่ม",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="sheets",
+        help_text="ใช้อ้างอิงย้อนหลังว่าชีทนี้ทำมาจากหนังสือเล่มไหน",
+    )
+
     is_active = models.BooleanField("เปิดใช้งาน", default=True)
 
     class Meta:
@@ -246,6 +256,149 @@ class Sheet(models.Model):
 
     def __str__(self) -> str:
         return f"{self.code} - {self.title}"
+
+
+# -----------------------
+# Book (คลังหนังสือ) - หนังสือต้นทางที่ใช้ทำชีท
+# -----------------------
+class Book(models.Model):
+    """A source book the school builds its sheets from.
+
+    Only the cover image is uploaded here; the book file itself lives
+    elsewhere and is referenced by link, since scanned books are far too
+    large to keep on the app's disk.
+    """
+
+    class AnswerLocation(models.TextChoices):
+        INCLUDED = "included", "รวมเฉลยในเล่ม"
+        SEPARATE = "separate", "มีเฉลยแยกเล่ม"
+
+    code = models.CharField("รหัสหนังสือ", max_length=50, unique=True)
+    title = models.CharField("ชื่อหนังสือ", max_length=255)
+    subject = models.ForeignKey(
+        Subject,
+        verbose_name="วิชา",
+        on_delete=models.PROTECT,
+        related_name="books",
+        null=True,
+        blank=True,
+    )
+    grade_level = models.CharField(
+        "ระดับชั้น",
+        max_length=20,
+        choices=Sheet.GradeLevel.choices,
+        blank=True,
+        default="",
+    )
+    file_url = models.URLField("ลิงก์ไฟล์หนังสือ", max_length=2000, blank=True)
+    answer_location = models.CharField(
+        "เฉลย",
+        max_length=20,
+        choices=AnswerLocation.choices,
+        default=AnswerLocation.INCLUDED,
+    )
+    answer_url = models.URLField(
+        "ลิงก์ไฟล์เฉลย",
+        max_length=2000,
+        blank=True,
+        help_text="ใช้เมื่อเลือก 'มีเฉลยแยกเล่ม'",
+    )
+    cover_image = models.ImageField(
+        "รูปปก",
+        upload_to="book_covers/",
+        blank=True,
+        null=True,
+        help_text="อัปโหลด JPG หรือ PNG ใช้เป็นรูปประจำหนังสือเล่มนี้",
+    )
+    note = models.TextField("หมายเหตุ", blank=True)
+    is_active = models.BooleanField("ใช้งาน", default=True)
+    created_at = models.DateTimeField("วันที่สร้าง", default=timezone.now)
+    updated_at = models.DateTimeField("อัปเดตล่าสุด", auto_now=True)
+
+    class Meta:
+        verbose_name = "Book"
+        verbose_name_plural = "Books"
+        ordering = ("grade_level", "subject__name", "code")
+
+    def __str__(self) -> str:
+        return f"{self.code} - {self.title}"
+
+
+# -----------------------
+# SheetDocument (ไฟล์ PDF ของชีท: ปก / เนื้อหา / เฉลย)
+# -----------------------
+class SheetDocument(models.Model):
+    """A PDF attached to a sheet.
+
+    A sheet has at most one cover but may have several content and answer
+    files, so they all live in one table keyed by `kind` rather than as
+    separate fields on Sheet. The cover also carries a PNG thumbnail
+    rendered from page 1 in the browser at upload time, so the tutor
+    bookshelf can show covers without rendering a PDF per tile.
+    """
+
+    class Kind(models.TextChoices):
+        COVER = "cover", "ปก"
+        CONTENT = "content", "เนื้อหา"
+        ANSWER = "answer", "เฉลย"
+
+    sheet = models.ForeignKey(
+        Sheet,
+        verbose_name="ชีท",
+        on_delete=models.CASCADE,
+        related_name="documents",
+    )
+    kind = models.CharField("ประเภทไฟล์", max_length=20, choices=Kind.choices)
+    title = models.CharField(
+        "ชื่อไฟล์ที่แสดง",
+        max_length=255,
+        blank=True,
+        help_text="เว้นว่างได้ ระบบจะใช้ชื่อไฟล์เดิม",
+    )
+    pdf = models.FileField("ไฟล์ PDF", upload_to="sheet_documents/")
+    thumbnail = models.ImageField(
+        "รูปย่อหน้าแรก",
+        upload_to="sheet_doc_thumbs/",
+        blank=True,
+        null=True,
+        help_text="สร้างอัตโนมัติจากหน้าแรกของ PDF ตอนอัปโหลด",
+    )
+    page_count = models.PositiveIntegerField("จำนวนหน้า", default=0)
+    source_book = models.ForeignKey(
+        Book,
+        verbose_name="มาจากหนังสือเล่ม",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="sheet_documents",
+    )
+    source_url = models.URLField("ลิงก์อ้างอิง", max_length=2000, blank=True)
+    display_order = models.PositiveIntegerField("ลำดับ", default=1)
+    uploaded_by = models.ForeignKey(
+        "auth.User",
+        verbose_name="ผู้อัปโหลด",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="sheet_documents",
+    )
+    created_at = models.DateTimeField("วันที่อัปโหลด", default=timezone.now)
+    updated_at = models.DateTimeField("อัปเดตล่าสุด", auto_now=True)
+
+    class Meta:
+        verbose_name = "Sheet Document"
+        verbose_name_plural = "Sheet Documents"
+        ordering = ("sheet__code", "kind", "display_order", "id")
+
+    def __str__(self) -> str:
+        return f"{self.sheet.code} | {self.get_kind_display()} | {self.display_name}"
+
+    @property
+    def display_name(self) -> str:
+        if self.title:
+            return self.title
+        name = (self.pdf.name or "").rsplit("/", 1)[-1]
+        return name or self.get_kind_display()
 
 
 # -----------------------

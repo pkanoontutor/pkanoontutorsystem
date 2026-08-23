@@ -48,6 +48,20 @@
 <body>
   <div class="page">
     <div class="editor">
+      <div class="btnrow">
+        {% if notice.is_sent_to_parent %}
+          <form method="post" action="{% url 'core:course_renewal_notice_unmark_sent' notice.id %}" style="flex:1;">
+            {% csrf_token %}
+            <button class="btn red" type="submit" style="width:100%;">ยกเลิกสถานะส่งแล้ว</button>
+          </form>
+        {% else %}
+          <form method="post" action="{% url 'core:course_renewal_notice_mark_sent' notice.id %}" style="flex:1;">
+            {% csrf_token %}
+            <button class="btn green" type="submit" style="width:100%;">ส่งแจ้งผู้ปกครองแล้ว และกลับหน้า list</button>
+          </form>
+        {% endif %}
+      </div>
+
       <form method="post" id="editForm" style="display:grid;gap:12px;">
         {% csrf_token %}
         <div>
@@ -158,27 +172,13 @@
 
         <button class="btn primary" type="submit">บันทึกข้อมูลใบแจ้ง</button>
       </form>
-
-      <div class="btnrow">
-        {% if notice.is_sent_to_parent %}
-          <form method="post" action="{% url 'core:course_renewal_notice_unmark_sent' notice.id %}" style="flex:1;">
-            {% csrf_token %}
-            <button class="btn red" type="submit" style="width:100%;">ยกเลิกสถานะส่งแล้ว</button>
-          </form>
-        {% else %}
-          <form method="post" action="{% url 'core:course_renewal_notice_mark_sent' notice.id %}" style="flex:1;">
-            {% csrf_token %}
-            <button class="btn green" type="submit" style="width:100%;">ส่งแจ้งผู้ปกครองแล้ว และกลับหน้า list</button>
-          </form>
-        {% endif %}
-      </div>
     </div>
 
     <div class="preview-wrap">
       <div class="toolbar">
         <button class="btn blue" type="button" onclick="openImage()">Open Image in New Tab</button>
         <button class="btn green" type="button" onclick="copyImage()">Copy Image</button>
-        <button class="btn soft" type="button" onclick="downloadImage()">Download PNG</button>
+        <button class="btn soft" type="button" onclick="downloadImage()">Save Image</button>
       </div>
 
       <div class="receipt" id="receiptCard">
@@ -345,28 +345,74 @@
       const el = document.getElementById("receiptCard");
       return await html2canvas(el, {scale: 3, backgroundColor: "#ffffff", useCORS: true});
     }
-    async function openImage() {
-      const canvas = await makeCanvas();
-      const url = canvas.toDataURL("image/png");
-      const win = window.open();
-      win.document.write('<img src="' + url + '" style="max-width:100%;height:auto;">');
+    function canvasToBlob(canvas) {
+      return new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
     }
+
+    // Opens the window synchronously (in direct response to the click) and
+    // fills it in once the canvas is ready -- iOS/desktop Safari block
+    // window.open() as an unsolicited popup if it happens after an await.
+    function openImage() {
+      const win = window.open("", "_blank");
+      makeCanvas().then((canvas) => {
+        const url = canvas.toDataURL("image/png");
+        // Browsers block navigating the current tab to a data: URL (an
+        // anti-phishing restriction), so if the popup didn't open there's
+        // nothing left to fall back to except asking for popups to be allowed.
+        if (win && !win.closed) {
+          win.document.write('<img src="' + url + '" style="max-width:100%;height:auto;">');
+        } else {
+          alert("เบราว์เซอร์บล็อกการเปิดแท็บใหม่ กรุณาอนุญาต popup สำหรับเว็บนี้แล้วลองใหม่ หรือใช้ปุ่ม Save Image แทนครับ");
+        }
+      });
+    }
+
+    // iOS Safari ignores the `download` attribute on generated images, so
+    // there's no native "Download" there -- the share sheet (which offers
+    // "Save Image") is the actual save path on iOS, tried first here. Falls
+    // back to the classic <a download> link for browsers without Web Share
+    // (desktop Chrome/Firefox etc., where it already works fine).
     async function downloadImage() {
       const canvas = await makeCanvas();
+      const filename = "course-renewal-notice-{{ notice.id }}.png";
+      if (navigator.canShare && navigator.share) {
+        try {
+          const blob = await canvasToBlob(canvas);
+          const file = new File([blob], filename, {type: "image/png"});
+          if (navigator.canShare({files: [file]})) {
+            await navigator.share({files: [file]});
+            return;
+          }
+        } catch (e) {
+          if (e && e.name === "AbortError") return; // user cancelled the share sheet
+        }
+      }
       const a = document.createElement("a");
       a.href = canvas.toDataURL("image/png");
-      a.download = "course-renewal-notice-{{ notice.id }}.png";
+      a.download = filename;
+      document.body.appendChild(a);
       a.click();
+      a.remove();
     }
-    async function copyImage() {
+
+    // Safari (iOS and desktop) only allows navigator.clipboard.write() when
+    // called synchronously inside the click handler, so the ClipboardItem is
+    // built from an unresolved Blob promise here rather than awaiting the
+    // canvas first -- Safari's documented "future value" pattern for this.
+    function copyImage() {
+      if (!navigator.clipboard || !window.ClipboardItem) {
+        alert("เบราว์เซอร์นี้ไม่รองรับ Copy Image โดยตรง ให้ใช้ Open Image หรือ Save Image แทนครับ");
+        return;
+      }
       try {
-        const canvas = await makeCanvas();
-        canvas.toBlob(async (blob) => {
-          await navigator.clipboard.write([new ClipboardItem({"image/png": blob})]);
+        const item = new ClipboardItem({"image/png": makeCanvas().then(canvasToBlob)});
+        navigator.clipboard.write([item]).then(() => {
           alert("Copy รูปใบแจ้งแล้วครับ");
+        }).catch((err) => {
+          alert("Copy ไม่สำเร็จ ลองใช้ Save Image แทนครับ" + (err && err.message ? ("\n(" + err.message + ")") : ""));
         });
       } catch (e) {
-        alert("Browser นี้อาจไม่รองรับ Copy Image โดยตรง ให้ใช้ Open Image หรือ Download PNG แทนครับ");
+        alert("เบราว์เซอร์นี้ไม่รองรับ Copy Image โดยตรง ให้ใช้ Open Image หรือ Save Image แทนครับ");
       }
     }
   </script>

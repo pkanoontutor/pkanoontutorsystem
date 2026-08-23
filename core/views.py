@@ -59,6 +59,7 @@ from .models import (
     TestParticipant,
     TestScore,
 )
+from .sheet_pdf_import import attach_document, sync_sheet_total_pages
 
 
 def _parse_date(s: str | None) -> date:
@@ -2163,9 +2164,9 @@ def sheet_document_upload(request: HttpRequest, pk: int) -> JsonResponse:
     """Attach a PDF (ปก / เนื้อหา / เฉลย) to a sheet.
 
     A sheet keeps at most one cover, so re-uploading one replaces the
-    previous file; content and answer PDFs accumulate. The cover's PNG
-    thumbnail is rendered from page 1 by pdf.js in the browser and posted
-    alongside, which avoids putting a PDF rasteriser on the server.
+    previous file; content and answer PDFs accumulate. Page count and (for
+    a ปก) the PNG thumbnail are rendered server-side via pypdfium2 -- fast
+    even on a 100MB+ file -- so the client only needs to POST the raw PDF.
     """
     sheet = get_object_or_404(Sheet, pk=pk)
     kind = (request.POST.get("kind") or "").strip()
@@ -2180,77 +2181,25 @@ def sheet_document_upload(request: HttpRequest, pk: int) -> JsonResponse:
         return JsonResponse({"ok": False, "message": "รองรับเฉพาะไฟล์ PDF"}, status=400)
 
     book = Book.objects.filter(id=_id_or_none(request.POST.get("source_book_id"))).first()
-    try:
-        page_count = max(int(request.POST.get("page_count") or 0), 0)
-    except (TypeError, ValueError):
-        page_count = 0
 
-    if kind == SheetDocument.Kind.COVER:
-        # One cover per sheet: drop the old row (and its files) first.
-        for old in SheetDocument.objects.filter(sheet=sheet, kind=SheetDocument.Kind.COVER):
-            old.pdf.delete(save=False)
-            if old.thumbnail:
-                old.thumbnail.delete(save=False)
-            old.delete()
-        next_order = 1
-    else:
-        next_order = (
-            SheetDocument.objects.filter(sheet=sheet, kind=kind)
-            .aggregate(m=Max("display_order")).get("m") or 0
-        ) + 1
-
-    doc = SheetDocument.objects.create(
-        sheet=sheet,
-        kind=kind,
-        title=(request.POST.get("title") or "").strip()[:255],
-        pdf=upload,
-        page_count=page_count,
+    doc = attach_document(
+        sheet, kind, upload,
+        (request.POST.get("title") or upload.name or "").strip() or upload.name,
         source_book=book,
-        source_url=(request.POST.get("source_url") or "").strip()[:2000],
-        display_order=next_order,
+        source_url=(request.POST.get("source_url") or "").strip(),
         uploaded_by=request.user if request.user.is_authenticated else None,
     )
-
-    thumb = request.FILES.get("thumbnail")
-    if thumb and (thumb.content_type or "").startswith("image/"):
-        doc.thumbnail.save(f"{sheet.code or sheet.id}-{doc.id}.png", thumb, save=True)
-
-    # The cover thumbnail doubles as the sheet's profile picture, so the
-    # bookshelf and Sheet Inventory show the same image.
-    if kind == SheetDocument.Kind.COVER and doc.thumbnail:
-        if sheet.cover_image:
-            sheet.cover_image.delete(save=False)
-        doc.thumbnail.open("rb")
-        sheet.cover_image.save(f"{sheet.code or sheet.id}.png", doc.thumbnail.file, save=True)
 
     # The uploaded content file is now the authoritative page count -- it is
     # the thing tutors actually page through -- so the sheet's own total is
     # brought in line with it. Several content files add up.
-    sheet_pages = _sync_sheet_total_pages(sheet)
+    sheet_pages = sync_sheet_total_pages(sheet)
 
     return JsonResponse({
         "ok": True,
         "document": _sheet_document_payload(doc),
         "sheet_total_pages": sheet_pages,
     })
-
-
-def _sync_sheet_total_pages(sheet: Sheet) -> int:
-    """Set Sheet.total_pages from its uploaded content PDFs.
-
-    Returns the sheet's page total (unchanged if nothing countable was
-    uploaded, so a PDF whose page count could not be read never wipes a
-    figure that was entered by hand).
-    """
-    total = (
-        SheetDocument.objects
-        .filter(sheet=sheet, kind=SheetDocument.Kind.CONTENT)
-        .aggregate(n=Sum("page_count")).get("n") or 0
-    )
-    if total and total != int(sheet.total_pages or 0):
-        sheet.total_pages = total
-        sheet.save(update_fields=["total_pages"])
-    return int(sheet.total_pages or 0)
 
 
 @require_POST
@@ -2265,7 +2214,7 @@ def sheet_document_delete(request: HttpRequest, pk: int) -> JsonResponse:
     if doc.thumbnail:
         doc.thumbnail.delete(save=False)
     doc.delete()
-    sheet_pages = _sync_sheet_total_pages(sheet) if was_content else int(sheet.total_pages or 0)
+    sheet_pages = sync_sheet_total_pages(sheet) if was_content else int(sheet.total_pages or 0)
     return JsonResponse({"ok": True, "sheet_total_pages": sheet_pages})
 
 

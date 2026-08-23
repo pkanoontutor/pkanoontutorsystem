@@ -3,6 +3,7 @@ from collections import Counter, OrderedDict, defaultdict
 
 import json
 import csv
+import os
 import re
 from datetime import date, timedelta, datetime
 from decimal import Decimal
@@ -59,7 +60,16 @@ from .models import (
     TestParticipant,
     TestScore,
 )
-from .sheet_pdf_import import attach_document, sync_sheet_total_pages
+from .sheet_pdf_import import (
+    attach_document,
+    attach_document_from_path,
+    classify,
+    find_sheet_folders,
+    render_pdf,
+    safe_extract_zip,
+    sheet_code_from_folder,
+    sync_sheet_total_pages,
+)
 
 
 def _parse_date(s: str | None) -> date:
@@ -2229,6 +2239,126 @@ def _sheet_document_payload(doc: SheetDocument) -> dict:
         "page_count": int(doc.page_count or 0),
         "book": doc.source_book.title if doc.source_book_id else "",
         "source_url": doc.source_url or "",
+    }
+
+
+@login_required
+def sheet_bulk_pdf_import(request: HttpRequest) -> HttpResponse:
+    """Upload a .zip of the sheet archive (whole tree, one grade, or any
+    subset -- one folder per sheet, named with the sheet code first) and
+    import every PDF inside in one go, using the exact same classification
+    and storage as the CLI importer and the per-sheet upload popup."""
+    result = None
+    if request.method == "POST":
+        upload = request.FILES.get("zip_file")
+        if not upload:
+            result = {"error": "กรุณาเลือกไฟล์ .zip"}
+        elif not (upload.name or "").lower().endswith(".zip"):
+            result = {"error": "รองรับเฉพาะไฟล์ .zip"}
+        else:
+            result = _run_bulk_pdf_import(upload, request.user)
+    return render(request, "core/sheet_bulk_pdf_import.html", {"result": result})
+
+
+def _run_bulk_pdf_import(upload, user) -> dict:
+    import shutil
+    import tempfile
+    import zipfile
+
+    from django.conf import settings
+
+    base_tmp = getattr(settings, "FILE_UPLOAD_TEMP_DIR", None) or tempfile.gettempdir()
+    work_dir = tempfile.mkdtemp(prefix="sheetzip_", dir=base_tmp)
+    extract_dir = os.path.join(work_dir, "extracted")
+
+    stats = {
+        "folders": 0, "matched": 0, "no_sheet": 0,
+        "created": 0, "skipped": 0, "unreadable": 0, "dupes": 0, "errors": 0,
+    }
+    missing_codes: list[str] = []
+    matched_rows: list[dict] = []
+    error_log: list[str] = []
+
+    try:
+        # A zip that exceeded the in-memory threshold already sits on disk
+        # as a TemporaryUploadedFile -- reuse that path instead of copying
+        # a potentially multi-GB file a second time.
+        temp_path = getattr(upload, "temporary_file_path", None)
+        if callable(temp_path):
+            zip_path = temp_path()
+        else:
+            zip_path = os.path.join(work_dir, "upload.zip")
+            with open(zip_path, "wb") as fh:
+                for chunk in upload.chunks():
+                    fh.write(chunk)
+
+        try:
+            safe_extract_zip(zip_path, extract_dir)
+        except (zipfile.BadZipFile, ValueError) as exc:
+            return {"error": f"เปิดไฟล์ซิปไม่สำเร็จ: {exc}"}
+
+        folders = find_sheet_folders(extract_dir)
+        known = {s.code.upper(): s for s in Sheet.objects.all()}
+        touched_sheets: set[int] = set()
+
+        for folder in folders:
+            stats["folders"] += 1
+            code = sheet_code_from_folder(os.path.basename(folder))
+            sheet = known.get(code.upper())
+            pdfs = sorted(f for f in os.listdir(folder) if f.lower().endswith(".pdf"))
+
+            if not sheet:
+                stats["no_sheet"] += 1
+                missing_codes.append(code)
+                continue
+
+            stats["matched"] += 1
+            row = {"code": code, "title": sheet.title, "files": []}
+            seen_sizes: dict[tuple[str, int], str] = {}
+
+            for fname in pdfs:
+                path = os.path.join(folder, fname)
+                size = os.path.getsize(path)
+                pages, _ = render_pdf(path, thumbnail=False)
+                kind, _why = classify(fname, pages)
+                if pages == 0:
+                    stats["unreadable"] += 1
+
+                if SheetDocument.objects.filter(sheet=sheet, kind=kind, title=fname).exists():
+                    stats["skipped"] += 1
+                    row["files"].append({"name": fname, "kind": kind, "status": "skip"})
+                    continue
+
+                if seen_sizes.get((kind, size)):
+                    stats["dupes"] += 1
+                seen_sizes[(kind, size)] = fname
+
+                try:
+                    attach_document_from_path(
+                        sheet, kind, path, fname, page_count=pages, uploaded_by=user,
+                    )
+                    touched_sheets.add(sheet.id)
+                    stats["created"] += 1
+                    row["files"].append({"name": fname, "kind": kind, "status": "ok", "pages": pages})
+                except Exception as exc:
+                    stats["errors"] += 1
+                    error_log.append(f"{code} / {fname}: {exc}")
+                    row["files"].append({"name": fname, "kind": kind, "status": "error"})
+
+            matched_rows.append(row)
+
+        for sid in touched_sheets:
+            sheet = Sheet.objects.filter(id=sid).first()
+            if sheet:
+                sync_sheet_total_pages(sheet)
+    finally:
+        shutil.rmtree(work_dir, ignore_errors=True)
+
+    return {
+        "stats": stats,
+        "missing_codes": sorted(set(missing_codes)),
+        "matched_rows": matched_rows,
+        "errors": error_log,
     }
 
 

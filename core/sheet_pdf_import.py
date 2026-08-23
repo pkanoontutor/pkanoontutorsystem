@@ -205,6 +205,25 @@ def attach_document_from_path(
         return attach_document(sheet, kind, File(fh), display_filename, **kwargs)
 
 
+def safe_extract_zip(zip_path: str, dest_dir: str) -> None:
+    """Extract a zip file, rejecting anything that would escape dest_dir
+    (zip-slip) or carries an absolute/traversal path. Validates every
+    member before extracting any of them."""
+    import zipfile
+
+    os.makedirs(dest_dir, exist_ok=True)
+    dest_real = os.path.realpath(dest_dir)
+    with zipfile.ZipFile(zip_path) as zf:
+        for info in zf.infolist():
+            name = info.filename.replace("\\", "/")
+            if name.startswith("/") or ".." in name.split("/"):
+                raise ValueError(f"ไฟล์ในซิปมีชื่อที่ไม่ปลอดภัย: {info.filename}")
+            target = os.path.realpath(os.path.join(dest_dir, name))
+            if target != dest_real and not target.startswith(dest_real + os.sep):
+                raise ValueError(f"ไฟล์ในซิปพยายามออกนอกโฟลเดอร์ที่กำหนด: {info.filename}")
+        zf.extractall(dest_dir)
+
+
 def sync_sheet_total_pages(sheet: Sheet) -> int:
     """Set Sheet.total_pages from its uploaded content PDFs (several add
     up). Returns the sheet's page total unchanged if nothing countable is

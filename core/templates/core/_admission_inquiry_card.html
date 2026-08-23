@@ -22,6 +22,7 @@
       <form method="post" action="{% url 'core:admission_report_update' %}">{% csrf_token %}<input type="hidden" name="inquiry_id" value="{{ i.id }}"><input type="hidden" name="sheet_prepared" value="{% if i.sheet_prepared %}no{% else %}yes{% endif %}"><button type="submit" class="quick-btn">📄</button></form>
       {% if i.request_type == 'trial' %}<form method="post" action="{% url 'core:admission_report_update' %}">{% csrf_token %}<input type="hidden" name="inquiry_id" value="{{ i.id }}"><input type="hidden" name="trial_attended" value="yes"><button type="submit" class="quick-btn">✅</button></form>{% endif %}
       <form method="post" action="{% url 'core:admission_report_update' %}">{% csrf_token %}<input type="hidden" name="inquiry_id" value="{{ i.id }}"><input type="hidden" name="is_completed" value="{% if i.is_completed %}no{% else %}yes{% endif %}"><button type="submit" class="quick-btn">🏁</button></form>
+      {% if not i.is_completed %}<a class="quick-btn" style="text-decoration:none;display:inline-flex;align-items:center;justify-content:center;" title="สร้างใบแจ้งชำระค่าคอร์ส" href="{% url 'core:new_student_payment_notice_create' i.id %}">🆕</a>{% endif %}
     </div>
     <div class="detail-grid">
       <div><b>วันเรียน:</b> {{ i.first_lesson_date|date:"d/m/Y" }}</div><div><b>รอบ:</b> {{ i.get_preferred_time_slot_display }}</div><div><b>GPA:</b> {{ i.latest_gpa|default:"-" }}</div><div><b>ลงทะเบียน:</b> {{ i.created_at|date:"d/m/Y H:i" }}</div>

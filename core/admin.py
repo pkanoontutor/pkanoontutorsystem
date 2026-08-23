@@ -28,6 +28,7 @@ from .models import (
     TutorPayrollEntry,
     CoursePayment,
     CourseRenewalNotice,
+    NewStudentPaymentNotice,
     TeachingTutor,
     ScheduleRoom,
     ScheduleExamCountdown,
@@ -849,6 +850,40 @@ class CourseRenewalNoticeAdmin(admin.ModelAdmin):
         "package_20_net_price",
         "package_30_net_price",
         "installment_remaining_amount",
+    )
+    ordering = ("-created_at",)
+
+
+@admin.register(NewStudentPaymentNotice)
+class NewStudentPaymentNoticeAdmin(admin.ModelAdmin):
+    list_display = (
+        "created_at",
+        "nickname",
+        "first_name",
+        "last_name",
+        "school_name",
+        "grade_level",
+        "target_class",
+        "admission_inquiry",
+        "is_sent_to_parent",
+        "sent_to_parent_at",
+    )
+    list_filter = ("grade_level", "is_sent_to_parent", "target_class")
+    search_fields = (
+        "nickname",
+        "first_name",
+        "last_name",
+        "school_name",
+        "contact_phone",
+        "admission_inquiry__nickname",
+    )
+    autocomplete_fields = ("admission_inquiry", "target_class", "created_by", "sent_to_parent_by")
+    readonly_fields = (
+        "created_at",
+        "updated_at",
+        "package_10_net_price",
+        "package_20_net_price",
+        "package_30_net_price",
     )
     ordering = ("-created_at",)
 

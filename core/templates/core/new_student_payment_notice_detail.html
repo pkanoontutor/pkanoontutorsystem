@@ -1,0 +1,220 @@
+{% load static %}
+{% load humanize %}
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>ใบแจ้งชำระค่าคอร์สนักเรียนใหม่ {{ notice.id }}</title>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    *{box-sizing:border-box}
+    body{margin:0;background:#f5f3ff;font-family:"IBM Plex Sans Thai",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:#0f172a}
+    .page{min-height:100vh;padding:14px;display:grid;gap:14px;grid-template-columns:minmax(320px,430px) minmax(360px,520px);justify-content:center;align-items:start}
+    .editor,.receipt{background:#fff;border-radius:26px;box-shadow:0 14px 32px rgba(15,23,42,.16);border:1px solid rgba(255,255,255,.9)}
+    .editor{padding:16px;display:grid;gap:12px;position:sticky;top:12px}
+    .editor h1{font-size:20px;margin:0;color:#0f172a}.hint{font-size:12px;color:#64748b;line-height:1.45;font-weight:800}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.field{display:flex;flex-direction:column;gap:5px}.field label{font-size:11px;font-weight:1000;color:#334155;text-transform:uppercase;letter-spacing:.04em}
+    input,textarea,select{border:1px solid #e2e8f0;border-radius:13px;padding:10px;font-weight:800;background:#fff;width:100%;font-family:inherit}
+    textarea{min-height:88px;resize:vertical}.pkg-edit{border:1px solid #e2e8f0;background:#f8fafc;border-radius:16px;padding:10px;display:grid;gap:8px}
+    .pkg-title{font-size:13px;font-weight:1000;color:#0f172a}
+    .btnrow{display:flex;gap:8px;flex-wrap:wrap}.btn{border:0;border-radius:999px;padding:11px 15px;font-weight:1000;cursor:pointer;background:#0f172a;color:#fff;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:6px;line-height:1.2}
+    .btn.icon{width:38px;height:38px;padding:0;font-size:18px}.btn.primary{background:#7c3aed}.btn.soft{background:#fff;color:#0f172a;border:1px solid #cbd5e1}.btn.green{background:#16a34a}.btn.red{background:#dc2626}.btn.blue{background:#2563eb}
+    .statusbox{border-radius:18px;padding:12px;border:1px solid #e2e8f0;background:#f8fafc;font-size:13px;font-weight:900;line-height:1.5}.statusbox.sent{background:#dcfce7;border-color:#86efac;color:#166534}.statusbox.unsent{background:#fffbeb;border-color:#fde68a;color:#92400e}
+    .preview-wrap{display:grid;gap:10px;justify-items:center}.toolbar{width:min(100%,520px);display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+    .receipt{width:440px;max-width:100%;padding:20px;background:#fff}
+    .top{text-align:center;border-bottom:2px solid #e2e8f0;padding-bottom:12px}.logo{max-height:74px;max-width:190px;object-fit:contain}.doc{font-size:24px;font-weight:1000;margin-top:8px;color:#7c3aed}.school{font-size:13px;font-weight:900;color:#475569;margin-top:3px}
+    .student-card{margin-top:12px;background:linear-gradient(135deg,#faf5ff,#f5f3ff);border:1px solid #e9d5ff;border-radius:20px;padding:12px;display:grid;gap:7px}.student-name{font-size:20px;font-weight:1000;color:#0f172a;line-height:1.25}.meta{font-size:12px;color:#475569;font-weight:900;line-height:1.5}
+    .date-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}.date-box{border-radius:18px;padding:11px;text-align:center;background:#eff6ff;border:1px solid #bfdbfe}.date-box .k{font-size:11px;font-weight:1000;text-transform:uppercase;color:#1d4ed8}.date-box .v{font-size:15px;font-weight:1000;margin-top:4px}
+    .packages{display:grid;gap:8px;margin-top:12px}.pkg{border-radius:18px;border:1px solid #e2e8f0;padding:11px;background:#f8fafc}.pkg.blue{background:#eff6ff;border-color:#bfdbfe}.pkg.green{background:#f0fdf4;border-color:#bbf7d0}.pkg.purple{background:#f5f3ff;border-color:#ddd6fe}.pkg-head{display:flex;justify-content:space-between;gap:8px;align-items:center}.pkg-name{font-weight:1000;font-size:15px}.net{font-size:20px;font-weight:1000;color:#15803d}.price-line{display:flex;justify-content:space-between;gap:8px;font-size:12px;font-weight:900;color:#475569;margin-top:5px}.full{text-decoration:line-through;color:#94a3b8}.discount{color:#dc2626}
+    .qr-zone{margin-top:12px;display:grid;grid-template-columns:130px 1fr;gap:12px;align-items:center;background:#f8fafc;border:1px solid #e2e8f0;border-radius:20px;padding:12px}.qr{width:130px;height:130px;object-fit:contain;background:#fff;border-radius:16px;padding:6px}.qr-title{font-size:15px;font-weight:1000}.qr-sub{font-size:12px;color:#64748b;font-weight:800;line-height:1.45;margin-top:4px}
+    .note{margin-top:12px;border-radius:18px;background:#faf5ff;border:1px solid #e9d5ff;padding:12px;color:#6b21a8;font-size:13px;font-weight:900;line-height:1.55}.foot{text-align:center;margin-top:12px;color:#64748b;font-size:11px;font-weight:800}
+    @media(max-width:980px){.page{grid-template-columns:1fr}.editor{position:static}.receipt{width:min(100%,440px)}.btn{flex:1}.btn.icon{flex:0 0 38px}}
+    @media(max-width:480px){.page{padding:8px}.editor{border-radius:20px;padding:12px}.receipt{border-radius:0;width:100%;padding:16px}.toolbar{position:sticky;top:6px;z-index:5}.date-row{grid-template-columns:1fr}.qr-zone{grid-template-columns:1fr;justify-items:center;text-align:center}.grid{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="editor">
+      <form method="post" id="editForm" style="display:grid;gap:12px;">
+        {% csrf_token %}
+        <div>
+          <h1>🆕 ใบแจ้งชำระค่าคอร์สนักเรียนใหม่</h1>
+          <div class="hint">แก้ไขข้อมูลด้านล่างได้อิสระ (ไม่กระทบใบสมัครต้นทาง) จากนั้นกดบันทึก ภาพ preview ด้านขวาจะอัปเดตหลังบันทึก</div>
+        </div>
+
+        {% if notice.is_sent_to_parent %}
+          <div class="statusbox sent">✅ ส่งแจ้งผู้ปกครองแล้ว<br>วันที่ส่ง: {{ notice.sent_to_parent_at|date:"d/m/Y H:i" }}</div>
+        {% else %}
+          <div class="statusbox unsent">⏳ ยังไม่ได้กดส่งแจ้งผู้ปกครอง</div>
+        {% endif %}
+
+        <div class="btnrow">
+          <a class="btn soft" href="{% url 'core:new_student_payment_notice_list' %}">← กลับหน้า list</a>
+          {% if admission_inquiry_admin_url %}<a class="btn icon soft" title="ใบสมัครอ้างอิง" href="{{ admission_inquiry_admin_url }}">📋</a>{% endif %}
+        </div>
+
+        {% if create_receipt_url %}
+          <a class="btn green" href="{{ create_receipt_url }}">💳 ผู้ปกครองจ่ายแล้ว → ไปออกใบเสร็จ/สร้าง Enrollment</a>
+        {% endif %}
+
+        <div class="grid">
+          <div class="field"><label>ชื่อเล่น</label><input name="nickname" value="{{ notice.nickname }}"></div>
+          <div class="field"><label>โรงเรียน</label><input name="school_name" value="{{ notice.school_name }}"></div>
+          <div class="field"><label>ชื่อจริง</label><input name="first_name" value="{{ notice.first_name }}"></div>
+          <div class="field"><label>นามสกุล</label><input name="last_name" value="{{ notice.last_name }}"></div>
+          <div class="field"><label>เบอร์ติดต่อ</label><input name="contact_phone" value="{{ notice.contact_phone }}"></div>
+          <div class="field">
+            <label>ระดับชั้น</label>
+            <select name="grade_level">
+              <option value="">— ไม่ระบุ —</option>
+              {% for value,label in grade_choices %}<option value="{{ value }}" {% if notice.grade_level == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+            </select>
+          </div>
+        </div>
+
+        <div class="grid">
+          <div class="field">
+            <label>Class ที่คาดว่าจะเข้าเรียน</label>
+            <select name="target_class_id">
+              <option value="">— ไม่ระบุ —</option>
+              {% for c in classes %}<option value="{{ c.id }}" {% if notice.target_class_id == c.id %}selected{% endif %}>{{ c.name }} ({{ c.get_time_slot_display }})</option>{% endfor %}
+            </select>
+          </div>
+          <div class="field">
+            <label>วันที่เริ่มเรียนวันแรก</label>
+            <input type="date" name="first_lesson_date" value="{{ notice.first_lesson_date|date:'Y-m-d' }}">
+          </div>
+        </div>
+
+        <div class="pkg-edit">
+          <div class="pkg-title">แพ็กเกจ 10 สัปดาห์</div>
+          <div class="grid">
+            <div class="field"><label>ราคาเต็ม</label><input name="package_10_full_price" value="{{ notice.package_10_full_price }}"></div>
+            <div class="field"><label>ส่วนลด</label><input name="package_10_discount" value="{{ notice.package_10_discount }}"></div>
+          </div>
+        </div>
+        <div class="pkg-edit">
+          <div class="pkg-title">แพ็กเกจ 20 สัปดาห์</div>
+          <div class="grid">
+            <div class="field"><label>ราคาเต็ม</label><input name="package_20_full_price" value="{{ notice.package_20_full_price }}"></div>
+            <div class="field"><label>ส่วนลด</label><input name="package_20_discount" value="{{ notice.package_20_discount }}"></div>
+          </div>
+        </div>
+        <div class="pkg-edit">
+          <div class="pkg-title">แพ็กเกจ 30 สัปดาห์</div>
+          <div class="grid">
+            <div class="field"><label>ราคาเต็ม</label><input name="package_30_full_price" value="{{ notice.package_30_full_price }}"></div>
+            <div class="field"><label>ส่วนลด</label><input name="package_30_discount" value="{{ notice.package_30_discount }}"></div>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>ข้อความท้ายใบแจ้ง</label>
+          <textarea name="note_wording">{{ notice.note_wording }}</textarea>
+        </div>
+
+        <button class="btn primary" type="submit">บันทึกข้อมูลใบแจ้ง</button>
+      </form>
+
+      <div class="btnrow">
+        {% if notice.is_sent_to_parent %}
+          <form method="post" action="{% url 'core:new_student_payment_notice_unmark_sent' notice.id %}" style="flex:1;">
+            {% csrf_token %}
+            <button class="btn red" type="submit" style="width:100%;">ยกเลิกสถานะส่งแล้ว</button>
+          </form>
+        {% else %}
+          <form method="post" action="{% url 'core:new_student_payment_notice_mark_sent' notice.id %}" style="flex:1;">
+            {% csrf_token %}
+            <button class="btn green" type="submit" style="width:100%;">ส่งแจ้งผู้ปกครองแล้ว และกลับหน้า list</button>
+          </form>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="preview-wrap">
+      <div class="toolbar">
+        <button class="btn blue" type="button" onclick="openImage()">Open Image in New Tab</button>
+        <button class="btn green" type="button" onclick="copyImage()">Copy Image</button>
+        <button class="btn soft" type="button" onclick="downloadImage()">Download PNG</button>
+      </div>
+
+      <div class="receipt" id="receiptCard">
+        <div class="top">
+          <img class="logo" src="{% static 'core/logo2.png' %}" alt="logo">
+          <div class="doc">ใบแจ้งชำระค่าคอร์ส</div>
+          <div class="school">พี่ขนุนติวเตอร์</div>
+        </div>
+
+        <div class="student-card">
+          <div class="student-name">{{ notice.nickname|default:"-" }} · {{ notice.full_name }}</div>
+          <div class="meta">
+            โรงเรียน: {{ notice.school_name|default:"-" }}<br>
+            ระดับชั้น: {{ notice.get_grade_level_display|default:"-" }}<br>
+            Class ที่คาดว่าจะเข้าเรียน: {{ notice.target_class.name|default:"-" }}
+          </div>
+        </div>
+
+        <div class="date-row">
+          <div class="date-box"><div class="k">วันที่เริ่มเรียนวันแรก</div><div class="v">{{ notice.first_lesson_date|date:"d/m/Y"|default:"-" }}</div></div>
+        </div>
+
+        <div class="packages">
+          {% for p in packages %}
+            <div class="pkg {{ p.accent }}">
+              <div class="pkg-head"><div class="pkg-name">{{ p.label }}</div><div class="net">{{ p.net_price|floatformat:0|intcomma }} บาท</div></div>
+              <div class="price-line"><span>ราคาเต็ม</span><span class="full">{{ p.full_price|floatformat:0|intcomma }} บาท</span></div>
+              {% if p.discount > 0 %}<div class="price-line"><span>ส่วนลด</span><span class="discount">-{{ p.discount|floatformat:0|intcomma }} บาท</span></div>{% endif %}
+            </div>
+          {% endfor %}
+        </div>
+
+        <div class="qr-zone">
+          <img class="qr" src="{% static 'core/QRPromptpay.png' %}" alt="QR PromptPay">
+          <div>
+            <div class="qr-title">สแกน QR เพื่อชำระเงิน</div>
+            <div class="qr-sub">หลังชำระแล้วสามารถส่งสลิปผ่าน Line Official ได้เลยครับ เพื่อยืนยันที่นั่ง</div>
+          </div>
+        </div>
+
+        <div class="note">{{ notice.note_wording }}</div>
+        <div class="foot">สร้างเมื่อ {{ notice.created_at|date:"d/m/Y H:i" }} · อัปเดตล่าสุด {{ notice.updated_at|date:"d/m/Y H:i" }}</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    async function makeCanvas() {
+      const el = document.getElementById("receiptCard");
+      return await html2canvas(el, {scale: 3, backgroundColor: "#ffffff", useCORS: true});
+    }
+    async function openImage() {
+      const canvas = await makeCanvas();
+      const url = canvas.toDataURL("image/png");
+      const win = window.open();
+      win.document.write('<img src="' + url + '" style="max-width:100%;height:auto;">');
+    }
+    async function downloadImage() {
+      const canvas = await makeCanvas();
+      const a = document.createElement("a");
+      a.href = canvas.toDataURL("image/png");
+      a.download = "new-student-payment-notice-{{ notice.id }}.png";
+      a.click();
+    }
+    async function copyImage() {
+      try {
+        const canvas = await makeCanvas();
+        canvas.toBlob(async (blob) => {
+          await navigator.clipboard.write([new ClipboardItem({"image/png": blob})]);
+          alert("Copy รูปใบแจ้งแล้วครับ");
+        });
+      } catch (e) {
+        alert("Browser นี้อาจไม่รองรับ Copy Image โดยตรง ให้ใช้ Open Image หรือ Download PNG แทนครับ");
+      }
+    }
+  </script>
+</body>
+</html>

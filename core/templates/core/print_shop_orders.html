@@ -125,30 +125,36 @@
 
           <div class="link-box {% if not o.file_url and not o.pdf_docs %}missing{% endif %}" data-link-box="{{ o.id }}">
             {% if o.pdf_docs %}
-              {# Uploaded PDFs win over the link: the shop downloads straight from the system. #}
+              {# Sheet-linked orders send the uploaded ปก/เนื้อหา PDFs directly -- no link, no เฉลย. #}
               <div class="link-row">
-                <div class="link-label">📄 ไฟล์ PDF ในระบบ ({{ o.pdf_docs|length }} ไฟล์) — กดโหลดได้เลย</div>
+                <div class="link-label">📄 ไฟล์ ปก/เนื้อหา ในระบบ ({{ o.pdf_docs|length }} ไฟล์) — กดโหลดได้เลย</div>
               </div>
               <div class="link-row" style="flex-wrap:wrap">
                 {% for d in o.pdf_docs %}
-                  <a class="btn blue" href="{{ d.url }}" download>⬇ {{ d.name }}{% if d.page_count %} ({{ d.page_count }} หน้า){% endif %}</a>
+                  <a class="btn blue" href="{{ d.url }}" download>⬇ {{ d.kind_label }} · {{ d.name }}{% if d.page_count %} ({{ d.page_count }} หน้า){% endif %}</a>
                 {% endfor %}
               </div>
+            {% elif o.sheet_id %}
+              <div class="link-row">
+                <div class="link-label">⚠ ยังไม่มีไฟล์ปก/เนื้อหาอัปโหลดในระบบ — แจ้งฝ่ายจัดการให้อัปโหลดที่ Sheet Inventory</div>
+              </div>
             {% endif %}
-            <div class="link-row">
-              <div class="link-label">{% if o.file_url %}📎 ลิงก์ไฟล์ต้นฉบับ{% if not o.file_url_is_custom %} (จาก Sheet Inventory){% endif %}{% elif not o.pdf_docs %}⚠ ยังไม่มีไฟล์หรือลิงก์ต้นฉบับ{% else %}ลิงก์สำรอง{% endif %}</div>
-              {% if o.file_url %}
-                <a class="btn {% if o.pdf_docs %}soft{% else %}blue{% endif %}" href="{{ o.file_url }}" target="_blank">เปิดไฟล์</a>
-                <button class="btn soft" type="button" data-copy-link="{{ o.file_url }}">📋 คัดลอกลิงก์</button>
-              {% endif %}
-              <button class="btn soft" type="button" data-toggle-link="{{ o.id }}">{% if o.file_url %}แก้ไขลิงก์{% else %}+ เพิ่มลิงก์ไฟล์{% endif %}</button>
-              <span class="copied-flag" data-copied-flag="{{ o.id }}">คัดลอกแล้ว ✓</span>
-            </div>
-            <form class="link-edit" data-link-edit="{{ o.id }}" method="post" action="{% url 'core:print_shop_update_order' o.id %}">
-              {% csrf_token %}
-              <input type="url" name="onedrive_url" value="{{ o.file_url }}" placeholder="วางลิงก์ไฟล์ (OneDrive/Google Drive) ที่นี่" style="flex:1;min-width:220px">
-              <button class="btn dark" name="action" value="update_link" type="submit">บันทึกลิงก์</button>
-            </form>
+            {% if not o.sheet_id %}
+              <div class="link-row">
+                <div class="link-label">{% if o.file_url %}📎 ลิงก์ไฟล์ต้นฉบับ{% else %}⚠ ยังไม่มีลิงก์ไฟล์ต้นฉบับ{% endif %}</div>
+                {% if o.file_url %}
+                  <a class="btn blue" href="{{ o.file_url }}" target="_blank">เปิดไฟล์</a>
+                  <button class="btn soft" type="button" data-copy-link="{{ o.file_url }}">📋 คัดลอกลิงก์</button>
+                {% endif %}
+                <button class="btn soft" type="button" data-toggle-link="{{ o.id }}">{% if o.file_url %}แก้ไขลิงก์{% else %}+ เพิ่มลิงก์ไฟล์{% endif %}</button>
+                <span class="copied-flag" data-copied-flag="{{ o.id }}">คัดลอกแล้ว ✓</span>
+              </div>
+              <form class="link-edit" data-link-edit="{{ o.id }}" method="post" action="{% url 'core:print_shop_update_order' o.id %}">
+                {% csrf_token %}
+                <input type="url" name="onedrive_url" value="{{ o.file_url }}" placeholder="วางลิงก์ไฟล์ (OneDrive/Google Drive) ที่นี่" style="flex:1;min-width:220px">
+                <button class="btn dark" name="action" value="update_link" type="submit">บันทึกลิงก์</button>
+              </form>
+            {% endif %}
           </div>
 
           <form class="status-form" method="post" action="{% url 'core:print_shop_update_order' o.id %}">
@@ -197,7 +203,11 @@
             <span class="pill">{{ o.spine_color_label }}</span>
             <span class="pill">กดเสร็จเมื่อ {{ o.completed_at|date:'d/m/Y H:i' }}</span>
           </div>
-          {% if o.file_url %}<a class="btn soft" href="{{ o.file_url }}" target="_blank" style="justify-self:start;width:fit-content;">เปิดไฟล์อีกครั้ง</a>{% endif %}
+          {% if o.pdf_docs %}
+            <div class="pillrow">
+              {% for d in o.pdf_docs %}<a class="btn soft" href="{{ d.url }}" download style="width:fit-content;">⬇ {{ d.kind_label }}</a>{% endfor %}
+            </div>
+          {% elif o.file_url %}<a class="btn soft" href="{{ o.file_url }}" target="_blank" style="justify-self:start;width:fit-content;">เปิดไฟล์อีกครั้ง</a>{% endif %}
         </div>
       {% empty %}<div class="empty">ยังไม่มีรายการที่เสร็จแล้ว</div>{% endfor %}
     </div>

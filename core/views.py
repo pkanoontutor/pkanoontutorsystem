@@ -48,6 +48,7 @@ from .models import (
     TutorPayrollEntry,
     CoursePayment,
     CourseRenewalNotice,
+    NewStudentPaymentNotice,
     TeachingTutor,
     TutorSheetProgress,
     TeachingClassSubjectTemplate,
@@ -5672,6 +5673,38 @@ def course_renewal_notice_list(request: HttpRequest) -> HttpResponse:
 
     sent_notices = sent_history_qs.order_by("-sent_to_parent_at", "-created_at")
 
+    # Early notices: some parents want to pay far ahead of course completion,
+    # so staff can search ANY active enrollment here (no remaining_sessions
+    # gate) and reuse the exact same create view as the near-completion
+    # cards above. Only runs the query when searched, since the full active
+    # roster is large and irrelevant most of the time.
+    q_any = (request.GET.get("q_any") or "").strip()
+    early_rows = []
+    if q_any:
+        early_enrollments = (
+            Enrollment.objects
+            .select_related("student", "tutoring_class")
+            .filter(is_active=True, student__is_active=True, tutoring_class__is_active=True)
+            .filter(
+                Q(student__nickname__icontains=q_any) |
+                Q(student__full_name__icontains=q_any) |
+                Q(student__student_code__icontains=q_any) |
+                Q(tutoring_class__name__icontains=q_any) |
+                Q(sale_run_no__icontains=q_any)
+            )
+            .order_by("student__nickname", "student__full_name")[:30]
+        )
+        for enrollment in early_enrollments:
+            expected_end, next_start = _default_renewal_dates(enrollment)
+            early_rows.append({
+                "enrollment": enrollment,
+                "student": enrollment.student,
+                "tutoring_class": enrollment.tutoring_class,
+                "remaining": int(enrollment.remaining_sessions or 0),
+                "default_expected_end": expected_end,
+                "default_next_start": next_start,
+            })
+
     return render(request, "core/course_renewal_notice_list.html", {
         "not_notified_rows": not_notified_rows,
         "notified_rows": notified_rows,
@@ -5679,6 +5712,8 @@ def course_renewal_notice_list(request: HttpRequest) -> HttpResponse:
         "q": q,
         "date_from": date_from.isoformat() if date_from else "",
         "date_to": date_to.isoformat() if date_to else "",
+        "q_any": q_any,
+        "early_rows": early_rows,
     })
 
 @login_required
@@ -5842,6 +5877,199 @@ def course_renewal_notice_detail(request: HttpRequest, pk: int) -> HttpResponse:
     })
 
 
+# =========================================================
+# ✅ New Student Payment Notice (ใบแจ้งชำระค่าคอร์สสำหรับนักเรียนใหม่)
+# =========================================================
+def _new_student_package_list(notice: NewStudentPaymentNotice) -> list[dict]:
+    return [
+        {"label": "10 สัปดาห์", "accent": "blue", "full_price": notice.package_10_full_price, "discount": notice.package_10_discount, "net_price": notice.package_10_net_price},
+        {"label": "20 สัปดาห์", "accent": "green", "full_price": notice.package_20_full_price, "discount": notice.package_20_discount, "net_price": notice.package_20_net_price},
+        {"label": "30 สัปดาห์", "accent": "purple", "full_price": notice.package_30_full_price, "discount": notice.package_30_discount, "net_price": notice.package_30_net_price},
+    ]
+
+
+@login_required
+def new_student_payment_notice_list(request: HttpRequest) -> HttpResponse:
+    """
+    รายการใบสมัคร (AdmissionInquiry) ที่ยังไม่ปิดงาน สำหรับสร้างใบแจ้งชำระค่าคอร์สให้
+    นักเรียนใหม่ที่กรอกข้อมูลไว้ในระบบรับสมัครแล้ว แต่ยังไม่มี Student/Enrollment จริง.
+    แบ่งกลุ่มแบบเดียวกับใบแจ้งต่อคอร์ส: ยังไม่แจ้ง / แจ้งแล้ว ตามสถานะ is_sent_to_parent
+    ของใบแจ้งล่าสุดที่ผูกกับใบสมัครนั้น.
+    """
+    q = (request.GET.get("q") or "").strip()
+    date_from = _safe_date(request.GET.get("date_from"))
+    date_to = _safe_date(request.GET.get("date_to"))
+
+    inquiries_qs = (
+        AdmissionInquiry.objects
+        .filter(is_completed=False)
+        .select_related("target_class")
+        .order_by("-created_at")
+    )
+    if q:
+        inquiries_qs = inquiries_qs.filter(
+            Q(nickname__icontains=q) |
+            Q(first_name__icontains=q) |
+            Q(last_name__icontains=q) |
+            Q(school_name__icontains=q) |
+            Q(contact_phone__icontains=q)
+        )
+
+    not_notified_rows = []
+    notified_rows = []
+
+    for inquiry in inquiries_qs:
+        notices_qs = (
+            NewStudentPaymentNotice.objects
+            .select_related("sent_to_parent_by")
+            .filter(admission_inquiry=inquiry)
+            .order_by("-created_at")
+        )
+        latest_unsent_notice = notices_qs.filter(is_sent_to_parent=False).first()
+        latest_sent_notice = (
+            notices_qs.filter(is_sent_to_parent=True).order_by("-sent_to_parent_at", "-created_at").first()
+        )
+
+        row = {
+            "inquiry": inquiry,
+            "latest_unsent_notice": latest_unsent_notice,
+            "latest_sent_notice": latest_sent_notice,
+        }
+        if latest_sent_notice:
+            notified_rows.append(row)
+        else:
+            not_notified_rows.append(row)
+
+    all_notices_qs = (
+        NewStudentPaymentNotice.objects
+        .select_related("admission_inquiry", "target_class", "sent_to_parent_by")
+        .order_by("-created_at")
+    )
+    if q:
+        all_notices_qs = all_notices_qs.filter(
+            Q(nickname__icontains=q) |
+            Q(first_name__icontains=q) |
+            Q(last_name__icontains=q) |
+            Q(school_name__icontains=q) |
+            Q(contact_phone__icontains=q)
+        )
+
+    sent_history_qs = all_notices_qs.filter(is_sent_to_parent=True)
+    if date_from:
+        sent_history_qs = sent_history_qs.filter(sent_to_parent_at__date__gte=date_from)
+    if date_to:
+        sent_history_qs = sent_history_qs.filter(sent_to_parent_at__date__lte=date_to)
+
+    sent_notices = sent_history_qs.order_by("-sent_to_parent_at", "-created_at")
+
+    return render(request, "core/new_student_payment_notice_list.html", {
+        "not_notified_rows": not_notified_rows,
+        "notified_rows": notified_rows,
+        "sent_notices": sent_notices,
+        "q": q,
+        "date_from": date_from.isoformat() if date_from else "",
+        "date_to": date_to.isoformat() if date_to else "",
+    })
+
+
+@login_required
+def new_student_payment_notice_create(request: HttpRequest, admission_inquiry_id: int) -> HttpResponse:
+    inquiry = get_object_or_404(AdmissionInquiry, id=admission_inquiry_id)
+
+    notice = NewStudentPaymentNotice.objects.create(
+        admission_inquiry=inquiry,
+        nickname=inquiry.nickname,
+        first_name=inquiry.first_name,
+        last_name=inquiry.last_name,
+        school_name=inquiry.school_name,
+        contact_phone=inquiry.contact_phone,
+        grade_level=inquiry.grade_level,
+        target_class=inquiry.target_class,
+        first_lesson_date=inquiry.first_lesson_date,
+        created_by=request.user if request.user.is_authenticated else None,
+    )
+
+    return redirect("core:new_student_payment_notice_detail", pk=notice.pk)
+
+
+@login_required
+def new_student_payment_notice_detail(request: HttpRequest, pk: int) -> HttpResponse:
+    notice = get_object_or_404(
+        NewStudentPaymentNotice.objects.select_related("admission_inquiry", "target_class"),
+        pk=pk,
+    )
+
+    if request.method == "POST":
+        notice.nickname = (request.POST.get("nickname") or "").strip()
+        notice.first_name = (request.POST.get("first_name") or "").strip()
+        notice.last_name = (request.POST.get("last_name") or "").strip()
+        notice.school_name = (request.POST.get("school_name") or "").strip()
+        notice.contact_phone = (request.POST.get("contact_phone") or "").strip()
+
+        grade_level = (request.POST.get("grade_level") or "").strip()
+        if grade_level in dict(AdmissionInquiry.GradeLevel.choices):
+            notice.grade_level = grade_level
+
+        target_class_id = (request.POST.get("target_class_id") or "").strip()
+        notice.target_class = TutoringClass.objects.filter(id=target_class_id).first() if target_class_id else None
+
+        notice.first_lesson_date = _safe_date(request.POST.get("first_lesson_date"))
+
+        notice.package_10_full_price = _decimal_from_post(request.POST.get("package_10_full_price"), notice.package_10_full_price)
+        notice.package_10_discount = _decimal_from_post(request.POST.get("package_10_discount"), notice.package_10_discount)
+
+        notice.package_20_full_price = _decimal_from_post(request.POST.get("package_20_full_price"), notice.package_20_full_price)
+        notice.package_20_discount = _decimal_from_post(request.POST.get("package_20_discount"), notice.package_20_discount)
+
+        notice.package_30_full_price = _decimal_from_post(request.POST.get("package_30_full_price"), notice.package_30_full_price)
+        notice.package_30_discount = _decimal_from_post(request.POST.get("package_30_discount"), notice.package_30_discount)
+
+        notice.note_wording = (request.POST.get("note_wording") or "").strip() or notice.note_wording
+
+        notice.save()
+        return redirect("core:new_student_payment_notice_detail", pk=notice.pk)
+
+    admission_inquiry_admin_url = (
+        f"/adminlublub/core/admissioninquiry/{notice.admission_inquiry_id}/change/"
+        if notice.admission_inquiry_id else ""
+    )
+    # Only offer the "go create the real receipt" shortcut while the source
+    # inquiry is still open -- once it's completed (or was never linked),
+    # staff should search for the student normally on the receipt page.
+    create_receipt_url = ""
+    if notice.admission_inquiry_id and not notice.admission_inquiry.is_completed:
+        create_receipt_url = f"/course-payments/new/?admission_id={notice.admission_inquiry_id}"
+
+    return render(request, "core/new_student_payment_notice_detail.html", {
+        "notice": notice,
+        "packages": _new_student_package_list(notice),
+        "classes": TutoringClass.objects.filter(is_active=True).order_by("time_slot", "name"),
+        "grade_choices": AdmissionInquiry.GradeLevel.choices,
+        "admission_inquiry_admin_url": admission_inquiry_admin_url,
+        "create_receipt_url": create_receipt_url,
+    })
+
+
+@require_POST
+@login_required
+def new_student_payment_notice_mark_sent(request: HttpRequest, pk: int) -> HttpResponse:
+    notice = get_object_or_404(NewStudentPaymentNotice, pk=pk)
+    notice.is_sent_to_parent = True
+    notice.sent_to_parent_at = timezone.now()
+    notice.sent_to_parent_by = request.user if request.user.is_authenticated else None
+    notice.save()
+    return redirect("core:new_student_payment_notice_list")
+
+
+@require_POST
+@login_required
+def new_student_payment_notice_unmark_sent(request: HttpRequest, pk: int) -> HttpResponse:
+    notice = get_object_or_404(NewStudentPaymentNotice, pk=pk)
+    notice.is_sent_to_parent = False
+    notice.sent_to_parent_at = None
+    notice.sent_to_parent_by = None
+    notice.save()
+    return redirect(request.META.get("HTTP_REFERER") or "core:new_student_payment_notice_list")
 
 
 # =========================================================

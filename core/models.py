@@ -1619,6 +1619,104 @@ class AdmissionInquiry(models.Model):
     def __str__(self) -> str:
         return f"{self.get_request_type_display()} | {self.nickname} | {self.full_name}"
 
+
+class NewStudentPaymentNotice(models.Model):
+    """
+    ใบแจ้งชำระค่าคอร์สสำหรับนักเรียนใหม่ที่ยังไม่มี Student/Enrollment จริงในระบบ --
+    สร้างจากข้อมูลที่กรอกไว้ใน AdmissionInquiry (ระบบรับสมัคร) เก็บเป็น snapshot
+    แก้ไขได้อิสระโดยไม่กระทบข้อมูลต้นทาง แยกจาก CourseRenewalNotice เพราะยังไม่มี
+    Enrollment ให้ผูก และไม่มีแนวคิด "ใกล้ครบคอร์ส"/เครดิตชวนเพื่อนแบบนักเรียนเดิม
+    """
+
+    admission_inquiry = models.ForeignKey(
+        AdmissionInquiry,
+        verbose_name="ใบสมัครอ้างอิง",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="new_student_payment_notices",
+        help_text="ใบสมัครที่ใช้ดึงข้อมูลมาตอนสร้าง (ไม่ผูกติดกัน แก้ไขในใบแจ้งนี้ได้อิสระ)",
+    )
+
+    nickname = models.CharField("ชื่อเล่น", max_length=100, blank=True)
+    first_name = models.CharField("ชื่อจริง", max_length=150, blank=True)
+    last_name = models.CharField("นามสกุล", max_length=150, blank=True)
+    school_name = models.CharField("โรงเรียน", max_length=255, blank=True)
+    contact_phone = models.CharField("เบอร์ติดต่อ", max_length=50, blank=True)
+    grade_level = models.CharField(
+        "ระดับชั้น",
+        max_length=20,
+        choices=AdmissionInquiry.GradeLevel.choices,
+        blank=True,
+    )
+    target_class = models.ForeignKey(
+        TutoringClass,
+        verbose_name="Class ที่คาดว่าจะเข้าเรียน",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="new_student_payment_notices",
+    )
+    first_lesson_date = models.DateField("วันที่เริ่มเรียนวันแรก", null=True, blank=True)
+
+    package_10_full_price = models.DecimalField("10 สัปดาห์ - ราคาเต็ม", max_digits=10, decimal_places=2, default=3990)
+    package_10_discount = models.DecimalField("10 สัปดาห์ - ส่วนลด", max_digits=10, decimal_places=2, default=0)
+    package_10_net_price = models.DecimalField("10 สัปดาห์ - ราคาสุทธิ", max_digits=10, decimal_places=2, default=3990)
+
+    package_20_full_price = models.DecimalField("20 สัปดาห์ - ราคาเต็ม", max_digits=10, decimal_places=2, default=7980)
+    package_20_discount = models.DecimalField("20 สัปดาห์ - ส่วนลด", max_digits=10, decimal_places=2, default=300)
+    package_20_net_price = models.DecimalField("20 สัปดาห์ - ราคาสุทธิ", max_digits=10, decimal_places=2, default=7680)
+
+    package_30_full_price = models.DecimalField("30 สัปดาห์ - ราคาเต็ม", max_digits=10, decimal_places=2, default=11970)
+    package_30_discount = models.DecimalField("30 สัปดาห์ - ส่วนลด", max_digits=10, decimal_places=2, default=800)
+    package_30_net_price = models.DecimalField("30 สัปดาห์ - ราคาสุทธิ", max_digits=10, decimal_places=2, default=11170)
+
+    note_wording = models.TextField(
+        "ข้อความท้ายใบแจ้ง",
+        default="ชำระแล้วรบกวนส่งสลิปแจ้งพี่ขนุนทาง Line @ เพื่อยืนยันที่นั่งและออกใบเสร็จให้ครับ",
+    )
+
+    is_sent_to_parent = models.BooleanField("ส่งแจ้งผู้ปกครองแล้ว", default=False)
+    sent_to_parent_at = models.DateTimeField("วันที่ส่งแจ้งผู้ปกครอง", null=True, blank=True)
+    sent_to_parent_by = models.ForeignKey(
+        "auth.User",
+        verbose_name="ผู้กดส่งแจ้ง",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="sent_new_student_payment_notices",
+    )
+
+    created_by = models.ForeignKey(
+        "auth.User",
+        verbose_name="ผู้สร้าง",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="created_new_student_payment_notices",
+    )
+    created_at = models.DateTimeField("วันที่สร้าง", default=timezone.now)
+    updated_at = models.DateTimeField("อัปเดตล่าสุด", auto_now=True)
+
+    class Meta:
+        verbose_name = "New Student Payment Notice"
+        verbose_name_plural = "New Student Payment Notices"
+        ordering = ("-created_at",)
+
+    @property
+    def full_name(self) -> str:
+        return f"{self.first_name} {self.last_name}".strip()
+
+    def __str__(self) -> str:
+        return f"ใบแจ้งชำระนักเรียนใหม่ | {self.nickname or self.full_name} | {self.created_at:%d/%m/%Y}"
+
+    def save(self, *args, **kwargs):
+        self.package_10_net_price = max((self.package_10_full_price or 0) - (self.package_10_discount or 0), Decimal("0"))
+        self.package_20_net_price = max((self.package_20_full_price or 0) - (self.package_20_discount or 0), Decimal("0"))
+        self.package_30_net_price = max((self.package_30_full_price or 0) - (self.package_30_discount or 0), Decimal("0"))
+        super().save(*args, **kwargs)
+
+
 # =========================================================
 # ✅ School Finance / Overview Modules
 # =========================================================

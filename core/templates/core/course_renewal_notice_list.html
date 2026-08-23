@@ -48,8 +48,55 @@
     <div class="actions">
       <a class="btnx soft" href="/pkanoon-admin-tool/">← Admin Tool</a>
       <a class="btnx soft" href="/dashboard/">Dashboard</a>
+      <a class="btnx soft" href="{% url 'core:new_student_payment_notice_list' %}">🆕 ใบแจ้งชำระนักเรียนใหม่</a>
     </div>
   </section>
+
+  <details class="panel">
+    <summary class="section-head">
+      <div>
+        <div class="section-title">สร้างใบแจ้งล่วงหน้า (ยังไม่ใกล้ครบคอร์ส)</div>
+        <div class="section-sub">สำหรับผู้ปกครองที่อยากจ่ายล่วงหน้านานๆ — ค้นหานักเรียนที่ Enrollment ยังไม่ใกล้ครบคอร์สได้ที่นี่</div>
+      </div>
+      <span class="toggle-hint"></span>
+    </summary>
+    <div class="details-body">
+      <form method="get" class="filter" style="grid-template-columns:1fr auto auto;">
+        <div class="field">
+          <label>ค้นหานักเรียน/class ที่ต้องการสร้างใบแจ้งล่วงหน้า</label>
+          <input name="q_any" value="{{ q_any }}" placeholder="ชื่อเล่น / ชื่อจริง / รหัสนักเรียน / ชื่อ class / sale run">
+        </div>
+        <button class="btnx primary" type="submit">ค้นหา</button>
+        {% if q_any %}<a class="btnx soft" href="{% url 'core:course_renewal_notice_list' %}">ล้าง</a>{% endif %}
+      </form>
+
+      {% if q_any %}
+        <div class="grid" style="margin-top:12px;">
+          {% for row in early_rows %}
+            <div class="enroll-card">
+              <div class="student-line">
+                <div>
+                  <div class="student">{{ row.student.nickname|default:"-" }} · {{ row.student.full_name }}</div>
+                  <div class="meta">
+                    {{ row.student.student_code }} · {{ row.student.grade_level|default:"-" }}<br>
+                    {{ row.tutoring_class.name }} · {{ row.tutoring_class.get_time_slot_display }}
+                  </div>
+                </div>
+              </div>
+              <div class="pillrow">
+                <span class="pill">เหลือ {{ row.remaining }} ครั้ง</span>
+              </div>
+              <div class="action-row">
+                <a class="btnx green" href="{% url 'core:course_renewal_notice_create' row.enrollment.id %}">สร้างใบแจ้งต่อคอร์สล่วงหน้า</a>
+              </div>
+            </div>
+          {% empty %}
+            <div class="empty">ไม่พบนักเรียนที่ตรงกับคำค้นหา</div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    </div>
+  </details>
 
   <section class="panel">
     <form method="get" class="filter">

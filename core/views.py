@@ -223,6 +223,11 @@ def _ordered_grade_groups(rows: list[dict]) -> list[dict]:
         if grade not in buckets:
             buckets.setdefault(grade, [])
         buckets[grade].append(row)
+    # Inactive sheets sink to the end of their grade rather than being mixed
+    # in -- list.sort is stable, so the existing subject/code order survives
+    # within each partition.
+    for grade_rows in buckets.values():
+        grade_rows.sort(key=lambda r: not getattr(r["sheet"], "is_active", True))
     return [
         {"grade": grade, "label": _sheet_grade_label(grade), "rows": buckets.get(grade, []), "count": len(buckets.get(grade, []))}
         for grade in SHEET_GRADE_ORDER
@@ -630,7 +635,11 @@ def _pending_print_qty_by_sheet() -> dict[int, int]:
     }
 
 
-def _sheet_row(sheet: Sheet, pending_by_sheet: dict[int, int] | None = None) -> dict:
+def _sheet_row(
+    sheet: Sheet,
+    pending_by_sheet: dict[int, int] | None = None,
+    documents_by_sheet: dict[int, dict] | None = None,
+) -> dict:
     inv = _inventory_for_sheet(sheet)
     qty = int(inv.quantity or 0) if inv else 0
     minimum = int(getattr(inv, "minimum_stock", 0) or 0) if inv else 0
@@ -638,6 +647,7 @@ def _sheet_row(sheet: Sheet, pending_by_sheet: dict[int, int] | None = None) -> 
     pending_qty = int((pending_by_sheet or {}).get(sheet.id, 0) or 0)
     last_updated_at = getattr(inv, "updated_at", None) if inv else None
     subject_style = _sheet_subject_style(sheet.subject.name if getattr(sheet, "subject_id", None) else "")
+    documents = (documents_by_sheet or {}).get(sheet.id) or {"cover": [], "content": [], "answer": []}
     return {
         "sheet": sheet,
         "inventory": inv,
@@ -649,6 +659,8 @@ def _sheet_row(sheet: Sheet, pending_by_sheet: dict[int, int] | None = None) -> 
         "grade_level": getattr(sheet, "grade_level", "") or "",
         "grade_label": _sheet_grade_label(getattr(sheet, "grade_level", "") or ""),
         "is_low": minimum > 0 and qty <= minimum,
+        "documents": documents,
+        "docs_complete": bool(documents["cover"] and documents["content"] and documents["answer"]),
         "last_updated_at": last_updated_at,
         "subject_style": f"--subject-bg:{subject_style['bg']};--subject-border:{subject_style['border']};--subject-accent:{subject_style['accent']};",
         "subject_color_label": subject_style["label"],
@@ -825,7 +837,8 @@ def _sheet_inventory_context(*, q: str = "", extra: dict | None = None, request:
 
     sheets = list(sheets_qs.order_by("grade_level", "subject__name", "code"))
     pending_by_sheet = _pending_print_qty_by_sheet()
-    sheet_rows = [_sheet_row(s, pending_by_sheet) for s in sheets]
+    documents_by_sheet = _sheet_documents_by_id([s.id for s in sheets])
+    sheet_rows = [_sheet_row(s, pending_by_sheet, documents_by_sheet) for s in sheets]
     all_sheets = Sheet.objects.select_related("subject").filter(is_active=True).order_by("grade_level", "subject__name", "code")
     active_classes = TutoringClass.objects.filter(is_active=True).order_by("time_slot", "name")
     shop_url = request.build_absolute_uri("/print-shop/") if request else "/print-shop/"
@@ -838,6 +851,7 @@ def _sheet_inventory_context(*, q: str = "", extra: dict | None = None, request:
         "classes": active_classes,
         "all_sheets": all_sheets,
         "sheet_choices": all_sheets,
+        "books": Book.objects.filter(is_active=True).order_by("grade_level", "code"),
         "class_rows": _build_class_sheet_rows(),
         "movements": (
             SheetInventoryMovement.objects
@@ -851,6 +865,7 @@ def _sheet_inventory_context(*, q: str = "", extra: dict | None = None, request:
         "ready_to_receive_orders": _ready_to_receive_orders_with_links(),
         "pending_print_orders": _pending_print_orders_with_links(),
         "shop_url": shop_url,
+        "documents_by_sheet_json": json.dumps(documents_by_sheet, ensure_ascii=False),
     }
     if extra:
         context.update(extra)
@@ -1244,6 +1259,85 @@ def sheet_inventory_dashboard(request: HttpRequest) -> HttpResponse:
                 return JsonResponse({"ok": True, "onedrive_url": onedrive_url, "sheet_id": sheet.id})
             return redirect("core:sheet_inventory_dashboard")
 
+        elif action.startswith("update_sheet_location:"):
+            # Pencil-toggle editor for "ตำแหน่งที่วาง" -- same single-field
+            # AJAX pattern as the link editor above.
+            sheet_id = action.split(":", 1)[1]
+            is_ajax = request.headers.get("x-requested-with") == "XMLHttpRequest"
+            sheet = Sheet.objects.filter(id=sheet_id).first()
+            if not sheet:
+                if is_ajax:
+                    return JsonResponse({"ok": False, "message": "ไม่พบชีทนี้"}, status=404)
+                return redirect("core:sheet_inventory_dashboard")
+            location = (request.POST.get("storage_location") or "").strip()[:120]
+            inventory, _ = SheetInventory.objects.get_or_create(sheet=sheet, defaults={"quantity": 0})
+            inventory.storage_location = location
+            inventory.save(update_fields=["storage_location", "updated_at"])
+            if is_ajax:
+                return JsonResponse({"ok": True, "storage_location": location, "sheet_id": sheet.id})
+            return redirect("core:sheet_inventory_dashboard")
+
+        elif action.startswith("toggle_sheet_active:"):
+            # ปิด/เปิดใช้งานชีท -- an inactive sheet greys out and sinks to
+            # the end of its grade group (see _ordered_grade_groups) rather
+            # than disappearing, so it's still findable and reversible.
+            sheet_id = action.split(":", 1)[1]
+            is_ajax = request.headers.get("x-requested-with") == "XMLHttpRequest"
+            sheet = Sheet.objects.filter(id=sheet_id).first()
+            if not sheet:
+                if is_ajax:
+                    return JsonResponse({"ok": False, "message": "ไม่พบชีทนี้"}, status=404)
+                return redirect("core:sheet_inventory_dashboard")
+            sheet.is_active = not sheet.is_active
+            sheet.save(update_fields=["is_active"])
+            if is_ajax:
+                return JsonResponse({"ok": True, "is_active": sheet.is_active, "sheet_id": sheet.id})
+            return redirect("core:sheet_inventory_dashboard")
+
+        elif action.startswith("update_sheet_counts:"):
+            # จำนวนหน้า/จำนวนข้อ -- moved here from the removed sheet-profile
+            # page. total_pages is normally kept in sync automatically from
+            # uploaded content PDFs (see sync_sheet_total_pages), so editing
+            # it here is mainly for total_questions, which has no automatic
+            # source and drives the tutor teaching-progress % calculation.
+            sheet_id = action.split(":", 1)[1]
+            is_ajax = request.headers.get("x-requested-with") == "XMLHttpRequest"
+            sheet = Sheet.objects.filter(id=sheet_id).first()
+            if not sheet:
+                if is_ajax:
+                    return JsonResponse({"ok": False, "message": "ไม่พบชีทนี้"}, status=404)
+                return redirect("core:sheet_inventory_dashboard")
+            sheet.total_pages = max(int(request.POST.get("total_pages") or 0), 0)
+            sheet.total_questions = max(int(request.POST.get("total_questions") or 0), 0)
+            sheet.save(update_fields=["total_pages", "total_questions"])
+            if is_ajax:
+                return JsonResponse({
+                    "ok": True, "sheet_id": sheet.id,
+                    "total_pages": sheet.total_pages, "total_questions": sheet.total_questions,
+                })
+            return redirect("core:sheet_inventory_dashboard")
+
+        elif action.startswith("update_source_book:"):
+            # "สร้างจากหนังสือเล่มไหน" -- also moved here from the removed
+            # sheet-profile page.
+            sheet_id = action.split(":", 1)[1]
+            is_ajax = request.headers.get("x-requested-with") == "XMLHttpRequest"
+            sheet = Sheet.objects.filter(id=sheet_id).first()
+            if not sheet:
+                if is_ajax:
+                    return JsonResponse({"ok": False, "message": "ไม่พบชีทนี้"}, status=404)
+                return redirect("core:sheet_inventory_dashboard")
+            book = Book.objects.filter(id=_id_or_none(request.POST.get("source_book_id"))).first()
+            sheet.source_book = book
+            sheet.save(update_fields=["source_book"])
+            if is_ajax:
+                return JsonResponse({
+                    "ok": True, "sheet_id": sheet.id,
+                    "source_book_id": book.id if book else None,
+                    "source_book_title": book.title if book else "",
+                })
+            return redirect("core:sheet_inventory_dashboard")
+
         elif action.startswith("update_sheet_target:"):
             # Also accepts an optional onedrive_url so the sheet-profile page's
             # single "ตั้งค่าการส่งปรินท์" form can save both in one submit.
@@ -1499,7 +1593,8 @@ def sheet_inventory_dashboard(request: HttpRequest) -> HttpResponse:
 
         elif action.startswith("set_stock_single:"):
             sheet_id = action.split(":", 1)[1]
-            _save_inventory_set_from_post(
+            is_ajax = request.headers.get("x-requested-with") == "XMLHttpRequest"
+            ok, message = _save_inventory_set_from_post(
                 request,
                 sheet_id=sheet_id,
                 qty_prefix="set_qty_",
@@ -1507,6 +1602,14 @@ def sheet_inventory_dashboard(request: HttpRequest) -> HttpResponse:
                 movement_type=SheetInventoryMovement.MovementType.SET,
                 default_note="Manual balance update from Sheet Inventory",
             )
+            if is_ajax:
+                if not ok:
+                    return JsonResponse({"ok": False, "message": message}, status=400)
+                inventory = SheetInventory.objects.filter(sheet_id=sheet_id).first()
+                return JsonResponse({
+                    "ok": True, "sheet_id": int(sheet_id),
+                    "quantity": inventory.quantity if inventory else 0,
+                })
             return redirect("core:sheet_inventory_dashboard")
 
         elif action.startswith("add_stock_single:"):
@@ -2116,50 +2219,6 @@ def sheet_allocation_report(request: HttpRequest) -> HttpResponse:
     })
 
 
-@login_required
-def sheet_inventory_profile(request: HttpRequest, pk: int) -> HttpResponse:
-    sheet = get_object_or_404(Sheet.objects.select_related("subject"), pk=pk)
-
-    # Page/question counts are edited here rather than only via bulk upload,
-    # because the page count now drives the teaching-progress percentages.
-    if request.method == "POST" and request.POST.get("action") == "update_sheet_counts":
-        sheet.total_pages = max(int(request.POST.get("total_pages") or 0), 0)
-        sheet.total_questions = max(int(request.POST.get("total_questions") or 0), 0)
-        sheet.save(update_fields=["total_pages", "total_questions"])
-        return redirect(f"{request.path}?saved=counts")
-
-    if request.method == "POST" and request.POST.get("action") == "update_source_book":
-        sheet.source_book = Book.objects.filter(id=_id_or_none(request.POST.get("source_book_id"))).first()
-        sheet.save(update_fields=["source_book"])
-        return redirect(f"{request.path}?saved=book")
-
-    inventory, _ = SheetInventory.objects.get_or_create(sheet=sheet, defaults={"quantity": 0})
-    movements = SheetInventoryMovement.objects.filter(sheet=sheet).select_related("created_by").order_by("-created_at")[:80]
-    mappings = SheetClassMapping.objects.filter(sheet=sheet, is_active=True).select_related("tutoring_class")
-
-    docs = list(
-        SheetDocument.objects.filter(sheet=sheet)
-        .select_related("source_book")
-        .order_by("kind", "display_order", "id")
-    )
-    docs_by_kind = {
-        "cover": [_sheet_document_payload(d) for d in docs if d.kind == SheetDocument.Kind.COVER],
-        "content": [_sheet_document_payload(d) for d in docs if d.kind == SheetDocument.Kind.CONTENT],
-        "answer": [_sheet_document_payload(d) for d in docs if d.kind == SheetDocument.Kind.ANSWER],
-    }
-
-    return render(request, "core/sheet_inventory_profile.html", {
-        "sheet": sheet,
-        "inventory": inventory,
-        "movements": movements,
-        "mappings": mappings,
-        "saved_counts": request.GET.get("saved") == "counts",
-        "saved_book": request.GET.get("saved") == "book",
-        "documents_json": json.dumps(docs_by_kind, ensure_ascii=False),
-        "books": Book.objects.filter(is_active=True).order_by("grade_level", "code"),
-    })
-
-
 def _id_or_none(raw) -> int | None:
     """Form selects post "" for "no selection", which blows up a pk filter."""
     try:
@@ -2240,6 +2299,27 @@ def _sheet_document_payload(doc: SheetDocument) -> dict:
         "book": doc.source_book.title if doc.source_book_id else "",
         "source_url": doc.source_url or "",
     }
+
+
+def _sheet_documents_by_id(sheet_ids: list[int]) -> dict[int, dict]:
+    """ปก/เนื้อหา/เฉลย for every sheet in one query, keyed by sheet id --
+    used to render each card's upload popup and its "complete" state
+    without an N+1 query per card."""
+    out: dict[int, dict] = {
+        sid: {"cover": [], "content": [], "answer": []} for sid in sheet_ids
+    }
+    if not sheet_ids:
+        return out
+    docs = (
+        SheetDocument.objects
+        .filter(sheet_id__in=sheet_ids)
+        .select_related("source_book")
+        .order_by("kind", "display_order", "id")
+    )
+    for d in docs:
+        out.setdefault(d.sheet_id, {"cover": [], "content": [], "answer": []})
+        out[d.sheet_id][d.kind].append(_sheet_document_payload(d))
+    return out
 
 
 @login_required
@@ -2449,28 +2529,6 @@ def book_list(request: HttpRequest) -> HttpResponse:
     })
 
 
-@require_POST
-@login_required
-def sheet_inventory_cover_upload(request: HttpRequest, pk: int) -> JsonResponse:
-    """Cover photo for a sheet. Accepts a normal file input or a pasted
-    clipboard image -- both arrive as the same multipart 'cover_image' field,
-    the JS side just builds the FormData differently."""
-    sheet = get_object_or_404(Sheet, pk=pk)
-    upload = request.FILES.get("cover_image")
-    if not upload:
-        return JsonResponse({"ok": False, "message": "ไม่พบไฟล์รูปที่ส่งมา"}, status=400)
-    if not (upload.content_type or "").startswith("image/"):
-        return JsonResponse({"ok": False, "message": "ไฟล์นี้ไม่ใช่รูปภาพ"}, status=400)
-    if upload.size > 8 * 1024 * 1024:
-        return JsonResponse({"ok": False, "message": "ไฟล์รูปใหญ่เกิน 8MB"}, status=400)
-
-    ext = ".png" if upload.content_type == "image/png" else ".jpg"
-    if sheet.cover_image:
-        sheet.cover_image.delete(save=False)
-    sheet.cover_image.save(f"{sheet.code or sheet.id}{ext}", upload, save=True)
-    return JsonResponse({"ok": True, "url": sheet.cover_image.url})
-
-
 @login_required
 def sheet_inventory_export(request: HttpRequest) -> HttpResponse:
     wb = Workbook()
@@ -2607,37 +2665,28 @@ def sheet_print_order_admin(request: HttpRequest) -> HttpResponse:
 
 
 def _attach_inventory_file_links(orders: list) -> None:
-    """The authoritative file link lives on SheetInventory.onedrive_url (set
-    once per sheet in the Sheet Inventory profile) -- pull it live for each
-    order instead of relying on the order's own onedrive_url snapshot, which
-    can go stale if the inventory link is added/changed after the order was
-    created. Custom (non-inventory) documents have no Sheet to pull from, so
-    they keep using their own onedrive_url.
-
-    Uploaded content PDFs (Sheet Inventory > ไฟล์ PDF ของชีท) are attached
-    too and take precedence in the UI: the shop downloads the file directly
-    instead of opening a link. The link stays as the fallback for sheets
-    that have not been uploaded yet."""
+    """Sheet-linked orders send the uploaded ปก and เนื้อหา PDFs for the
+    print shop to download directly -- no OneDrive link (never sent for a
+    sheet-linked order any more, even if one is on file), and never the
+    เฉลย (answer) file. Custom (non-inventory) orders have no upload
+    mechanism, so they keep using their own onedrive_url."""
     sheet_ids = [o.sheet_id for o in orders if o.sheet_id]
-    inv_map = {}
     docs_by_sheet: dict[int, list] = defaultdict(list)
     if sheet_ids:
-        inv_map = dict(
-            SheetInventory.objects.filter(sheet_id__in=sheet_ids).values_list("sheet_id", "onedrive_url")
-        )
         for doc in (
             SheetDocument.objects
-            .filter(sheet_id__in=sheet_ids, kind=SheetDocument.Kind.CONTENT)
-            .order_by("display_order", "id")
+            .filter(sheet_id__in=sheet_ids, kind__in=[SheetDocument.Kind.COVER, SheetDocument.Kind.CONTENT])
+            .order_by("kind", "display_order", "id")
         ):
             docs_by_sheet[doc.sheet_id].append({
                 "name": doc.display_name,
                 "url": doc.pdf.url if doc.pdf else "",
                 "page_count": int(doc.page_count or 0),
+                "kind_label": doc.get_kind_display(),
             })
     for o in orders:
         if o.sheet_id:
-            o.file_url = inv_map.get(o.sheet_id) or ""
+            o.file_url = ""
             o.file_url_is_custom = False
             o.pdf_docs = docs_by_sheet.get(o.sheet_id, [])
         else:
@@ -2694,7 +2743,7 @@ def print_shop_queue_preview(request: HttpRequest) -> JsonResponse:
             "quantity": int(o.quantity or 0),
             "due_date": o.due_date.strftime("%d/%m/%Y") if o.due_date else "",
             "is_overdue": bool(o.due_date and o.due_date < today),
-            "has_file": bool(o.file_url),
+            "has_file": bool(o.pdf_docs or o.file_url),
             "progress": int(getattr(o, "printed_quantity", 0) or 0),
         })
 

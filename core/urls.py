@@ -69,6 +69,7 @@ urlpatterns = [
     path("sheet-inventory/continuous-upload/", views.sheet_inventory_continuous_upload, name="sheet_inventory_continuous_upload"),
     path("sheet-inventory/staging/", views.sheet_staging_page, name="sheet_staging_page"),
     path("sheet-inventory/staging/upload/", views.sheet_staging_upload, name="sheet_staging_upload"),
+    path("sheet-inventory/staging/upload-chunk/", views.sheet_upload_chunk, name="sheet_upload_chunk"),
     path("sheet-inventory/staging/<int:pk>/link/", views.sheet_staging_link, name="sheet_staging_link"),
     path("sheet-inventory/staging/<int:pk>/delete/", views.sheet_staging_delete, name="sheet_staging_delete"),
 

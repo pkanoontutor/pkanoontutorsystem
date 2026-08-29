@@ -89,6 +89,7 @@
   </section>
 </div>
 
+{% include "core/_chunked_upload_js.html" %}
 <script>
 document.addEventListener('DOMContentLoaded', function(){
   const CSRF = "{{ csrf_token }}";
@@ -179,49 +180,7 @@ document.addEventListener('DOMContentLoaded', function(){
     if(e.target.closest('[data-clear-armed]')){ armedSheet = null; renderArmed(); }
   });
 
-  // ---------- upload to staging (retry + progress, same pattern as the
-  // continuous-upload page) ----------
-  const MAX_ATTEMPTS = 3;
-  const XHR_TIMEOUT_MS = 30 * 60 * 1000;
-
-  function uploadOneAttempt(file, onProgress){
-    return new Promise(function(resolve, reject){
-      const fd = new FormData();
-      fd.append('pdf', file);
-      const xhr = new XMLHttpRequest();
-      xhr.open('POST', "{% url 'core:sheet_staging_upload' %}");
-      xhr.setRequestHeader('X-CSRFToken', CSRF);
-      xhr.timeout = XHR_TIMEOUT_MS;
-      xhr.upload.addEventListener('progress', function(e){
-        if(e.lengthComputable) onProgress(Math.round(e.loaded / e.total * 100));
-      });
-      xhr.addEventListener('load', function(){
-        let parsed = {};
-        try{ parsed = JSON.parse(xhr.responseText || '{}'); }catch(e){}
-        if(xhr.status >= 200 && xhr.status < 300 && parsed.ok) resolve(parsed);
-        else reject({retryable:false, error:new Error(parsed.message || ('อัปโหลดไม่สำเร็จ (' + xhr.status + ')'))});
-      });
-      xhr.addEventListener('error', function(){ reject({retryable:true, error:new Error('เชื่อมต่อขาดหายระหว่างอัปโหลด')}); });
-      xhr.addEventListener('timeout', function(){ reject({retryable:true, error:new Error('หมดเวลาอัปโหลด (ไฟล์ใหญ่/เน็ตช้า)')}); });
-      xhr.send(fd);
-    });
-  }
-  async function uploadOneFile(file, onProgress, onRetryStatus){
-    let lastErr;
-    for(let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++){
-      try{
-        onProgress(0);
-        return await uploadOneAttempt(file, onProgress);
-      }catch(failure){
-        lastErr = failure.error || failure;
-        if(!failure.retryable || attempt === MAX_ATTEMPTS) throw lastErr;
-        onRetryStatus(attempt + 1, MAX_ATTEMPTS);
-        await new Promise(function(r){ setTimeout(r, 1500 * attempt); });
-      }
-    }
-    throw lastErr;
-  }
-
+  // ---------- upload to staging (chunked + resumable, see PkUpload) ----------
   async function uploadFilesToStaging(fileList){
     const files = Array.prototype.filter.call(fileList, function(f){ return /\.pdf$/i.test(f.name); });
     if(!files.length) return;
@@ -231,12 +190,16 @@ document.addEventListener('DOMContentLoaded', function(){
       const prefix = files.length > 1 ? (i + 1) + '/' + files.length + ' ' : '';
       bigDropText.textContent = prefix + 'กำลังอัปโหลด ' + file.name + ' 0%';
       try{
-        const data = await uploadOneFile(file, function(pct){
-          bigDropText.textContent = prefix + 'กำลังอัปโหลด ' + file.name + ' ' + pct + '%';
-        }, function(attempt, max){
-          bigDropText.textContent = prefix + 'เชื่อมต่อขาดหาย กำลังลองใหม่ (' + attempt + '/' + max + ')...';
+        const staged = await PkUpload.uploadPdf(file, {
+          csrf: CSRF,
+          onProgress: function(pct){
+            bigDropText.textContent = prefix + 'กำลังอัปโหลด ' + file.name + ' ' + pct + '%';
+          },
+          onStatus: function(msg){
+            bigDropText.textContent = prefix + file.name + ' — ' + msg;
+          },
         });
-        STAGED.unshift(data.staged);
+        STAGED.unshift(staged);
         renderStaged();
       }catch(err){
         bigDropText.textContent = 'ไม่สำเร็จ: ' + file.name + ' (' + (err.message||'') + ')';

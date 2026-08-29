@@ -24,6 +24,19 @@ services:
     # upload no longer starves everything else.
     startCommand: gunicorn config.wsgi:application --timeout 1800 --graceful-timeout 60 --workers 2 --worker-class gthread --threads 4
 
+    # Uploaded sheet PDFs are written under MEDIA_ROOT. Without a mounted
+    # disk that path lives on the container's own filesystem, which Render
+    # rebuilds on every deploy and restart -- so files that uploaded
+    # perfectly would silently disappear later. This mount is what makes
+    # them survive. MEDIA_ROOT below must stay inside mountPath.
+    disk:
+      name: pkanoontutor-media
+      mountPath: /var/data
+      sizeGB: 20
+    envVars:
+      - key: MEDIA_ROOT
+        value: /var/data/media
+
   # Full-system Excel export emailed to pkanoontutor@gmail.com.
   # Schedules are UTC; the site runs on Asia/Bangkok (UTC+7), so 23:59 local
   # is 16:59 UTC the same day.

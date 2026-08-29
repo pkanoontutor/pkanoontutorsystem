@@ -1,0 +1,120 @@
+{% comment %}
+Shared chunked-upload client. Include once per page that uploads sheet PDFs,
+then call PkUpload.uploadPdf(file, {csrf, onProgress, onStatus}).
+
+Why chunks rather than one request per file: a whole-file POST holds a
+gunicorn worker for the entire transfer, so a handful of concurrent uploads
+exhausts every slot, the server stops reading those sockets, and the
+browser's progress bar freezes partway with no error to show. Each chunk
+here is its own short request, so a worker is never tied up, a stalled
+chunk fails fast and retries on its own, and an interrupted file resumes
+from the offset the server reports instead of starting over.
+{% endcomment %}
+<script>
+window.PkUpload = (function(){
+  "use strict";
+
+  var CHUNK_SIZE = 2 * 1024 * 1024;   // small enough to clear any proxy limit
+  var MAX_ATTEMPTS = 5;
+  var CHUNK_TIMEOUT_MS = 120000;      // a 2MB chunk that takes >2min is stalled
+  var CHUNK_URL = "{% url 'core:sheet_upload_chunk' %}";
+
+  function randomId(){
+    var bytes = new Uint8Array(16);
+    (window.crypto || window.msCrypto).getRandomValues(bytes);
+    return Array.prototype.map.call(bytes, function(b){
+      return ('0' + b.toString(16)).slice(-2);
+    }).join('');
+  }
+
+  function sendChunk(csrf, fields, blob){
+    return new Promise(function(resolve, reject){
+      var fd = new FormData();
+      Object.keys(fields).forEach(function(k){ fd.append(k, fields[k]); });
+      fd.append('chunk', blob, fields.filename);
+
+      var xhr = new XMLHttpRequest();
+      xhr.open('POST', CHUNK_URL);
+      xhr.setRequestHeader('X-CSRFToken', csrf);
+      xhr.timeout = CHUNK_TIMEOUT_MS;
+      xhr.addEventListener('load', function(){
+        var parsed = {};
+        try { parsed = JSON.parse(xhr.responseText || '{}'); } catch(e){}
+        if(xhr.status >= 200 && xhr.status < 300 && parsed.ok){
+          resolve(parsed);
+        } else if(xhr.status === 409 && parsed.resync){
+          // Server holds a different offset than we assumed -- not an
+          // error, just re-seek and continue from where it actually is.
+          resolve({resync: true, offset: parsed.offset});
+        } else {
+          reject({retryable: xhr.status >= 500 || xhr.status === 0,
+                  error: new Error(parsed.message || ('อัปโหลดไม่สำเร็จ (' + xhr.status + ')'))});
+        }
+      });
+      xhr.addEventListener('error', function(){
+        reject({retryable: true, error: new Error('เชื่อมต่อขาดหายระหว่างอัปโหลด')});
+      });
+      xhr.addEventListener('timeout', function(){
+        reject({retryable: true, error: new Error('ส่วนนี้ของไฟล์ค้าง กำลังลองใหม่')});
+      });
+      xhr.send(fd);
+    });
+  }
+
+  function sleep(ms){ return new Promise(function(r){ setTimeout(r, ms); }); }
+
+  // Uploads one PDF and resolves with the created staged-file payload.
+  async function uploadPdfNow(file, opts){
+    opts = opts || {};
+    var csrf = opts.csrf;
+    var onProgress = opts.onProgress || function(){};
+    var onStatus = opts.onStatus || function(){};
+    var uploadId = randomId();
+    var offset = 0;
+
+    onProgress(0);
+    while(offset < file.size){
+      var end = Math.min(offset + CHUNK_SIZE, file.size);
+      var blob = file.slice(offset, end);
+      var fields = {
+        upload_id: uploadId,
+        filename: file.name,
+        offset: offset,
+        total_size: file.size,
+      };
+
+      var sent = null, lastErr = null;
+      for(var attempt = 1; attempt <= MAX_ATTEMPTS; attempt++){
+        try {
+          sent = await sendChunk(csrf, fields, blob);
+          break;
+        } catch(failure){
+          lastErr = failure.error || failure;
+          if(!failure.retryable || attempt === MAX_ATTEMPTS) throw lastErr;
+          onStatus('เชื่อมต่อขาดหาย กำลังลองใหม่ (' + (attempt + 1) + '/' + MAX_ATTEMPTS + ')...');
+          await sleep(1000 * attempt);
+        }
+      }
+      if(!sent) throw (lastErr || new Error('อัปโหลดไม่สำเร็จ'));
+
+      offset = sent.offset;
+      onProgress(Math.round(offset / file.size * 100));
+      if(sent.done) return sent.staged;
+    }
+    throw new Error('อัปโหลดไม่ครบไฟล์');
+  }
+
+  // One upload at a time across the whole page. Several large uploads racing
+  // each other is exactly what exhausted the server's request slots before,
+  // and serialising them also makes each one finish sooner.
+  var queue = Promise.resolve();
+  function uploadPdf(file, opts){
+    var run = queue.then(function(){ return uploadPdfNow(file, opts); },
+                         function(){ return uploadPdfNow(file, opts); });
+    queue = run.catch(function(){});
+    return run;
+  }
+
+  return {uploadPdf: uploadPdf, CHUNK_SIZE: CHUNK_SIZE};
+})();
+</script>

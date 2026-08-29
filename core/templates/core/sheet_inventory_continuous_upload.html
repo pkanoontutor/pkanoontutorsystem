@@ -135,6 +135,7 @@
 
 <div id="globalUploadStatus" class="global-status" hidden></div>
 
+{% include "core/_chunked_upload_js.html" %}
 <script>
 document.addEventListener('DOMContentLoaded', function(){
   const CSRF = "{{ csrf_token }}";
@@ -142,16 +143,6 @@ document.addEventListener('DOMContentLoaded', function(){
   const KIND_LABEL = {cover: '📘 ปก', content: '📄 เนื้อหา', answer: '✅ เฉลย'};
   const globalStatus = document.getElementById('globalUploadStatus');
   let globalInFlight = 0;
-
-  // Large PDFs sent over a slow/flaky connection are the main reason big
-  // uploads "just fail" -- a single dropped packet kills the whole XHR with
-  // no way to know it was almost done. Retrying transparently (network
-  // errors/timeouts only, never on a server-rejected file) turns a lot of
-  // those into a slightly-delayed success instead of a dead end. The 30
-  // minute per-attempt timeout matches gunicorn's own worker timeout
-  // (render.yaml), so the client never gives up before the server would.
-  const MAX_ATTEMPTS = 3;
-  const XHR_TIMEOUT_MS = 30 * 60 * 1000;
 
   function esc(s){ return String(s==null?'':s).replace(/[&<>'"]/g, function(c){
     return {'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c];
@@ -210,47 +201,24 @@ document.addEventListener('DOMContentLoaded', function(){
       .catch(function(){ alert('ลบไม่สำเร็จ'); });
   }
 
-  function uploadOneAttempt(kind, sheetId, file, onProgress){
-    return new Promise(function(resolve, reject){
-      const fd = new FormData();
-      fd.append('kind', kind);
-      fd.append('pdf', file);
-      const xhr = new XMLHttpRequest();
-      xhr.open('POST', '/sheet-inventory/sheet/' + sheetId + '/documents/upload/');
-      xhr.setRequestHeader('X-CSRFToken', CSRF);
-      xhr.timeout = XHR_TIMEOUT_MS;
-      xhr.upload.addEventListener('progress', function(e){
-        if(e.lengthComputable) onProgress(Math.round(e.loaded / e.total * 100));
-      });
-      xhr.addEventListener('load', function(){
-        let parsed = {};
-        try{ parsed = JSON.parse(xhr.responseText || '{}'); }catch(e){}
-        if(xhr.status >= 200 && xhr.status < 300 && parsed.ok) resolve(parsed);
-        // A response the server actually sent back (even an error one) means
-        // the request completed -- retrying it would only repeat the same
-        // rejection, so only network-level failures below are retryable.
-        else reject({retryable:false, error:new Error(parsed.message || ('อัปโหลดไม่สำเร็จ (' + xhr.status + ')'))});
-      });
-      xhr.addEventListener('error', function(){ reject({retryable:true, error:new Error('เชื่อมต่อขาดหายระหว่างอัปโหลด')}); });
-      xhr.addEventListener('timeout', function(){ reject({retryable:true, error:new Error('หมดเวลาอัปโหลด (ไฟล์ใหญ่/เน็ตช้า)')}); });
-      xhr.send(fd);
+  // The file goes up in chunks to the shared staging endpoint (so no single
+  // request ever holds a server slot for a whole transfer), then a second,
+  // tiny request attaches the already-uploaded file to this sheet and kind.
+  async function uploadOneFile(kind, sheetId, file, onProgress, onStatus){
+    const staged = await PkUpload.uploadPdf(file, {
+      csrf: CSRF,
+      onProgress: onProgress,
+      onStatus: onStatus,
     });
-  }
-
-  async function uploadOneFile(kind, sheetId, file, onProgress, onRetryStatus){
-    let lastErr;
-    for(let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++){
-      try{
-        onProgress(0);
-        return await uploadOneAttempt(kind, sheetId, file, onProgress);
-      }catch(failure){
-        lastErr = failure.error || failure;
-        if(!failure.retryable || attempt === MAX_ATTEMPTS) throw lastErr;
-        onRetryStatus(attempt + 1, MAX_ATTEMPTS);
-        await new Promise(function(r){ setTimeout(r, 1500 * attempt); });
-      }
-    }
-    throw lastErr;
+    const fd = new FormData();
+    fd.append('sheet_id', sheetId);
+    fd.append('kind', kind);
+    const res = await fetch('/sheet-inventory/staging/' + staged.id + '/link/', {
+      method: 'POST', headers: {'X-CSRFToken': CSRF}, body: fd,
+    });
+    const data = await res.json().catch(function(){ return {ok:false}; });
+    if(!data.ok) throw new Error(data.message || 'เชื่อมไฟล์กับชีทไม่สำเร็จ');
+    return data;
   }
 
   // Each zone's own files upload one at a time (keeps its progress bar
@@ -276,8 +244,8 @@ document.addEventListener('DOMContentLoaded', function(){
         const data = await uploadOneFile(kind, sheetId, file, function(pct){
           bar.style.width = pct + '%';
           text.textContent = prefix + file.name + ' ' + pct + '%';
-        }, function(attempt, max){
-          text.textContent = prefix + 'เชื่อมต่อขาดหาย กำลังลองใหม่ (' + attempt + '/' + max + ')...';
+        }, function(msg){
+          text.textContent = prefix + msg;
         });
         DOCS_BY_SHEET[sheetId] = DOCS_BY_SHEET[sheetId] || {cover:[],content:[],answer:[]};
         if(kind === 'cover'){

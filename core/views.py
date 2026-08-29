@@ -7968,6 +7968,7 @@ def school_finance(request: HttpRequest) -> HttpResponse:
             for tid in tutor_ids:
                 hours_raw = (request.POST.get(f"hours_{tid}") or "").strip()
                 online_hours_raw = (request.POST.get(f"online_hours_{tid}") or "").strip()
+                online_rate_raw = (request.POST.get(f"online_rate_{tid}") or "").strip()
                 idle_raw = (request.POST.get(f"idle_{tid}") or "").strip()
                 note_raw = (request.POST.get(f"note_{tid}") or "").strip()
                 special_rate_325 = request.POST.get(f"special_rate_325_{tid}") == "yes"
@@ -8008,6 +8009,12 @@ def school_finance(request: HttpRequest) -> HttpResponse:
                 )
                 entry.teaching_hours = hours
                 entry.online_teaching_hours = online_hours
+                # Blank = keep the 300/hr default; a number overrides it for
+                # this entry only, same convention as the onsite rate/travel.
+                try:
+                    entry.online_hourly_rate_override = Decimal(online_rate_raw) if online_rate_raw else None
+                except Exception:
+                    entry.online_hourly_rate_override = None
                 entry.special_rate_325 = special_rate_325
                 entry.idle_fee = idle_fee
                 entry.note = note_raw
@@ -10249,7 +10256,14 @@ def _schedule_tutor_day_summary(schedule) -> list:
         travel_override = entry.travel_fee_override if entry is not None else None
         rate = rate_override if rate_override is not None else default_rate
         travel_fee = travel_override if travel_override is not None else default_travel_fee
+        # Online hours aren't derivable from the onsite schedule grid, so they
+        # are always typed in here; a saved entry's values come back on reopen.
+        online_hours = entry.online_teaching_hours if entry is not None else None
+        online_rate_override = entry.online_hourly_rate_override if entry is not None else None
         rows.append({
+            "online_hours": online_hours,
+            "online_rate_override": online_rate_override,
+            "default_online_rate": TutorPayrollEntry.DEFAULT_ONLINE_HOURLY_RATE,
             "tutor": tutor,
             "taught_hours": taught,
             "gap_hours": gap,
@@ -10318,6 +10332,19 @@ def teaching_schedule_send_payroll(request: HttpRequest, pk: int) -> HttpRespons
                 entry.travel_fee_override = Decimal(raw_travel) if raw_travel else None
             except Exception:
                 entry.travel_fee_override = None
+
+            # Online hours are typed into the popup (the schedule grid only
+            # covers onsite), with the same blank-means-default rate rule.
+            raw_online_hours = (request.POST.get(f"online_hours_{tid}") or "").strip()
+            raw_online_rate = (request.POST.get(f"online_rate_override_{tid}") or "").strip()
+            try:
+                entry.online_teaching_hours = Decimal(raw_online_hours) if raw_online_hours else Decimal("0")
+            except Exception:
+                entry.online_teaching_hours = Decimal("0")
+            try:
+                entry.online_hourly_rate_override = Decimal(raw_online_rate) if raw_online_rate else None
+            except Exception:
+                entry.online_hourly_rate_override = None
 
             gap_note = f"ชม.แหว่ง {row['gap_hours']} ชม. (จากตารางสอน)" if row["gap_hours"] else ""
             if gap_note and gap_note not in (entry.note or ""):

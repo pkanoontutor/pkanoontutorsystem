@@ -339,7 +339,8 @@
   }
   .payroll-row{
     display:grid;
-    grid-template-columns:minmax(155px,1.1fr) 92px 92px 135px 120px minmax(150px,1fr) 170px 118px minmax(145px,auto);
+    /* teacher | onsite ชม. | online ชม. | online เรท | พิเศษ325 | นั่งว่าง | หมายเหตุ | live | total | tools */
+    grid-template-columns:minmax(155px,1.1fr) 92px 92px 104px 135px 120px minmax(150px,1fr) 170px 118px minmax(145px,auto);
     gap:9px;
     align-items:end;
     padding:12px;
@@ -667,7 +668,7 @@
     .filter-actions{grid-column:1/-1;justify-content:flex-start;}
     .expense-form{grid-template-columns:repeat(2,1fr);}
     .payroll-row{
-      grid-template-columns:minmax(160px,1.1fr) 92px 92px 135px 120px minmax(160px,1fr);
+      grid-template-columns:minmax(160px,1.1fr) 92px 92px 104px 135px 120px minmax(160px,1fr);
     }
     .row-tools{grid-column:1/-1;justify-content:flex-start;}
   }
@@ -960,7 +961,7 @@
         <span class="rule-pill">Onsite 1 ชม. = 550/ชม. + เดินทาง 200</span>
         <span class="rule-pill">Onsite 2–3 ชม. = 350/ชม. + เดินทาง 150</span>
         <span class="rule-pill">Onsite 4 ชม.+ = 300/ชม. หรือ 325/ชม. ถ้าติ๊กพิเศษ + เดินทาง 100</span>
-        <span class="rule-pill">Online = 300/ชม. ไม่คิดค่าเดินทาง</span>
+        <span class="rule-pill">Online = 300/ชม. (แก้เรทรายคนได้) ไม่คิดค่าเดินทาง</span>
       </div>
     </div>
 
@@ -992,6 +993,13 @@
               <div class="field">
                 <label>ชม.สอนออนไลน์</label>
                 <input class="js-online-hours" type="number" name="online_hours_{{ tutor.id }}" step="0.25" min="0" value="{% if entry %}{{ entry.online_teaching_hours }}{% endif %}">
+              </div>
+
+              <div class="field">
+                <label>เรทออนไลน์/ชม.</label>
+                <input class="js-online-rate" type="number" name="online_rate_{{ tutor.id }}" step="0.01" min="0"
+                       placeholder="300"
+                       value="{% if entry and entry.online_hourly_rate_override is not None %}{{ entry.online_hourly_rate_override|floatformat:2 }}{% endif %}">
               </div>
 
               <label class="special-toggle">
@@ -1136,6 +1144,7 @@
               <th class="num">เรท</th>
               <th class="num">ค่าสอน onsite</th>
               <th class="num">Online</th>
+              <th class="num">เรท online</th>
               <th class="num">ค่าสอน online</th>
               <th class="num">เดินทาง</th>
               <th class="num">อื่น ๆ</th>
@@ -1153,6 +1162,7 @@
               <td class="num">{{ p.hourly_rate|floatformat:0 }}</td>
               <td class="num">{{ p.teaching_fee|floatformat:2 }}</td>
               <td class="num">{{ p.online_teaching_hours }}</td>
+              <td class="num">{{ p.online_hourly_rate|floatformat:0 }}</td>
               <td class="num">{{ p.online_teaching_fee|floatformat:2 }}</td>
               <td class="num">{{ p.travel_fee|floatformat:2 }}</td>
               <td class="num">{{ p.idle_fee|floatformat:2 }}</td>
@@ -1165,7 +1175,7 @@
               </td>
             </tr>
             {% empty %}
-            <tr><td colspan="12" style="text-align:center;color:#64748b;">ยังไม่มีค่าจ้างติวเตอร์ในช่วงนี้</td></tr>
+            <tr><td colspan="13" style="text-align:center;color:#64748b;">ยังไม่มีค่าจ้างติวเตอร์ในช่วงนี้</td></tr>
             {% endfor %}
           </tbody>
         </table>
@@ -1254,7 +1264,10 @@
     const rate = rateForHours(h, specialRate);
     const travel = travelForHours(h);
     const onsiteFee = h * rate;
-    const onlineFee = onlineH * 300;
+    // Blank online rate = use the 300/hr default (shown as the placeholder).
+    const onlineRateRaw = row.querySelector('.js-online-rate')?.value;
+    const onlineRate = onlineRateRaw === '' || onlineRateRaw == null ? 300 : Number(onlineRateRaw);
+    const onlineFee = onlineH * onlineRate;
     const total = onsiteFee + onlineFee + travel + idle;
 
     row.querySelector('.js-rate').textContent = rate ? rate.toLocaleString('en-US') : '-';

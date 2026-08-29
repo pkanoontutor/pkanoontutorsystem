@@ -1893,6 +1893,11 @@ class TutorPayrollEntry(models.Model):
     )
     teaching_fee = models.DecimalField("ค่าสอน onsite", max_digits=12, decimal_places=2, default=0)
     online_teaching_hours = models.DecimalField("จำนวนชั่วโมงสอนออนไลน์", max_digits=5, decimal_places=2, default=0)
+    online_hourly_rate = models.DecimalField("เรทออนไลน์ต่อชั่วโมง", max_digits=10, decimal_places=2, default=300)
+    online_hourly_rate_override = models.DecimalField(
+        "เรทออนไลน์ที่กำหนดเอง", max_digits=10, decimal_places=2, null=True, blank=True,
+        help_text="เว้นว่างเพื่อใช้เรทออนไลน์เริ่มต้น 300 บาท/ชม. ใส่ตัวเลขเพื่อ override",
+    )
     online_teaching_fee = models.DecimalField("ค่าสอนออนไลน์", max_digits=12, decimal_places=2, default=0)
     travel_fee = models.DecimalField("ค่าเดินทาง", max_digits=12, decimal_places=2, default=0)
     travel_fee_override = models.DecimalField(
@@ -1935,12 +1940,18 @@ class TutorPayrollEntry(models.Model):
             return Decimal("150")
         return Decimal("100")
 
-    @staticmethod
-    def calculate_online_teaching_fee(online_hours: Decimal) -> Decimal:
+    # Online teaching is a flat rate regardless of how many hours were taught
+    # (unlike onsite, which steps 550/350/325-300 by hours) -- so there is no
+    # hours-based calculation here, just a default anyone can override.
+    DEFAULT_ONLINE_HOURLY_RATE = Decimal("300")
+
+    @classmethod
+    def calculate_online_teaching_fee(cls, online_hours: Decimal, rate: Decimal | None = None) -> Decimal:
         online_hours = Decimal(str(online_hours or 0))
         if online_hours <= 0:
             return Decimal("0")
-        return online_hours * Decimal("300")
+        rate = cls.DEFAULT_ONLINE_HOURLY_RATE if rate is None else Decimal(str(rate))
+        return online_hours * rate
 
     def recalculate(self):
         hours = Decimal(str(self.teaching_hours or 0))
@@ -1955,7 +1966,12 @@ class TutorPayrollEntry(models.Model):
         )
         self.teaching_fee = hours * self.hourly_rate
         self.online_teaching_hours = online_hours
-        self.online_teaching_fee = self.calculate_online_teaching_fee(online_hours)
+        self.online_hourly_rate = (
+            Decimal(str(self.online_hourly_rate_override))
+            if self.online_hourly_rate_override is not None
+            else self.DEFAULT_ONLINE_HOURLY_RATE
+        )
+        self.online_teaching_fee = self.calculate_online_teaching_fee(online_hours, self.online_hourly_rate)
         self.travel_fee = (
             Decimal(str(self.travel_fee_override))
             if self.travel_fee_override is not None

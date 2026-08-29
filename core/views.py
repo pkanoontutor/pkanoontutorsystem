@@ -7017,6 +7017,20 @@ def _low_stock_sheets(threshold: int = 3) -> list[dict]:
     return rows
 
 
+def _active_enrollment_summaries_by_student() -> dict:
+    """Active enrollments grouped by student id, for the admin-tool quick
+    search box: enough to link straight into a renewal notice (needs the
+    enrollment id, not just the student) without a second lookup."""
+    out: dict[int, list[dict]] = {}
+    for e in _active_enrollments_for_payment().select_related("tutoring_class"):
+        out.setdefault(e.student_id, []).append({
+            "id": e.id,
+            "class_name": e.tutoring_class.name,
+            "remaining_sessions": int(e.remaining_sessions or 0),
+        })
+    return out
+
+
 def pkanoon_admin_tool(request: HttpRequest) -> HttpResponse:
     """Private landing page for sensitive school tools."""
     from .models import AdminToolCard
@@ -7031,6 +7045,8 @@ def pkanoon_admin_tool(request: HttpRequest) -> HttpResponse:
         "binding_type_choices": SheetPrintOrder.BindingType.choices,
         "spine_color_choices": _print_color_choices(),
         "default_print_due_date": timezone.localdate() + timedelta(days=3),
+        "students_json": json.dumps(_allocation_students_json(), ensure_ascii=False),
+        "student_enrollments_json": json.dumps(_active_enrollment_summaries_by_student(), ensure_ascii=False),
     })
 
 

@@ -558,14 +558,29 @@ function fillFromAdmissionById(id){
   document.getElementById('admissionIdField').value = a.id;
   document.getElementById('paymentForm').scrollIntoView({behavior:'smooth', block:'start'});
 }
+function fillExistingStudentById(id){
+  const s = STUDENTS.find(function(x){ return Number(x.id) === Number(id); });
+  if(!s) return;
+  document.querySelector('input[name="student_mode"][value="existing"]').checked = true;
+  toggleStudentMode();
+  document.getElementById('studentSearch').value = s.label || '';
+  document.getElementById('studentId').value = s.id;
+  document.getElementById('studentPickedBox').innerHTML = `<b>${s.nickname || '-'}</b><br>${s.full_name || '-'}<br>${s.grade_level || '-'} · ${s.school_name || '-'}`;
+  renderEnrollmentsForStudent(s.id, true);
+  document.getElementById('paymentForm').scrollIntoView({behavior:'smooth', block:'start'});
+}
 
 document.addEventListener('DOMContentLoaded',()=>{
   toggleStudentMode();applyPaymentTypeDefault();toggleReceiptKind();
   // Coming from the admin tool's real-time overview: "สร้างใบเสร็จ" on an
   // admission card links here with ?admission_id=<id> to skip re-typing the
-  // student's info.
-  var admissionId = new URLSearchParams(window.location.search).get('admission_id');
-  if(admissionId){ fillFromAdmissionById(admissionId); }
+  // student's info; the student quick-search box links here with
+  // ?student_id=<id> for an existing student instead.
+  const params = new URLSearchParams(window.location.search);
+  const admissionId = params.get('admission_id');
+  const studentId = params.get('student_id');
+  if(studentId){ fillExistingStudentById(studentId); }
+  else if(admissionId){ fillFromAdmissionById(admissionId); }
 });
 </script>
 {% endblock %}

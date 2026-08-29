@@ -7938,6 +7938,35 @@ def course_payment_receipt_image(request: HttpRequest, pk: int) -> HttpResponse:
     return render(request, "core/course_payment_receipt_image.html", {"payment": payment})
 
 
+@login_required
+@xframe_options_sameorigin
+def course_payment_sessions_card_image(request: HttpRequest, pk: int) -> HttpResponse:
+    """A second shareable card alongside the receipt: how many sessions are
+    left right now, plus the payment history that got the student there.
+    Only meaningful for a course-linked payment -- "other" (non-course)
+    receipts have no Enrollment to report on."""
+    payment = get_object_or_404(
+        CoursePayment.objects.select_related("student", "enrollment", "enrollment__tutoring_class"),
+        pk=pk,
+    )
+    enrollment = payment.enrollment
+    if not enrollment:
+        return HttpResponse("ใบเสร็จนี้ไม่ได้ผูกกับ Enrollment จึงไม่มีข้อมูลครั้งเรียนคงเหลือ", status=404)
+
+    history = (
+        enrollment.course_payments
+        .filter(status=CoursePayment.ReceiptStatus.ISSUED)
+        .order_by("-payment_date", "-created_at")
+    )
+
+    return render(request, "core/course_payment_sessions_card_image.html", {
+        "payment": payment,
+        "enrollment": enrollment,
+        "remaining_sessions": enrollment.remaining_sessions,
+        "history": history,
+    })
+
+
 @require_POST
 @login_required
 def course_payment_cancel(request: HttpRequest, pk: int) -> HttpResponse:

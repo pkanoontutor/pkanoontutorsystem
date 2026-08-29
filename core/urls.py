@@ -118,6 +118,7 @@ urlpatterns = [
     path("course-payments/quick-pick/<int:pk>/dismiss/", views.course_payment_dismiss_quick_pick, name="course_payment_dismiss_quick_pick"),
     path("course-payments/<int:pk>/", views.course_payment_detail, name="course_payment_detail"),
     path("course-payments/<int:pk>/receipt-image/", views.course_payment_receipt_image, name="course_payment_receipt_image"),
+    path("course-payments/<int:pk>/sessions-card-image/", views.course_payment_sessions_card_image, name="course_payment_sessions_card_image"),
     path("course-payments/<int:pk>/cancel/", views.course_payment_cancel, name="course_payment_cancel"),
 
 

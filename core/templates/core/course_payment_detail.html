@@ -21,11 +21,16 @@
   .actions{display:flex;gap:8px;flex-wrap:wrap}
   .cancelbox{background:#fff7ed;border:1px solid #fed7aa;border-radius:16px;padding:12px}
   textarea{width:100%;border:1px solid #e2e8f0;border-radius:12px;padding:10px;font-weight:800;min-height:70px}
-  .preview-head{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px;}
+  .preview-head{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;}
   .preview-title{font-size:16px;font-weight:1000;}
   .preview-actions{display:flex;gap:6px;flex-wrap:wrap;}
+  .save-picker{display:flex;gap:10px;flex-wrap:wrap;align-items:center;background:#f8fafc;border:1px solid #e2e8f0;border-radius:14px;padding:9px 11px;margin-bottom:10px;}
+  .save-picker label{display:flex;align-items:center;gap:6px;font-weight:900;font-size:13px;color:#0f172a;cursor:pointer;}
+  .save-picker input{width:auto;margin:0;}
+  .preview-cards{display:grid;gap:12px;}
   .preview-frame-wrap{border:1px solid #f1e0ad;border-radius:16px;overflow:hidden;background:#fdf3d8;height:640px;}
   .preview-frame-wrap iframe{width:100%;height:100%;border:0;}
+  .preview-card-label{font-size:12px;font-weight:1000;color:#8a6a3a;margin-bottom:6px;}
   .copy-toast{font-size:12px;font-weight:800;color:#166534;margin-top:8px;display:none;}
   .copy-toast.show{display:block;}
   @media(max-width:960px){.cols{grid-template-columns:1fr}.preview-frame-wrap{height:560px;}}
@@ -41,7 +46,10 @@
     </div>
     <div class="actions">
       <a class="btnx soft" href="/course-payments/">← รายการ</a>
-      <a class="btnx soft" href="{% url 'core:course_payment_receipt_image' payment.id %}" target="_blank">เปิดในแท็บใหม่</a>
+      <a class="btnx soft" href="{% url 'core:course_payment_receipt_image' payment.id %}" target="_blank">เปิดใบเสร็จแท็บใหม่</a>
+      {% if payment.enrollment_id %}
+        <a class="btnx soft" href="{% url 'core:course_payment_sessions_card_image' payment.id %}" target="_blank">เปิดใบครั้งเรียนคงเหลือแท็บใหม่</a>
+      {% endif %}
     </div>
   </div>
 
@@ -83,16 +91,38 @@
 
     <div class="cardx">
       <div class="preview-head">
-        <div class="preview-title">🧾 พรีวิวใบเสร็จ</div>
+        <div class="preview-title">🧾 พรีวิวเอกสาร</div>
         <div class="preview-actions">
-          <button class="btnx green" type="button" onclick="copyReceiptImage()">Copy Image</button>
-          <button class="btnx soft" type="button" onclick="downloadReceiptImage()">Download PNG</button>
+          <button class="btnx green" type="button" onclick="copySelected()">Copy / Share ที่เลือก</button>
+          <button class="btnx soft" type="button" onclick="downloadSelected()">Download PNG ที่เลือก</button>
         </div>
       </div>
-      <div class="preview-frame-wrap">
-        <iframe id="receiptFrame" src="{% url 'core:course_payment_receipt_image' payment.id %}"></iframe>
+
+      <div class="save-picker">
+        <span style="font-size:12px;font-weight:1000;color:#64748b;">เลือกใบที่จะบันทึก:</span>
+        <label><input type="checkbox" id="includeReceipt" checked> ใบเสร็จ</label>
+        {% if payment.enrollment_id %}
+          <label><input type="checkbox" id="includeSessions" checked> ใบครั้งเรียนคงเหลือ</label>
+        {% endif %}
       </div>
-      <div class="copy-toast" id="copyToast">✅ Copy รูปใบเสร็จแล้ว วางได้เลย (Ctrl+V / Cmd+V)</div>
+
+      <div class="preview-cards">
+        <div>
+          <div class="preview-card-label">ใบเสร็จ</div>
+          <div class="preview-frame-wrap">
+            <iframe id="receiptFrame" src="{% url 'core:course_payment_receipt_image' payment.id %}"></iframe>
+          </div>
+        </div>
+        {% if payment.enrollment_id %}
+          <div>
+            <div class="preview-card-label">ใบครั้งเรียนคงเหลือ</div>
+            <div class="preview-frame-wrap">
+              <iframe id="sessionsFrame" src="{% url 'core:course_payment_sessions_card_image' payment.id %}"></iframe>
+            </div>
+          </div>
+        {% endif %}
+      </div>
+      <div class="copy-toast" id="copyToast">✅ บันทึกรูปที่เลือกแล้ว</div>
     </div>
   </div>
 </div>
@@ -102,18 +132,99 @@ function receiptWin(){
   var f=document.getElementById('receiptFrame');
   return f && f.contentWindow;
 }
-function copyReceiptImage(){
-  var w=receiptWin();
-  if(w && typeof w.copyImage === 'function'){
-    w.copyImage();
-    var t=document.getElementById('copyToast');
-    t.classList.add('show');
-    setTimeout(function(){t.classList.remove('show');},4000);
+function sessionsWin(){
+  var f=document.getElementById('sessionsFrame');
+  return f && f.contentWindow;
+}
+function isIOSDevice(){
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+}
+function flashToast(msg){
+  var t=document.getElementById('copyToast');
+  t.textContent = msg || '✅ บันทึกรูปที่เลือกแล้ว';
+  t.classList.add('show');
+  setTimeout(function(){t.classList.remove('show');},4000);
+}
+
+// Which iframe(s) the checkboxes currently point at -- each entry pairs the
+// child window (whose own makeCanvas/downloadImage this page reuses rather
+// than re-capturing the receipt/sessions DOM itself) with a filename.
+function selectedTargets(){
+  var targets=[];
+  var receiptBox=document.getElementById('includeReceipt');
+  var sessionsBox=document.getElementById('includeSessions');
+  if(receiptBox && receiptBox.checked){
+    targets.push({win:receiptWin(), name:'receipt_{{ payment.receipt_no }}.png'});
+  }
+  if(sessionsBox && sessionsBox.checked){
+    targets.push({win:sessionsWin(), name:'sessions_{{ payment.receipt_no }}.png'});
+  }
+  return targets;
+}
+
+async function canvasToFile(win, name){
+  if(!win || typeof win.makeCanvas !== 'function') return null;
+  var canvas=await win.makeCanvas();
+  var blob=await new Promise(function(resolve,reject){
+    canvas.toBlob(function(b){ b ? resolve(b) : reject(new Error('สร้างรูปไม่สำเร็จ')); }, 'image/png');
+  });
+  return new File([blob], name, {type:'image/png'});
+}
+
+async function shareOrCopyOne(file){
+  if(isIOSDevice() && navigator.canShare && navigator.canShare({files:[file]})){
+    await navigator.share({files:[file], title:file.name});
+    return;
+  }
+  if(navigator.clipboard && window.ClipboardItem){
+    await navigator.clipboard.write([new ClipboardItem({'image/png':file})]);
+    return;
+  }
+  var a=document.createElement('a');
+  a.href=URL.createObjectURL(file);
+  a.download=file.name;
+  a.click();
+}
+
+async function copySelected(){
+  var targets=selectedTargets();
+  if(!targets.length){ alert('กรุณาเลือกอย่างน้อย 1 ใบ'); return; }
+  try{
+    var files=[];
+    for(var i=0;i<targets.length;i++){
+      var f=await canvasToFile(targets[i].win, targets[i].name);
+      if(f) files.push(f);
+    }
+    if(!files.length){ alert('สร้างรูปไม่สำเร็จ'); return; }
+
+    if(files.length > 1){
+      // iOS's share sheet natively offers "Save Images" (plural) when given
+      // more than one file -- the one real way to land both in Photos with
+      // a single action. Browsers without multi-file share fall back to
+      // handling each image in turn.
+      if(navigator.canShare && navigator.canShare({files:files})){
+        await navigator.share({files:files, title:'เอกสาร {{ payment.receipt_no }}'});
+        flashToast('✅ ส่งรูปทั้ง ' + files.length + ' ใบไปที่ Share Sheet แล้ว');
+        return;
+      }
+      for(var j=0;j<files.length;j++){ await shareOrCopyOne(files[j]); }
+      flashToast('✅ บันทึกรูปทั้ง ' + files.length + ' ใบแล้ว');
+      return;
+    }
+
+    await shareOrCopyOne(files[0]);
+    flashToast('✅ บันทึกรูปที่เลือกแล้ว');
+  }catch(e){
+    alert('บันทึกไม่สำเร็จ: ' + (e && e.message ? e.message : 'ลองใหม่อีกครั้ง'));
   }
 }
-function downloadReceiptImage(){
-  var w=receiptWin();
-  if(w && typeof w.downloadImage === 'function'){ w.downloadImage(); }
+
+function downloadSelected(){
+  var targets=selectedTargets();
+  if(!targets.length){ alert('กรุณาเลือกอย่างน้อย 1 ใบ'); return; }
+  targets.forEach(function(t){
+    if(t.win && typeof t.win.downloadImage === 'function'){ t.win.downloadImage(); }
+  });
 }
 </script>
 {% endblock %}

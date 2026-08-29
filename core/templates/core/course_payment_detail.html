@@ -45,6 +45,7 @@
       <div style="color:#64748b;margin-top:4px;">{{ payment.student.display_name }}</div>
     </div>
     <div class="actions">
+      <a class="btnx primary" href="{% url 'core:course_payment_create' %}">🧾 สร้างใบเสร็จใหม่</a>
       <a class="btnx soft" href="/course-payments/">← รายการ</a>
       <a class="btnx soft" href="{% url 'core:course_payment_receipt_image' payment.id %}" target="_blank">เปิดใบเสร็จแท็บใหม่</a>
       {% if payment.enrollment_id %}

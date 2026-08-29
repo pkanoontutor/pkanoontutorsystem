@@ -167,6 +167,12 @@
   /* Real-time overview */
   .rt-details{background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--accent);
     border-radius:var(--radius-lg);box-shadow:var(--shadow);overflow:hidden;}
+  /* The student quick-search box reuses .rt-details for its look, but its
+     results dropdown is absolutely positioned to spill *below* the box --
+     .rt-details' own overflow:hidden (there for the <details> accordions'
+     rounded corners) was clipping that dropdown to nothing, so there was no
+     visible room to click a result. */
+  #studentQuickBox{overflow:visible;}
   .rt-summary{cursor:pointer;list-style:none;padding:18px 22px;display:flex;align-items:center;
     justify-content:space-between;gap:12px;flex-wrap:wrap;}
   .rt-summary::-webkit-details-marker{display:none;}

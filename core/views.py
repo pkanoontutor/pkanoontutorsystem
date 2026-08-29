@@ -4941,7 +4941,7 @@ COURSE_SESSION_CHOICES = [
 # Defaults for a "receipt_kind=other" receipt (e.g. a trial-lesson sheet fee)
 # that is not tied to any class or Enrollment.
 DEFAULT_OTHER_RECEIPT_ITEM = "ค่าชีทสำหรับทดลองเรียน"
-DEFAULT_OTHER_RECEIPT_AMOUNT = Decimal("100")
+DEFAULT_OTHER_RECEIPT_AMOUNT = Decimal("190")
 
 
 def _active_students_for_payment():
@@ -5975,10 +5975,15 @@ def course_renewal_notice_detail(request: HttpRequest, pk: int) -> HttpResponse:
 # ✅ New Student Payment Notice (ใบแจ้งชำระค่าคอร์สสำหรับนักเรียนใหม่)
 # =========================================================
 def _new_student_package_list(notice: NewStudentPaymentNotice) -> list[dict]:
+    bonus = notice.pricing_option == NewStudentPaymentNotice.PricingOption.NO_TRIAL
+    labels = (
+        {10: "10 แถม 2 ครั้ง", 20: "20 แถม 2 ครั้ง", 30: "30 แถม 2 ครั้ง"} if bonus
+        else {10: "10 สัปดาห์", 20: "20 สัปดาห์", 30: "30 สัปดาห์"}
+    )
     return [
-        {"label": "10 สัปดาห์", "accent": "blue", "full_price": notice.package_10_full_price, "discount": notice.package_10_discount, "net_price": notice.package_10_net_price},
-        {"label": "20 สัปดาห์", "accent": "green", "full_price": notice.package_20_full_price, "discount": notice.package_20_discount, "net_price": notice.package_20_net_price},
-        {"label": "30 สัปดาห์", "accent": "purple", "full_price": notice.package_30_full_price, "discount": notice.package_30_discount, "net_price": notice.package_30_net_price},
+        {"label": labels[10], "accent": "blue", "full_price": notice.package_10_full_price, "discount": notice.package_10_discount, "net_price": notice.package_10_net_price},
+        {"label": labels[20], "accent": "green", "full_price": notice.package_20_full_price, "discount": notice.package_20_discount, "net_price": notice.package_20_net_price},
+        {"label": labels[30], "accent": "purple", "full_price": notice.package_30_full_price, "discount": notice.package_30_discount, "net_price": notice.package_30_net_price},
     ]
 
 
@@ -6089,6 +6094,17 @@ def _new_student_notice_search_suggestions() -> list[str]:
 def new_student_payment_notice_create(request: HttpRequest, admission_inquiry_id: int) -> HttpResponse:
     inquiry = get_object_or_404(AdmissionInquiry, id=admission_inquiry_id)
 
+    # A booked-trial inquiry defaults to "ทดลองเรียนแล้วสมัคร" pricing (the
+    # 190-baht trial fee counts toward enrolling); anyone who requested to
+    # enroll directly (or reserve a seat) defaults to "สมัครโดยไม่ทดลอง" --
+    # staff can still flip it by hand on the detail page either way.
+    pricing_option = (
+        NewStudentPaymentNotice.PricingOption.TRIAL_THEN_ENROLL
+        if inquiry.request_type == AdmissionInquiry.RequestType.TRIAL
+        else NewStudentPaymentNotice.PricingOption.NO_TRIAL
+    )
+    discounts = NewStudentPaymentNotice.default_discounts_for(pricing_option)
+
     notice = NewStudentPaymentNotice.objects.create(
         admission_inquiry=inquiry,
         nickname=inquiry.nickname,
@@ -6099,6 +6115,10 @@ def new_student_payment_notice_create(request: HttpRequest, admission_inquiry_id
         grade_level=inquiry.grade_level,
         target_class=inquiry.target_class,
         first_lesson_date=inquiry.first_lesson_date,
+        pricing_option=pricing_option,
+        package_10_discount=discounts[10],
+        package_20_discount=discounts[20],
+        package_30_discount=discounts[30],
         created_by=request.user if request.user.is_authenticated else None,
     )
 
@@ -6127,6 +6147,10 @@ def new_student_payment_notice_detail(request: HttpRequest, pk: int) -> HttpResp
         notice.target_class = TutoringClass.objects.filter(id=target_class_id).first() if target_class_id else None
 
         notice.first_lesson_date = _safe_date(request.POST.get("first_lesson_date"))
+
+        pricing_option = (request.POST.get("pricing_option") or "").strip()
+        if pricing_option in dict(NewStudentPaymentNotice.PricingOption.choices):
+            notice.pricing_option = pricing_option
 
         notice.package_10_full_price = _decimal_from_post(request.POST.get("package_10_full_price"), notice.package_10_full_price)
         notice.package_10_discount = _decimal_from_post(request.POST.get("package_10_discount"), notice.package_10_discount)
@@ -7824,7 +7848,15 @@ def course_payment_create(request: HttpRequest) -> HttpResponse:
             payment_type = (post.get("payment_type") or CoursePayment.PaymentType.FULL).strip()
             payment_method = (post.get("payment_method") or CoursePayment.PaymentMethod.BANK_TRANSFER).strip()
             package = (post.get("session_package") or "10").strip()
-            sessions_granted = _sessions_from_package(package, post.get("custom_sessions"))
+            # "สมัครโดยไม่ทดลอง" (new-student, 10/20/30-session packages only)
+            # grants 2 bonus sessions at the same price -- clamped since this
+            # is client-computed, same trust level as course_price/discount
+            # on the rest of this form.
+            try:
+                bonus_sessions = max(min(int(post.get("bonus_sessions") or 0), 10), 0)
+            except (TypeError, ValueError):
+                bonus_sessions = 0
+            sessions_granted = _sessions_from_package(package, post.get("custom_sessions")) + bonus_sessions
             course_price = _money(post.get("course_price"))
             discount_amount = _money(post.get("discount_amount"))
             net_amount = max(course_price - discount_amount, Decimal("0"))

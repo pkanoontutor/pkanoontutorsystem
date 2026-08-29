@@ -257,6 +257,15 @@
     </div>
   </div>
 
+  <div class="rt-details" id="studentQuickBox" style="padding:18px 22px;">
+    <div class="rt-summary-title" style="margin-bottom:12px;">🔎 ค้นหานักเรียน</div>
+    <div class="pk-search" id="studentSearchRoot" style="position:relative;">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+      <input id="studentQuickInput" type="text" placeholder="พิมพ์ชื่อเล่น / ชื่อจริง / รหัสนักเรียน แล้วเลือกจากรายการ" autocomplete="off">
+      <div id="studentQuickResults" class="rt-list" style="display:none;position:absolute;left:0;right:0;top:calc(100% + 6px);z-index:80;background:var(--panel);border:1px solid var(--line-strong);border-radius:12px;box-shadow:var(--shadow-hi);max-height:340px;overflow-y:auto;padding:8px;"></div>
+    </div>
+  </div>
+
   <details class="rt-details" open>
     <summary class="rt-summary">
       <span class="rt-summary-title">📡 ภาพรวมเรียลไทม์</span>
@@ -419,6 +428,8 @@
 <script>
   /* Data injected by Django, so template tags below are rendered. */
   window.PK_CARDS = {{ cards_json|safe }};
+  window.PK_STUDENTS = {{ students_json|safe }};
+  window.PK_STUDENT_ENROLLMENTS = {{ student_enrollments_json|safe }};
   window.PK_CSRF = "{{ csrf_token }}";
   window.PK_URLS = {
     save: "{% url 'core:admin_tool_card_save' %}",
@@ -888,4 +899,86 @@
 })();
 </script>
 {% endverbatim %}
+
+<script>
+(function(){
+  "use strict";
+  var STUDENTS = window.PK_STUDENTS || [];
+  var ENROLLMENTS_BY_STUDENT = window.PK_STUDENT_ENROLLMENTS || {};
+  var input = document.getElementById("studentQuickInput");
+  var results = document.getElementById("studentQuickResults");
+  if(!input || !results) return;
+  var timer = null;
+
+  function esc(s){
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function(c){
+      return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];
+    });
+  }
+  function normalize(s){ return String(s || "").toLowerCase().replace(/\s+/g, ""); }
+  function rowText(row){
+    return normalize([row.label, row.student_code, row.nickname, row.full_name, row.grade_level].join(" "));
+  }
+  function hideResults(){ results.style.display = "none"; results.innerHTML = ""; }
+
+  function renewalButton(studentId, nickname, fullName){
+    var enrollments = ENROLLMENTS_BY_STUDENT[studentId] || [];
+    if(enrollments.length === 1){
+      var e = enrollments[0];
+      return '<a class="rt-mini-btn" target="_blank" rel="noopener" href="/course-renewal-notices/create/' + e.id + '/" title="สร้างใบแจ้งต่อคอร์ส (' + esc(e.class_name) + ')">🔁 สร้างใบต่อคอร์ส</a>';
+    }
+    if(enrollments.length > 1){
+      var q = encodeURIComponent(nickname || fullName || "");
+      // q_any (not q) is the "search any active enrollment" box on that page --
+      // q only filters the near-completion sections, which would show nothing
+      // for a student who isn't close to running out of sessions.
+      return '<a class="rt-mini-btn" target="_blank" rel="noopener" href="/course-renewal-notices/?q_any=' + q + '" title="เด็กคนนี้มี Class ที่ Active มากกว่า 1 คอร์ส เลือกจากหน้าใบแจ้งต่อคอร์สแทน">🔁 เลือก Class (' + enrollments.length + ')</a>';
+    }
+    return '<span class="rt-mini-btn" style="opacity:.45;cursor:not-allowed;" title="เด็กคนนี้ยังไม่มี Enrollment ที่ Active">🔁 สร้างใบต่อคอร์ส</span>';
+  }
+
+  function renderRow(s){
+    return (
+      '<div class="rt-row">' +
+        '<div class="rt-row-main">' +
+          '<div class="rt-row-name">' + esc(s.nickname || "-") + ' <span class="rt-tag">' + esc(s.grade_level || "-") + '</span></div>' +
+          '<div class="rt-row-meta">' + esc(s.full_name || "-") + ' · ' + esc(s.student_code || "-") + '</div>' +
+        '</div>' +
+        '<div class="rt-row-actions">' +
+          '<a class="rt-mini-btn" target="_blank" rel="noopener" href="/remaining-attendance/?student_id=' + s.id + '" title="เช็คครั้งเรียนคงเหลือ">📊 เช็คครั้งเรียนคงเหลือ</a>' +
+          '<a class="rt-mini-btn receipt" target="_blank" rel="noopener" href="/course-payments/new/?student_id=' + s.id + '" title="สร้างใบเสร็จ">🧾 สร้างใบเสร็จ</a>' +
+          renewalButton(s.id, s.nickname, s.full_name) +
+        '</div>' +
+      '</div>'
+    );
+  }
+
+  function render(term){
+    var needle = normalize(term);
+    if(!needle){ hideResults(); return; }
+    var rows = STUDENTS.filter(function(r){ return rowText(r).indexOf(needle) !== -1; }).slice(0, 10);
+    if(!rows.length){
+      results.innerHTML = '<div class="rt-empty-mini">ไม่พบชื่อที่ตรงกับคำค้นหา</div>';
+      results.style.display = "block";
+      return;
+    }
+    results.innerHTML = rows.map(renderRow).join("");
+    results.style.display = "block";
+  }
+
+  input.addEventListener("input", function(){
+    clearTimeout(timer);
+    var term = input.value.trim();
+    if(term.length < 1){ hideResults(); return; }
+    timer = setTimeout(function(){ render(term); }, 120);
+  });
+  input.addEventListener("focus", function(){
+    var term = input.value.trim();
+    if(term.length >= 1) render(term);
+  });
+  document.addEventListener("click", function(e){
+    if(!e.target.closest("#studentSearchRoot")) hideResults();
+  });
+})();
+</script>
 {% endblock %}

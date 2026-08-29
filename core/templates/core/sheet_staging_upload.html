@@ -1,0 +1,319 @@
+{% extends "core/base.html" %}
+{% block title %}อัปโหลดไฟล์ล่วงหน้า{% endblock %}
+
+{% block head %}
+<style>
+  .st-wrap{max-width:1100px;margin:0 auto;display:grid;gap:12px}
+  .hero{background:linear-gradient(135deg,#0f172a,#7c3aed,#c026d3);color:#fff;border-radius:22px;padding:16px 18px;box-shadow:0 10px 22px rgba(15,23,42,.16);display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:flex-start}
+  .title{font-size:22px;font-weight:1000;letter-spacing:-.03em}
+  .sub{font-size:12px;color:#f3e8ff;margin-top:4px;line-height:1.55;max-width:680px}
+  .actions{display:flex;gap:7px;flex-wrap:wrap}
+  .btnx{border:0;border-radius:11px;padding:8px 12px;font-weight:1000;text-decoration:none;display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;white-space:nowrap;font-family:inherit}
+  .soft{background:#fff;color:#0f172a;border:1px solid #e2e8f0}
+  .primary{background:#7c3aed;color:#fff}
+  .panel{background:#fff;border-radius:16px;padding:14px;box-shadow:0 4px 10px rgba(15,23,42,.06)}
+  .panel-title{font-size:14px;font-weight:1000;color:#0f172a;margin-bottom:8px}
+
+  .big-drop{border:2px dashed #c4b5fd;border-radius:16px;background:#faf5ff;min-height:100px;
+    display:flex;align-items:center;justify-content:center;text-align:center;padding:16px;
+    font-size:13px;font-weight:900;color:#6b21a8;cursor:pointer;transition:.12s}
+  .big-drop.is-drag{border-color:#7c3aed;background:#f3e8ff}
+  .big-drop.is-busy{border-color:#f59e0b;background:#fffbeb;color:#92400e}
+
+  .armed-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .armed-row input{flex:1;min-width:220px;border:1px solid #e2e8f0;border-radius:11px;padding:9px 10px;font-weight:800;font-size:13px}
+  .armed-box{position:relative}
+  .armed-results{display:none;position:absolute;left:0;right:0;top:calc(100% + 6px);z-index:60;background:#fff;
+    border:1px solid #e2e8f0;border-radius:12px;box-shadow:0 10px 24px rgba(15,23,42,.16);max-height:280px;overflow-y:auto;padding:6px}
+  .armed-item{padding:8px 9px;border-radius:9px;cursor:pointer;font-size:12.5px;font-weight:800;color:#334155}
+  .armed-item:hover{background:#f3e8ff}
+  .armed-current{background:#f3e8ff;border:1px solid #ddd6fe;border-radius:12px;padding:9px 11px;font-size:12.5px;font-weight:900;color:#6b21a8;display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .armed-current .clear{cursor:pointer;color:#94a3b8;font-weight:1000}
+  .armed-current .clear:hover{color:#dc2626}
+  .armed-empty{font-size:12px;font-weight:800;color:#94a3b8;padding:9px 2px}
+
+  .staged-list{display:grid;gap:8px;margin-top:10px}
+  .staged-row{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;background:#f8fafc;
+    border:1px solid #e2e8f0;border-radius:14px;padding:10px 12px}
+  .staged-name{font-weight:900;font-size:13px;color:#0f172a;overflow-wrap:anywhere}
+  .staged-meta{font-size:11px;font-weight:800;color:#64748b;margin-top:2px}
+  .staged-actions{display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+  .kind-btn{border:1px solid #e2e8f0;background:#fff;border-radius:9px;padding:7px 11px;font-weight:900;font-size:11.5px;cursor:pointer;font-family:inherit;color:#334155}
+  .kind-btn:hover:not(:disabled){background:#f1f5f9;border-color:#cbd5e1}
+  .kind-btn:disabled{opacity:.4;cursor:not-allowed}
+  .kind-btn.busy{opacity:.6;cursor:wait}
+  .del-btn{width:28px;height:28px;border-radius:9px;border:1px solid #e2e8f0;background:#fff;color:#94a3b8;font-weight:1000;cursor:pointer}
+  .del-btn:hover{background:#fee2e2;color:#dc2626;border-color:#fecaca}
+  .staged-status{font-size:11px;font-weight:900;color:#b45309;margin-top:4px}
+  .staged-status.ok{color:#166534}
+  .staged-status.err{color:#b91c1c}
+  .empty-note{font-size:12.5px;font-weight:800;color:#94a3b8;padding:14px 2px;text-align:center}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="st-wrap">
+  <section class="hero">
+    <div>
+      <div class="title">🗂️ อัปโหลดไฟล์ล่วงหน้า</div>
+      <div class="sub">ลากไฟล์มาวางเก็บไว้บนระบบก่อนได้เลย ไม่ต้องรู้ว่าจะเอาไปเข้าชีทไหนตอนนี้ก็ได้ — ค่อยเลือกชีทและประเภท (ปก/เนื้อหา/เฉลย) แล้วกดเชื่อมทีหลัง</div>
+    </div>
+    <div class="actions">
+      <a class="btnx soft" href="{% url 'core:sheet_inventory_dashboard' %}">← คลังชีท</a>
+      <a class="btnx soft" href="{% url 'core:sheet_inventory_continuous_upload' %}">📤 อัปโหลดต่อเนื่อง</a>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-title">1) วางไฟล์ที่นี่</div>
+    <div class="big-drop" id="bigDrop">
+      <span id="bigDropText">ลากไฟล์ PDF มาวาง (หลายไฟล์พร้อมกันได้) หรือคลิกเพื่อเลือก</span>
+    </div>
+    <input type="file" accept="application/pdf" multiple hidden id="bigDropInput">
+  </section>
+
+  <section class="panel">
+    <div class="panel-title">2) เลือกชีทเป้าหมาย (แล้วกดปุ่มประเภทไฟล์ในรายการด้านล่างได้เลย)</div>
+    <div class="armed-row">
+      <div class="armed-box" style="flex:1;min-width:260px;">
+        <input type="text" id="sheetSearch" placeholder="พิมพ์รหัสชีท / ชื่อชีท / วิชา แล้วเลือกจากรายการ" autocomplete="off">
+        <div id="sheetResults" class="armed-results"></div>
+      </div>
+    </div>
+    <div id="armedDisplay" style="margin-top:8px"></div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-title">3) ไฟล์ที่รอเชื่อม (<span id="stagedCount">{{ staged_list|length }}</span>)</div>
+    <div class="staged-list" id="stagedList"></div>
+  </section>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+  const CSRF = "{{ csrf_token }}";
+  const SHEETS = {{ sheets_json|safe }};
+  let STAGED = {{ staged_list_json|safe }};
+
+  const bigDrop = document.getElementById('bigDrop');
+  const bigDropText = document.getElementById('bigDropText');
+  const bigDropInput = document.getElementById('bigDropInput');
+  const stagedList = document.getElementById('stagedList');
+  const stagedCount = document.getElementById('stagedCount');
+  const sheetSearch = document.getElementById('sheetSearch');
+  const sheetResults = document.getElementById('sheetResults');
+  const armedDisplay = document.getElementById('armedDisplay');
+
+  let armedSheet = null;
+  const KIND_LABEL = {cover:'📘 ปก', content:'📄 เนื้อหา', answer:'✅ เฉลย'};
+
+  function esc(s){ return String(s==null?'':s).replace(/[&<>'"]/g, function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c];
+  }); }
+  function fmtSize(bytes){
+    if(!bytes) return '-';
+    const mb = bytes / (1024*1024);
+    return mb >= 1 ? mb.toFixed(1) + ' MB' : Math.round(bytes/1024) + ' KB';
+  }
+
+  function renderArmed(){
+    if(!armedSheet){
+      armedDisplay.innerHTML = '<div class="armed-empty">ยังไม่ได้เลือกชีทเป้าหมาย — ค้นหาด้านบนก่อน</div>';
+    }else{
+      armedDisplay.innerHTML = '<div class="armed-current"><span>🎯 ' + esc(armedSheet.label) + '</span><span class="clear" data-clear-armed>✕ เปลี่ยน</span></div>';
+    }
+    renderStaged();
+  }
+
+  function renderStaged(){
+    stagedCount.textContent = STAGED.length;
+    if(!STAGED.length){
+      stagedList.innerHTML = '<div class="empty-note">ยังไม่มีไฟล์รอเชื่อม — ลากไฟล์มาวางด้านบนได้เลย</div>';
+      return;
+    }
+    stagedList.innerHTML = STAGED.map(function(s){
+      return '<div class="staged-row" data-staged-row="' + s.id + '">' +
+        '<div>' +
+          '<div class="staged-name">' + esc(s.filename) + '</div>' +
+          '<div class="staged-meta">' + fmtSize(s.size) + ' · อัปโหลดเมื่อ ' + esc(s.uploaded_at) + '</div>' +
+          '<div class="staged-status" data-staged-status></div>' +
+        '</div>' +
+        '<div class="staged-actions">' +
+          ['cover','content','answer'].map(function(k){
+            return '<button type="button" class="kind-btn" data-link-kind="' + k + '" data-staged-id="' + s.id + '" ' + (armedSheet ? '' : 'disabled') + '>' + KIND_LABEL[k] + '</button>';
+          }).join('') +
+          '<button type="button" class="del-btn" data-del-staged="' + s.id + '" title="ลบไฟล์นี้ทิ้ง">✕</button>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+  }
+
+  // ---------- sheet search (armed target) ----------
+  function renderSheetResults(term){
+    const needle = term.trim().toLowerCase().replace(/\s+/g, '');
+    if(!needle){ sheetResults.style.display = 'none'; sheetResults.innerHTML = ''; return; }
+    const rows = SHEETS.filter(function(s){
+      return (s.code + s.title + s.subject + s.grade_level).toLowerCase().replace(/\s+/g, '').indexOf(needle) !== -1;
+    }).slice(0, 12);
+    if(!rows.length){
+      sheetResults.innerHTML = '<div class="armed-empty">ไม่พบชีทที่ตรงกับคำค้นหา</div>';
+    }else{
+      sheetResults.innerHTML = rows.map(function(s){
+        return '<div class="armed-item" data-pick-sheet="' + s.id + '">' + esc(s.label) + '</div>';
+      }).join('');
+    }
+    sheetResults.style.display = 'block';
+  }
+  sheetSearch.addEventListener('input', function(){ renderSheetResults(sheetSearch.value); });
+  sheetSearch.addEventListener('focus', function(){ if(sheetSearch.value.trim()) renderSheetResults(sheetSearch.value); });
+  sheetResults.addEventListener('click', function(e){
+    const item = e.target.closest('[data-pick-sheet]');
+    if(!item) return;
+    const s = SHEETS.find(function(x){ return String(x.id) === item.dataset.pickSheet; });
+    if(s){ armedSheet = s; renderArmed(); sheetSearch.value = ''; sheetResults.style.display = 'none'; }
+  });
+  document.addEventListener('click', function(e){
+    if(!e.target.closest('.armed-box')) sheetResults.style.display = 'none';
+  });
+  armedDisplay.addEventListener('click', function(e){
+    if(e.target.closest('[data-clear-armed]')){ armedSheet = null; renderArmed(); }
+  });
+
+  // ---------- upload to staging (retry + progress, same pattern as the
+  // continuous-upload page) ----------
+  const MAX_ATTEMPTS = 3;
+  const XHR_TIMEOUT_MS = 30 * 60 * 1000;
+
+  function uploadOneAttempt(file, onProgress){
+    return new Promise(function(resolve, reject){
+      const fd = new FormData();
+      fd.append('pdf', file);
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', "{% url 'core:sheet_staging_upload' %}");
+      xhr.setRequestHeader('X-CSRFToken', CSRF);
+      xhr.timeout = XHR_TIMEOUT_MS;
+      xhr.upload.addEventListener('progress', function(e){
+        if(e.lengthComputable) onProgress(Math.round(e.loaded / e.total * 100));
+      });
+      xhr.addEventListener('load', function(){
+        let parsed = {};
+        try{ parsed = JSON.parse(xhr.responseText || '{}'); }catch(e){}
+        if(xhr.status >= 200 && xhr.status < 300 && parsed.ok) resolve(parsed);
+        else reject({retryable:false, error:new Error(parsed.message || ('อัปโหลดไม่สำเร็จ (' + xhr.status + ')'))});
+      });
+      xhr.addEventListener('error', function(){ reject({retryable:true, error:new Error('เชื่อมต่อขาดหายระหว่างอัปโหลด')}); });
+      xhr.addEventListener('timeout', function(){ reject({retryable:true, error:new Error('หมดเวลาอัปโหลด (ไฟล์ใหญ่/เน็ตช้า)')}); });
+      xhr.send(fd);
+    });
+  }
+  async function uploadOneFile(file, onProgress, onRetryStatus){
+    let lastErr;
+    for(let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++){
+      try{
+        onProgress(0);
+        return await uploadOneAttempt(file, onProgress);
+      }catch(failure){
+        lastErr = failure.error || failure;
+        if(!failure.retryable || attempt === MAX_ATTEMPTS) throw lastErr;
+        onRetryStatus(attempt + 1, MAX_ATTEMPTS);
+        await new Promise(function(r){ setTimeout(r, 1500 * attempt); });
+      }
+    }
+    throw lastErr;
+  }
+
+  async function uploadFilesToStaging(fileList){
+    const files = Array.prototype.filter.call(fileList, function(f){ return /\.pdf$/i.test(f.name); });
+    if(!files.length) return;
+    bigDrop.classList.add('is-busy');
+    for(let i = 0; i < files.length; i++){
+      const file = files[i];
+      const prefix = files.length > 1 ? (i + 1) + '/' + files.length + ' ' : '';
+      bigDropText.textContent = prefix + 'กำลังอัปโหลด ' + file.name + ' 0%';
+      try{
+        const data = await uploadOneFile(file, function(pct){
+          bigDropText.textContent = prefix + 'กำลังอัปโหลด ' + file.name + ' ' + pct + '%';
+        }, function(attempt, max){
+          bigDropText.textContent = prefix + 'เชื่อมต่อขาดหาย กำลังลองใหม่ (' + attempt + '/' + max + ')...';
+        });
+        STAGED.unshift(data.staged);
+        renderStaged();
+      }catch(err){
+        bigDropText.textContent = 'ไม่สำเร็จ: ' + file.name + ' (' + (err.message||'') + ')';
+        await new Promise(function(r){ setTimeout(r, 1800); });
+      }
+    }
+    bigDrop.classList.remove('is-busy');
+    bigDropText.textContent = 'ลากไฟล์ PDF มาวาง (หลายไฟล์พร้อมกันได้) หรือคลิกเพื่อเลือก';
+  }
+
+  bigDrop.addEventListener('click', function(){ bigDropInput.click(); });
+  bigDropInput.addEventListener('change', function(){
+    if(bigDropInput.files && bigDropInput.files.length) uploadFilesToStaging(bigDropInput.files);
+    bigDropInput.value = '';
+  });
+  ['dragenter','dragover'].forEach(function(evt){
+    bigDrop.addEventListener(evt, function(e){ e.preventDefault(); e.stopPropagation(); bigDrop.classList.add('is-drag'); });
+  });
+  ['dragleave','drop'].forEach(function(evt){
+    bigDrop.addEventListener(evt, function(e){ e.preventDefault(); e.stopPropagation(); bigDrop.classList.remove('is-drag'); });
+  });
+  bigDrop.addEventListener('drop', function(e){
+    const files = e.dataTransfer && e.dataTransfer.files;
+    if(files && files.length) uploadFilesToStaging(files);
+  });
+
+  // ---------- link a staged file to the armed sheet ----------
+  function csrfFetch(url){
+    return fetch(url, {method:'POST', headers:{'X-CSRFToken': CSRF}});
+  }
+  stagedList.addEventListener('click', function(e){
+    const linkBtn = e.target.closest('[data-link-kind]');
+    const delBtn = e.target.closest('[data-del-staged]');
+    if(linkBtn){
+      if(!armedSheet) return;
+      const stagedId = linkBtn.dataset.stagedId;
+      const kind = linkBtn.dataset.linkKind;
+      const row = stagedList.querySelector('[data-staged-row="' + stagedId + '"]');
+      const statusEl = row.querySelector('[data-staged-status]');
+      row.querySelectorAll('[data-link-kind]').forEach(function(b){ b.disabled = true; b.classList.add('busy'); });
+      statusEl.textContent = 'กำลังเชื่อมกับ ' + armedSheet.label + '...';
+      statusEl.className = 'staged-status';
+      const fd = new FormData();
+      fd.append('sheet_id', armedSheet.id);
+      fd.append('kind', kind);
+      fetch("/sheet-inventory/staging/" + stagedId + "/link/", {method:'POST', headers:{'X-CSRFToken': CSRF}, body: fd})
+        .then(function(r){ return r.json(); })
+        .then(function(data){
+          if(!data.ok){
+            statusEl.textContent = data.message || 'เชื่อมไม่สำเร็จ';
+            statusEl.className = 'staged-status err';
+            row.querySelectorAll('[data-link-kind]').forEach(function(b){ b.disabled = false; b.classList.remove('busy'); });
+            return;
+          }
+          STAGED = STAGED.filter(function(s){ return String(s.id) !== String(stagedId); });
+          renderStaged();
+        })
+        .catch(function(){
+          statusEl.textContent = 'เชื่อมไม่สำเร็จ (เชื่อมต่อไม่ได้)';
+          statusEl.className = 'staged-status err';
+          row.querySelectorAll('[data-link-kind]').forEach(function(b){ b.disabled = false; b.classList.remove('busy'); });
+        });
+    }else if(delBtn){
+      const stagedId = delBtn.dataset.delStaged;
+      if(!confirm('ลบไฟล์นี้ทิ้งโดยไม่เชื่อมกับชีทใช่ไหม?')) return;
+      csrfFetch("/sheet-inventory/staging/" + stagedId + "/delete/")
+        .then(function(r){ return r.json(); })
+        .then(function(data){
+          if(!data.ok){ alert(data.message || 'ลบไม่สำเร็จ'); return; }
+          STAGED = STAGED.filter(function(s){ return String(s.id) !== String(stagedId); });
+          renderStaged();
+        })
+        .catch(function(){ alert('ลบไม่สำเร็จ'); });
+    }
+  });
+
+  renderArmed();
+});
+</script>
+{% endblock %}

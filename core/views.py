@@ -34,6 +34,7 @@ from .models import (
     Sheet,
     Book,
     SheetDocument,
+    StagedSheetDocument,
     ClassSubject,
     Attendance,
     Enrollment,
@@ -2339,6 +2340,130 @@ def _sheet_documents_by_id(sheet_ids: list[int]) -> dict[int, dict]:
         out.setdefault(d.sheet_id, {"cover": [], "content": [], "answer": []})
         out[d.sheet_id][d.kind].append(_sheet_document_payload(d))
     return out
+
+
+def _staged_document_payload(staged: StagedSheetDocument) -> dict:
+    return {
+        "id": staged.id,
+        "filename": staged.original_filename,
+        "size": staged.file_size,
+        "url": staged.file.url if staged.file else "",
+        "uploaded_at": staged.uploaded_at.strftime("%d/%m/%Y %H:%M"),
+    }
+
+
+@login_required
+def sheet_staging_page(request: HttpRequest) -> HttpResponse:
+    """A pile of PDFs uploaded ahead of time (no sheet chosen yet). Staff
+    upload everything here first -- the slow, network-bound part -- then
+    pick which sheet/kind each one belongs to afterward, which is a quick
+    local operation that doesn't require re-sending the file if it fails."""
+    staged = StagedSheetDocument.objects.filter(linked_document__isnull=True).select_related("uploaded_by")
+    sheets = list(Sheet.objects.select_related("subject").filter(is_active=True).order_by("grade_level", "subject__name", "code"))
+    sheets_json = [
+        {
+            "id": s.id,
+            "code": s.code,
+            "title": s.title,
+            "grade_level": s.get_grade_level_display(),
+            "subject": s.subject.name if s.subject_id else "",
+            "label": f"{s.code} | {s.title} | {s.get_grade_level_display()} | {s.subject.name if s.subject_id else '-'}",
+        }
+        for s in sheets
+    ]
+    staged_payloads = [_staged_document_payload(s) for s in staged]
+    return render(request, "core/sheet_staging_upload.html", {
+        "staged_list": staged_payloads,
+        "staged_list_json": json.dumps(staged_payloads, ensure_ascii=False),
+        "sheets_json": json.dumps(sheets_json, ensure_ascii=False),
+    })
+
+
+@require_POST
+@login_required
+def sheet_staging_upload(request: HttpRequest) -> JsonResponse:
+    """Receive one PDF with no sheet/kind decided yet -- deliberately the
+    lightest possible view (a plain file save, no pdfium involved) since
+    this is the slow network-bound step; classifying and attaching it to a
+    sheet happens later in sheet_staging_link, once the bytes are already
+    safely on disk."""
+    upload = request.FILES.get("pdf")
+    if not upload:
+        return JsonResponse({"ok": False, "message": "ไม่พบไฟล์ PDF"}, status=400)
+    name_lower = (upload.name or "").lower()
+    if not (name_lower.endswith(".pdf") or (upload.content_type or "") == "application/pdf"):
+        return JsonResponse({"ok": False, "message": "รองรับเฉพาะไฟล์ PDF"}, status=400)
+
+    try:
+        staged = StagedSheetDocument(
+            original_filename=upload.name,
+            file_size=upload.size or 0,
+            uploaded_by=request.user if request.user.is_authenticated else None,
+        )
+        staged.file.save(upload.name, upload, save=True)
+    except Exception:
+        logger.exception(
+            "sheet_staging_upload failed: filename=%s size=%s", upload.name, getattr(upload, "size", None),
+        )
+        return JsonResponse({"ok": False, "message": "อัปโหลดไม่สำเร็จ (เกิดข้อผิดพลาดที่เซิร์ฟเวอร์) ลองใหม่อีกครั้ง"}, status=500)
+
+    return JsonResponse({"ok": True, "staged": _staged_document_payload(staged)})
+
+
+@require_POST
+@login_required
+def sheet_staging_link(request: HttpRequest, pk: int) -> JsonResponse:
+    """Classify and attach an already-staged PDF to a sheet -- the file is
+    already fully on disk by this point, so this only does local I/O and
+    pdfium processing, never a network transfer, which is what made this
+    step worth separating from the upload itself."""
+    staged = get_object_or_404(StagedSheetDocument, pk=pk, linked_document__isnull=True)
+    sheet = get_object_or_404(Sheet, pk=request.POST.get("sheet_id"))
+    kind = (request.POST.get("kind") or "").strip()
+    if kind not in dict(SheetDocument.Kind.choices):
+        return JsonResponse({"ok": False, "message": "ประเภทไฟล์ไม่ถูกต้อง"}, status=400)
+
+    try:
+        path = staged.file.path
+        page_count, _rendered = render_pdf(path, thumbnail=False)
+        doc = attach_document_from_path(
+            sheet, kind, path, staged.original_filename,
+            page_count=page_count,
+            uploaded_by=request.user if request.user.is_authenticated else None,
+        )
+    except Exception:
+        logger.exception(
+            "sheet_staging_link failed: staged=%s sheet=%s kind=%s filename=%s",
+            staged.pk, sheet.pk, kind, staged.original_filename,
+        )
+        return JsonResponse({"ok": False, "message": "เชื่อมไฟล์ไม่สำเร็จ (เกิดข้อผิดพลาดที่เซิร์ฟเวอร์) ลองใหม่อีกครั้ง"}, status=500)
+
+    sheet_pages = sync_sheet_total_pages(sheet)
+    staged.linked_document = doc
+    staged.linked_at = timezone.now()
+    # attach_document already made its own copy under sheet_documents/, so
+    # the staging copy is redundant -- free the space now that it's linked.
+    # delete() with save=False only clears the in-memory field, so "file"
+    # must be included in the save below or the DB row keeps pointing at a
+    # path that no longer exists on disk.
+    staged.file.delete(save=False)
+    staged.save(update_fields=["linked_document", "linked_at", "file"])
+
+    return JsonResponse({
+        "ok": True,
+        "document": _sheet_document_payload(doc),
+        "sheet_total_pages": sheet_pages,
+    })
+
+
+@require_POST
+@login_required
+def sheet_staging_delete(request: HttpRequest, pk: int) -> JsonResponse:
+    """Discard a staged file without linking it to any sheet."""
+    staged = get_object_or_404(StagedSheetDocument, pk=pk, linked_document__isnull=True)
+    staged.file.delete(save=False)
+    staged.delete()
+    return JsonResponse({"ok": True})
 
 
 @login_required

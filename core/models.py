@@ -401,6 +401,47 @@ class SheetDocument(models.Model):
         return name or self.get_kind_display()
 
 
+class StagedSheetDocument(models.Model):
+    """A PDF uploaded ahead of time, not yet attached to any sheet.
+
+    Lets staff drop a pile of files onto the server first (the slow, network-
+    bound part) and pick which sheet/kind each one belongs to afterward (a
+    quick local operation) instead of one combined upload -- so a batch of
+    large files doesn't all need to succeed in one sitting, and re-linking a
+    file after a mistake doesn't mean re-uploading it.
+    """
+
+    file = models.FileField("ไฟล์ PDF", upload_to="sheet_staging/")
+    original_filename = models.CharField("ชื่อไฟล์เดิม", max_length=255)
+    file_size = models.PositiveBigIntegerField("ขนาดไฟล์ (bytes)", default=0)
+    uploaded_by = models.ForeignKey(
+        "auth.User",
+        verbose_name="ผู้อัปโหลด",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="staged_sheet_documents",
+    )
+    uploaded_at = models.DateTimeField("วันที่อัปโหลด", default=timezone.now)
+    linked_document = models.OneToOneField(
+        SheetDocument,
+        verbose_name="ไฟล์ที่เชื่อมแล้ว",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="staged_source",
+    )
+    linked_at = models.DateTimeField("วันที่เชื่อมกับชีท", null=True, blank=True)
+
+    class Meta:
+        verbose_name = "Staged Sheet Document"
+        verbose_name_plural = "Staged Sheet Documents"
+        ordering = ("-uploaded_at",)
+
+    def __str__(self) -> str:
+        return f"{self.original_filename} ({'เชื่อมแล้ว' if self.linked_document_id else 'รอเชื่อม'})"
+
+
 # -----------------------
 # ClassSubject (คลาส/วิชา) - Tutor อัปเดตได้
 # (ใช้เป็นฐานของหน้า "Sheet Update" แบบตาราง)

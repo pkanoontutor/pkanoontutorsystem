@@ -2379,6 +2379,130 @@ def sheet_staging_page(request: HttpRequest) -> HttpResponse:
     })
 
 
+# A whole-file upload occupies one gunicorn worker/thread for its entire
+# duration. Once every slot is held by a slow upload the server stops
+# reading those sockets, the kernel's receive buffers fill, and the
+# browser's upload progress freezes partway with nothing to report -- the
+# "stalls at n% then dies" failure. Uploading in small chunks means each
+# request finishes in about a second, so a worker is never monopolised, a
+# stalled chunk can be retried on its own, and an interrupted transfer
+# resumes from the byte offset the server actually has rather than
+# restarting the whole file.
+CHUNK_MAX_BYTES = 8 * 1024 * 1024          # generous ceiling; client sends ~2MB
+CHUNK_MAX_TOTAL_BYTES = 2 * 1024 * 1024 * 1024
+CHUNK_STALE_SECONDS = 24 * 60 * 60
+_UPLOAD_ID_RE = re.compile(r"^[0-9a-f]{16,64}$")
+
+
+def _chunk_staging_dir() -> str:
+    import tempfile
+
+    from django.conf import settings
+
+    base = getattr(settings, "FILE_UPLOAD_TEMP_DIR", None) or tempfile.gettempdir()
+    path = os.path.join(base, "sheet_chunks")
+    os.makedirs(path, exist_ok=True)
+    return path
+
+
+def _sweep_stale_chunks(directory: str) -> None:
+    """Drop half-finished .part files from uploads that were abandoned, so a
+    browser closed mid-transfer doesn't leak disk forever."""
+    import time
+
+    cutoff = time.time() - CHUNK_STALE_SECONDS
+    try:
+        for name in os.listdir(directory):
+            path = os.path.join(directory, name)
+            try:
+                if os.path.isfile(path) and os.path.getmtime(path) < cutoff:
+                    os.remove(path)
+            except OSError:
+                pass
+    except OSError:
+        pass
+
+
+@require_POST
+@login_required
+def sheet_upload_chunk(request: HttpRequest) -> JsonResponse:
+    """Append one chunk of a PDF to its in-progress temp file.
+
+    The client drives this with an explicit byte `offset`, and the server
+    answers with the offset it actually holds. That makes the protocol
+    self-correcting: a chunk that was retried after already landing, or a
+    client resuming a transfer it lost track of, both just get told the
+    real offset and carry on from there instead of corrupting the file.
+    Once the assembled size reaches `total_size` the file is promoted to a
+    StagedSheetDocument, ready for sheet_staging_link to attach it.
+    """
+    from django.core.files import File
+
+    upload_id = (request.POST.get("upload_id") or "").strip().lower()
+    if not _UPLOAD_ID_RE.match(upload_id):
+        return JsonResponse({"ok": False, "message": "upload_id ไม่ถูกต้อง"}, status=400)
+
+    filename = (request.POST.get("filename") or "").strip()
+    if not filename.lower().endswith(".pdf"):
+        return JsonResponse({"ok": False, "message": "รองรับเฉพาะไฟล์ PDF"}, status=400)
+
+    try:
+        offset = int(request.POST.get("offset"))
+        total_size = int(request.POST.get("total_size"))
+    except (TypeError, ValueError):
+        return JsonResponse({"ok": False, "message": "offset/total_size ไม่ถูกต้อง"}, status=400)
+    if offset < 0 or total_size <= 0 or total_size > CHUNK_MAX_TOTAL_BYTES:
+        return JsonResponse({"ok": False, "message": "ขนาดไฟล์ไม่ถูกต้อง"}, status=400)
+
+    chunk = request.FILES.get("chunk")
+    if not chunk:
+        return JsonResponse({"ok": False, "message": "ไม่พบข้อมูลส่วนนี้ของไฟล์"}, status=400)
+    if (chunk.size or 0) > CHUNK_MAX_BYTES:
+        return JsonResponse({"ok": False, "message": "ส่วนของไฟล์ใหญ่เกินกำหนด"}, status=400)
+
+    directory = _chunk_staging_dir()
+    part_path = os.path.join(directory, f"{upload_id}.part")
+
+    try:
+        current = os.path.getsize(part_path) if os.path.exists(part_path) else 0
+        if current == 0:
+            _sweep_stale_chunks(directory)
+
+        # Not where the client thinks it is: hand back the truth and let it
+        # re-slice from there rather than writing bytes at the wrong place.
+        if offset != current:
+            return JsonResponse({"ok": False, "resync": True, "offset": current}, status=409)
+
+        if current + (chunk.size or 0) > total_size:
+            return JsonResponse({"ok": False, "message": "ข้อมูลเกินขนาดไฟล์ที่แจ้งไว้"}, status=400)
+
+        with open(part_path, "ab") as fh:
+            for piece in chunk.chunks():
+                fh.write(piece)
+        new_offset = os.path.getsize(part_path)
+
+        if new_offset < total_size:
+            return JsonResponse({"ok": True, "offset": new_offset, "done": False})
+
+        # Complete: promote the assembled file into the staging table.
+        staged = StagedSheetDocument(
+            original_filename=filename,
+            file_size=new_offset,
+            uploaded_by=request.user if request.user.is_authenticated else None,
+        )
+        with open(part_path, "rb") as fh:
+            staged.file.save(filename, File(fh), save=True)
+        os.remove(part_path)
+    except Exception:
+        logger.exception(
+            "sheet_upload_chunk failed: upload_id=%s filename=%s offset=%s total=%s",
+            upload_id, filename, offset, total_size,
+        )
+        return JsonResponse({"ok": False, "message": "อัปโหลดไม่สำเร็จ (เกิดข้อผิดพลาดที่เซิร์ฟเวอร์) ลองใหม่อีกครั้ง"}, status=500)
+
+    return JsonResponse({"ok": True, "offset": new_offset, "done": True, "staged": _staged_document_payload(staged)})
+
+
 @require_POST
 @login_required
 def sheet_staging_upload(request: HttpRequest) -> JsonResponse:

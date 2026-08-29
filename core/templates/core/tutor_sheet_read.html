@@ -37,8 +37,27 @@
 
   .stage{background:#fff;border:1px solid #eef2f7;border-radius:16px;padding:11px;display:flex;flex-direction:column;gap:9px;min-height:60vh}
   .canvas-box{flex:1;display:grid;place-items:center;background:#f1f5f9;border-radius:12px;padding:9px;overflow:auto}
-  #pageCanvas{max-width:100%;height:auto;box-shadow:0 5px 18px rgba(15,23,42,.18);border-radius:4px;background:#fff}
+  .canvas-stack{position:relative;display:inline-block;line-height:0}
+  #pageCanvas{display:block;max-width:100%;height:auto;box-shadow:0 5px 18px rgba(15,23,42,.18);border-radius:4px;background:#fff}
+  #markupCanvas{position:absolute;left:0;top:0;pointer-events:none;touch-action:none;border-radius:4px}
+  #markupCanvas.tool-pen{pointer-events:auto;cursor:crosshair}
+  #markupCanvas.tool-eraser{pointer-events:auto;cursor:cell}
   .pager{display:flex;justify-content:center;align-items:center;gap:11px;flex-wrap:wrap}
+
+  /* Highlighter toolbar */
+  .markup-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;
+    background:#f8fafc;border:1px solid #eef2f7;border-radius:12px;padding:7px 9px}
+  .mk-tools{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+  .mk-swatch{width:30px;height:30px;border-radius:9px;border:2px solid transparent;cursor:pointer;
+    display:grid;place-items:center;font-size:14px;box-shadow:inset 0 0 0 1px rgba(15,23,42,.12)}
+  .mk-swatch.active{border-color:#0f172a;box-shadow:0 0 0 3px rgba(15,23,42,.12)}
+  .mk-eraser{width:34px;height:30px;border-radius:9px;border:2px solid #e2e8f0;background:#fff;cursor:pointer;
+    font-size:15px;display:grid;place-items:center}
+  .mk-eraser.active{border-color:#0f172a;background:#e2e8f0}
+  .mk-actions{display:flex;align-items:center;gap:6px}
+  .mk-icon{width:32px;height:30px;border-radius:9px;border:1px solid #e2e8f0;background:#fff;cursor:pointer;font-size:14px}
+  .mk-icon:disabled{opacity:.35;cursor:not-allowed}
+  .mk-status{font-size:11px;font-weight:900;color:#64748b;min-width:64px;text-align:right}
   .pbtn{border:1px solid #e2e8f0;background:#fff;border-radius:11px;padding:9px 17px;font-weight:1000;font-size:14px;cursor:pointer;font-family:inherit;color:#0f172a}
   .pbtn:hover:not(:disabled){background:#f1f5f9;border-color:#cbd5e1}
   .pbtn:disabled{opacity:.35;cursor:not-allowed}
@@ -143,7 +162,15 @@
     '<div class="reader">' +
       '<div class="thumbs" id="thumbs"></div>' +
       '<div class="stage">' +
-        '<div class="canvas-box"><canvas id="pageCanvas"></canvas><div class="loading" id="stageLoading">กำลังเปิดไฟล์...</div></div>' +
+        '<div class="markup-bar">' +
+          '<div class="mk-tools" id="mkColors"></div>' +
+          '<div class="mk-actions">' +
+            '<button class="mk-icon" id="undoBtn" title="ย้อนกลับ" disabled>↩️</button>' +
+            '<button class="mk-icon" id="redoBtn" title="ทำซ้ำ" disabled>↪️</button>' +
+            '<span class="mk-status" id="mkStatus"></span>' +
+          '</div>' +
+        '</div>' +
+        '<div class="canvas-box"><div class="canvas-stack"><canvas id="pageCanvas"></canvas><canvas id="markupCanvas"></canvas></div><div class="loading" id="stageLoading">กำลังเปิดไฟล์...</div></div>' +
         '<div class="pager">' +
           '<button class="pbtn" id="prevBtn">‹ ก่อนหน้า</button>' +
           '<span class="pnum">หน้า <input type="number" id="pageInput" min="1" value="1"> / <span id="pageTotal">–</span></span>' +
@@ -156,15 +183,24 @@
   const fileTabs=document.getElementById('fileTabs');
   const thumbsEl=document.getElementById('thumbs');
   const canvas=document.getElementById('pageCanvas');
+  const markupCanvas=document.getElementById('markupCanvas');
+  const markupCtx=markupCanvas.getContext('2d');
   const stageLoading=document.getElementById('stageLoading');
   const prevBtn=document.getElementById('prevBtn');
   const nextBtn=document.getElementById('nextBtn');
   const pageInput=document.getElementById('pageInput');
   const pageTotal=document.getElementById('pageTotal');
   const resumeNote=document.getElementById('resumeNote');
+  const mkColors=document.getElementById('mkColors');
+  const undoBtn=document.getElementById('undoBtn');
+  const redoBtn=document.getElementById('redoBtn');
+  const mkStatus=document.getElementById('mkStatus');
 
   const KIND_LABEL={content:'📘 เนื้อหา', answer:'✅ เฉลย'};
   let kind='content', docId=null, pdf=null, page=1, total=0, renderToken=0;
+  const lastPageByDoc={};   // remembers where each document was left, so
+                            // switching เนื้อหา/เฉลย or between files of the
+                            // same kind doesn't reset back to page 1.
 
   const docsOf = k => DOCS.filter(d=>d.kind===k);
   const esc = s => String(s==null?'':s).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
@@ -177,7 +213,7 @@
       if(b.dataset.kind===kind) return;
       kind=b.dataset.kind;
       const first=docsOf(kind)[0];
-      if(first) openDoc(first.id, 1);
+      if(first) openDoc(first.id, lastPageByDoc[first.id]||1);
     }));
   }
 
@@ -188,20 +224,26 @@
       `<button class="ftab ${d.id===docId?'active':''}" data-doc="${d.id}">${esc(d.name)}</button>`).join('');
     fileTabs.querySelectorAll('[data-doc]').forEach(b=>b.addEventListener('click',()=>{
       const id=Number(b.dataset.doc);
-      if(id!==docId) openDoc(id,1);
+      if(id!==docId) openDoc(id, lastPageByDoc[id]||1);
     }));
   }
 
   async function openDoc(id, startPage){
     const doc=DOCS.find(d=>d.id===id);
     if(!doc) return;
+    flushPendingSave();           // land any unsaved stroke on the page we're leaving
     docId=id; kind=doc.kind;
     renderKindTabs(); renderFileTabs();
     stageLoading.style.display=''; stageLoading.textContent='กำลังเปิดไฟล์...';
     canvas.style.display='none';
+    markupCanvas.style.display='none';
     thumbsEl.innerHTML='<div class="thumb-ph">กำลังโหลด...</div>';
     try{
-      pdf=await pdfjsLib.getDocument(doc.url).promise;
+      const [loadedPdf]=await Promise.all([
+        pdfjsLib.getDocument(doc.url).promise,
+        ensureMarkupLoaded(id),
+      ]);
+      pdf=loadedPdf;
       total=pdf.numPages;
       pageTotal.textContent=total;
       pageInput.max=total;
@@ -217,7 +259,9 @@
 
   async function goTo(n){
     if(!pdf) return;
+    flushPendingSave();           // land any unsaved stroke on the page we're leaving
     page=Math.min(Math.max(n,1),total);
+    lastPageByDoc[docId]=page;
     pageInput.value=page;
     prevBtn.disabled=(page<=1);
     nextBtn.disabled=(page>=total);
@@ -230,6 +274,7 @@
       const scale=Math.max(Math.min((box||820)/base.width, 2.2), 0.3);
       const vp=p.getViewport({scale});
       canvas.width=Math.round(vp.width); canvas.height=Math.round(vp.height);
+      canvas.style.width=canvas.width+'px'; canvas.style.height=canvas.height+'px';
       // Bounded so a page that will not paint reports back instead of
       // leaving the tutor staring at a spinner mid-lesson.
       const done=await Promise.race([
@@ -237,8 +282,19 @@
         new Promise(res=>setTimeout(()=>res(false),20000)),
       ]);
       if(token!==renderToken) return;   // a newer page won the race
-      if(done){ canvas.style.display=''; stageLoading.style.display='none'; }
-      else{ stageLoading.style.display=''; stageLoading.textContent='แสดงหน้านี้ไม่ได้ ลองกดหน้าถัดไปหรือเปิดใหม่อีกครั้ง'; }
+      if(done){
+        canvas.style.display=''; stageLoading.style.display='none';
+        // The overlay is sized in device pixels to exactly match the page
+        // canvas (not a CSS %), so a stroke drawn at a given pixel always
+        // lines up with the artwork underneath regardless of zoom/container width.
+        markupCanvas.width=canvas.width; markupCanvas.height=canvas.height;
+        markupCanvas.style.width=canvas.style.width; markupCanvas.style.height=canvas.style.height;
+        markupCanvas.style.display='';
+        redrawMarkup();
+        updateUndoRedoButtons();
+      }else{
+        stageLoading.style.display=''; stageLoading.textContent='แสดงหน้านี้ไม่ได้ ลองกดหน้าถัดไปหรือเปิดใหม่อีกครั้ง';
+      }
     }catch(e){
       if(token===renderToken){ stageLoading.style.display=''; stageLoading.textContent='แสดงหน้านี้ไม่ได้'; }
     }
@@ -298,6 +354,266 @@
       else if(el.bottom>box.bottom) thumbsEl.scrollTop+=(el.bottom-box.bottom)+8;
     }
   }
+
+  /* ---------- Highlighter markup: draw / erase / undo / redo / autosave ----------
+     Strokes are stored per (document, page) with points normalized 0-1 against
+     the page's own pixel size, so they redraw correctly at any zoom/container
+     width. Never touches the PDF itself -- purely an overlay canvas layer,
+     autosaved to the server keyed by tutor + document + page. */
+  // `swatch` is the opaque color shown on the toolbar button; `stroke` is
+  // what actually gets drawn -- it needs real alpha (not just multiply blend
+  // mode) so the overlay canvas itself ends up with translucent pixels once
+  // composited over the page canvas below it. Two separate <canvas> elements
+  // don't share a pixel buffer, so "multiply" alone only blends strokes
+  // against each other within the overlay, not against the text underneath.
+  const MK_COLORS=[
+    {swatch:'#fde047', stroke:'rgba(250,204,21,.45)', label:'ไฮไลท์เหลือง'},
+    {swatch:'#4ade80', stroke:'rgba(74,222,128,.40)', label:'ไฮไลท์เขียว'},
+    {swatch:'#38bdf8', stroke:'rgba(56,189,248,.38)', label:'ไฮไลท์ฟ้า'},
+    {swatch:'#f472b6', stroke:'rgba(244,114,182,.38)', label:'ไฮไลท์ชมพู'},
+  ];
+  const PEN_WIDTH=0.016;     // fraction of canvas width
+  const ERASE_RADIUS=0.022;  // fraction of canvas width, hit-test radius
+
+  let activeTool=null;       // null | 'pen' | 'eraser'
+  let activeColor=MK_COLORS[0].stroke;
+  const pageStrokes={};      // "docId:page" -> [stroke, ...]
+  const pageHistory={};      // "docId:page" -> {undo:[op,...], redo:[op,...]}
+  const markupLoadedDocs=new Set();
+  let drawing=false, currentStroke=null, eraseRemoved=null;
+  let saveTimer=null, savePending=null;
+
+  mkColors.innerHTML = MK_COLORS.map(c=>
+    `<button type="button" class="mk-swatch" data-stroke="${c.stroke}" title="${c.label}" style="background:${c.swatch}"></button>`
+  ).join('') + '<button type="button" class="mk-eraser" id="eraserBtn" title="ยางลบ (ลากทับเส้นที่จะลบ)">🧽</button>';
+  const eraserBtn=document.getElementById('eraserBtn');
+
+  function pageKey(){ return docId+':'+page; }
+  function getStrokes(){ return pageStrokes[pageKey()] || (pageStrokes[pageKey()]=[]); }
+  function getHistory(){ return pageHistory[pageKey()] || (pageHistory[pageKey()]={undo:[],redo:[]}); }
+
+  function syncToolUI(){
+    mkColors.querySelectorAll('.mk-swatch').forEach(b=>
+      b.classList.toggle('active', activeTool==='pen' && b.dataset.stroke===activeColor));
+    eraserBtn.classList.toggle('active', activeTool==='eraser');
+    markupCanvas.classList.toggle('tool-pen', activeTool==='pen');
+    markupCanvas.classList.toggle('tool-eraser', activeTool==='eraser');
+  }
+  mkColors.querySelectorAll('.mk-swatch').forEach(b=>b.addEventListener('click',()=>{
+    if(activeTool==='pen' && activeColor===b.dataset.stroke){ activeTool=null; }
+    else{ activeTool='pen'; activeColor=b.dataset.stroke; }
+    syncToolUI();
+  }));
+  eraserBtn.addEventListener('click',()=>{
+    activeTool = activeTool==='eraser' ? null : 'eraser';
+    syncToolUI();
+  });
+
+  function drawStrokePath(ctx, stroke){
+    const pts=stroke.points;
+    if(pts.length<1) return;
+    const w=Math.max(stroke.width*markupCanvas.width, 2);
+    ctx.globalCompositeOperation='multiply';
+    ctx.strokeStyle=stroke.color;
+    ctx.fillStyle=stroke.color;
+    ctx.lineWidth=w;
+    ctx.lineCap='round'; ctx.lineJoin='round';
+    if(pts.length===1){
+      // A tap with no drag: draw a dot so it's still visible.
+      ctx.beginPath();
+      ctx.arc(pts[0][0]*markupCanvas.width, pts[0][1]*markupCanvas.height, w/2, 0, Math.PI*2);
+      ctx.fill();
+      return;
+    }
+    ctx.beginPath();
+    ctx.moveTo(pts[0][0]*markupCanvas.width, pts[0][1]*markupCanvas.height);
+    for(let i=1;i<pts.length;i++){
+      ctx.lineTo(pts[i][0]*markupCanvas.width, pts[i][1]*markupCanvas.height);
+    }
+    ctx.stroke();
+  }
+
+  function redrawMarkup(){
+    markupCtx.clearRect(0,0,markupCanvas.width,markupCanvas.height);
+    markupCtx.globalAlpha=1;
+    getStrokes().forEach(s=>drawStrokePath(markupCtx, s));
+  }
+
+  function updateUndoRedoButtons(){
+    const h=getHistory();
+    undoBtn.disabled = h.undo.length===0;
+    redoBtn.disabled = h.redo.length===0;
+  }
+
+  function pointFromEvent(evt){
+    const rect=markupCanvas.getBoundingClientRect();
+    const x=(evt.clientX-rect.left)/rect.width;
+    const y=(evt.clientY-rect.top)/rect.height;
+    return [Math.min(Math.max(x,0),1), Math.min(Math.max(y,0),1)];
+  }
+
+  function distance(a,b){
+    const dx=a[0]-b[0], dy=a[1]-b[1];
+    return Math.sqrt(dx*dx+dy*dy);
+  }
+
+  function eraseAt(pt){
+    const strokes=getStrokes();
+    for(let i=strokes.length-1;i>=0;i--){
+      const s=strokes[i];
+      if(s.points.some(p=>distance(p,pt)<=ERASE_RADIUS)){
+        eraseRemoved.push({stroke:s, index:i});
+        strokes.splice(i,1);
+      }
+    }
+  }
+
+  markupCanvas.addEventListener('pointerdown',e=>{
+    if(!activeTool) return;
+    e.preventDefault();
+    markupCanvas.setPointerCapture(e.pointerId);
+    drawing=true;
+    const pt=pointFromEvent(e);
+    if(activeTool==='pen'){
+      currentStroke={color:activeColor, width:PEN_WIDTH, points:[pt]};
+    }else{
+      eraseRemoved=[];
+      eraseAt(pt);
+      redrawMarkup();
+    }
+  });
+  let rafPending=false;
+  markupCanvas.addEventListener('pointermove',e=>{
+    if(!drawing) return;
+    e.preventDefault();
+    const pt=pointFromEvent(e);
+    if(activeTool==='pen' && currentStroke){
+      currentStroke.points.push(pt);
+    }else if(activeTool==='eraser'){
+      eraseAt(pt);
+    }
+    // Redraw the whole page's strokes plus the in-progress one each frame
+    // (rAF-gated so a flood of pointermove events can't outrun the screen)
+    // rather than drawing just the newest segment -- with multiply blending,
+    // stitching isolated 2-point segments together leaves faint seams where
+    // the round line-caps of adjacent segments overlap.
+    if(!rafPending){
+      rafPending=true;
+      requestAnimationFrame(()=>{
+        rafPending=false;
+        redrawMarkup();
+        if(activeTool==='pen' && currentStroke) drawStrokePath(markupCtx, currentStroke);
+      });
+    }
+  });
+  function endStroke(){
+    if(!drawing) return;
+    drawing=false;
+    const h=getHistory();
+    if(activeTool==='pen' && currentStroke){
+      getStrokes().push(currentStroke);
+      h.undo.push({type:'add', stroke:currentStroke});
+      h.redo.length=0;
+      currentStroke=null;
+      scheduleSave();
+    }else if(activeTool==='eraser' && eraseRemoved && eraseRemoved.length){
+      h.undo.push({type:'erase', removed:eraseRemoved});
+      h.redo.length=0;
+      eraseRemoved=null;
+      scheduleSave();
+    }
+    updateUndoRedoButtons();
+  }
+  markupCanvas.addEventListener('pointerup',endStroke);
+  markupCanvas.addEventListener('pointercancel',endStroke);
+  markupCanvas.addEventListener('pointerleave',()=>{ if(drawing) endStroke(); });
+
+  function applyUndo(op){
+    const strokes=getStrokes();
+    if(op.type==='add'){
+      const idx=strokes.indexOf(op.stroke);
+      if(idx!==-1) strokes.splice(idx,1);
+    }else if(op.type==='erase'){
+      // Restore in ascending original-index order so the array comes back
+      // exactly as it was before the erase.
+      op.removed.slice().sort((a,b)=>a.index-b.index).forEach(r=>strokes.splice(r.index,0,r.stroke));
+    }
+  }
+  function applyRedo(op){
+    const strokes=getStrokes();
+    if(op.type==='add'){
+      strokes.push(op.stroke);
+    }else if(op.type==='erase'){
+      op.removed.forEach(r=>{
+        const idx=strokes.indexOf(r.stroke);
+        if(idx!==-1) strokes.splice(idx,1);
+      });
+    }
+  }
+  undoBtn.addEventListener('click',()=>{
+    const h=getHistory();
+    const op=h.undo.pop();
+    if(!op) return;
+    applyUndo(op);
+    h.redo.push(op);
+    redrawMarkup();
+    updateUndoRedoButtons();
+    scheduleSave();
+  });
+  redoBtn.addEventListener('click',()=>{
+    const h=getHistory();
+    const op=h.redo.pop();
+    if(!op) return;
+    applyRedo(op);
+    h.undo.push(op);
+    redrawMarkup();
+    updateUndoRedoButtons();
+    scheduleSave();
+  });
+
+  function scheduleSave(){
+    const key=pageKey(), docForSave=docId, pageForSave=page, strokes=getStrokes().slice();
+    mkStatus.textContent='กำลังบันทึก...';
+    clearTimeout(saveTimer);
+    savePending={key, docForSave, pageForSave, strokes};
+    saveTimer=setTimeout(doSave, 700);
+  }
+  function flushPendingSave(){
+    if(saveTimer){ clearTimeout(saveTimer); saveTimer=null; doSave(); }
+  }
+  async function doSave(){
+    if(!savePending) return;
+    const {docForSave, pageForSave, strokes}=savePending;
+    savePending=null;
+    try{
+      const res=await fetch(`/tutor-sheets/markup/${docForSave}/${pageForSave}/`, {
+        method:'POST',
+        headers:{'Content-Type':'application/json','X-CSRFToken':CSRF},
+        body:JSON.stringify({strokes}),
+      });
+      const data=await res.json().catch(()=>({ok:false}));
+      mkStatus.textContent = data.ok ? 'บันทึกแล้ว' : 'บันทึกไม่สำเร็จ';
+    }catch(e){
+      mkStatus.textContent='บันทึกไม่สำเร็จ';
+    }
+  }
+  window.addEventListener('beforeunload',()=>{ if(saveTimer) flushPendingSave(); });
+
+  async function ensureMarkupLoaded(id){
+    if(markupLoadedDocs.has(id)) return;
+    markupLoadedDocs.add(id);
+    try{
+      const res=await fetch(`/tutor-sheets/markup/${id}/`);
+      const data=await res.json();
+      if(data.ok){
+        Object.keys(data.pages).forEach(pStr=>{
+          pageStrokes[id+':'+pStr]=data.pages[pStr];
+        });
+      }
+    }catch(e){ /* markup is a bonus layer -- a failed fetch just starts blank */ }
+  }
+
+  syncToolUI();
 
   prevBtn.addEventListener('click',()=>goTo(page-1));
   nextBtn.addEventListener('click',()=>goTo(page+1));

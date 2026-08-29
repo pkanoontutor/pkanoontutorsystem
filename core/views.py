@@ -2275,6 +2275,37 @@ def sheet_document_upload(request: HttpRequest, pk: int) -> JsonResponse:
 
 @require_POST
 @login_required
+def sheet_document_upload_auto(request: HttpRequest, pk: int) -> JsonResponse:
+    """Same as sheet_document_upload, but for the continuous-upload page --
+    no kind is supplied up front, so the file is classified automatically
+    from its filename/page-count, exactly like the bulk zip importer does."""
+    sheet = get_object_or_404(Sheet, pk=pk)
+    upload = request.FILES.get("pdf")
+    if not upload:
+        return JsonResponse({"ok": False, "message": "ไม่พบไฟล์ PDF"}, status=400)
+    name_lower = (upload.name or "").lower()
+    if not (name_lower.endswith(".pdf") or (upload.content_type or "") == "application/pdf"):
+        return JsonResponse({"ok": False, "message": "รองรับเฉพาะไฟล์ PDF"}, status=400)
+
+    page_count, _rendered = render_pdf(upload, thumbnail=False)
+    kind, _why = classify(upload.name, page_count)
+
+    doc = attach_document(
+        sheet, kind, upload, upload.name,
+        page_count=page_count,
+        uploaded_by=request.user if request.user.is_authenticated else None,
+    )
+    sheet_pages = sync_sheet_total_pages(sheet)
+
+    return JsonResponse({
+        "ok": True,
+        "document": _sheet_document_payload(doc),
+        "sheet_total_pages": sheet_pages,
+    })
+
+
+@require_POST
+@login_required
 def sheet_document_delete(request: HttpRequest, pk: int) -> JsonResponse:
     doc = SheetDocument.objects.filter(pk=pk).select_related("sheet").first()
     if not doc:
@@ -2322,6 +2353,47 @@ def _sheet_documents_by_id(sheet_ids: list[int]) -> dict[int, dict]:
         out.setdefault(d.sheet_id, {"cover": [], "content": [], "answer": []})
         out[d.sheet_id][d.kind].append(_sheet_document_payload(d))
     return out
+
+
+@login_required
+def sheet_inventory_continuous_upload(request: HttpRequest) -> HttpResponse:
+    """One row per sheet with a drop zone on the right -- no popup to open
+    and close between sheets, so uploading files for many books in a row
+    stays uninterrupted. Each drop uploads in the background via
+    sheet_document_upload_auto (auto-classified by filename), and the whole
+    thing works from a single page load."""
+    q = (request.GET.get("q") or "").strip()
+    sheets_qs = Sheet.objects.select_related("subject").filter(is_active=True)
+    if q:
+        grade_q = _normalize_sheet_grade_level(q)
+        query = (
+            Q(code__icontains=q) |
+            Q(title__icontains=q) |
+            Q(subject__name__icontains=q)
+        )
+        if grade_q:
+            query |= Q(grade_level=grade_q)
+        sheets_qs = sheets_qs.filter(query)
+
+    sheets = list(sheets_qs.order_by("grade_level", "subject__name", "code"))
+    documents_by_sheet = _sheet_documents_by_id([s.id for s in sheets])
+    rows = [
+        {
+            "sheet": s,
+            "docs_complete": bool(
+                documents_by_sheet.get(s.id, {}).get("cover")
+                and documents_by_sheet.get(s.id, {}).get("content")
+                and documents_by_sheet.get(s.id, {}).get("answer")
+            ),
+        }
+        for s in sheets
+    ]
+
+    return render(request, "core/sheet_inventory_continuous_upload.html", {
+        "q": q,
+        "grade_groups": _ordered_grade_groups(rows),
+        "documents_by_sheet_json": json.dumps(documents_by_sheet, ensure_ascii=False),
+    })
 
 
 @login_required

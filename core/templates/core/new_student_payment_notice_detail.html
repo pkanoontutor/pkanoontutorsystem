@@ -21,6 +21,11 @@
     input,textarea,select{border:1px solid #e2e8f0;border-radius:13px;padding:10px;font-weight:800;background:#fff;width:100%;font-family:inherit}
     textarea{min-height:88px;resize:vertical}.pkg-edit{border:1px solid #e2e8f0;background:#f8fafc;border-radius:16px;padding:10px;display:grid;gap:8px}
     .pkg-title{font-size:13px;font-weight:1000;color:#0f172a}
+    .opt-row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    .opt-card{border:1px solid #e2e8f0;background:#f8fafc;border-radius:14px;padding:10px;font-size:12.5px;font-weight:900;
+      display:flex;align-items:center;gap:8px;cursor:pointer;color:#334155}
+    .opt-card:has(input:checked){background:#f5f3ff;border-color:#c4b5fd;color:#6b21a8}
+    .opt-card input{width:auto}
     .btnrow{display:flex;gap:8px;flex-wrap:wrap}.btn{border:0;border-radius:999px;padding:11px 15px;font-weight:1000;cursor:pointer;background:#0f172a;color:#fff;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:6px;line-height:1.2}
     .btn.icon{width:38px;height:38px;padding:0;font-size:18px}.btn.primary{background:#7c3aed}.btn.soft{background:#fff;color:#0f172a;border:1px solid #cbd5e1}.btn.green{background:#16a34a}.btn.red{background:#dc2626}.btn.blue{background:#2563eb}
     .statusbox{border-radius:18px;padding:12px;border:1px solid #e2e8f0;background:#f8fafc;font-size:13px;font-weight:900;line-height:1.5}.statusbox.sent{background:#dcfce7;border-color:#86efac;color:#166534}.statusbox.unsent{background:#fffbeb;border-color:#fde68a;color:#92400e}
@@ -90,25 +95,39 @@
           </div>
         </div>
 
+        <div class="field">
+          <label>รูปแบบการสมัคร</label>
+          <div class="opt-row">
+            <label class="opt-card">
+              <input type="radio" name="pricing_option" value="trial_then_enroll" {% if notice.pricing_option == "trial_then_enroll" %}checked{% endif %} onchange="applyPricingOptionDefaults()">
+              ทดลองเรียนแล้วสมัคร (ลดเพิ่ม 190 บาท)
+            </label>
+            <label class="opt-card">
+              <input type="radio" name="pricing_option" value="no_trial" {% if notice.pricing_option == "no_trial" %}checked{% endif %} onchange="applyPricingOptionDefaults()">
+              สมัครโดยไม่ทดลอง (แถม 2 ครั้ง)
+            </label>
+          </div>
+        </div>
+
         <div class="pkg-edit">
-          <div class="pkg-title">แพ็กเกจ 10 สัปดาห์</div>
+          <div class="pkg-title" id="pkgTitle10">แพ็กเกจ {% if notice.pricing_option == "no_trial" %}10 แถม 2 ครั้ง{% else %}10 สัปดาห์{% endif %}</div>
           <div class="grid">
             <div class="field"><label>ราคาเต็ม</label><input name="package_10_full_price" value="{{ notice.package_10_full_price }}"></div>
-            <div class="field"><label>ส่วนลด</label><input name="package_10_discount" value="{{ notice.package_10_discount }}"></div>
+            <div class="field"><label>ส่วนลด</label><input name="package_10_discount" id="package10Discount" value="{{ notice.package_10_discount }}"></div>
           </div>
         </div>
         <div class="pkg-edit">
-          <div class="pkg-title">แพ็กเกจ 20 สัปดาห์</div>
+          <div class="pkg-title" id="pkgTitle20">แพ็กเกจ {% if notice.pricing_option == "no_trial" %}20 แถม 2 ครั้ง{% else %}20 สัปดาห์{% endif %}</div>
           <div class="grid">
             <div class="field"><label>ราคาเต็ม</label><input name="package_20_full_price" value="{{ notice.package_20_full_price }}"></div>
-            <div class="field"><label>ส่วนลด</label><input name="package_20_discount" value="{{ notice.package_20_discount }}"></div>
+            <div class="field"><label>ส่วนลด</label><input name="package_20_discount" id="package20Discount" value="{{ notice.package_20_discount }}"></div>
           </div>
         </div>
         <div class="pkg-edit">
-          <div class="pkg-title">แพ็กเกจ 30 สัปดาห์</div>
+          <div class="pkg-title" id="pkgTitle30">แพ็กเกจ {% if notice.pricing_option == "no_trial" %}30 แถม 2 ครั้ง{% else %}30 สัปดาห์{% endif %}</div>
           <div class="grid">
             <div class="field"><label>ราคาเต็ม</label><input name="package_30_full_price" value="{{ notice.package_30_full_price }}"></div>
-            <div class="field"><label>ส่วนลด</label><input name="package_30_discount" value="{{ notice.package_30_discount }}"></div>
+            <div class="field"><label>ส่วนลด</label><input name="package_30_discount" id="package30Discount" value="{{ notice.package_30_discount }}"></div>
           </div>
         </div>
 
@@ -187,6 +206,22 @@
   </div>
 
   <script>
+    // Mirrors NewStudentPaymentNotice.BASE_PACKAGE_DISCOUNTS / TRIAL_TOPUP_DISCOUNT
+    // in core/models.py -- "ทดลองเรียนแล้วสมัคร" tops each package's discount
+    // up by 190 baht (the trial fee counts toward enrolling); "สมัครโดยไม่ทดลอง"
+    // keeps the base discount but the package includes 2 bonus sessions.
+    const BASE_PACKAGE_DISCOUNTS = {10: 0, 20: 300, 30: 800};
+    const TRIAL_TOPUP_DISCOUNT = 190;
+    function applyPricingOptionDefaults(){
+      const opt = document.querySelector('input[name="pricing_option"]:checked').value;
+      const extra = opt === 'trial_then_enroll' ? TRIAL_TOPUP_DISCOUNT : 0;
+      const bonusSuffix = opt === 'no_trial' ? ' แถม 2 ครั้ง' : ' สัปดาห์';
+      [10, 20, 30].forEach(function(n){
+        document.getElementById('package' + n + 'Discount').value = BASE_PACKAGE_DISCOUNTS[n] + extra;
+        document.getElementById('pkgTitle' + n).textContent = 'แพ็กเกจ ' + n + bonusSuffix;
+      });
+    }
+
     async function makeCanvas() {
       const el = document.getElementById("receiptCard");
       return await html2canvas(el, {scale: 3, backgroundColor: "#ffffff", useCORS: true});

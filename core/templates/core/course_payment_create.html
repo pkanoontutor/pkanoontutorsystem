@@ -205,13 +205,27 @@
           </div>
         </div>
 
+        <div class="field full hidden" id="pricingOptionField">
+          <label>รูปแบบการสมัคร (นักเรียนใหม่)</label>
+          <div class="toggle">
+            <label class="radio-card">
+              <input type="radio" name="pricing_option" value="trial_then_enroll" checked onchange="onPricingOptionChange()">
+              ทดลองเรียนแล้วสมัคร (ลดเพิ่ม 190 บาท)
+            </label>
+            <label class="radio-card">
+              <input type="radio" name="pricing_option" value="no_trial" onchange="onPricingOptionChange()">
+              สมัครโดยไม่ทดลอง (แถม 2 ครั้ง)
+            </label>
+          </div>
+        </div>
+
         <div class="field full" id="sessionsField">
           <label>จำนวนครั้ง</label>
           <div class="session-choice-grid" id="sessionChoiceGrid">
             {% for value,label,sessions in session_choices %}
               <label class="radio-card session-card">
                 <input type="radio" name="session_package" value="{{ value }}" data-sessions="{{ sessions }}" {% if value == "10" %}checked{% endif %} onchange="applySessionPackage(true)">
-                {{ label }}
+                <span class="session-label-text" data-base-label="{{ label }}">{{ label }}</span>
               </label>
             {% endfor %}
           </div>
@@ -219,6 +233,7 @@
           <div class="hint" id="packagePriceHint" style="color:#b45309;font-weight:900;margin-top:4px;"></div>
         </div>
         <div class="field hidden" id="customSessionField"><label>กรอกจำนวนครั้งเอง</label><input type="number" name="custom_sessions" id="customSessions" min="1" value="10" oninput="updateSummary(true)"></div>
+        <input type="hidden" name="bonus_sessions" id="bonusSessions" value="0">
 
         <div class="field full hidden" id="itemDescriptionField">
           <label>รายการ</label>
@@ -260,6 +275,42 @@ const PACKAGE_PRICE_DEFAULTS = {
   '30': { new: {price:11970, discount:1000}, existing: {price:11970, discount:1000} },
 };
 
+// New-student "รูปแบบการสมัคร" promo, 10/20/30-session packages only (mirrors
+// NewStudentPaymentNotice's pricing_option in core/models.py): "ทดลองเรียนแล้ว
+// สมัคร" tops up that package's usual new-student discount by another 190
+// baht; "สมัครโดยไม่ทดลอง" keeps the usual price/discount but grants 2 bonus
+// sessions on top of the package's nominal count.
+const NEW_STUDENT_PROMO_PACKAGES = ['10', '20', '30'];
+const TRIAL_THEN_ENROLL_TOPUP = 190;
+const NO_TRIAL_BONUS_SESSIONS = 2;
+function pricingOptionValue(){
+  const r = document.querySelector('input[name="pricing_option"]:checked');
+  return r ? r.value : 'trial_then_enroll';
+}
+function bonusSessionsFor(pack, mode){
+  if(mode !== 'new' || !NEW_STUDENT_PROMO_PACKAGES.includes(pack)) return 0;
+  return pricingOptionValue() === 'no_trial' ? NO_TRIAL_BONUS_SESSIONS : 0;
+}
+// Updates each 10/20/30 session-card's visible label to show the bonus
+// sessions while "สมัครโดยไม่ทดลอง" is active for a new student; reverts to
+// the plain label otherwise.
+function updateSessionLabels(){
+  const modeRadio = document.querySelector('input[name="student_mode"]:checked');
+  const mode = modeRadio ? modeRadio.value : 'existing';
+  const showBonus = mode === 'new' && pricingOptionValue() === 'no_trial';
+  document.querySelectorAll('.session-card').forEach(function(card){
+    const input = card.querySelector('input[name="session_package"]');
+    const span = card.querySelector('.session-label-text');
+    const base = span.dataset.baseLabel;
+    span.textContent = (showBonus && NEW_STUDENT_PROMO_PACKAGES.includes(input.value))
+      ? base.replace(/ครั้ง$/, 'แถม ' + NO_TRIAL_BONUS_SESSIONS + ' ครั้ง')
+      : base;
+  });
+}
+function onPricingOptionChange(){
+  applyPackagePriceDefault();
+}
+
 // Extra discount that stacks on top of the package price, from two sources:
 //  - the friend-referral search box (100 THB, new students only)
 //  - clicking a "ใบแจ้งต่อคอร์สล่าสุด" quick-pick card, which carries over
@@ -274,14 +325,19 @@ function extraDiscountTotal(){
 
 function applyPackagePriceDefault(){
   const hint = document.getElementById('packagePriceHint');
+  const modeRadio = document.querySelector('input[name="student_mode"]:checked');
+  const mode = modeRadio ? modeRadio.value : 'existing';
+  document.getElementById('pricingOptionField').classList.toggle('hidden', mode !== 'new');
+  updateSessionLabels();
   if(isOtherReceipt()){ hint.textContent=''; return; }
   const radio = selectedSessionRadio();
   if(!radio) return;
-  const modeRadio = document.querySelector('input[name="student_mode"]:checked');
-  const mode = modeRadio ? modeRadio.value : 'existing';
   const table = PACKAGE_PRICE_DEFAULTS[radio.value];
   const discountInput = document.getElementById('discountAmount');
   const extra = extraDiscountTotal();
+  document.getElementById('bonusSessions').value = bonusSessionsFor(radio.value, mode);
+  const promoTopup = (mode === 'new' && NEW_STUDENT_PROMO_PACKAGES.includes(radio.value) && pricingOptionValue() === 'trial_then_enroll')
+    ? TRIAL_THEN_ENROLL_TOPUP : 0;
 
   if(!table){
     // "กรอกเอง" (custom) has no standard price -- leave whatever was typed,
@@ -309,7 +365,7 @@ function applyPackagePriceDefault(){
   }
   hint.textContent = '';
   document.getElementById('coursePrice').value = entry.price;
-  discountInput.value = entry.discount + extra;
+  discountInput.value = entry.discount + promoTopup + extra;
   discountInput.dataset.extraDiscount = extra;
   updateSummary(true);
 }
@@ -329,12 +385,14 @@ function toggleReceiptKind(){
   document.getElementById('coursePriceLabel').textContent = other ? 'จำนวนเงิน' : 'ราคาคอร์ส';
 
   const priceInput = document.getElementById('coursePrice');
-  // Swap in/out the "other receipt" default amount, but only when the field
-  // still holds whichever default was last applied automatically -- if the
-  // user typed their own number, leave it alone.
   const current = Number(priceInput.value || 0);
   if(other){
-    if(current === 0){ priceInput.value = DEFAULT_OTHER_AMOUNT; }
+    // Switching to "other" always resets to its own default (190 บาท, no
+    // discount) -- the price field otherwise still holds whatever the
+    // course-package selection last filled in, which is meaningless once
+    // this is a standalone item instead of a session package.
+    priceInput.value = DEFAULT_OTHER_AMOUNT;
+    document.getElementById('discountAmount').value = 0;
   }else if(current === DEFAULT_OTHER_AMOUNT){
     priceInput.value = 0;
   }
@@ -495,7 +553,9 @@ function updateSummary(forceAmount){
 
   const radio=selectedSessionRadio();
   const pack=radio ? radio.value : '10';
-  const sessions=pack==='custom'?Number(document.getElementById('customSessions').value||0):Number((radio && radio.dataset.sessions)||10);
+  const baseSessions=pack==='custom'?Number(document.getElementById('customSessions').value||0):Number((radio && radio.dataset.sessions)||10);
+  const bonus=Number(document.getElementById('bonusSessions').value||0);
+  const sessions=baseSessions+bonus;
   document.getElementById('netSummary').textContent=net.toLocaleString('en-US',{maximumFractionDigits:2})+' บาท / '+sessions+' ครั้ง';
   document.getElementById('amountPaid').value=net.toFixed(2);
 }

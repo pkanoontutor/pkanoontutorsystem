@@ -1659,6 +1659,28 @@ class NewStudentPaymentNotice(models.Model):
     )
     first_lesson_date = models.DateField("วันที่เริ่มเรียนวันแรก", null=True, blank=True)
 
+    class PricingOption(models.TextChoices):
+        TRIAL_THEN_ENROLL = "trial_then_enroll", "ทดลองเรียนแล้วสมัคร"
+        NO_TRIAL = "no_trial", "สมัครโดยไม่ทดลอง"
+
+    pricing_option = models.CharField(
+        "รูปแบบการสมัคร",
+        max_length=20,
+        choices=PricingOption.choices,
+        default=PricingOption.TRIAL_THEN_ENROLL,
+    )
+
+    # Base ("สมัครโดยไม่ทดลอง") package discounts; "ทดลองเรียนแล้วสมัคร" tops
+    # each one up by an extra 190 baht, since that parent already paid for a
+    # trial lesson that now counts toward enrolling.
+    BASE_PACKAGE_DISCOUNTS = {10: Decimal("0"), 20: Decimal("300"), 30: Decimal("800")}
+    TRIAL_TOPUP_DISCOUNT = Decimal("190")
+
+    @classmethod
+    def default_discounts_for(cls, pricing_option: str) -> dict[int, Decimal]:
+        extra = cls.TRIAL_TOPUP_DISCOUNT if pricing_option == cls.PricingOption.TRIAL_THEN_ENROLL else Decimal("0")
+        return {n: base + extra for n, base in cls.BASE_PACKAGE_DISCOUNTS.items()}
+
     package_10_full_price = models.DecimalField("10 สัปดาห์ - ราคาเต็ม", max_digits=10, decimal_places=2, default=3990)
     package_10_discount = models.DecimalField("10 สัปดาห์ - ส่วนลด", max_digits=10, decimal_places=2, default=0)
     package_10_net_price = models.DecimalField("10 สัปดาห์ - ราคาสุทธิ", max_digits=10, decimal_places=2, default=3990)

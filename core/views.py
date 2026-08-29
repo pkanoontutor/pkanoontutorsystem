@@ -3,6 +3,7 @@ from collections import Counter, OrderedDict, defaultdict
 
 import json
 import csv
+import logging
 import os
 import re
 from datetime import date, timedelta, datetime
@@ -23,6 +24,8 @@ from django.views.decorators.clickjacking import xframe_options_sameorigin
 
 from openpyxl import Workbook, load_workbook
 from openpyxl.utils import get_column_letter
+
+logger = logging.getLogger(__name__)
 
 from .models import (
     Student,
@@ -2253,13 +2256,27 @@ def sheet_document_upload(request: HttpRequest, pk: int) -> JsonResponse:
 
     book = Book.objects.filter(id=_id_or_none(request.POST.get("source_book_id"))).first()
 
-    doc = attach_document(
-        sheet, kind, upload,
-        (request.POST.get("title") or upload.name or "").strip() or upload.name,
-        source_book=book,
-        source_url=(request.POST.get("source_url") or "").strip(),
-        uploaded_by=request.user if request.user.is_authenticated else None,
-    )
+    try:
+        doc = attach_document(
+            sheet, kind, upload,
+            (request.POST.get("title") or upload.name or "").strip() or upload.name,
+            source_book=book,
+            source_url=(request.POST.get("source_url") or "").strip(),
+            uploaded_by=request.user if request.user.is_authenticated else None,
+        )
+    except Exception:
+        # Whatever went wrong (disk full, a PDF pdfium can't open, a storage
+        # hiccup...), the client needs a parseable JSON error back so its
+        # retry logic can react -- an unhandled exception here would instead
+        # fall through to Django's generic HTML error page, which the
+        # client's `JSON.parse` silently swallows into a blank error message.
+        # Logged with the sheet/kind/filename so a pattern (e.g. one
+        # consistently-corrupt file) is diagnosable from the server logs.
+        logger.exception(
+            "sheet_document_upload failed: sheet=%s kind=%s filename=%s size=%s",
+            sheet.pk, kind, upload.name, getattr(upload, "size", None),
+        )
+        return JsonResponse({"ok": False, "message": "อัปโหลดไม่สำเร็จ (เกิดข้อผิดพลาดที่เซิร์ฟเวอร์) ลองใหม่อีกครั้ง"}, status=500)
 
     # The uploaded content file is now the authoritative page count -- it is
     # the thing tutors actually page through -- so the sheet's own total is

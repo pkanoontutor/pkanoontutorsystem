@@ -2008,6 +2008,49 @@ class TutorSheetProgress(models.Model):
         return f"{self.tutoring_class} | {self.sheet.code} | หน้า {self.last_page}"
 
 
+class TutorSheetMarkup(models.Model):
+    """Highlighter markup a tutor drew on one page of one PDF file.
+
+    Keyed by tutor + document + page (NOT by class, unlike TutorSheetProgress)
+    -- the pen marks belong to that tutor's own copy of the book, so they
+    follow the tutor across whichever class they open the sheet from.
+    Never rendered back into the PDF; `strokes` is just vector paths (points
+    normalized 0-1 against the page's un-zoomed size) redrawn on an overlay
+    canvas client-side.
+    """
+
+    tutor = models.ForeignKey(
+        TeachingTutor,
+        verbose_name="ติวเตอร์",
+        on_delete=models.CASCADE,
+        related_name="sheet_markups",
+    )
+    document = models.ForeignKey(
+        "SheetDocument",
+        verbose_name="เล่ม (ไฟล์ PDF)",
+        on_delete=models.CASCADE,
+        related_name="tutor_markups",
+    )
+    page = models.PositiveIntegerField("หน้าที่")
+    strokes = models.JSONField("ขีดเขียน", default=list, blank=True)
+    updated_at = models.DateTimeField("อัปเดตล่าสุด", auto_now=True)
+    created_at = models.DateTimeField("วันที่สร้าง", default=timezone.now)
+
+    class Meta:
+        verbose_name = "Tutor Sheet Markup"
+        verbose_name_plural = "Tutor Sheet Markups"
+        ordering = ("document", "page")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["tutor", "document", "page"],
+                name="uniq_tutor_sheet_markup_per_tutor_document_page",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.tutor.name} | {self.document} | หน้า {self.page}"
+
+
 class TeachingClassSubjectTemplate(models.Model):
     tutoring_class = models.ForeignKey(
         TutoringClass,

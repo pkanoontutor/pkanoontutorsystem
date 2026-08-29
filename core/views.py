@@ -51,6 +51,7 @@ from .models import (
     NewStudentPaymentNotice,
     TeachingTutor,
     TutorSheetProgress,
+    TutorSheetMarkup,
     TeachingClassSubjectTemplate,
     TeachingWeeklyAssignment,
     TeachingProgressUpdate,
@@ -3961,6 +3962,58 @@ def tutor_sheet_save_progress(request: HttpRequest) -> JsonResponse:
             else "บันทึกหน้าที่สอนค้างไว้แล้ว (สัปดาห์นี้ยังไม่มี assignment วิชานี้ จึงยังไม่เข้ารายงาน)"
         ),
     })
+
+
+def tutor_sheet_markup_list(request: HttpRequest, document_id: int) -> JsonResponse:
+    """All of this tutor's highlighter markup for one PDF file, one request
+    per document-open rather than one per page turn -- keeps flipping pages
+    instant since the strokes are already in the browser."""
+    tutor = _get_sheet_tutor(request)
+    if not tutor:
+        return JsonResponse({"ok": False, "message": "กรุณาเข้าสู่ระบบใหม่"}, status=403)
+
+    document = SheetDocument.objects.filter(id=document_id).first()
+    if not document:
+        return JsonResponse({"ok": False, "message": "ไม่พบไฟล์นี้"}, status=404)
+
+    pages = {
+        str(m.page): m.strokes
+        for m in TutorSheetMarkup.objects.filter(tutor=tutor, document=document)
+    }
+    return JsonResponse({"ok": True, "pages": pages})
+
+
+@require_POST
+def tutor_sheet_markup_save(request: HttpRequest, document_id: int, page: int) -> JsonResponse:
+    """Autosave: the client sends the full current strokes list for this
+    page on every change (draw or erase), so this is a plain upsert/replace
+    rather than an append -- simplest thing that can't drift out of sync."""
+    tutor = _get_sheet_tutor(request)
+    if not tutor:
+        return JsonResponse({"ok": False, "message": "กรุณาเข้าสู่ระบบใหม่"}, status=403)
+
+    document = SheetDocument.objects.filter(id=document_id).first()
+    if not document:
+        return JsonResponse({"ok": False, "message": "ไม่พบไฟล์นี้"}, status=404)
+
+    try:
+        strokes = json.loads(request.body.decode("utf-8") or "{}").get("strokes")
+    except (ValueError, UnicodeDecodeError):
+        strokes = None
+    if not isinstance(strokes, list):
+        return JsonResponse({"ok": False, "message": "ข้อมูลขีดเขียนไม่ถูกต้อง"}, status=400)
+
+    if strokes:
+        TutorSheetMarkup.objects.update_or_create(
+            tutor=tutor, document=document, page=page,
+            defaults={"strokes": strokes},
+        )
+    else:
+        # An empty page (everything erased/undone back to nothing) doesn't
+        # need a row at all -- delete it instead of storing "[]" forever.
+        TutorSheetMarkup.objects.filter(tutor=tutor, document=document, page=page).delete()
+
+    return JsonResponse({"ok": True})
 
 
 # =========================================================

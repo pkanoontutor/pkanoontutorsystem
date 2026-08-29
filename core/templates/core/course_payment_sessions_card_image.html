@@ -1,0 +1,237 @@
+{% load static %}
+{% load humanize %}
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>ครั้งเรียนคงเหลือ {{ payment.student.nickname }}</title>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    *{box-sizing:border-box;}
+    :root{--font:"IBM Plex Sans Thai",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+    body{margin:0;background:#fdf3d8;font-family:var(--font);color:#3a3527;}
+    .page{min-height:100vh;padding:12px;display:grid;place-items:start center;gap:10px;}
+    .toolbar{width:min(100%,440px);display:flex;gap:8px;flex-wrap:wrap;justify-content:center;position:sticky;top:8px;z-index:10;}
+    .btn{border:0;border-radius:999px;padding:10px 13px;font-weight:700;cursor:pointer;background:#e0722b;color:#fff;box-shadow:0 4px 10px rgba(224,114,43,.28);font-family:inherit;}
+    .btn.soft{background:#fff;color:#8a5a17;border:1px solid #f1d99b;}
+    .receipt-shell{width:min(100%,440px);}
+    .receipt{background:#fffdf6;border-radius:20px;box-shadow:0 18px 46px rgba(139,94,15,.20);border:1px solid #f1e0ad;overflow:hidden;}
+    .receipt-inner{padding:18px 18px 16px;}
+    .top-band{height:10px;background:linear-gradient(90deg,#8bc34a,#f6c445,#f4874b);}
+    .company-head{display:grid;grid-template-columns:82px 1fr;gap:12px;align-items:center;border-bottom:2px solid #f6c445;padding-bottom:11px;}
+    .logo-box{border:1px solid #f1e0ad;border-radius:14px;padding:7px;background:#fffaf0;display:flex;align-items:center;justify-content:center;min-height:76px;}
+    .logo{max-width:66px;max-height:62px;object-fit:contain;}
+    .company-name{font-size:20px;font-weight:700;letter-spacing:-.01em;color:#7a4a12;line-height:1.15;}
+    .company-meta{margin-top:5px;font-size:11px;color:#8a6a3a;line-height:1.42;font-weight:500;}
+    .doc-title{font-size:24px;font-weight:700;color:#e0722b;letter-spacing:.01em;margin-top:13px;}
+    .student-line{margin-top:4px;font-size:14px;font-weight:700;color:#4a3510;}
+    .student-meta{font-size:11px;color:#8a6a3a;font-weight:600;margin-top:2px;}
+    .remaining-box{margin-top:14px;border:2px solid #f6c445;border-radius:18px;padding:18px 12px;text-align:center;background:linear-gradient(180deg,#fffdf6,#fff8e6);}
+    .remaining-label{font-size:13px;font-weight:700;color:#8a6a3a;text-transform:uppercase;letter-spacing:.06em;}
+    .remaining-num{font-size:64px;line-height:1;font-weight:700;color:#e0722b;letter-spacing:-.02em;margin-top:6px;}
+    .remaining-unit{font-size:15px;font-weight:700;color:#8a6a3a;margin-top:4px;}
+    .hist-title{font-size:13px;font-weight:700;color:#7a4a12;margin-top:16px;margin-bottom:8px;}
+    .hist-table{border:1px solid #f1e0ad;border-radius:14px;overflow:hidden;}
+    .hist-head,.hist-row{display:grid;grid-template-columns:1fr 84px 78px;align-items:stretch;}
+    .hist-head div{background:#8bc34a;color:#fff;font-size:10.5px;font-weight:700;padding:7px 8px;}
+    .hist-row div{font-size:12.5px;font-weight:600;padding:8px;border-bottom:1px solid #f6ecc9;line-height:1.35;}
+    .hist-row:last-child div{border-bottom:0;}
+    .hist-row div:not(:last-child),.hist-head div:not(:last-child){border-right:1px solid #f6ecc9;}
+    .num{text-align:right;}
+    .hist-empty{padding:12px;text-align:center;font-size:12px;font-weight:700;color:#a5793a;background:#fff8e6;}
+    .qr-zone{margin-top:16px;border-top:2px dashed #f1d99b;padding-top:14px;display:grid;grid-template-columns:104px 1fr;gap:12px;align-items:center;}
+    .qr-box{width:104px;height:104px;background:#fff;border:1px solid #f1e0ad;border-radius:14px;padding:6px;display:grid;place-items:center;}
+    .qr-title{font-size:13px;font-weight:700;color:#7a4a12;}
+    .qr-sub{font-size:11px;color:#8a6a3a;font-weight:600;line-height:1.5;margin-top:3px;}
+    .qr-link{font-size:12px;font-weight:700;color:#e0722b;margin-top:3px;}
+    .foot{border-top:1px solid #f1e0ad;margin-top:13px;padding-top:10px;text-align:center;color:#a5793a;font-size:11px;font-weight:500;line-height:1.45;}
+    .preview-backdrop{position:fixed;inset:0;background:rgba(58,40,10,.72);z-index:999;display:grid;place-items:center;padding:14px;}
+    .preview-backdrop[hidden]{display:none!important;}
+    .preview-card{width:min(100%,480px);max-height:calc(100vh - 28px);background:#fffdf6;border-radius:22px;padding:12px;display:grid;gap:10px;box-shadow:0 24px 70px rgba(0,0,0,.35);}
+    .preview-head{display:flex;justify-content:space-between;gap:8px;align-items:flex-start;}
+    .preview-title{font-size:14px;font-weight:700;color:#7a4a12;line-height:1.35;}
+    .preview-hint{font-size:12px;color:#8a6a3a;font-weight:600;line-height:1.45;margin-top:2px;}
+    .preview-img-wrap{max-height:calc(100vh - 170px);overflow:auto;border-radius:16px;background:#fff8e6;border:1px solid #f1e0ad;display:grid;place-items:start center;padding:8px;}
+    .preview-img{max-width:100%;height:auto;border-radius:12px;background:#fff;}
+    .preview-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;}
+    @media(max-width:480px){
+      .page{padding:8px;background:#fffdf6;}
+      .toolbar{width:100%;top:4px;}
+      .btn{flex:1;padding:9px 8px;font-size:12px;}
+      .receipt-shell{width:100%;}
+      .receipt{border-radius:0;box-shadow:none;border:0;min-height:calc(100vh - 60px);}
+      .receipt-inner{padding:13px;}
+      .company-head{grid-template-columns:66px 1fr;gap:9px;}
+      .logo-box{min-height:62px;border-radius:12px;}.logo{max-width:54px;max-height:50px;}
+      .company-name{font-size:18px;}.company-meta{font-size:10px;}
+      .doc-title{font-size:21px;}
+      .remaining-num{font-size:52px;}
+      .qr-zone{grid-template-columns:84px 1fr;}
+      .qr-box{width:84px;height:84px;}
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="toolbar">
+      <button class="btn" onclick="openImage()">Open Image</button>
+      <button class="btn" onclick="copyImage()">Copy / Share Image</button>
+      <button class="btn soft" onclick="downloadImage()">Download PNG</button>
+    </div>
+
+    <div class="receipt-shell">
+      <div id="receipt" class="receipt">
+        <div class="top-band"></div>
+        <div class="receipt-inner">
+          <div class="company-head">
+            <div class="logo-box"><img class="logo" src="{% static 'core/logo2.png' %}" alt="logo"></div>
+            <div>
+              <div class="company-name">หจก.พี่ขนุนติวเตอร์</div>
+              <div class="company-meta">ตำบลสำโรงเหนือ อำเภอเมืองสมุทรปราการ จ.สมุทรปราการ 10270</div>
+            </div>
+          </div>
+
+          <div class="doc-title">ครั้งเรียนคงเหลือ</div>
+          <div class="student-line">{{ payment.student.nickname|default:"-" }} · {{ payment.student.full_name|default:payment.student.display_name }}</div>
+          <div class="student-meta">{{ enrollment.tutoring_class.name }}{% if payment.student.grade_level %} · {{ payment.student.grade_level }}{% endif %}</div>
+
+          <div class="remaining-box">
+            <div class="remaining-label">คงเหลือตอนนี้</div>
+            <div class="remaining-num">{{ remaining_sessions }}</div>
+            <div class="remaining-unit">ครั้ง</div>
+          </div>
+
+          <div class="hist-title">ประวัติการชำระเงิน</div>
+          <div class="hist-table">
+            <div class="hist-head"><div>วันที่ชำระ</div><div class="num">จำนวนเงิน</div><div class="num">ได้เพิ่ม</div></div>
+            {% for h in history %}
+              <div class="hist-row">
+                <div>{{ h.payment_date|date:"d/m/Y" }}</div>
+                <div class="num">฿{{ h.amount_paid|floatformat:"0g"|intcomma }}</div>
+                <div class="num">{{ h.sessions_granted }} ครั้ง</div>
+              </div>
+            {% empty %}
+              <div class="hist-empty">ยังไม่มีประวัติการชำระเงิน</div>
+            {% endfor %}
+          </div>
+
+          <div class="qr-zone">
+            <div class="qr-box"><div id="qrHolder"></div></div>
+            <div>
+              <div class="qr-title">สแกน QR เพื่อเข้าเว็บไซต์</div>
+              <div class="qr-sub">สามารถเช็คครั้งเรียน/ชั่วโมงเรียนคงเหลือได้ที่นี่</div>
+              <div class="qr-link">www.pkanoontutor.com</div>
+            </div>
+          </div>
+
+          <div class="foot">เอกสารนี้ออกโดยระบบ Lookmak System</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="preview-backdrop" id="imagePreview" hidden>
+    <div class="preview-card">
+      <div class="preview-head">
+        <div>
+          <div class="preview-title">รูปใบครั้งเรียนคงเหลือพร้อมใช้งาน</div>
+          <div class="preview-hint" id="previewHint">บน iPhone / iPad ให้กดค้างที่รูป แล้วเลือก Copy Image หรือ Save Image</div>
+        </div>
+        <button class="btn soft" type="button" onclick="closePreview()">ปิด</button>
+      </div>
+      <div class="preview-img-wrap"><img id="previewImage" class="preview-img" alt="Sessions card image"></div>
+      <div class="preview-actions">
+        <button class="btn soft" type="button" onclick="downloadImage()">Download PNG</button>
+        <button class="btn" type="button" onclick="closePreview()">ปิด</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+  new QRCode(document.getElementById("qrHolder"), {
+    text: "https://www.pkanoontutor.com",
+    width: 88, height: 88, correctLevel: QRCode.CorrectLevel.M,
+  });
+
+  function isIOSDevice(){
+    return /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  }
+  function canvasToBlob(canvas){
+    return new Promise((resolve,reject)=>{
+      canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('สร้างรูปไม่สำเร็จ')), 'image/png');
+    });
+  }
+  async function makeCanvas(){
+    const node=document.getElementById('receipt');
+    return await html2canvas(node,{scale:3,useCORS:true,backgroundColor:'#ffffff'});
+  }
+  function showPreview(url, hint){
+    const box=document.getElementById('imagePreview');
+    const img=document.getElementById('previewImage');
+    const hintBox=document.getElementById('previewHint');
+    img.src=url;
+    hintBox.textContent=hint || 'กดค้างที่รูป แล้วเลือก Copy Image หรือ Save Image';
+    box.hidden=false;
+  }
+  function closePreview(){
+    document.getElementById('imagePreview').hidden=true;
+  }
+  async function openImage(){
+    const canvas=await makeCanvas();
+    const url=canvas.toDataURL('image/png');
+    const w=window.open('');
+    if(w){
+      w.document.write('<title>ครั้งเรียนคงเหลือ {{ payment.student.nickname|escapejs }}</title><body style="margin:0;background:#111;display:grid;place-items:center;min-height:100vh;"><img src="'+url+'" style="max-width:100%;height:auto;"></body>');
+    }else{
+      showPreview(url,'Popup ถูก block ไว้ ให้กดค้างที่รูปเพื่อ Copy Image หรือ Save Image');
+    }
+  }
+  async function downloadImage(){
+    const canvas=await makeCanvas();
+    const a=document.createElement('a');
+    a.download='sessions_{{ payment.receipt_no }}.png';
+    a.href=canvas.toDataURL('image/png');
+    a.click();
+  }
+  async function copyImage(){
+    try{
+      const canvas=await makeCanvas();
+      const blob=await canvasToBlob(canvas);
+      const filename='sessions_{{ payment.receipt_no }}.png';
+      const file=new File([blob], filename, {type:'image/png'});
+
+      if(isIOSDevice() && navigator.canShare && navigator.canShare({files:[file]})){
+        await navigator.share({files:[file], title:'ครั้งเรียนคงเหลือ {{ payment.student.nickname|escapejs }}'});
+        return;
+      }
+
+      if(navigator.clipboard && window.ClipboardItem){
+        await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]);
+        alert('Copy รูปใบครั้งเรียนคงเหลือแล้ว');
+        return;
+      }
+
+      showPreview(URL.createObjectURL(blob),'เครื่องนี้ยัง copy รูปตรง ๆ ไม่ได้ ให้กดค้างที่รูป แล้วเลือก Copy Image หรือ Save Image');
+    }catch(e){
+      try{
+        const canvas=await makeCanvas();
+        showPreview(canvas.toDataURL('image/png'),'ถ้า Copy / Share ไม่ขึ้น ให้กดค้างที่รูป แล้วเลือก Copy Image หรือ Save Image');
+      }catch(inner){
+        alert('สร้างรูปไม่สำเร็จ ให้ลอง Open Image หรือ Download PNG แทน');
+      }
+    }
+  }
+  document.addEventListener('keydown',function(e){
+    if(e.key==='Escape') closePreview();
+  });
+  document.getElementById('imagePreview').addEventListener('click',function(e){
+    if(e.target===this) closePreview();
+  });
+</script>
+</body>
+</html>

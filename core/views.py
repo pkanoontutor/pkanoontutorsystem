@@ -6022,7 +6022,26 @@ def new_student_payment_notice_list(request: HttpRequest) -> HttpResponse:
         "q": q,
         "date_from": date_from.isoformat() if date_from else "",
         "date_to": date_to.isoformat() if date_to else "",
+        "search_suggestions_json": json.dumps(_new_student_notice_search_suggestions(), ensure_ascii=False),
     })
+
+
+def _new_student_notice_search_suggestions() -> list[str]:
+    """Names to offer in the search box's dropdown -- always the full
+    universe (not filtered by the current q), so picking one and having it
+    re-search never comes up empty."""
+    names: set[str] = set()
+    for i in AdmissionInquiry.objects.filter(is_completed=False).only("nickname", "first_name", "last_name"):
+        if i.nickname:
+            names.add(i.nickname)
+        if i.full_name:
+            names.add(i.full_name)
+    for n in NewStudentPaymentNotice.objects.only("nickname", "first_name", "last_name"):
+        if n.nickname:
+            names.add(n.nickname)
+        if n.full_name:
+            names.add(n.full_name)
+    return sorted(names)
 
 
 @login_required

@@ -18,6 +18,11 @@
   details:not([open]) .toggle-hint::after{content:'กดเพื่อขยาย'}
   .filter{display:grid;grid-template-columns:1.3fr 180px 180px auto auto;gap:10px;align-items:end}.field{display:flex;flex-direction:column;gap:5px}.field label{font-size:11px;font-weight:1000;color:#334155;text-transform:uppercase;letter-spacing:.04em}
   input{border:1px solid #e2e8f0;border-radius:13px;padding:10px 11px;font-weight:800;background:#fff;width:100%;min-width:0}
+  .search-field{position:relative}
+  .search-dropdown{position:absolute;left:0;right:0;top:calc(100% + 5px);z-index:80;background:#fff;border:1px solid #e2e8f0;border-radius:14px;box-shadow:0 16px 34px rgba(15,23,42,.16);overflow:hidden;max-height:260px;overflow-y:auto}
+  .search-item{display:block;width:100%;border:0;background:#fff;text-align:left;padding:10px 12px;cursor:pointer;font-family:inherit;font-size:13px;font-weight:900;color:#0f172a;border-bottom:1px solid #f1f5f9}
+  .search-item:last-child{border-bottom:0}
+  .search-item:hover,.search-item:focus{background:#faf5ff;outline:none}
   .grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
   .enroll-card{background:#fff;border:1px solid #e2e8f0;border-radius:20px;padding:14px;box-shadow:0 4px 12px rgba(15,23,42,.06);display:grid;gap:10px}
   .enroll-card.notified{background:#f0fdf4;border-color:#bbf7d0}.enroll-card.not-yet{background:#faf5ff;border-color:#e9d5ff}
@@ -49,10 +54,11 @@
   </section>
 
   <section class="panel">
-    <form method="get" class="filter">
-      <div class="field">
+    <form method="get" class="filter" id="searchFilterForm">
+      <div class="field search-field" id="qSearchRoot">
         <label>ค้นหา</label>
-        <input name="q" value="{{ q }}" placeholder="ชื่อเล่น / ชื่อจริง / โรงเรียน / เบอร์ติดต่อ">
+        <input name="q" id="qSearchInput" value="{{ q }}" placeholder="พิมพ์บางส่วนของชื่อ แล้วเลือกจาก dropdown ได้เลย" autocomplete="off">
+        <div id="qSearchResults" class="search-dropdown" hidden></div>
       </div>
       <div class="field">
         <label>ส่งตั้งแต่วันที่</label>
@@ -198,4 +204,55 @@
     </div>
   </section>
 </div>
+
+<script>
+(function(){
+  const SUGGESTIONS = {{ search_suggestions_json|safe }};
+  const input = document.getElementById('qSearchInput');
+  const results = document.getElementById('qSearchResults');
+  const root = document.getElementById('qSearchRoot');
+  const form = document.getElementById('searchFilterForm');
+  let timer = null;
+
+  function esc(s){
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+    });
+  }
+  function normalize(s){ return String(s || '').toLowerCase().replace(/\s+/g, ''); }
+  function hideResults(){ results.hidden = true; results.innerHTML = ''; }
+
+  function render(term){
+    const needle = normalize(term);
+    if(!needle){ hideResults(); return; }
+    const matches = SUGGESTIONS.filter(function(s){ return normalize(s).indexOf(needle) !== -1; }).slice(0, 12);
+    if(!matches.length){ hideResults(); return; }
+    results.innerHTML = matches.map(function(s){
+      return '<button type="button" class="search-item">' + esc(s) + '</button>';
+    }).join('');
+    results.querySelectorAll('.search-item').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        input.value = btn.textContent;
+        hideResults();
+        form.submit();   // re-runs the exact same server-side search, just without a manual Filter click
+      });
+    });
+    results.hidden = false;
+  }
+
+  input.addEventListener('input', function(){
+    clearTimeout(timer);
+    const term = input.value.trim();
+    if(term.length < 1){ hideResults(); return; }
+    timer = setTimeout(function(){ render(term); }, 120);
+  });
+  input.addEventListener('focus', function(){
+    const term = input.value.trim();
+    if(term.length >= 1) render(term);
+  });
+  document.addEventListener('click', function(e){
+    if(!e.target.closest('#qSearchRoot')) hideResults();
+  });
+})();
+</script>
 {% endblock %}

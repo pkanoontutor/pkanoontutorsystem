@@ -40,17 +40,28 @@
   .canvas-stack{position:relative;display:inline-block;line-height:0}
   #pageCanvas{display:block;max-width:100%;height:auto;box-shadow:0 5px 18px rgba(15,23,42,.18);border-radius:4px;background:#fff}
   #markupCanvas{position:absolute;left:0;top:0;pointer-events:none;touch-action:none;border-radius:4px}
-  #markupCanvas.tool-pen{pointer-events:auto;cursor:crosshair}
+  #markupCanvas.tool-draw{pointer-events:auto;cursor:crosshair}
   #markupCanvas.tool-eraser{pointer-events:auto;cursor:cell}
   .pager{display:flex;justify-content:center;align-items:center;gap:11px;flex-wrap:wrap}
 
-  /* Highlighter toolbar */
+  /* Markup toolbar: highlighter + pen, each with its own colors and sizes */
   .markup-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;
     background:#f8fafc;border:1px solid #eef2f7;border-radius:12px;padding:7px 9px}
-  .mk-tools{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+  .mk-tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .mk-family{display:flex;gap:4px}
+  .mk-fam{width:32px;height:30px;border-radius:9px;border:2px solid #e2e8f0;background:#fff;cursor:pointer;
+    font-size:15px;display:grid;place-items:center}
+  .mk-fam.active{border-color:#0f172a;background:#eef2f7}
+  .mk-sub{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding-left:8px;border-left:1px solid #e2e8f0}
+  .mk-colors{display:flex;gap:6px}
   .mk-swatch{width:30px;height:30px;border-radius:9px;border:2px solid transparent;cursor:pointer;
     display:grid;place-items:center;font-size:14px;box-shadow:inset 0 0 0 1px rgba(15,23,42,.12)}
   .mk-swatch.active{border-color:#0f172a;box-shadow:0 0 0 3px rgba(15,23,42,.12)}
+  .mk-colorpick{width:30px;height:30px;border-radius:9px;border:1px solid #e2e8f0;padding:2px;cursor:pointer;background:#fff}
+  .mk-sizes{display:flex;gap:4px}
+  .mk-size{width:28px;height:30px;border-radius:9px;border:2px solid #e2e8f0;background:#fff;cursor:pointer;display:grid;place-items:center}
+  .mk-size.active{border-color:#0f172a;background:#e2e8f0}
+  .mk-size .dot{display:block;border-radius:50%;background:#334155}
   .mk-eraser{width:34px;height:30px;border-radius:9px;border:2px solid #e2e8f0;background:#fff;cursor:pointer;
     font-size:15px;display:grid;place-items:center}
   .mk-eraser.active{border-color:#0f172a;background:#e2e8f0}
@@ -163,7 +174,12 @@
       '<div class="thumbs" id="thumbs"></div>' +
       '<div class="stage">' +
         '<div class="markup-bar">' +
-          '<div class="mk-tools" id="mkColors"></div>' +
+          '<div class="mk-tools">' +
+            '<div class="mk-family" id="mkFamily"></div>' +
+            '<div class="mk-sub" id="mkHighlightSub"><div class="mk-colors" id="mkColors"></div><div class="mk-sizes" id="mkHlSizes"></div></div>' +
+            '<div class="mk-sub" id="mkPenSub" hidden><div class="mk-colors" id="mkPenColors"></div><input type="color" id="mkPenPicker" class="mk-colorpick" title="เลือกสีเอง" value="#111827"><div class="mk-sizes" id="mkPenSizes"></div></div>' +
+            '<button class="mk-eraser" id="eraserBtn" title="ยางลบ (ลากทับเส้นที่จะลบ)">🧽</button>' +
+          '</div>' +
           '<div class="mk-actions">' +
             '<button class="mk-icon" id="undoBtn" title="ย้อนกลับ" disabled>↩️</button>' +
             '<button class="mk-icon" id="redoBtn" title="ทำซ้ำ" disabled>↪️</button>' +
@@ -183,6 +199,7 @@
   const fileTabs=document.getElementById('fileTabs');
   const thumbsEl=document.getElementById('thumbs');
   const canvas=document.getElementById('pageCanvas');
+  const canvasBox=document.querySelector('.canvas-box');
   const markupCanvas=document.getElementById('markupCanvas');
   const markupCtx=markupCanvas.getContext('2d');
   const stageLoading=document.getElementById('stageLoading');
@@ -191,7 +208,14 @@
   const pageInput=document.getElementById('pageInput');
   const pageTotal=document.getElementById('pageTotal');
   const resumeNote=document.getElementById('resumeNote');
+  const mkFamily=document.getElementById('mkFamily');
   const mkColors=document.getElementById('mkColors');
+  const mkHlSizes=document.getElementById('mkHlSizes');
+  const mkPenColors=document.getElementById('mkPenColors');
+  const mkPenPicker=document.getElementById('mkPenPicker');
+  const mkPenSizes=document.getElementById('mkPenSizes');
+  const mkHighlightSub=document.getElementById('mkHighlightSub');
+  const mkPenSub=document.getElementById('mkPenSub');
   const undoBtn=document.getElementById('undoBtn');
   const redoBtn=document.getElementById('redoBtn');
   const mkStatus=document.getElementById('mkStatus');
@@ -270,8 +294,14 @@
     try{
       const p=await pdf.getPage(page);
       const base=p.getViewport({scale:1});
-      const box=canvas.parentElement.clientWidth-24;
-      const scale=Math.max(Math.min((box||820)/base.width, 2.2), 0.3);
+      // Measured from .canvas-box (always laid out at the stage's real width)
+      // rather than the canvas's own inline-block parent -- that parent
+      // collapses to ~0 while the canvas itself is still display:none (set
+      // in openDoc just before this runs), which fed a near-zero box back
+      // into the scale calc and pinned every page to the 0.3 floor forever,
+      // since each successive page then measured off the previous tiny one.
+      const box=Math.max(canvasBox.clientWidth-24, 200);
+      const scale=Math.max(Math.min(box/base.width, 2.2), 0.3);
       const vp=p.getViewport({scale});
       canvas.width=Math.round(vp.width); canvas.height=Math.round(vp.height);
       canvas.style.width=canvas.width+'px'; canvas.style.height=canvas.height+'px';
@@ -366,26 +396,57 @@
   // composited over the page canvas below it. Two separate <canvas> elements
   // don't share a pixel buffer, so "multiply" alone only blends strokes
   // against each other within the overlay, not against the text underneath.
-  const MK_COLORS=[
-    {swatch:'#fde047', stroke:'rgba(250,204,21,.45)', label:'ไฮไลท์เหลือง'},
-    {swatch:'#4ade80', stroke:'rgba(74,222,128,.40)', label:'ไฮไลท์เขียว'},
-    {swatch:'#38bdf8', stroke:'rgba(56,189,248,.38)', label:'ไฮไลท์ฟ้า'},
-    {swatch:'#f472b6', stroke:'rgba(244,114,182,.38)', label:'ไฮไลท์ชมพู'},
+  // Highlighter strokes stay translucent (multiply blend, wide default);
+  // pen strokes are opaque ink (normal blend, thin default) so the two read
+  // as genuinely different tools rather than just different colors.
+  const HL_COLORS=[
+    {value:'rgba(250,204,21,.45)', swatch:'#fde047', label:'ไฮไลท์เหลือง'},
+    {value:'rgba(74,222,128,.40)', swatch:'#4ade80', label:'ไฮไลท์เขียว'},
+    {value:'rgba(56,189,248,.38)', swatch:'#38bdf8', label:'ไฮไลท์ฟ้า'},
+    {value:'rgba(244,114,182,.38)', swatch:'#f472b6', label:'ไฮไลท์ชมพู'},
   ];
-  const PEN_WIDTH=0.016;     // fraction of canvas width
+  const PEN_COLORS=[
+    {value:'#111827', label:'ปากกาดำ'},
+    {value:'#dc2626', label:'ปากกาแดง'},
+    {value:'#2563eb', label:'ปากกาน้ำเงิน'},
+    {value:'#16a34a', label:'ปากกาเขียว'},
+  ];
+  const HL_SIZES=[{width:0.010,label:'บาง'},{width:0.016,label:'กลาง'},{width:0.026,label:'หนา'}];
+  const PEN_SIZES=[{width:0.004,label:'บาง'},{width:0.007,label:'กลาง'},{width:0.012,label:'หนา'}];
   const ERASE_RADIUS=0.022;  // fraction of canvas width, hit-test radius
 
-  let activeTool=null;       // null | 'pen' | 'eraser'
-  let activeColor=MK_COLORS[0].stroke;
+  let panelFamily='highlight';   // which sub-toolbar is showing: 'highlight' | 'pen'
+  let activeTool=null;           // null | 'draw' | 'eraser'
+  let armedFamily='highlight';   // family of the currently armed draw tool
+  let activeColor=HL_COLORS[0].value;
+  let hlWidth=HL_SIZES[1].width;
+  let penWidth=PEN_SIZES[1].width;
   const pageStrokes={};      // "docId:page" -> [stroke, ...]
   const pageHistory={};      // "docId:page" -> {undo:[op,...], redo:[op,...]}
   const markupLoadedDocs=new Set();
   let drawing=false, currentStroke=null, eraseRemoved=null;
   let saveTimer=null, savePending=null;
 
-  mkColors.innerHTML = MK_COLORS.map(c=>
-    `<button type="button" class="mk-swatch" data-stroke="${c.stroke}" title="${c.label}" style="background:${c.swatch}"></button>`
-  ).join('') + '<button type="button" class="mk-eraser" id="eraserBtn" title="ยางลบ (ลากทับเส้นที่จะลบ)">🧽</button>';
+  function sizeDotHtml(width, maxWidth){
+    const px=Math.round(6 + (width/maxWidth)*16);
+    return `<span class="dot" style="width:${px}px;height:${px}px"></span>`;
+  }
+
+  mkFamily.innerHTML =
+    '<button type="button" class="mk-fam active" data-family="highlight" title="ไฮไลท์">🖍️</button>' +
+    '<button type="button" class="mk-fam" data-family="pen" title="ปากกา">🖊️</button>';
+  mkColors.innerHTML = HL_COLORS.map(c=>
+    `<button type="button" class="mk-swatch" data-value="${c.value}" title="${c.label}" style="background:${c.swatch}"></button>`
+  ).join('');
+  mkHlSizes.innerHTML = HL_SIZES.map(s=>
+    `<button type="button" class="mk-size" data-width="${s.width}" title="หัวไฮไลท์${s.label}">${sizeDotHtml(s.width, HL_SIZES[HL_SIZES.length-1].width)}</button>`
+  ).join('');
+  mkPenColors.innerHTML = PEN_COLORS.map(c=>
+    `<button type="button" class="mk-swatch" data-value="${c.value}" title="${c.label}" style="background:${c.value}"></button>`
+  ).join('');
+  mkPenSizes.innerHTML = PEN_SIZES.map(s=>
+    `<button type="button" class="mk-size" data-width="${s.width}" title="หัวปากกา${s.label}">${sizeDotHtml(s.width, PEN_SIZES[PEN_SIZES.length-1].width)}</button>`
+  ).join('');
   const eraserBtn=document.getElementById('eraserBtn');
 
   function pageKey(){ return docId+':'+page; }
@@ -393,15 +454,47 @@
   function getHistory(){ return pageHistory[pageKey()] || (pageHistory[pageKey()]={undo:[],redo:[]}); }
 
   function syncToolUI(){
+    mkFamily.querySelectorAll('[data-family]').forEach(b=>
+      b.classList.toggle('active', b.dataset.family===panelFamily));
+    mkHighlightSub.hidden = panelFamily!=='highlight';
+    mkPenSub.hidden = panelFamily!=='pen';
     mkColors.querySelectorAll('.mk-swatch').forEach(b=>
-      b.classList.toggle('active', activeTool==='pen' && b.dataset.stroke===activeColor));
+      b.classList.toggle('active', activeTool==='draw' && armedFamily==='highlight' && b.dataset.value===activeColor));
+    mkPenColors.querySelectorAll('.mk-swatch').forEach(b=>
+      b.classList.toggle('active', activeTool==='draw' && armedFamily==='pen' && b.dataset.value===activeColor));
+    mkHlSizes.querySelectorAll('.mk-size').forEach(b=>
+      b.classList.toggle('active', Number(b.dataset.width)===hlWidth));
+    mkPenSizes.querySelectorAll('.mk-size').forEach(b=>
+      b.classList.toggle('active', Number(b.dataset.width)===penWidth));
     eraserBtn.classList.toggle('active', activeTool==='eraser');
-    markupCanvas.classList.toggle('tool-pen', activeTool==='pen');
+    markupCanvas.classList.toggle('tool-draw', activeTool==='draw');
     markupCanvas.classList.toggle('tool-eraser', activeTool==='eraser');
   }
+
+  mkFamily.querySelectorAll('[data-family]').forEach(b=>b.addEventListener('click',()=>{
+    panelFamily=b.dataset.family;
+    syncToolUI();
+  }));
   mkColors.querySelectorAll('.mk-swatch').forEach(b=>b.addEventListener('click',()=>{
-    if(activeTool==='pen' && activeColor===b.dataset.stroke){ activeTool=null; }
-    else{ activeTool='pen'; activeColor=b.dataset.stroke; }
+    if(activeTool==='draw' && armedFamily==='highlight' && activeColor===b.dataset.value){ activeTool=null; }
+    else{ activeTool='draw'; armedFamily='highlight'; activeColor=b.dataset.value; }
+    syncToolUI();
+  }));
+  mkHlSizes.querySelectorAll('.mk-size').forEach(b=>b.addEventListener('click',()=>{
+    hlWidth=Number(b.dataset.width);
+    syncToolUI();
+  }));
+  mkPenColors.querySelectorAll('.mk-swatch').forEach(b=>b.addEventListener('click',()=>{
+    if(activeTool==='draw' && armedFamily==='pen' && activeColor===b.dataset.value){ activeTool=null; }
+    else{ activeTool='draw'; armedFamily='pen'; activeColor=b.dataset.value; }
+    syncToolUI();
+  }));
+  mkPenPicker.addEventListener('input',()=>{
+    activeTool='draw'; armedFamily='pen'; activeColor=mkPenPicker.value;
+    syncToolUI();
+  });
+  mkPenSizes.querySelectorAll('.mk-size').forEach(b=>b.addEventListener('click',()=>{
+    penWidth=Number(b.dataset.width);
     syncToolUI();
   }));
   eraserBtn.addEventListener('click',()=>{
@@ -412,8 +505,11 @@
   function drawStrokePath(ctx, stroke){
     const pts=stroke.points;
     if(pts.length<1) return;
-    const w=Math.max(stroke.width*markupCanvas.width, 2);
-    ctx.globalCompositeOperation='multiply';
+    // Strokes saved before the pen tool existed have no `mode` -- treat
+    // those as highlighter, which is exactly what they always were.
+    const isPen=stroke.mode==='pen';
+    const w=Math.max(stroke.width*markupCanvas.width, isPen?1.5:2);
+    ctx.globalCompositeOperation=isPen?'source-over':'multiply';
     ctx.strokeStyle=stroke.color;
     ctx.fillStyle=stroke.color;
     ctx.lineWidth=w;
@@ -474,8 +570,9 @@
     markupCanvas.setPointerCapture(e.pointerId);
     drawing=true;
     const pt=pointFromEvent(e);
-    if(activeTool==='pen'){
-      currentStroke={color:activeColor, width:PEN_WIDTH, points:[pt]};
+    if(activeTool==='draw'){
+      const width=armedFamily==='highlight' ? hlWidth : penWidth;
+      currentStroke={color:activeColor, width, mode:armedFamily, points:[pt]};
     }else{
       eraseRemoved=[];
       eraseAt(pt);
@@ -487,7 +584,7 @@
     if(!drawing) return;
     e.preventDefault();
     const pt=pointFromEvent(e);
-    if(activeTool==='pen' && currentStroke){
+    if(activeTool==='draw' && currentStroke){
       currentStroke.points.push(pt);
     }else if(activeTool==='eraser'){
       eraseAt(pt);
@@ -502,7 +599,7 @@
       requestAnimationFrame(()=>{
         rafPending=false;
         redrawMarkup();
-        if(activeTool==='pen' && currentStroke) drawStrokePath(markupCtx, currentStroke);
+        if(activeTool==='draw' && currentStroke) drawStrokePath(markupCtx, currentStroke);
       });
     }
   });
@@ -510,7 +607,7 @@
     if(!drawing) return;
     drawing=false;
     const h=getHistory();
-    if(activeTool==='pen' && currentStroke){
+    if(activeTool==='draw' && currentStroke){
       getStrokes().push(currentStroke);
       h.undo.push({type:'add', stroke:currentStroke});
       h.redo.length=0;

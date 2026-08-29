@@ -64,7 +64,6 @@ urlpatterns = [
     path("sheet-inventory/bulk-upload/", views.sheet_inventory_bulk_upload, name="sheet_inventory_bulk_upload"),
     path("sheet-inventory/export/", views.sheet_inventory_export, name="sheet_inventory_export"),
     path("sheet-inventory/sheet/<int:pk>/documents/upload/", views.sheet_document_upload, name="sheet_document_upload"),
-    path("sheet-inventory/sheet/<int:pk>/documents/upload-auto/", views.sheet_document_upload_auto, name="sheet_document_upload_auto"),
     path("sheet-inventory/documents/<int:pk>/delete/", views.sheet_document_delete, name="sheet_document_delete"),
     path("sheet-inventory/bulk-pdf-import/", views.sheet_bulk_pdf_import, name="sheet_bulk_pdf_import"),
     path("sheet-inventory/continuous-upload/", views.sheet_inventory_continuous_upload, name="sheet_inventory_continuous_upload"),

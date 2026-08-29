@@ -2275,37 +2275,6 @@ def sheet_document_upload(request: HttpRequest, pk: int) -> JsonResponse:
 
 @require_POST
 @login_required
-def sheet_document_upload_auto(request: HttpRequest, pk: int) -> JsonResponse:
-    """Same as sheet_document_upload, but for the continuous-upload page --
-    no kind is supplied up front, so the file is classified automatically
-    from its filename/page-count, exactly like the bulk zip importer does."""
-    sheet = get_object_or_404(Sheet, pk=pk)
-    upload = request.FILES.get("pdf")
-    if not upload:
-        return JsonResponse({"ok": False, "message": "ไม่พบไฟล์ PDF"}, status=400)
-    name_lower = (upload.name or "").lower()
-    if not (name_lower.endswith(".pdf") or (upload.content_type or "") == "application/pdf"):
-        return JsonResponse({"ok": False, "message": "รองรับเฉพาะไฟล์ PDF"}, status=400)
-
-    page_count, _rendered = render_pdf(upload, thumbnail=False)
-    kind, _why = classify(upload.name, page_count)
-
-    doc = attach_document(
-        sheet, kind, upload, upload.name,
-        page_count=page_count,
-        uploaded_by=request.user if request.user.is_authenticated else None,
-    )
-    sheet_pages = sync_sheet_total_pages(sheet)
-
-    return JsonResponse({
-        "ok": True,
-        "document": _sheet_document_payload(doc),
-        "sheet_total_pages": sheet_pages,
-    })
-
-
-@require_POST
-@login_required
 def sheet_document_delete(request: HttpRequest, pk: int) -> JsonResponse:
     doc = SheetDocument.objects.filter(pk=pk).select_related("sheet").first()
     if not doc:
@@ -2357,11 +2326,11 @@ def _sheet_documents_by_id(sheet_ids: list[int]) -> dict[int, dict]:
 
 @login_required
 def sheet_inventory_continuous_upload(request: HttpRequest) -> HttpResponse:
-    """One row per sheet with a drop zone on the right -- no popup to open
-    and close between sheets, so uploading files for many books in a row
-    stays uninterrupted. Each drop uploads in the background via
-    sheet_document_upload_auto (auto-classified by filename), and the whole
-    thing works from a single page load."""
+    """One row per sheet with a ปก/เนื้อหา/เฉลย drop zone each, so uploading
+    files for many books in a row stays uninterrupted -- no popup to open
+    and close between sheets. Each drop uploads in the background via the
+    same sheet_document_upload endpoint the per-sheet popup uses, and the
+    whole thing works from a single page load."""
     q = (request.GET.get("q") or "").strip()
     sheets_qs = Sheet.objects.select_related("subject").filter(is_active=True)
     if q:

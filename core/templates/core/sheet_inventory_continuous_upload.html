@@ -1,0 +1,266 @@
+{% extends "core/base.html" %}
+{% block title %}อัปโหลดไฟล์ชีทต่อเนื่อง{% endblock %}
+
+{% block head %}
+<style>
+  .cu-wrap{max-width:1320px;margin:0 auto;display:grid;gap:12px}
+  .hero{background:linear-gradient(135deg,#0f172a,#0ea5e9,#22c55e);color:#fff;border-radius:22px;padding:16px 18px;box-shadow:0 10px 22px rgba(15,23,42,.16);display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:flex-start}
+  .title{font-size:22px;font-weight:1000;letter-spacing:-.03em}
+  .sub{font-size:12px;color:#e0f2fe;margin-top:4px;line-height:1.55;max-width:640px}
+  .actions{display:flex;gap:7px;flex-wrap:wrap}
+  .btnx{border:0;border-radius:11px;padding:8px 12px;font-weight:1000;text-decoration:none;display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;white-space:nowrap;font-family:inherit}
+  .soft{background:#fff;color:#0f172a;border:1px solid #e2e8f0}
+  .primary{background:#0ea5e9;color:#fff}
+  .panel{background:#fff;border-radius:16px;padding:12px;box-shadow:0 4px 10px rgba(15,23,42,.06)}
+  .search-row{display:flex;gap:8px;flex-wrap:wrap}
+  .search-row input{flex:1;min-width:220px;border:1px solid #e2e8f0;border-radius:11px;padding:9px 10px;font-weight:800;font-size:13px}
+
+  .grade-section{border:1px solid #e2e8f0;border-radius:16px;background:#fff;overflow:hidden;margin-bottom:10px}
+  .grade-section summary{cursor:pointer;list-style:none;padding:10px 13px;background:linear-gradient(135deg,#f8fafc,#eff6ff);display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .grade-section summary::-webkit-details-marker{display:none}
+  .grade-name{font-size:15px;font-weight:1000;color:#0f172a}
+  .grade-hint{font-size:11px;font-weight:800;color:#64748b}
+
+  .up-row{display:grid;grid-template-columns:112px 1.5fr 70px 1fr 240px;gap:10px;align-items:center;padding:9px 13px;border-top:1px solid #f1f5f9}
+  .up-row:hover{background:#fafbfc}
+  .up-code{font-weight:1000;font-size:13px;color:#0f172a;overflow-wrap:anywhere}
+  .up-title{font-size:12.5px;font-weight:800;color:#334155;overflow-wrap:anywhere}
+  .up-grade{font-size:11.5px;font-weight:900;color:#64748b}
+  .up-subject{font-size:11.5px;font-weight:800;color:#475569}
+  .up-right{display:grid;gap:5px}
+  .up-files{display:flex;gap:4px;flex-wrap:wrap;align-items:center;min-height:18px}
+  .file-chip{display:inline-flex;align-items:center;gap:4px;font-size:10.5px;font-weight:900;border-radius:999px;padding:3px 7px;border:1px solid;white-space:nowrap}
+  .file-chip.cover{background:#eff6ff;border-color:#bfdbfe;color:#1d4ed8}
+  .file-chip.content{background:#f0fdf4;border-color:#bbf7d0;color:#166534}
+  .file-chip.answer{background:#fdf4ff;border-color:#f0abfc;color:#a21caf}
+  .file-chip .x{cursor:pointer;font-weight:1000;margin-left:1px}
+  .file-chip .x:hover{color:#dc2626}
+  .no-files{font-size:10.5px;font-weight:800;color:#94a3b8}
+  .drop-zone{min-height:44px;border:2px dashed #cbd5e1;border-radius:11px;background:#f8fafc;
+    display:flex;align-items:center;justify-content:center;text-align:center;padding:5px 8px;
+    font-size:10.5px;font-weight:800;color:#64748b;cursor:pointer;transition:.12s;line-height:1.3}
+  .drop-zone.is-drag{border-color:#0ea5e9;background:#eff6ff;color:#0369a1}
+  .drop-zone.is-busy{border-color:#f59e0b;background:#fffbeb;color:#92400e}
+  .drop-zone.is-done{border-color:#22c55e;background:#f0fdf4;color:#166534}
+
+  .global-status{position:fixed;bottom:16px;right:16px;background:#0f172a;color:#fff;padding:9px 16px;
+    border-radius:999px;font-size:12px;font-weight:900;box-shadow:0 10px 24px rgba(15,23,42,.28);z-index:999;
+    display:flex;align-items:center;gap:8px}
+
+  @media(max-width:900px){
+    .up-row{grid-template-columns:1fr;gap:6px;padding:10px}
+    .up-grade,.up-subject{display:inline}
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="cu-wrap">
+  <section class="hero">
+    <div>
+      <div class="title">📤 อัปโหลดไฟล์ชีทต่อเนื่อง</div>
+      <div class="sub">ลากไฟล์ ปก/เนื้อหา/เฉลย มาวางในช่องของแต่ละเล่มได้เลย ระบบแยกประเภทไฟล์ให้อัตโนมัติจากชื่อไฟล์ และอัปโหลดแบบพื้นหลังต่อเนื่องได้ทันที ไม่ต้องรอ ไม่ต้องเปิด-ปิด popup ทีละเล่ม</div>
+    </div>
+    <div class="actions">
+      <a class="btnx soft" href="{% url 'core:sheet_inventory_dashboard' %}">← คลังชีท</a>
+      <a class="btnx soft" href="{% url 'core:sheet_bulk_pdf_import' %}">📦 นำเข้าแบบ ZIP</a>
+    </div>
+  </section>
+
+  <section class="panel">
+    <form method="get" class="search-row">
+      <input type="search" name="q" value="{{ q }}" placeholder="ค้นหารหัสชีท / ชื่อชีท / วิชา / ระดับชั้น">
+      <button class="btnx primary" type="submit">ค้นหา</button>
+      <a class="btnx soft" href="{% url 'core:sheet_inventory_continuous_upload' %}">ล้าง</a>
+    </form>
+  </section>
+
+  {% for group in grade_groups %}
+    <details class="grade-section" open>
+      <summary>
+        <div class="grade-name">{{ group.label }}</div>
+        <div class="grade-hint">{{ group.count }} เล่ม</div>
+      </summary>
+      <div>
+        {% for row in group.rows %}
+          <div class="up-row" data-upload-row data-sheet-id="{{ row.sheet.id }}">
+            <div class="up-code">{{ row.sheet.code }}</div>
+            <div class="up-title">{{ row.sheet.title }}</div>
+            <div class="up-grade">{{ row.sheet.get_grade_level_display|default:"-" }}</div>
+            <div class="up-subject">{{ row.sheet.subject.name }}</div>
+            <div class="up-right">
+              <div class="up-files" data-files-list></div>
+              <div class="drop-zone" data-drop-zone data-sheet-id="{{ row.sheet.id }}">ลากไฟล์ PDF มาวาง หรือคลิกเพื่อเลือก</div>
+              <input type="file" accept="application/pdf" multiple hidden data-file-input>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    </details>
+  {% empty %}
+    <div class="panel">ไม่พบชีทที่ตรงกับคำค้นหา</div>
+  {% endfor %}
+</div>
+
+<div id="globalUploadStatus" class="global-status" hidden></div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+  const CSRF = "{{ csrf_token }}";
+  const DOCS_BY_SHEET = {{ documents_by_sheet_json|safe }};
+  const KIND_LABEL = {cover: '📘 ปก', content: '📄 เนื้อหา', answer: '✅ เฉลย'};
+  const globalStatus = document.getElementById('globalUploadStatus');
+  let globalInFlight = 0;
+
+  function esc(s){ return String(s==null?'':s).replace(/[&<>'"]/g, function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c];
+  }); }
+
+  function bumpGlobalStatus(delta){
+    globalInFlight = Math.max(globalInFlight + delta, 0);
+    if(globalInFlight > 0){
+      globalStatus.innerHTML = '⏳ กำลังอัปโหลด ' + globalInFlight + ' ไฟล์ (พื้นหลัง)...';
+      globalStatus.hidden = false;
+    }else{
+      globalStatus.hidden = true;
+    }
+  }
+
+  function chipHtml(kind, doc){
+    return '<span class="file-chip ' + kind + '" title="' + esc(doc.name) + (doc.page_count ? ' (' + doc.page_count + ' หน้า)' : '') + '">' +
+      KIND_LABEL[kind] +
+      '<span class="x" data-del-doc="' + doc.id + '" title="ลบไฟล์นี้">×</span>' +
+    '</span>';
+  }
+
+  function renderRowFiles(sheetId){
+    const row = document.querySelector('[data-upload-row][data-sheet-id="' + sheetId + '"]');
+    if(!row) return;
+    const list = row.querySelector('[data-files-list]');
+    const docs = DOCS_BY_SHEET[sheetId] || {cover:[],content:[],answer:[]};
+    const chips = [];
+    ['cover','content','answer'].forEach(function(k){
+      (docs[k] || []).forEach(function(d){ chips.push(chipHtml(k, d)); });
+    });
+    list.innerHTML = chips.length ? chips.join('') : '<span class="no-files">ยังไม่มีไฟล์</span>';
+    list.querySelectorAll('[data-del-doc]').forEach(function(btn){
+      btn.addEventListener('click', function(e){
+        e.stopPropagation();
+        deleteDoc(sheetId, btn.dataset.delDoc);
+      });
+    });
+  }
+
+  function deleteDoc(sheetId, docId){
+    if(!confirm('ลบไฟล์นี้ออกจากระบบ?')) return;
+    fetch('/sheet-inventory/documents/' + docId + '/delete/', {
+      method: 'POST', headers: {'X-CSRFToken': CSRF},
+    })
+      .then(function(r){ return r.json(); })
+      .then(function(data){
+        if(!data.ok){ alert(data.message || 'ลบไม่สำเร็จ'); return; }
+        const docs = DOCS_BY_SHEET[sheetId];
+        if(docs){
+          Object.keys(docs).forEach(function(k){
+            docs[k] = (docs[k] || []).filter(function(d){ return String(d.id) !== String(docId); });
+          });
+        }
+        renderRowFiles(sheetId);
+      })
+      .catch(function(){ alert('ลบไม่สำเร็จ'); });
+  }
+
+  function uploadOneFile(sheetId, file){
+    return new Promise(function(resolve, reject){
+      const fd = new FormData();
+      fd.append('pdf', file);
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', '/sheet-inventory/sheet/' + sheetId + '/documents/upload-auto/');
+      xhr.setRequestHeader('X-CSRFToken', CSRF);
+      xhr.addEventListener('load', function(){
+        let parsed = {};
+        try{ parsed = JSON.parse(xhr.responseText || '{}'); }catch(e){}
+        if(xhr.status >= 200 && xhr.status < 300 && parsed.ok) resolve(parsed);
+        else reject(new Error(parsed.message || ('อัปโหลดไม่สำเร็จ (' + xhr.status + ')')));
+      });
+      xhr.addEventListener('error', function(){ reject(new Error('เชื่อมต่อไม่สำเร็จระหว่างอัปโหลด')); });
+      xhr.send(fd);
+    });
+  }
+
+  // Each row's files upload one at a time (keeps its own status text sane),
+  // but different rows run fully independently -- dropping onto the next
+  // sheet doesn't wait for the previous one to finish, which is the whole
+  // point of this page over the one-sheet-at-a-time popup.
+  async function uploadFilesForRow(sheetId, fileList){
+    const files = Array.prototype.filter.call(fileList, function(f){ return /\.pdf$/i.test(f.name); });
+    if(!files.length) return;
+    const zone = document.querySelector('[data-drop-zone][data-sheet-id="' + sheetId + '"]');
+    zone.classList.remove('is-done');
+    zone.classList.add('is-busy');
+    let okCount = 0;
+    for(let i = 0; i < files.length; i++){
+      const file = files[i];
+      zone.textContent = 'กำลังอัปโหลด ' + (i + 1) + '/' + files.length + ': ' + file.name;
+      bumpGlobalStatus(1);
+      try{
+        const data = await uploadOneFile(sheetId, file);
+        DOCS_BY_SHEET[sheetId] = DOCS_BY_SHEET[sheetId] || {cover:[],content:[],answer:[]};
+        if(data.document.kind === 'cover'){
+          DOCS_BY_SHEET[sheetId].cover = [data.document];
+        }else{
+          DOCS_BY_SHEET[sheetId][data.document.kind] = (DOCS_BY_SHEET[sheetId][data.document.kind] || []).concat([data.document]);
+        }
+        renderRowFiles(sheetId);
+        okCount++;
+      }catch(e){
+        zone.textContent = 'อัปโหลดไม่สำเร็จ: ' + file.name;
+      }
+      bumpGlobalStatus(-1);
+    }
+    zone.classList.remove('is-busy');
+    if(okCount){
+      zone.classList.add('is-done');
+      zone.textContent = '✅ อัปโหลดเสร็จแล้ว ' + okCount + ' ไฟล์';
+      setTimeout(function(){
+        zone.classList.remove('is-done');
+        zone.textContent = 'ลากไฟล์ PDF มาวาง หรือคลิกเพื่อเลือก';
+      }, 2200);
+    }
+  }
+
+  document.querySelectorAll('[data-upload-row]').forEach(function(row){
+    renderRowFiles(row.dataset.sheetId);
+  });
+
+  document.querySelectorAll('[data-drop-zone]').forEach(function(zone){
+    const sheetId = zone.dataset.sheetId;
+    const input = zone.parentElement.querySelector('[data-file-input]');
+    zone.addEventListener('click', function(){ input.click(); });
+    input.addEventListener('change', function(){
+      if(input.files && input.files.length) uploadFilesForRow(sheetId, input.files);
+      input.value = '';
+    });
+    ['dragenter','dragover'].forEach(function(evt){
+      zone.addEventListener(evt, function(e){ e.preventDefault(); e.stopPropagation(); zone.classList.add('is-drag'); });
+    });
+    ['dragleave','drop'].forEach(function(evt){
+      zone.addEventListener(evt, function(e){ e.preventDefault(); e.stopPropagation(); zone.classList.remove('is-drag'); });
+    });
+    zone.addEventListener('drop', function(e){
+      const files = e.dataTransfer && e.dataTransfer.files;
+      if(files && files.length) uploadFilesForRow(sheetId, files);
+    });
+  });
+
+  // Leaving mid-upload is allowed (that's the whole "background" point), but
+  // warn so a fresh page load doesn't silently strand an in-flight batch.
+  window.addEventListener('beforeunload', function(e){
+    if(globalInFlight > 0){
+      e.preventDefault();
+      e.returnValue = '';
+    }
+  });
+});
+</script>
+{% endblock %}

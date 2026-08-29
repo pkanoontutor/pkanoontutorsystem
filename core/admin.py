@@ -633,6 +633,7 @@ class TutorPayrollEntryAdmin(admin.ModelAdmin):
         "hourly_rate",
         "teaching_fee",
         "online_teaching_hours",
+        "online_hourly_rate",
         "online_teaching_fee",
         "travel_fee",
         "idle_fee",
@@ -644,6 +645,7 @@ class TutorPayrollEntryAdmin(admin.ModelAdmin):
     readonly_fields = (
         "hourly_rate",
         "teaching_fee",
+        "online_hourly_rate",
         "online_teaching_fee",
         "travel_fee",
         "total_amount",

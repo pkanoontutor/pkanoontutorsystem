@@ -238,11 +238,12 @@ def build_full_workbook() -> tuple[BytesIO, str]:
     add(
         "ค่าสอนติวเตอร์", "TutorPayrollEntry รายวัน พร้อมเรทที่ใช้จริง",
         ["วันที่สอน", "ติวเตอร์", "ชม. onsite", "เรท/ชม.", "ค่าสอน onsite", "เรทพิเศษ 325",
-         "ชม.ออนไลน์", "ค่าสอนออนไลน์", "ค่าเดินทาง", "ค่านั่งว่าง", "ยอดรวม", "หมายเหตุ"],
+         "ชม.ออนไลน์", "เรทออนไลน์/ชม.", "ค่าสอนออนไลน์", "ค่าเดินทาง", "ค่านั่งว่าง", "ยอดรวม", "หมายเหตุ"],
         (
             [_fmt_d(p.work_date), p.tutor.name if p.tutor_id else "",
              _money(p.teaching_hours), _money(p.hourly_rate), _money(p.teaching_fee),
              "ใช่" if p.special_rate_325 else "ไม่", _money(p.online_teaching_hours),
+             _money(p.online_hourly_rate),
              _money(p.online_teaching_fee), _money(p.travel_fee), _money(p.idle_fee),
              _money(p.total_amount), p.note or ""]
             for p in TutorPayrollEntry.objects.select_related("tutor").order_by("-work_date", "tutor__name")

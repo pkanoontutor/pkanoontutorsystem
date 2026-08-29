@@ -23,8 +23,6 @@
 
   .reader{display:grid;grid-template-columns:186px 1fr;gap:11px;align-items:start}
   .thumbs{background:#fff;border:1px solid #eef2f7;border-radius:16px;padding:9px;max-height:78vh;overflow-y:auto;display:grid;gap:9px}
-  /* Page number sits in its own footer bar rather than floating over the
-     artwork, so it stays readable whatever the page looks like. */
   .thumb{border:2px solid #e2e8f0;border-radius:10px;overflow:hidden;cursor:pointer;background:#fff;line-height:0;
     display:flex;flex-direction:column}
   .thumb:hover{border-color:#94a3b8}
@@ -35,16 +33,28 @@
   .thumb.active .num{background:#0d9488;color:#fff;border-top-color:#0d9488}
   .thumb-ph{height:150px;display:grid;place-items:center;font-size:11px;font-weight:900;color:#94a3b8}
 
-  .stage{background:#fff;border:1px solid #eef2f7;border-radius:16px;padding:11px;display:flex;flex-direction:column;gap:9px;min-height:60vh}
-  .canvas-box{flex:1;display:grid;place-items:center;background:#f1f5f9;border-radius:12px;padding:9px;overflow:auto}
-  .canvas-stack{position:relative;display:inline-block;line-height:0}
-  #pageCanvas{display:block;max-width:100%;height:auto;box-shadow:0 5px 18px rgba(15,23,42,.18);border-radius:4px;background:#fff}
-  #markupCanvas{position:absolute;left:0;top:0;pointer-events:none;touch-action:none;border-radius:4px}
-  #markupCanvas.tool-draw{pointer-events:auto;cursor:crosshair}
-  #markupCanvas.tool-eraser{pointer-events:auto;cursor:cell}
+  /* .stage is a plain (non-scrolling) flex column: the toolbar and pager
+     are siblings of .scroll-viewport, not descendants, so neither zooming
+     nor scrolling the pages ever moves or hides them -- no sticky/fixed
+     positioning hacks needed. Only .scroll-viewport itself scrolls. */
+  .stage{background:#fff;border:1px solid #eef2f7;border-radius:16px;padding:11px;display:flex;flex-direction:column;gap:9px}
+  .scroll-viewport{position:relative;height:70vh;overflow:auto;background:#f1f5f9;border-radius:12px;
+    touch-action:pan-y;overscroll-behavior:contain;}
+  .zoom-layer{display:flex;flex-direction:column;align-items:center;gap:18px;padding:18px 12px;}
+  .page-block{position:relative;line-height:0;background:#fff;border-radius:4px;box-shadow:0 5px 18px rgba(15,23,42,.18);}
+  .page-canvas{display:block;border-radius:4px;background:#fff}
+  .markup-canvas{position:absolute;left:0;top:0;pointer-events:none}
+  .markup-canvas.tool-draw{pointer-events:auto;cursor:crosshair}
+  .markup-canvas.tool-eraser{pointer-events:auto;cursor:cell}
+  .page-block .pg-badge{position:absolute;left:8px;top:8px;background:rgba(15,23,42,.65);color:#fff;
+    font-size:11px;font-weight:900;padding:2px 8px;border-radius:999px;pointer-events:none;}
+  .page-block.page-error{display:flex;align-items:center;justify-content:center;min-height:160px;cursor:pointer;}
+  .page-block.page-error::after{content:'⚠️ แสดงหน้านี้ไม่ได้ กดเพื่อลองใหม่';font-size:12.5px;font-weight:900;color:#b91c1c;}
+  .stage-empty{padding:40px 16px;text-align:center;font-weight:850;color:#64748b}
   .pager{display:flex;justify-content:center;align-items:center;gap:11px;flex-wrap:wrap}
 
-  /* Markup toolbar: highlighter + pen, each with its own colors and sizes */
+  /* Markup toolbar: highlighter + pen, each with its own colors and a
+     continuous size slider (1px minimum) */
   .markup-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;
     background:#f8fafc;border:1px solid #eef2f7;border-radius:12px;padding:7px 9px}
   .mk-tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
@@ -52,20 +62,23 @@
   .mk-fam{width:32px;height:30px;border-radius:9px;border:2px solid #e2e8f0;background:#fff;cursor:pointer;
     font-size:15px;display:grid;place-items:center}
   .mk-fam.active{border-color:#0f172a;background:#eef2f7}
-  .mk-sub{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding-left:8px;border-left:1px solid #e2e8f0}
+  .mk-sub{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding-left:8px;border-left:1px solid #e2e8f0}
   .mk-colors{display:flex;gap:6px}
   .mk-swatch{width:30px;height:30px;border-radius:9px;border:2px solid transparent;cursor:pointer;
     display:grid;place-items:center;font-size:14px;box-shadow:inset 0 0 0 1px rgba(15,23,42,.12)}
   .mk-swatch.active{border-color:#0f172a;box-shadow:0 0 0 3px rgba(15,23,42,.12)}
   .mk-colorpick{width:30px;height:30px;border-radius:9px;border:1px solid #e2e8f0;padding:2px;cursor:pointer;background:#fff}
-  .mk-sizes{display:flex;gap:4px}
-  .mk-size{width:28px;height:30px;border-radius:9px;border:2px solid #e2e8f0;background:#fff;cursor:pointer;display:grid;place-items:center}
-  .mk-size.active{border-color:#0f172a;background:#e2e8f0}
-  .mk-size .dot{display:block;border-radius:50%;background:#334155}
+  .mk-size-slider{display:flex;align-items:center;gap:6px}
+  .mk-size-slider input[type=range]{width:88px;accent-color:#0d9488;cursor:pointer}
+  .mk-size-dot{display:grid;place-items:center;width:22px;height:22px;flex:none}
+  .mk-size-dot span{display:block;border-radius:50%;background:#334155}
+  .mk-size-label{font-size:10.5px;font-weight:900;color:#64748b;min-width:30px;text-align:right}
   .mk-eraser{width:34px;height:30px;border-radius:9px;border:2px solid #e2e8f0;background:#fff;cursor:pointer;
     font-size:15px;display:grid;place-items:center}
   .mk-eraser.active{border-color:#0f172a;background:#e2e8f0}
-  .mk-actions{display:flex;align-items:center;gap:6px}
+  .mk-actions{display:flex;align-items:center;gap:10px}
+  .zoom-ctrl{display:flex;align-items:center;gap:4px;border-right:1px solid #e2e8f0;padding-right:10px}
+  .zoom-label{font-size:11.5px;font-weight:900;color:#334155;min-width:40px;text-align:center;cursor:pointer}
   .mk-icon{width:32px;height:30px;border-radius:9px;border:1px solid #e2e8f0;background:#fff;cursor:pointer;font-size:14px}
   .mk-icon:disabled{opacity:.35;cursor:not-allowed}
   .mk-status{font-size:11px;font-weight:900;color:#64748b;min-width:64px;text-align:right}
@@ -96,6 +109,7 @@
     .thumbs{display:flex;overflow-x:auto;max-height:none;padding:8px}
     .thumb{flex:0 0 96px}
     .thumb .num{font-size:13px;padding:5px 3px}
+    .scroll-viewport{height:60vh}
   }
 </style>
 {% endblock %}
@@ -176,17 +190,33 @@
         '<div class="markup-bar">' +
           '<div class="mk-tools">' +
             '<div class="mk-family" id="mkFamily"></div>' +
-            '<div class="mk-sub" id="mkHighlightSub"><div class="mk-colors" id="mkColors"></div><div class="mk-sizes" id="mkHlSizes"></div></div>' +
-            '<div class="mk-sub" id="mkPenSub" hidden><div class="mk-colors" id="mkPenColors"></div><input type="color" id="mkPenPicker" class="mk-colorpick" title="เลือกสีเอง" value="#111827"><div class="mk-sizes" id="mkPenSizes"></div></div>' +
+            '<div class="mk-sub" id="mkHighlightSub">' +
+              '<div class="mk-colors" id="mkColors"></div>' +
+              '<div class="mk-size-slider"><div class="mk-size-dot" id="hlSizeDot"><span></span></div>' +
+                '<input type="range" id="hlSizeRange" min="1" max="50" step="1" value="16">' +
+                '<span class="mk-size-label" id="hlSizeLabel">16px</span></div>' +
+            '</div>' +
+            '<div class="mk-sub" id="mkPenSub" hidden>' +
+              '<div class="mk-colors" id="mkPenColors"></div>' +
+              '<input type="color" id="mkPenPicker" class="mk-colorpick" title="เลือกสีเอง" value="#111827">' +
+              '<div class="mk-size-slider"><div class="mk-size-dot" id="penSizeDot"><span></span></div>' +
+                '<input type="range" id="penSizeRange" min="1" max="30" step="1" value="7">' +
+                '<span class="mk-size-label" id="penSizeLabel">7px</span></div>' +
+            '</div>' +
             '<button class="mk-eraser" id="eraserBtn" title="ยางลบ (ลากทับเส้นที่จะลบ)">🧽</button>' +
           '</div>' +
           '<div class="mk-actions">' +
+            '<div class="zoom-ctrl">' +
+              '<button class="mk-icon" id="zoomOutBtn" title="ซูมออก">➖</button>' +
+              '<span class="zoom-label" id="zoomLabel" title="กดเพื่อรีเซ็ตเป็น 100%">100%</span>' +
+              '<button class="mk-icon" id="zoomInBtn" title="ซูมเข้า">➕</button>' +
+            '</div>' +
             '<button class="mk-icon" id="undoBtn" title="ย้อนกลับ" disabled>↩️</button>' +
             '<button class="mk-icon" id="redoBtn" title="ทำซ้ำ" disabled>↪️</button>' +
             '<span class="mk-status" id="mkStatus"></span>' +
           '</div>' +
         '</div>' +
-        '<div class="canvas-box"><div class="canvas-stack"><canvas id="pageCanvas"></canvas><canvas id="markupCanvas"></canvas></div><div class="loading" id="stageLoading">กำลังเปิดไฟล์...</div></div>' +
+        '<div class="scroll-viewport" id="scrollViewport"><div class="zoom-layer" id="zoomLayer"></div></div>' +
         '<div class="pager">' +
           '<button class="pbtn" id="prevBtn">‹ ก่อนหน้า</button>' +
           '<span class="pnum">หน้า <input type="number" id="pageInput" min="1" value="1"> / <span id="pageTotal">–</span></span>' +
@@ -198,11 +228,8 @@
   const kindTabs=document.getElementById('kindTabs');
   const fileTabs=document.getElementById('fileTabs');
   const thumbsEl=document.getElementById('thumbs');
-  const canvas=document.getElementById('pageCanvas');
-  const canvasBox=document.querySelector('.canvas-box');
-  const markupCanvas=document.getElementById('markupCanvas');
-  const markupCtx=markupCanvas.getContext('2d');
-  const stageLoading=document.getElementById('stageLoading');
+  const scrollViewport=document.getElementById('scrollViewport');
+  const zoomLayer=document.getElementById('zoomLayer');
   const prevBtn=document.getElementById('prevBtn');
   const nextBtn=document.getElementById('nextBtn');
   const pageInput=document.getElementById('pageInput');
@@ -210,21 +237,30 @@
   const resumeNote=document.getElementById('resumeNote');
   const mkFamily=document.getElementById('mkFamily');
   const mkColors=document.getElementById('mkColors');
-  const mkHlSizes=document.getElementById('mkHlSizes');
   const mkPenColors=document.getElementById('mkPenColors');
   const mkPenPicker=document.getElementById('mkPenPicker');
-  const mkPenSizes=document.getElementById('mkPenSizes');
   const mkHighlightSub=document.getElementById('mkHighlightSub');
   const mkPenSub=document.getElementById('mkPenSub');
+  const hlSizeRange=document.getElementById('hlSizeRange');
+  const hlSizeLabel=document.getElementById('hlSizeLabel');
+  const hlSizeDot=document.querySelector('#hlSizeDot span');
+  const penSizeRange=document.getElementById('penSizeRange');
+  const penSizeLabel=document.getElementById('penSizeLabel');
+  const penSizeDot=document.querySelector('#penSizeDot span');
   const undoBtn=document.getElementById('undoBtn');
   const redoBtn=document.getElementById('redoBtn');
   const mkStatus=document.getElementById('mkStatus');
+  const zoomInBtn=document.getElementById('zoomInBtn');
+  const zoomOutBtn=document.getElementById('zoomOutBtn');
+  const zoomLabel=document.getElementById('zoomLabel');
 
   const KIND_LABEL={content:'📘 เนื้อหา', answer:'✅ เฉลย'};
-  let kind='content', docId=null, pdf=null, page=1, total=0, renderToken=0;
-  const lastPageByDoc={};   // remembers where each document was left, so
-                            // switching เนื้อหา/เฉลย or between files of the
-                            // same kind doesn't reset back to page 1.
+  let kind='content', docId=null, pdf=null, total=0, currentPage=1, openToken=0;
+  let scaleBase=1;
+  let pageState=[];          // 1 entry per page: {el, canvas, markupCanvas, markupCtx, rendered, rendering, token}
+  const lastPageByDoc={};    // remembers where each document was left, so
+                             // switching เนื้อหา/เฉลย or between files of the
+                             // same kind doesn't reset back to page 1.
 
   const docsOf = k => DOCS.filter(d=>d.kind===k);
   const esc = s => String(s==null?'':s).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
@@ -252,86 +288,206 @@
     }));
   }
 
+  /* ---------- Virtualized continuous-scroll page renderer ----------
+     Every page gets a placeholder block up front (correct height, so the
+     scrollbar/scroll math is right from the first frame and thumbnails +
+     page count are known immediately). Only a window of pages around
+     whatever's on screen is actually rasterized at any moment -- pages
+     that scroll far out of range get their canvas bitmap freed again --
+     which is what lets "preload the whole book" stay smooth instead of
+     trying to hold hundreds of full-size page bitmaps in memory at once. */
+  const RENDER_AHEAD = 5;   // pages beyond the visible one to keep pre-rendered
+  const KEEP_BUFFER = 12;   // pages beyond that before an old render is freed
+  let windowRaf=null;
+
   async function openDoc(id, startPage){
     const doc=DOCS.find(d=>d.id===id);
     if(!doc) return;
-    flushPendingSave();           // land any unsaved stroke on the page we're leaving
+    flushAllPendingSaves();       // land any unsaved strokes on the doc we're leaving
+    const myOpenToken=++openToken;
     docId=id; kind=doc.kind;
     renderKindTabs(); renderFileTabs();
-    stageLoading.style.display=''; stageLoading.textContent='กำลังเปิดไฟล์...';
-    canvas.style.display='none';
-    markupCanvas.style.display='none';
+    zoomLayer.innerHTML='<div class="loading">กำลังเปิดไฟล์...</div>';
     thumbsEl.innerHTML='<div class="thumb-ph">กำลังโหลด...</div>';
+    pageState=[];
+    resetZoom();
     try{
       const [loadedPdf]=await Promise.all([
         pdfjsLib.getDocument(doc.url).promise,
         ensureMarkupLoaded(id),
       ]);
+      if(myOpenToken!==openToken) return;   // switched documents again mid-load
       pdf=loadedPdf;
       total=pdf.numPages;
       pageTotal.textContent=total;
       pageInput.max=total;
-      // Thumbnails are built alongside the main page rather than after it,
-      // so a slow first render never leaves the strip empty.
-      goTo(Math.min(Math.max(startPage||1,1), total));
+      currentPage=Math.min(Math.max(startPage||1,1), total);
+      pageInput.value=currentPage;
+
+      const p1=await pdf.getPage(1);
+      const vp1=p1.getViewport({scale:1});
+      const box=Math.max(scrollViewport.clientWidth-24, 200);
+      scaleBase=Math.max(Math.min(box/vp1.width, 2.2), 0.3);
+      buildPageBlocks(vp1.width*scaleBase, vp1.height*scaleBase);
+      scrollToPage(currentPage, {instant:true});
+      updateUndoRedoButtons();
+      onPageNavButtons();
       buildThumbs();
     }catch(e){
-      stageLoading.textContent='เปิดไฟล์ไม่สำเร็จ: '+(e.message||e);
-      thumbsEl.innerHTML='';
+      if(myOpenToken===openToken){
+        zoomLayer.innerHTML='<div class="loading">เปิดไฟล์ไม่สำเร็จ: '+esc(e.message||e)+'</div>';
+        thumbsEl.innerHTML='';
+      }
     }
   }
 
-  async function goTo(n){
-    if(!pdf) return;
-    flushPendingSave();           // land any unsaved stroke on the page we're leaving
-    page=Math.min(Math.max(n,1),total);
-    lastPageByDoc[docId]=page;
-    pageInput.value=page;
-    prevBtn.disabled=(page<=1);
-    nextBtn.disabled=(page>=total);
-    markThumb();                 // highlight follows the click, not the paint
-    const token=++renderToken;
+  function buildPageBlocks(guessW, guessH){
+    zoomLayer.innerHTML='';
+    pageState=[];
+    const w=Math.round(guessW), h=Math.round(guessH);
+    for(let i=1;i<=total;i++){
+      const wrap=document.createElement('div');
+      wrap.className='page-block';
+      wrap.dataset.page=i;
+      wrap.style.width=w+'px';
+      wrap.style.height=h+'px';
+      const c=document.createElement('canvas');
+      c.className='page-canvas';
+      const mc=document.createElement('canvas');
+      mc.className='markup-canvas';
+      const badge=document.createElement('div');
+      badge.className='pg-badge';
+      badge.textContent=i;
+      wrap.appendChild(c); wrap.appendChild(mc); wrap.appendChild(badge);
+      zoomLayer.appendChild(wrap);
+      pageState.push({el:wrap, canvas:c, markupCanvas:mc, markupCtx:mc.getContext('2d'), rendered:false, rendering:false, token:0});
+    }
+  }
+
+  async function renderPageAt(n){
+    const st=pageState[n-1];
+    if(!st || st.rendered || st.rendering) return;
+    st.rendering=true;
+    st.el.classList.remove('page-error');
+    const myToken=++st.token;
+    const myOpenToken=openToken;
     try{
-      const p=await pdf.getPage(page);
-      const base=p.getViewport({scale:1});
-      // Measured from .canvas-box (always laid out at the stage's real width)
-      // rather than the canvas's own inline-block parent -- that parent
-      // collapses to ~0 while the canvas itself is still display:none (set
-      // in openDoc just before this runs), which fed a near-zero box back
-      // into the scale calc and pinned every page to the 0.3 floor forever,
-      // since each successive page then measured off the previous tiny one.
-      const box=Math.max(canvasBox.clientWidth-24, 200);
-      const scale=Math.max(Math.min(box/base.width, 2.2), 0.3);
-      const vp=p.getViewport({scale});
-      canvas.width=Math.round(vp.width); canvas.height=Math.round(vp.height);
-      canvas.style.width=canvas.width+'px'; canvas.style.height=canvas.height+'px';
+      const p=await pdf.getPage(n);
+      const vp=p.getViewport({scale:scaleBase});
+      const c=st.canvas;
+      c.width=Math.round(vp.width); c.height=Math.round(vp.height);
       // Bounded so a page that will not paint reports back instead of
       // leaving the tutor staring at a spinner mid-lesson.
       const done=await Promise.race([
-        p.render({canvasContext:canvas.getContext('2d'), viewport:vp}).promise.then(()=>true),
+        p.render({canvasContext:c.getContext('2d'), viewport:vp}).promise.then(()=>true),
         new Promise(res=>setTimeout(()=>res(false),20000)),
       ]);
-      if(token!==renderToken) return;   // a newer page won the race
+      if(myOpenToken!==openToken || st.token!==myToken) return;   // doc switched or superseded
+      st.rendering=false;
       if(done){
-        canvas.style.display=''; stageLoading.style.display='none';
+        st.el.style.width=c.width+'px'; st.el.style.height=c.height+'px';
         // The overlay is sized in device pixels to exactly match the page
         // canvas (not a CSS %), so a stroke drawn at a given pixel always
-        // lines up with the artwork underneath regardless of zoom/container width.
-        markupCanvas.width=canvas.width; markupCanvas.height=canvas.height;
-        markupCanvas.style.width=canvas.style.width; markupCanvas.style.height=canvas.style.height;
-        markupCanvas.style.display='';
-        redrawMarkup();
-        updateUndoRedoButtons();
+        // lines up with the artwork underneath regardless of zoom.
+        st.markupCanvas.width=c.width; st.markupCanvas.height=c.height;
+        st.markupCanvas.style.width=c.width+'px'; st.markupCanvas.style.height=c.height+'px';
+        st.rendered=true;
+        redrawMarkupFor(n);
+        if(n===currentPage) updateUndoRedoButtons();
       }else{
-        stageLoading.style.display=''; stageLoading.textContent='แสดงหน้านี้ไม่ได้ ลองกดหน้าถัดไปหรือเปิดใหม่อีกครั้ง';
+        st.el.classList.add('page-error');
       }
     }catch(e){
-      if(token===renderToken){ stageLoading.style.display=''; stageLoading.textContent='แสดงหน้านี้ไม่ได้'; }
+      if(myOpenToken===openToken && st.token===myToken){ st.rendering=false; st.el.classList.add('page-error'); }
     }
   }
 
+  function unloadPageAt(n){
+    const st=pageState[n-1];
+    if(!st || (!st.rendered && !st.rendering)) return;
+    st.canvas.width=0; st.canvas.height=0;
+    st.markupCanvas.width=0; st.markupCanvas.height=0;
+    st.rendered=false;
+    st.rendering=false;
+    st.token++;   // invalidate any render still in flight for this page, so
+                  // its completion (which checks this token) can't silently
+                  // repopulate a canvas we just freed
+  }
+
+  // Debounced via a plain timer rather than requestAnimationFrame: rAF (and
+  // IntersectionObserver, which is driven by the same rendering pipeline)
+  // only fires once the browser actually paints a frame, which some
+  // automated/backgrounded contexts stall indefinitely -- a real device
+  // being scrolled by a real finger doesn't have that problem, but there's
+  // no reason to take on the risk when a timer does the same coalescing.
+  function scheduleWindow(){
+    if(windowRaf) return;
+    windowRaf=setTimeout(()=>{
+      windowRaf=null;
+      const lo=Math.max(1, currentPage-RENDER_AHEAD);
+      const hi=Math.min(total, currentPage+RENDER_AHEAD);
+      for(let i=lo;i<=hi;i++) renderPageAt(i);
+      for(let i=1;i<=total;i++){
+        if(i<currentPage-KEEP_BUFFER || i>currentPage+KEEP_BUFFER) unloadPageAt(i);
+      }
+    }, 0);
+  }
+
+  // "Current page" while free-scrolling is whichever page-block's top edge
+  // is above the viewport's vertical center -- cheap enough (a plain loop
+  // over pageState) to run on every scroll event without debounce.
+  let scrollUpdatePending=false;
+  function updateCurrentPageFromScroll(){
+    if(!pageState.length) return;
+    const mid=scrollViewport.scrollTop + scrollViewport.clientHeight/2;
+    let best=1;
+    for(let i=0;i<pageState.length;i++){
+      if(pageState[i].el.offsetTop<=mid) best=i+1; else break;
+    }
+    if(best!==currentPage){
+      currentPage=best;
+      lastPageByDoc[docId]=currentPage;
+      pageInput.value=currentPage;
+      onPageNavButtons();
+      markThumb();
+      updateUndoRedoButtons();
+    }
+    scheduleWindow();
+  }
+  scrollViewport.addEventListener('scroll', ()=>{
+    if(scrollUpdatePending) return;
+    scrollUpdatePending=true;
+    setTimeout(()=>{ scrollUpdatePending=false; updateCurrentPageFromScroll(); }, 60);
+  }, {passive:true});
+
+  function onPageNavButtons(){
+    prevBtn.disabled=(currentPage<=1);
+    nextBtn.disabled=(currentPage>=total);
+  }
+
+  function scrollToPage(n, opts){
+    n=Math.min(Math.max(n,1), total||1);
+    const st=pageState[n-1];
+    if(!st) return;
+    currentPage=n;
+    lastPageByDoc[docId]=n;
+    pageInput.value=n;
+    onPageNavButtons();
+    markThumb();
+    renderPageAt(n);           // don't wait for the observer -- a click should feel instant
+    scheduleWindow();
+    const top=st.el.offsetTop-10;
+    if(opts && opts.instant) scrollViewport.scrollTop=top;
+    else scrollViewport.scrollTo({top, behavior:'smooth'});
+  }
+
+  zoomLayer.addEventListener('click', e=>{
+    const errBlock=e.target.closest('.page-block.page-error');
+    if(errBlock) renderPageAt(Number(errBlock.dataset.page));
+  });
+
   async function buildThumbs(){
-    const doc=pdf, n=total, token=renderToken;
+    const doc=pdf, n=total, myOpenToken=openToken;
     // Every tile is placed (and clickable) before any drawing starts, so the
     // tutor can jump pages immediately and one unrenderable page cannot stop
     // the rest of the strip from filling in.
@@ -339,19 +495,19 @@
     const canvases=[];
     for(let i=1;i<=n;i++){
       const wrap=document.createElement('div');
-      wrap.className='thumb'+(i===page?' active':'');
+      wrap.className='thumb'+(i===currentPage?' active':'');
       wrap.dataset.page=i;
       const c=document.createElement('canvas');
       c.width=104; c.height=140;
       wrap.appendChild(c);
       const num=document.createElement('span'); num.className='num'; num.textContent=i;
       wrap.appendChild(num);
-      wrap.addEventListener('click',()=>goTo(i));
+      wrap.addEventListener('click',()=>scrollToPage(i));
       thumbsEl.appendChild(wrap);
       canvases.push(c);
     }
     for(let i=1;i<=n;i++){
-      if(doc!==pdf) return;          // switched file while drawing
+      if(myOpenToken!==openToken || doc!==pdf) return;   // switched file while drawing
       try{
         const p=await doc.getPage(i);
         const base=p.getViewport({scale:1});
@@ -368,7 +524,7 @@
 
   function markThumb(){
     thumbsEl.querySelectorAll('.thumb').forEach(t=>
-      t.classList.toggle('active', Number(t.dataset.page)===page));
+      t.classList.toggle('active', Number(t.dataset.page)===currentPage));
     const active=thumbsEl.querySelector('.thumb.active');
     if(!active) return;
     // Scroll the strip itself rather than calling scrollIntoView, which
@@ -385,10 +541,80 @@
     }
   }
 
-  /* ---------- Highlighter markup: draw / erase / undo / redo / autosave ----------
+  /* ---------- Zoom: CSS `zoom` on .zoom-layer (not transform) ----------
+     `zoom` genuinely changes layout, so .scroll-viewport's scrollHeight,
+     each page-block's offsetTop, and getBoundingClientRect() all reflect
+     the zoomed size automatically -- scrollToPage's math and the drawing
+     overlay's point-mapping need no special-casing for it. The toolbar
+     sits outside .scroll-viewport entirely so it is never affected. */
+  const ZOOM_MIN=0.5, ZOOM_MAX=3, ZOOM_STEP=0.15;
+  let zoomLevel=1;
+
+  function applyZoom(z){
+    const prev=zoomLevel;
+    zoomLevel=Math.min(Math.max(z, ZOOM_MIN), ZOOM_MAX);
+    if(zoomLevel===prev) return;
+    // Keep the page currently in view anchored under the toolbar rather
+    // than letting the zoom pivot from the scroll container's top-left.
+    const st=pageState[currentPage-1];
+    const anchorBefore = st ? st.el.offsetTop + st.el.offsetHeight/2 : 0;
+    zoomLayer.style.zoom=zoomLevel;
+    zoomLabel.textContent=Math.round(zoomLevel*100)+'%';
+    if(st){
+      const anchorAfter = st.el.offsetTop + st.el.offsetHeight/2;
+      scrollViewport.scrollTop += (anchorAfter-anchorBefore);
+    }
+    scheduleWindow();
+  }
+  function resetZoom(){ zoomLevel=1; zoomLayer.style.zoom=1; zoomLabel.textContent='100%'; }
+
+  zoomInBtn.addEventListener('click',()=>applyZoom(zoomLevel+ZOOM_STEP));
+  zoomOutBtn.addEventListener('click',()=>applyZoom(zoomLevel-ZOOM_STEP));
+  zoomLabel.addEventListener('click',()=>applyZoom(1));
+
+  // Ctrl+wheel (mouse) / pinch-on-trackpad (fires as ctrlKey wheel in
+  // Chrome & Firefox) zooms the PDF instead of the browser reaching for
+  // its own page zoom.
+  scrollViewport.addEventListener('wheel', e=>{
+    if(!e.ctrlKey) return;
+    e.preventDefault();
+    applyZoom(zoomLevel - e.deltaY*0.01);
+  }, {passive:false});
+
+  // Two-finger pinch on a touchscreen: tracked by hand via pointer events
+  // (rather than relying on the browser's native pinch-zoom, which would
+  // zoom the whole page instead of just the PDF -- exactly the complaint
+  // this is fixing) so it drives the same custom zoom as the buttons.
+  const activeTouches=new Map();
+  let pinchStartDist=0, pinchStartZoom=1;
+  scrollViewport.addEventListener('pointerdown', e=>{
+    if(e.pointerType!=='touch') return;
+    activeTouches.set(e.pointerId, {x:e.clientX, y:e.clientY});
+    if(activeTouches.size===2){
+      const pts=[...activeTouches.values()];
+      pinchStartDist=Math.hypot(pts[0].x-pts[1].x, pts[0].y-pts[1].y) || 1;
+      pinchStartZoom=zoomLevel;
+    }
+  });
+  scrollViewport.addEventListener('pointermove', e=>{
+    if(e.pointerType!=='touch' || !activeTouches.has(e.pointerId)) return;
+    activeTouches.set(e.pointerId, {x:e.clientX, y:e.clientY});
+    if(activeTouches.size===2){
+      e.preventDefault();
+      const pts=[...activeTouches.values()];
+      const dist=Math.hypot(pts[0].x-pts[1].x, pts[0].y-pts[1].y);
+      applyZoom(pinchStartZoom*(dist/pinchStartDist));
+    }
+  }, {passive:false});
+  function clearTouch(e){ activeTouches.delete(e.pointerId); }
+  scrollViewport.addEventListener('pointerup', clearTouch);
+  scrollViewport.addEventListener('pointercancel', clearTouch);
+  scrollViewport.addEventListener('pointerleave', clearTouch);
+
+  /* ---------- Markup: highlighter + pen, draw / erase / undo / redo / autosave ----------
      Strokes are stored per (document, page) with points normalized 0-1 against
-     the page's own pixel size, so they redraw correctly at any zoom/container
-     width. Never touches the PDF itself -- purely an overlay canvas layer,
+     that page's own pixel size, so they redraw correctly at any zoom. Never
+     touches the PDF itself -- purely an overlay canvas layer per page,
      autosaved to the server keyed by tutor + document + page. */
   // `swatch` is the opaque color shown on the toolbar button; `stroke` is
   // what actually gets drawn -- it needs real alpha (not just multiply blend
@@ -411,26 +637,26 @@
     {value:'#2563eb', label:'ปากกาน้ำเงิน'},
     {value:'#16a34a', label:'ปากกาเขียว'},
   ];
-  const HL_SIZES=[{width:0.010,label:'บาง'},{width:0.016,label:'กลาง'},{width:0.026,label:'หนา'}];
-  const PEN_SIZES=[{width:0.004,label:'บาง'},{width:0.007,label:'กลาง'},{width:0.012,label:'หนา'}];
+  // Widths are fractions of a page's rendered pixel width (same idea as the
+  // page-to-page-independent design before), calibrated against this
+  // reference so the slider's px labels ("1px" minimum) mean roughly what
+  // they say on a typically-sized rendered page.
+  const SIZE_REF_WIDTH=1000;
   const ERASE_RADIUS=0.022;  // fraction of canvas width, hit-test radius
 
   let panelFamily='highlight';   // which sub-toolbar is showing: 'highlight' | 'pen'
   let activeTool=null;           // null | 'draw' | 'eraser'
   let armedFamily='highlight';   // family of the currently armed draw tool
   let activeColor=HL_COLORS[0].value;
-  let hlWidth=HL_SIZES[1].width;
-  let penWidth=PEN_SIZES[1].width;
+  let hlWidth=16/SIZE_REF_WIDTH;
+  let penWidth=7/SIZE_REF_WIDTH;
   const pageStrokes={};      // "docId:page" -> [stroke, ...]
   const pageHistory={};      // "docId:page" -> {undo:[op,...], redo:[op,...]}
   const markupLoadedDocs=new Set();
   let drawing=false, currentStroke=null, eraseRemoved=null;
-  let saveTimer=null, savePending=null;
-
-  function sizeDotHtml(width, maxWidth){
-    const px=Math.round(6 + (width/maxWidth)*16);
-    return `<span class="dot" style="width:${px}px;height:${px}px"></span>`;
-  }
+  let activePageNum=null, activeMarkupCanvas=null, activeMarkupCtx=null;
+  const saveTimers={};       // page -> timer
+  const savePending={};      // page -> {docForSave, pageForSave, strokes}
 
   mkFamily.innerHTML =
     '<button type="button" class="mk-fam active" data-family="highlight" title="ไฮไลท์">🖍️</button>' +
@@ -438,20 +664,30 @@
   mkColors.innerHTML = HL_COLORS.map(c=>
     `<button type="button" class="mk-swatch" data-value="${c.value}" title="${c.label}" style="background:${c.swatch}"></button>`
   ).join('');
-  mkHlSizes.innerHTML = HL_SIZES.map(s=>
-    `<button type="button" class="mk-size" data-width="${s.width}" title="หัวไฮไลท์${s.label}">${sizeDotHtml(s.width, HL_SIZES[HL_SIZES.length-1].width)}</button>`
-  ).join('');
   mkPenColors.innerHTML = PEN_COLORS.map(c=>
     `<button type="button" class="mk-swatch" data-value="${c.value}" title="${c.label}" style="background:${c.value}"></button>`
   ).join('');
-  mkPenSizes.innerHTML = PEN_SIZES.map(s=>
-    `<button type="button" class="mk-size" data-width="${s.width}" title="หัวปากกา${s.label}">${sizeDotHtml(s.width, PEN_SIZES[PEN_SIZES.length-1].width)}</button>`
-  ).join('');
   const eraserBtn=document.getElementById('eraserBtn');
 
-  function pageKey(){ return docId+':'+page; }
-  function getStrokes(){ return pageStrokes[pageKey()] || (pageStrokes[pageKey()]=[]); }
-  function getHistory(){ return pageHistory[pageKey()] || (pageHistory[pageKey()]={undo:[],redo:[]}); }
+  function pageKeyFor(n){ return docId+':'+n; }
+  function getStrokesFor(n){ return pageStrokes[pageKeyFor(n)] || (pageStrokes[pageKeyFor(n)]=[]); }
+  function getHistoryFor(n){ return pageHistory[pageKeyFor(n)] || (pageHistory[pageKeyFor(n)]={undo:[],redo:[]}); }
+
+  function updateSizeUI(){
+    hlSizeDot.style.width=hlSizeDot.style.height=(2+Number(hlSizeRange.value)*0.6)+'px';
+    hlSizeLabel.textContent=hlSizeRange.value+'px';
+    penSizeDot.style.width=penSizeDot.style.height=(2+Number(penSizeRange.value)*0.6)+'px';
+    penSizeLabel.textContent=penSizeRange.value+'px';
+  }
+  hlSizeRange.addEventListener('input',()=>{
+    hlWidth=Number(hlSizeRange.value)/SIZE_REF_WIDTH;
+    updateSizeUI();
+  });
+  penSizeRange.addEventListener('input',()=>{
+    penWidth=Number(penSizeRange.value)/SIZE_REF_WIDTH;
+    updateSizeUI();
+  });
+  updateSizeUI();
 
   function syncToolUI(){
     mkFamily.querySelectorAll('[data-family]').forEach(b=>
@@ -462,13 +698,8 @@
       b.classList.toggle('active', activeTool==='draw' && armedFamily==='highlight' && b.dataset.value===activeColor));
     mkPenColors.querySelectorAll('.mk-swatch').forEach(b=>
       b.classList.toggle('active', activeTool==='draw' && armedFamily==='pen' && b.dataset.value===activeColor));
-    mkHlSizes.querySelectorAll('.mk-size').forEach(b=>
-      b.classList.toggle('active', Number(b.dataset.width)===hlWidth));
-    mkPenSizes.querySelectorAll('.mk-size').forEach(b=>
-      b.classList.toggle('active', Number(b.dataset.width)===penWidth));
     eraserBtn.classList.toggle('active', activeTool==='eraser');
-    markupCanvas.classList.toggle('tool-draw', activeTool==='draw');
-    markupCanvas.classList.toggle('tool-eraser', activeTool==='eraser');
+    zoomLayer.classList.toggle('tool-draw', activeTool==='draw');
   }
 
   mkFamily.querySelectorAll('[data-family]').forEach(b=>b.addEventListener('click',()=>{
@@ -478,37 +709,39 @@
   mkColors.querySelectorAll('.mk-swatch').forEach(b=>b.addEventListener('click',()=>{
     if(activeTool==='draw' && armedFamily==='highlight' && activeColor===b.dataset.value){ activeTool=null; }
     else{ activeTool='draw'; armedFamily='highlight'; activeColor=b.dataset.value; }
-    syncToolUI();
-  }));
-  mkHlSizes.querySelectorAll('.mk-size').forEach(b=>b.addEventListener('click',()=>{
-    hlWidth=Number(b.dataset.width);
-    syncToolUI();
+    syncToolUI(); syncCanvasCursors();
   }));
   mkPenColors.querySelectorAll('.mk-swatch').forEach(b=>b.addEventListener('click',()=>{
     if(activeTool==='draw' && armedFamily==='pen' && activeColor===b.dataset.value){ activeTool=null; }
     else{ activeTool='draw'; armedFamily='pen'; activeColor=b.dataset.value; }
-    syncToolUI();
+    syncToolUI(); syncCanvasCursors();
   }));
   mkPenPicker.addEventListener('input',()=>{
     activeTool='draw'; armedFamily='pen'; activeColor=mkPenPicker.value;
-    syncToolUI();
+    syncToolUI(); syncCanvasCursors();
   });
-  mkPenSizes.querySelectorAll('.mk-size').forEach(b=>b.addEventListener('click',()=>{
-    penWidth=Number(b.dataset.width);
-    syncToolUI();
-  }));
   eraserBtn.addEventListener('click',()=>{
     activeTool = activeTool==='eraser' ? null : 'eraser';
-    syncToolUI();
+    syncToolUI(); syncCanvasCursors();
   });
 
-  function drawStrokePath(ctx, stroke){
+  // Every page's overlay canvas needs pointer-events:auto while a tool is
+  // armed (so a pen tap draws immediately, on whichever page it lands on)
+  // and none while idle (so a finger can scroll/pinch straight through).
+  function syncCanvasCursors(){
+    pageState.forEach(st=>{
+      st.markupCanvas.classList.toggle('tool-draw', activeTool==='draw');
+      st.markupCanvas.classList.toggle('tool-eraser', activeTool==='eraser');
+    });
+  }
+
+  function drawStrokePath(ctx, canvasEl, stroke){
     const pts=stroke.points;
     if(pts.length<1) return;
     // Strokes saved before the pen tool existed have no `mode` -- treat
     // those as highlighter, which is exactly what they always were.
     const isPen=stroke.mode==='pen';
-    const w=Math.max(stroke.width*markupCanvas.width, isPen?1.5:2);
+    const w=Math.max(stroke.width*canvasEl.width, 1);
     ctx.globalCompositeOperation=isPen?'source-over':'multiply';
     ctx.strokeStyle=stroke.color;
     ctx.fillStyle=stroke.color;
@@ -517,32 +750,34 @@
     if(pts.length===1){
       // A tap with no drag: draw a dot so it's still visible.
       ctx.beginPath();
-      ctx.arc(pts[0][0]*markupCanvas.width, pts[0][1]*markupCanvas.height, w/2, 0, Math.PI*2);
+      ctx.arc(pts[0][0]*canvasEl.width, pts[0][1]*canvasEl.height, w/2, 0, Math.PI*2);
       ctx.fill();
       return;
     }
     ctx.beginPath();
-    ctx.moveTo(pts[0][0]*markupCanvas.width, pts[0][1]*markupCanvas.height);
+    ctx.moveTo(pts[0][0]*canvasEl.width, pts[0][1]*canvasEl.height);
     for(let i=1;i<pts.length;i++){
-      ctx.lineTo(pts[i][0]*markupCanvas.width, pts[i][1]*markupCanvas.height);
+      ctx.lineTo(pts[i][0]*canvasEl.width, pts[i][1]*canvasEl.height);
     }
     ctx.stroke();
   }
 
-  function redrawMarkup(){
-    markupCtx.clearRect(0,0,markupCanvas.width,markupCanvas.height);
-    markupCtx.globalAlpha=1;
-    getStrokes().forEach(s=>drawStrokePath(markupCtx, s));
+  function redrawMarkupFor(n){
+    const st=pageState[n-1];
+    if(!st || !st.rendered) return;
+    st.markupCtx.clearRect(0,0,st.markupCanvas.width, st.markupCanvas.height);
+    st.markupCtx.globalAlpha=1;
+    getStrokesFor(n).forEach(s=>drawStrokePath(st.markupCtx, st.markupCanvas, s));
   }
 
   function updateUndoRedoButtons(){
-    const h=getHistory();
+    const h=getHistoryFor(currentPage);
     undoBtn.disabled = h.undo.length===0;
     redoBtn.disabled = h.redo.length===0;
   }
 
-  function pointFromEvent(evt){
-    const rect=markupCanvas.getBoundingClientRect();
+  function pointFromEvent(canvasEl, evt){
+    const rect=canvasEl.getBoundingClientRect();
     const x=(evt.clientX-rect.left)/rect.width;
     const y=(evt.clientY-rect.top)/rect.height;
     return [Math.min(Math.max(x,0),1), Math.min(Math.max(y,0),1)];
@@ -553,8 +788,8 @@
     return Math.sqrt(dx*dx+dy*dy);
   }
 
-  function eraseAt(pt){
-    const strokes=getStrokes();
+  function eraseAtOn(n, pt){
+    const strokes=getStrokesFor(n);
     for(let i=strokes.length-1;i>=0;i--){
       const s=strokes[i];
       if(s.points.some(p=>distance(p,pt)<=ERASE_RADIUS)){
@@ -564,30 +799,42 @@
     }
   }
 
-  markupCanvas.addEventListener('pointerdown',e=>{
-    if(!activeTool) return;
+  // Only a real pen or a mouse draws -- a finger (pointerType 'touch') is
+  // left alone entirely (no preventDefault, no capture) so the browser's
+  // native scroll/pinch on .scroll-viewport keeps working even while a
+  // drawing tool is armed. This is also what makes an Apple Pencil feel
+  // stable: it no longer fights a resting palm or a scroll gesture for
+  // the same canvas.
+  zoomLayer.addEventListener('pointerdown', e=>{
+    if(!activeTool || e.pointerType==='touch') return;
+    const mc=e.target.closest('.markup-canvas');
+    if(!mc) return;
     e.preventDefault();
-    markupCanvas.setPointerCapture(e.pointerId);
+    mc.setPointerCapture(e.pointerId);
+    const wrap=mc.closest('.page-block');
+    activePageNum=Number(wrap.dataset.page);
+    activeMarkupCanvas=mc;
+    activeMarkupCtx=mc.getContext('2d');
     drawing=true;
-    const pt=pointFromEvent(e);
+    const pt=pointFromEvent(mc, e);
     if(activeTool==='draw'){
       const width=armedFamily==='highlight' ? hlWidth : penWidth;
       currentStroke={color:activeColor, width, mode:armedFamily, points:[pt]};
     }else{
       eraseRemoved=[];
-      eraseAt(pt);
-      redrawMarkup();
+      eraseAtOn(activePageNum, pt);
+      redrawMarkupFor(activePageNum);
     }
   });
   let rafPending=false;
-  markupCanvas.addEventListener('pointermove',e=>{
-    if(!drawing) return;
+  zoomLayer.addEventListener('pointermove', e=>{
+    if(!drawing || e.pointerType==='touch') return;
     e.preventDefault();
-    const pt=pointFromEvent(e);
+    const pt=pointFromEvent(activeMarkupCanvas, e);
     if(activeTool==='draw' && currentStroke){
       currentStroke.points.push(pt);
     }else if(activeTool==='eraser'){
-      eraseAt(pt);
+      eraseAtOn(activePageNum, pt);
     }
     // Redraw the whole page's strokes plus the in-progress one each frame
     // (rAF-gated so a flood of pointermove events can't outrun the screen)
@@ -598,35 +845,37 @@
       rafPending=true;
       requestAnimationFrame(()=>{
         rafPending=false;
-        redrawMarkup();
-        if(activeTool==='draw' && currentStroke) drawStrokePath(markupCtx, currentStroke);
+        redrawMarkupFor(activePageNum);
+        if(activeTool==='draw' && currentStroke) drawStrokePath(activeMarkupCtx, activeMarkupCanvas, currentStroke);
       });
     }
   });
-  function endStroke(){
+  function endStroke(e){
+    if(e && e.pointerType==='touch') return;
     if(!drawing) return;
     drawing=false;
-    const h=getHistory();
+    const n=activePageNum;
+    const h=getHistoryFor(n);
     if(activeTool==='draw' && currentStroke){
-      getStrokes().push(currentStroke);
+      getStrokesFor(n).push(currentStroke);
       h.undo.push({type:'add', stroke:currentStroke});
       h.redo.length=0;
       currentStroke=null;
-      scheduleSave();
+      scheduleSave(n);
     }else if(activeTool==='eraser' && eraseRemoved && eraseRemoved.length){
       h.undo.push({type:'erase', removed:eraseRemoved});
       h.redo.length=0;
       eraseRemoved=null;
-      scheduleSave();
+      scheduleSave(n);
     }
-    updateUndoRedoButtons();
+    if(n===currentPage) updateUndoRedoButtons();
   }
-  markupCanvas.addEventListener('pointerup',endStroke);
-  markupCanvas.addEventListener('pointercancel',endStroke);
-  markupCanvas.addEventListener('pointerleave',()=>{ if(drawing) endStroke(); });
+  zoomLayer.addEventListener('pointerup', endStroke);
+  zoomLayer.addEventListener('pointercancel', endStroke);
+  zoomLayer.addEventListener('pointerleave', endStroke);
 
-  function applyUndo(op){
-    const strokes=getStrokes();
+  function applyUndo(n, op){
+    const strokes=getStrokesFor(n);
     if(op.type==='add'){
       const idx=strokes.indexOf(op.stroke);
       if(idx!==-1) strokes.splice(idx,1);
@@ -636,8 +885,8 @@
       op.removed.slice().sort((a,b)=>a.index-b.index).forEach(r=>strokes.splice(r.index,0,r.stroke));
     }
   }
-  function applyRedo(op){
-    const strokes=getStrokes();
+  function applyRedo(n, op){
+    const strokes=getStrokesFor(n);
     if(op.type==='add'){
       strokes.push(op.stroke);
     }else if(op.type==='erase'){
@@ -648,45 +897,46 @@
     }
   }
   undoBtn.addEventListener('click',()=>{
-    const h=getHistory();
+    const n=currentPage;
+    const h=getHistoryFor(n);
     const op=h.undo.pop();
     if(!op) return;
-    applyUndo(op);
+    applyUndo(n, op);
     h.redo.push(op);
-    redrawMarkup();
+    redrawMarkupFor(n);
     updateUndoRedoButtons();
-    scheduleSave();
+    scheduleSave(n);
   });
   redoBtn.addEventListener('click',()=>{
-    const h=getHistory();
+    const n=currentPage;
+    const h=getHistoryFor(n);
     const op=h.redo.pop();
     if(!op) return;
-    applyRedo(op);
+    applyRedo(n, op);
     h.undo.push(op);
-    redrawMarkup();
+    redrawMarkupFor(n);
     updateUndoRedoButtons();
-    scheduleSave();
+    scheduleSave(n);
   });
 
-  function scheduleSave(){
-    const key=pageKey(), docForSave=docId, pageForSave=page, strokes=getStrokes().slice();
+  function scheduleSave(n){
     mkStatus.textContent='กำลังบันทึก...';
-    clearTimeout(saveTimer);
-    savePending={key, docForSave, pageForSave, strokes};
-    saveTimer=setTimeout(doSave, 700);
+    clearTimeout(saveTimers[n]);
+    savePending[n]={docForSave:docId, pageForSave:n, strokes:getStrokesFor(n).slice()};
+    saveTimers[n]=setTimeout(()=>doSave(n), 700);
   }
-  function flushPendingSave(){
-    if(saveTimer){ clearTimeout(saveTimer); saveTimer=null; doSave(); }
+  function flushAllPendingSaves(){
+    Object.keys(saveTimers).forEach(k=>{ clearTimeout(saveTimers[k]); doSave(Number(k)); });
   }
-  async function doSave(){
-    if(!savePending) return;
-    const {docForSave, pageForSave, strokes}=savePending;
-    savePending=null;
+  async function doSave(n){
+    const pending=savePending[n];
+    if(!pending) return;
+    delete savePending[n];
     try{
-      const res=await fetch(`/tutor-sheets/markup/${docForSave}/${pageForSave}/`, {
+      const res=await fetch(`/tutor-sheets/markup/${pending.docForSave}/${pending.pageForSave}/`, {
         method:'POST',
         headers:{'Content-Type':'application/json','X-CSRFToken':CSRF},
-        body:JSON.stringify({strokes}),
+        body:JSON.stringify({strokes:pending.strokes}),
       });
       const data=await res.json().catch(()=>({ok:false}));
       mkStatus.textContent = data.ok ? 'บันทึกแล้ว' : 'บันทึกไม่สำเร็จ';
@@ -694,7 +944,7 @@
       mkStatus.textContent='บันทึกไม่สำเร็จ';
     }
   }
-  window.addEventListener('beforeunload',()=>{ if(saveTimer) flushPendingSave(); });
+  window.addEventListener('beforeunload',()=>{ flushAllPendingSaves(); });
 
   async function ensureMarkupLoaded(id){
     if(markupLoadedDocs.has(id)) return;
@@ -712,21 +962,21 @@
 
   syncToolUI();
 
-  prevBtn.addEventListener('click',()=>goTo(page-1));
-  nextBtn.addEventListener('click',()=>goTo(page+1));
-  pageInput.addEventListener('change',()=>goTo(Number(pageInput.value)||1));
+  prevBtn.addEventListener('click',()=>scrollToPage(currentPage-1));
+  nextBtn.addEventListener('click',()=>scrollToPage(currentPage+1));
+  pageInput.addEventListener('change',()=>scrollToPage(Number(pageInput.value)||1));
   document.addEventListener('keydown',e=>{
     if(document.querySelector('.modal-bg.show')) return;
     if(e.target.tagName==='INPUT'||e.target.tagName==='SELECT') return;
-    if(e.key==='ArrowRight'||e.key==='PageDown'){ e.preventDefault(); goTo(page+1); }
-    if(e.key==='ArrowLeft'||e.key==='PageUp'){ e.preventDefault(); goTo(page-1); }
+    if(e.key==='ArrowRight'||e.key==='PageDown'){ e.preventDefault(); scrollToPage(currentPage+1); }
+    if(e.key==='ArrowLeft'||e.key==='PageUp'){ e.preventDefault(); scrollToPage(currentPage-1); }
   });
 
   /* ---------- จบคาบ ---------- */
   const bg=document.getElementById('endModalBg');
   const endMsg=document.getElementById('endMsg');
   document.getElementById('endClassBtn').addEventListener('click',()=>{
-    document.getElementById('endPage').value=page;                 // default from the open page
+    document.getElementById('endPage').value=currentPage;           // default from the open page
     document.getElementById('endQuestion').value=RESUME.question||'';
     endMsg.textContent=''; endMsg.className='msg';
     bg.classList.add('show');
@@ -742,7 +992,7 @@
     const fd=new FormData();
     fd.append('class_id',CLASS_ID); fd.append('sheet_id',SHEET_ID);
     fd.append('document_id',docId||''); fd.append('question',q);
-    fd.append('page',document.getElementById('endPage').value||page);
+    fd.append('page',document.getElementById('endPage').value||currentPage);
     const sel=document.getElementById('assignmentSel');
     if(sel) fd.append('assignment_id',sel.value);
     this.disabled=true; endMsg.textContent='กำลังบันทึก...'; endMsg.className='msg';

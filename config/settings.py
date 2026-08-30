@@ -176,6 +176,15 @@ except OSError:
     # Read-only or missing volume: fall back to the system temp dir.
     FILE_UPLOAD_TEMP_DIR = None
 
+# Pre-create subdirectories that ImageField / chunked-upload views write into
+# so the first request doesn't race against directory creation, and so a
+# misconfigured MEDIA_ROOT fails loudly at startup rather than on first upload.
+for _subdir in ("student_profiles", "pdfs", "sheet_chunks"):
+    try:
+        os.makedirs(os.path.join(MEDIA_ROOT, _subdir), exist_ok=True)
+    except OSError:
+        pass
+
 
 # -------------------------------------------------------------------
 # DEFAULT PRIMARY KEY

@@ -176,14 +176,74 @@ except OSError:
     # Read-only or missing volume: fall back to the system temp dir.
     FILE_UPLOAD_TEMP_DIR = None
 
-# Pre-create subdirectories that ImageField / chunked-upload views write into
-# so the first request doesn't race against directory creation, and so a
-# misconfigured MEDIA_ROOT fails loudly at startup rather than on first upload.
-for _subdir in ("student_profiles", "pdfs", "sheet_chunks"):
+# Pre-create subdirectories that ImageField / chunked-upload views write into.
+# Also log the result so Render application logs show exactly what happened at
+# startup — this is the first thing to read when a 500 appears on file upload.
+import sys as _sys
+_media_ok = True
+for _subdir in ("student_profiles", "pdfs", "sheet_chunks", "_upload_tmp"):
+    _path = os.path.join(MEDIA_ROOT, _subdir)
     try:
-        os.makedirs(os.path.join(MEDIA_ROOT, _subdir), exist_ok=True)
-    except OSError:
-        pass
+        os.makedirs(_path, exist_ok=True)
+        # Verify writability with a probe file.
+        _probe = os.path.join(_path, ".write_probe")
+        with open(_probe, "w") as _f:
+            _f.write("ok")
+        os.remove(_probe)
+        print(f"[MEDIA] writable: {_path}", file=_sys.stderr)
+    except OSError as _e:
+        _media_ok = False
+        print(f"[MEDIA] NOT writable: {_path} — {_e}", file=_sys.stderr)
+if not _media_ok:
+    print(
+        f"[MEDIA] WARNING: MEDIA_ROOT={MEDIA_ROOT!r} has unwritable subdirs. "
+        "File uploads will fail with 500. Set MEDIA_ROOT env var to the "
+        "persistent disk path (e.g. /var/data/media) on Render.",
+        file=_sys.stderr,
+    )
+del _sys, _subdir, _path, _media_ok
+
+
+# -------------------------------------------------------------------
+# LOGGING — print all errors + tracebacks to stderr so Render captures them
+# -------------------------------------------------------------------
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "verbose": {
+            "format": "[{levelname}] {asctime} {name} {message}",
+            "style": "{",
+        },
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "verbose",
+        },
+    },
+    "root": {
+        "handlers": ["console"],
+        "level": "WARNING",
+    },
+    "loggers": {
+        "django": {
+            "handlers": ["console"],
+            "level": "WARNING",
+            "propagate": False,
+        },
+        "django.request": {
+            "handlers": ["console"],
+            "level": "ERROR",
+            "propagate": False,
+        },
+        "core": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False,
+        },
+    },
+}
 
 
 # -------------------------------------------------------------------

@@ -1,6 +1,10 @@
+import logging
+
 from django.contrib import admin
 from django.utils.safestring import mark_safe
 from django.utils import timezone
+
+logger = logging.getLogger(__name__)
 
 from .models import (
     CostScenario,
@@ -149,6 +153,17 @@ class StudentAdmin(admin.ModelAdmin):
     @admin.display(description="โรงเรียน")
     def school_display(self, obj):
         return obj.school.name if obj.school else "-"
+
+    def save_model(self, request, obj, form, change):
+        try:
+            super().save_model(request, obj, form, change)
+        except Exception:
+            logger.exception(
+                "StudentAdmin.save_model failed for student pk=%s (has image: %s)",
+                obj.pk,
+                bool(request.FILES.get("profile_image")),
+            )
+            raise
 
     def profile_image_thumb(self, obj):
         if obj.profile_image:

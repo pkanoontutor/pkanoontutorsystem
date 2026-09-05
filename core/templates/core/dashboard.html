@@ -834,11 +834,21 @@
   <!-- Weekly check-in chart -->
   <div class="card checkin-chart-card">
     {{ weekly_checkin_chart_json|json_script:"checkinChartData" }}
-    <div class="section-label">จำนวนนักเรียนที่มาเรียน (เช็คชื่อ "มา") — 16 สัปดาห์ล่าสุด</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+      <div class="section-label" style="margin:0;">จำนวนนักเรียนที่มาเรียน (เช็คชื่อ "มา")</div>
+      <div style="display:flex;gap:4px;">
+        <button id="chartPanLeft"  onclick="chartPan(-1)" style="border:1px solid #e2e8f0;background:#fff;border-radius:8px;padding:3px 10px;font-size:15px;cursor:pointer;line-height:1;">‹</button>
+        <button id="chartPanRight" onclick="chartPan(+1)" style="border:1px solid #e2e8f0;background:#fff;border-radius:8px;padding:3px 10px;font-size:15px;cursor:pointer;line-height:1;">›</button>
+        <button onclick="chartPanEnd()"  style="border:1px solid #e2e8f0;background:#fff;border-radius:8px;padding:3px 8px;font-size:11px;font-weight:700;cursor:pointer;">ล่าสุด</button>
+      </div>
+    </div>
     <div class="checkin-chart-legend">
-      <span><i class="dot dot-sat"></i>เสาร์ (แท่ง)</span>
-      <span><i class="dot dot-sun"></i>อาทิตย์ (แท่ง)</span>
-      <span><i class="dot dot-total"></i>รวม (เส้น)</span>
+      <span><i class="dot" style="background:#3b82f6;"></i>เสาร์เช้า</span>
+      <span><i class="dot" style="background:#93c5fd;"></i>เสาร์บ่าย</span>
+      <span><i class="dot" style="background:#f59e0b;"></i>อาทิตย์เช้า</span>
+      <span><i class="dot" style="background:#fde68a;border:1px solid #f59e0b;"></i>อาทิตย์บ่าย</span>
+      <span><i class="dot" style="background:#16a34a;border-radius:50%;width:8px;height:8px;display:inline-block;"></i>มารวม (เส้น)</span>
+      <span><i class="dot" style="background:#94a3b8;border-radius:50%;width:8px;height:8px;display:inline-block;"></i>ลงทะเบียนรวม (เส้น)</span>
     </div>
     <div class="checkin-chart-box">
       <svg id="checkinChart" viewBox="0 0 1000 260" preserveAspectRatio="xMidYMid meet"></svg>
@@ -1565,82 +1575,157 @@
 
 <script>
 (function(){
-  // Weekly check-in chart: paired bars (เสาร์/อาทิตย์) + an overlaid line for
-  // the two-day total. Hand-rolled SVG, no external library.
+  // Weekly check-in chart v2:
+  // - Scrollable window (default: 16 most-recent weeks, pan left/right)
+  // - Stacked bars per day: sat_am (dark blue) / sat_pm (light blue),
+  //   sun_am (amber) / sun_pm (light amber)
+  // - White number labels inside each bar half (if bar is tall enough)
+  // - Green line: present total, with number labels above each dot
+  // - Grey line: enrolled total (present + absent), with number labels
   var el = document.getElementById('checkinChart');
   var dataEl = document.getElementById('checkinChartData');
   if(!el || !dataEl) return;
-  var series = JSON.parse(dataEl.textContent || '[]');
-  if(!series.length) return;
+  var ALL = JSON.parse(dataEl.textContent || '[]');
+  if(!ALL.length) return;
+
+  var WINDOW = 16;   // weeks visible at once
+  var offset = 0;    // 0 = show the last WINDOW weeks; negative = scroll back
 
   var NS = 'http://www.w3.org/2000/svg';
-  function svgEl(tag, attrs){
+  function svgEl(tag, attrs, text){
     var e = document.createElementNS(NS, tag);
     for(var k in attrs){ if(attrs[k] !== null && attrs[k] !== undefined) e.setAttribute(k, attrs[k]); }
+    if(text !== undefined) e.textContent = text;
     return e;
   }
-  function niceMax(v){
-    if(v <= 0) return 1;
-    var mag = Math.pow(10, Math.floor(Math.log10(v)));
-    var n = v / mag;
-    var step = n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10;
-    return step * mag;
+
+  function visibleSeries(){
+    // offset 0 → last WINDOW items; offset -1 → shifted 1 week earlier, etc.
+    var end = ALL.length + offset;          // exclusive
+    var start = Math.max(0, end - WINDOW);
+    return ALL.slice(start, end);
   }
 
   function draw(){
     while(el.firstChild) el.removeChild(el.firstChild);
-    var box = el.getBoundingClientRect();
-    var W = 1000, H = 260, ML = 34, MR = 10, MT = 12, MB = 34;
+    var series = visibleSeries();
+    if(!series.length) return;
+
+    var W = 1000, H = 260, ML = 34, MR = 10, MT = 18, MB = 34;
     var iw = W - ML - MR, ih = H - MT - MB;
 
-    var maxVal = 350;
+    // Compute y-scale from visible data.
+    var maxRaw = 0;
+    series.forEach(function(s){ if(s.enrolled > maxRaw) maxRaw = s.enrolled; });
+    if(maxRaw < 1) maxRaw = 1;
+    // Round up to a nice number.
+    var mag = Math.pow(10, Math.floor(Math.log10(maxRaw)));
+    var n = maxRaw / mag;
+    var maxVal = (n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10) * mag;
+
     var y = function(v){ return MT + ih - (v / maxVal) * ih; };
     var band = iw / series.length;
     var cx = function(i){ return ML + band * i + band / 2; };
 
-    // gridlines + axis labels
+    // Gridlines + Y-axis labels
     for(var g = 0; g <= 4; g++){
       var yy = MT + ih * (g / 4);
-      el.appendChild(svgEl('line', {x1: ML, y1: yy, x2: ML + iw, y2: yy, stroke: '#eef2f7', 'stroke-width': 1}));
-      el.appendChild(svgEl('text', {x: ML - 6, y: yy + 3, 'text-anchor': 'end', 'font-size': 9, 'font-weight': 800, fill: '#94a3b8'}));
-      el.lastChild.textContent = Math.round(maxVal - maxVal * (g / 4));
+      el.appendChild(svgEl('line', {x1:ML, y1:yy, x2:ML+iw, y2:yy, stroke:'#eef2f7', 'stroke-width':1}));
+      el.appendChild(svgEl('text', {x:ML-5, y:yy+3.5, 'text-anchor':'end', 'font-size':8, 'font-weight':700, fill:'#94a3b8'},
+        String(Math.round(maxVal * (1 - g/4)))));
     }
 
-    // paired bars
-    var barW = Math.max(band * 0.32, 2);
+    // Bars — stacked halves per day, paired (sat left, sun right)
+    var halfBarW = Math.max(band * 0.22, 3);
+    var gap = 2;
     series.forEach(function(s, i){
-      var xSat = cx(i) - barW - 1.5, xSun = cx(i) + 1.5;
-      var ySat = y(s.sat), ySun = y(s.sun);
-      var rectSat = svgEl('rect', {x: xSat, y: ySat, width: barW, height: Math.max(MT + ih - ySat, 0), fill: '#3b82f6', rx: 2});
-      var rectSun = svgEl('rect', {x: xSun, y: ySun, width: barW, height: Math.max(MT + ih - ySun, 0), fill: '#f59e0b', rx: 2});
+      var xSat = cx(i) - halfBarW - gap;
+      var xSun = cx(i) + gap;
+      var bottom = MT + ih;
 
-      var titleSat = svgEl('title', {}); titleSat.textContent = 'สัปดาห์ ' + s.label + ' · เสาร์ ' + s.sat + ' คน';
-      rectSat.appendChild(titleSat);
-      var titleSun = svgEl('title', {}); titleSun.textContent = 'สัปดาห์ ' + s.label + ' · อาทิตย์ ' + s.sun + ' คน';
-      rectSun.appendChild(titleSun);
+      // Helper: draw one stacked bar (two halves) and white labels
+      function drawBar(x, bw, lo, hi, colLo, colHi, dayLabel){
+        var yLo = y(lo), yHi = y(lo + hi);
+        var hLo = Math.max(bottom - yLo, 0);
+        var hHi = Math.max(yLo - yHi, 0);
 
-      el.appendChild(rectSat);
-      el.appendChild(rectSun);
+        // Bottom half (morning / am)
+        if(hLo > 0){
+          var r = svgEl('rect', {x:x, y:yLo, width:bw, height:hLo, fill:colLo, rx:2});
+          r.appendChild(svgEl('title', {}, dayLabel+'เช้า '+lo+' คน'));
+          el.appendChild(r);
+          if(lo > 0 && hLo >= 11){
+            el.appendChild(svgEl('text', {x:x+bw/2, y:yLo+hLo/2+3.5, 'text-anchor':'middle',
+              'font-size':8, 'font-weight':800, fill:'#fff'}, String(lo)));
+          }
+        }
+        // Top half (afternoon / pm)
+        if(hHi > 0){
+          var r2 = svgEl('rect', {x:x, y:yHi, width:bw, height:hHi, fill:colHi, rx:2});
+          r2.appendChild(svgEl('title', {}, dayLabel+'บ่าย '+hi+' คน'));
+          el.appendChild(r2);
+          if(hi > 0 && hHi >= 11){
+            el.appendChild(svgEl('text', {x:x+bw/2, y:yHi+hHi/2+3.5, 'text-anchor':'middle',
+              'font-size':8, 'font-weight':800, fill:'#1e3a5f'}, String(hi)));
+          }
+        }
+      }
+
+      drawBar(xSat, halfBarW, s.sat_am, s.sat_pm, '#3b82f6', '#93c5fd', 'เสาร์');
+      drawBar(xSun, halfBarW, s.sun_am, s.sun_pm, '#f59e0b', '#fde68a', 'อาทิตย์');
     });
 
-    // total line overlay
-    var linePath = series.map(function(s, i){ return (i ? 'L' : 'M') + cx(i) + ' ' + y(s.total); }).join(' ');
-    el.appendChild(svgEl('path', {d: linePath, fill: 'none', stroke: '#16a34a', 'stroke-width': 2.4, 'stroke-linejoin': 'round', 'stroke-linecap': 'round'}));
-    series.forEach(function(s, i){
-      var c = svgEl('circle', {cx: cx(i), cy: y(s.total), r: 3, fill: '#fff', stroke: '#16a34a', 'stroke-width': 2});
-      var t = svgEl('title', {}); t.textContent = 'สัปดาห์ ' + s.label + ' · รวม ' + s.total + ' คน';
-      c.appendChild(t);
-      el.appendChild(c);
+    // Enrolled line (grey, dashed)
+    var enrolledPath = series.map(function(s,i){ return (i?'L':'M')+cx(i)+' '+y(s.enrolled); }).join(' ');
+    el.appendChild(svgEl('path', {d:enrolledPath, fill:'none', stroke:'#94a3b8', 'stroke-width':1.8,
+      'stroke-dasharray':'4 3', 'stroke-linejoin':'round', 'stroke-linecap':'round'}));
+    series.forEach(function(s,i){
+      if(!s.enrolled) return;
+      var cy2 = y(s.enrolled);
+      el.appendChild(svgEl('circle', {cx:cx(i), cy:cy2, r:2.5, fill:'#fff', stroke:'#94a3b8', 'stroke-width':1.5}));
+      el.appendChild(svgEl('text', {x:cx(i), y:cy2-5, 'text-anchor':'middle',
+        'font-size':7.5, 'font-weight':700, fill:'#64748b'}, String(s.enrolled)));
     });
 
-    // x-axis labels, thinned out so they don't overlap over 16 weeks
-    var every = Math.ceil(series.length / 8);
-    series.forEach(function(s, i){
-      if(i % every) return;
-      el.appendChild(svgEl('text', {x: cx(i), y: H - MB + 16, 'text-anchor': 'middle', 'font-size': 9, 'font-weight': 800, fill: '#94a3b8'}));
-      el.lastChild.textContent = s.label;
+    // Present-total line (green, solid)
+    var totalPath = series.map(function(s,i){ return (i?'L':'M')+cx(i)+' '+y(s.total); }).join(' ');
+    el.appendChild(svgEl('path', {d:totalPath, fill:'none', stroke:'#16a34a', 'stroke-width':2.2,
+      'stroke-linejoin':'round', 'stroke-linecap':'round'}));
+    series.forEach(function(s,i){
+      if(!s.total && !s.enrolled) return;
+      var cy3 = y(s.total);
+      el.appendChild(svgEl('circle', {cx:cx(i), cy:cy3, r:3, fill:'#fff', stroke:'#16a34a', 'stroke-width':1.8}));
+      if(s.total){
+        el.appendChild(svgEl('text', {x:cx(i), y:cy3-5, 'text-anchor':'middle',
+          'font-size':7.5, 'font-weight':700, fill:'#15803d'}, String(s.total)));
+      }
     });
+
+    // X-axis labels (every week since window is ≤16)
+    series.forEach(function(s,i){
+      el.appendChild(svgEl('text', {x:cx(i), y:H-MB+14, 'text-anchor':'middle',
+        'font-size':8, 'font-weight':700, fill:'#94a3b8'}, s.label));
+    });
+
+    // Update pan buttons
+    var btnL = document.getElementById('chartPanLeft');
+    var btnR = document.getElementById('chartPanRight');
+    if(btnL) btnL.disabled = (ALL.length + offset <= WINDOW);
+    if(btnR) btnR.disabled = (offset >= 0);
   }
+
+  window.chartPan = function(dir){
+    var newOff = offset + dir;
+    var minOff = -(ALL.length - WINDOW);
+    if(newOff > 0) newOff = 0;
+    if(newOff < minOff) newOff = minOff;
+    offset = newOff;
+    draw();
+  };
+  window.chartPanEnd = function(){
+    offset = 0;
+    draw();
+  };
 
   draw();
   window.addEventListener('resize', draw);

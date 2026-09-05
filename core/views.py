@@ -241,53 +241,120 @@ def _ordered_grade_groups(rows: list[dict]) -> list[dict]:
     ]
 
 
-def _weekly_checkin_chart_data(anchor: date, weeks: int = 16) -> list[dict]:
-    """Saturday vs Sunday check-in ("มาเรียน" / present only) counts per school
-    week, most recent `weeks` weeks up to and including `anchor`'s week.
-    Returned as a plain list -- the template serializes it via json_script."""
-    # School week = Saturday..Sunday, matching _school_week_range elsewhere.
+def _weekly_checkin_chart_data(anchor: date) -> list[dict]:
+    """Per-week attendance breakdown for the chart.
+
+    Returns ALL weeks from the earliest attendance record up to and including
+    `anchor`'s school week, so the chart JS can scroll back arbitrarily far
+    while still defaulting to the 16 most-recent weeks.
+
+    Each entry includes present counts split by time-slot
+    (sat_am, sat_pm, sun_am, sun_pm) plus enrolled counts for the same splits
+    so the chart can draw a second "total enrolled" line.
+    """
+    # School week = Saturday..Sunday.
     days_since_sat = (anchor.weekday() - 5) % 7
     this_week_sat = anchor - timedelta(days=days_since_sat)
-    first_week_sat = this_week_sat - timedelta(weeks=weeks - 1)
-    range_start = first_week_sat
-    range_end = this_week_sat + timedelta(days=1)  # Sunday of the last week
 
-    rows = (
+    # Find the earliest attendance date so we know how far back to go.
+    from django.db.models import Min
+    earliest = Attendance.objects.aggregate(Min("attendance_date"))["attendance_date__min"]
+    if not earliest:
+        return []
+    # Snap earliest to its school-week Saturday.
+    days_since_sat_e = (earliest.weekday() - 5) % 7
+    first_week_sat = earliest - timedelta(days=days_since_sat_e)
+
+    range_end = this_week_sat + timedelta(days=1)  # Sunday of the current week
+
+    # ── Present counts split by time slot ──────────────────────────────────
+    present_rows = (
         Attendance.objects
         .filter(
             status=Attendance.Status.PRESENT,
-            attendance_date__gte=range_start,
+            attendance_date__gte=first_week_sat,
             attendance_date__lte=range_end,
             enrollment__tutoring_class__is_active=True,
             student__is_active=True,
         )
-        .values_list("attendance_date", flat=True)
+        .values_list(
+            "attendance_date",
+            "enrollment__tutoring_class__time_slot",
+        )
     )
-    sat_counts: dict[date, int] = {}
-    sun_counts: dict[date, int] = {}
-    for d in rows:
-        wd = d.weekday()
+    # Keyed by school-week Saturday date.
+    slot_counts: dict[date, dict[str, int]] = {}
+    for att_date, slot in present_rows:
+        wd = att_date.weekday()
+        if wd == 5:   # Saturday
+            wk_key = att_date
+        elif wd == 6: # Sunday → key by the preceding Saturday
+            wk_key = att_date - timedelta(days=1)
+        else:
+            continue
+        bucket = slot_counts.setdefault(wk_key, {})
+        bucket[slot] = bucket.get(slot, 0) + 1
+
+    # ── Enrolled counts (all statuses) split by time slot ──────────────────
+    # Enrollment doesn't have a date range — we need attendance records for
+    # any status (present / excused / no_show) to count "scheduled that day".
+    enrolled_rows = (
+        Attendance.objects
+        .filter(
+            attendance_date__gte=first_week_sat,
+            attendance_date__lte=range_end,
+            enrollment__tutoring_class__is_active=True,
+            student__is_active=True,
+        )
+        .values_list(
+            "attendance_date",
+            "enrollment__tutoring_class__time_slot",
+        )
+    )
+    enrolled_counts: dict[date, dict[str, int]] = {}
+    for att_date, slot in enrolled_rows:
+        wd = att_date.weekday()
         if wd == 5:
-            sat_counts[d] = sat_counts.get(d, 0) + 1
+            wk_key = att_date
         elif wd == 6:
-            week_sat = d - timedelta(days=1)
-            sun_counts[week_sat] = sun_counts.get(week_sat, 0) + 1
+            wk_key = att_date - timedelta(days=1)
+        else:
+            continue
+        bucket = enrolled_counts.setdefault(wk_key, {})
+        bucket[slot] = bucket.get(slot, 0) + 1
 
     series = []
-    for i in range(weeks):
-        wk_sat = first_week_sat + timedelta(weeks=i)
-        wk_sun = wk_sat + timedelta(days=1)
-        sat = sat_counts.get(wk_sat, 0)
-        # sun_counts is keyed by that Sunday's school-week Saturday (see the
-        # loop above), not by the Sunday date itself -- look up with wk_sat.
-        sun = sun_counts.get(wk_sat, 0)
+    wk_sat = first_week_sat
+    while wk_sat <= this_week_sat:
+        sc = slot_counts.get(wk_sat, {})
+        ec = enrolled_counts.get(wk_sat, {})
+        sat_am  = sc.get("sat_morning", 0)
+        sat_pm  = sc.get("sat_afternoon", 0)
+        sun_am  = sc.get("sun_morning", 0)
+        sun_pm  = sc.get("sun_afternoon", 0)
+        e_sat_am  = ec.get("sat_morning", 0)
+        e_sat_pm  = ec.get("sat_afternoon", 0)
+        e_sun_am  = ec.get("sun_morning", 0)
+        e_sun_pm  = ec.get("sun_afternoon", 0)
         series.append({
             "week_start": wk_sat.isoformat(),
             "label": wk_sat.strftime("%d/%m"),
-            "sat": sat,
-            "sun": sun,
-            "total": sat + sun,
+            "sat_am": sat_am,
+            "sat_pm": sat_pm,
+            "sun_am": sun_am,
+            "sun_pm": sun_pm,
+            "sat": sat_am + sat_pm,
+            "sun": sun_am + sun_pm,
+            "total": sat_am + sat_pm + sun_am + sun_pm,
+            "e_sat_am": e_sat_am,
+            "e_sat_pm": e_sat_pm,
+            "e_sun_am": e_sun_am,
+            "e_sun_pm": e_sun_pm,
+            "enrolled_sat": e_sat_am + e_sat_pm,
+            "enrolled_sun": e_sun_am + e_sun_pm,
+            "enrolled": e_sat_am + e_sat_pm + e_sun_am + e_sun_pm,
         })
+        wk_sat += timedelta(weeks=1)
     return series
 
 

@@ -1,0 +1,134 @@
+{% extends "core/base.html" %}
+{% block title %}ประวัติการสมัครและทดลองเรียน{% endblock %}
+{% block head %}
+<style>
+  .wrap{max-width:1100px;margin:0 auto;display:grid;gap:14px;}
+  .cardx{background:#fff;border-radius:18px;padding:16px 18px;box-shadow:0 4px 14px rgba(15,23,42,.07);}
+  .page-title{font-size:22px;font-weight:900;}
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-top:10px;}
+  .stat{background:#f8fafc;border-radius:14px;padding:12px 14px;text-align:center;}
+  .stat-n{font-size:28px;font-weight:900;line-height:1;}
+  .stat-l{font-size:11px;font-weight:700;color:#64748b;margin-top:4px;}
+  .stat.green{background:#dcfce7;} .stat.green .stat-n{color:#15803d;}
+  .stat.red{background:#fee2e2;}   .stat.red .stat-n{color:#b91c1c;}
+  .stat.amber{background:#fff7ed;} .stat.amber .stat-n{color:#c2410c;}
+  .filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+  .filters input,.filters select{border:1px solid #e2e8f0;border-radius:10px;padding:7px 10px;font-size:13px;font-weight:700;font-family:inherit;}
+  .filters button{border:0;border-radius:10px;padding:7px 14px;font-size:13px;font-weight:700;background:#0f172a;color:#fff;cursor:pointer;font-family:inherit;}
+  .filters a.clear{font-size:12px;font-weight:700;color:#64748b;text-decoration:none;}
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  th{background:#f8fafc;padding:8px 10px;text-align:left;font-weight:900;font-size:11.5px;color:#475569;border-bottom:2px solid #e2e8f0;white-space:nowrap;}
+  td{padding:9px 10px;border-bottom:1px solid #f1f5f9;vertical-align:middle;}
+  tr:hover td{background:#f8fafc;}
+  .badge{display:inline-flex;padding:3px 8px;border-radius:999px;font-size:11px;font-weight:700;white-space:nowrap;}
+  .b-trial{background:#dbeafe;color:#1d4ed8;}
+  .b-enroll{background:#dcfce7;color:#15803d;}
+  .b-queue{background:#f3e8ff;color:#7c3aed;}
+  .b-enrolled{background:#dcfce7;color:#15803d;}
+  .b-not_enrolled{background:#fee2e2;color:#b91c1c;}
+  .b-pending{background:#f1f5f9;color:#64748b;}
+  .b-cancelled{background:#fef9c3;color:#92400e;}
+  .b-yes{background:#dcfce7;color:#15803d;}
+  .b-no{background:#fee2e2;color:#b91c1c;}
+  .note{font-size:11px;color:#94a3b8;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  @media(max-width:720px){
+    .stats{grid-template-columns:repeat(2,1fr);}
+    table{display:block;overflow-x:auto;}
+  }
+</style>
+{% endblock %}
+{% block content %}
+<div class="wrap">
+  <div class="cardx">
+    <div class="page-title">📋 ประวัติการสมัครและทดลองเรียน</div>
+    <div class="stats">
+      <div class="stat"><div class="stat-n">{{ total }}</div><div class="stat-l">รายการทั้งหมด</div></div>
+      <div class="stat green"><div class="stat-n">{{ enrolled_count }}</div><div class="stat-l">ทดลองแล้วสมัคร</div></div>
+      <div class="stat red"><div class="stat-n">{{ not_enrolled_count }}</div><div class="stat-l">ทดลองแล้วไม่สมัคร</div></div>
+      <div class="stat amber"><div class="stat-n">{{ pending_count }}</div><div class="stat-l">รอดำเนินการ</div></div>
+    </div>
+  </div>
+
+  <div class="cardx">
+    <form method="get" class="filters">
+      <input type="search" name="q" value="{{ search }}" placeholder="ค้นชื่อ/เบอร์..." style="min-width:160px;">
+      <select name="type">
+        <option value="">ทุกประเภท</option>
+        <option value="trial" {% if type_filter == "trial" %}selected{% endif %}>จองทดลองเรียน</option>
+        <option value="enroll" {% if type_filter == "enroll" %}selected{% endif %}>สมัครเรียน</option>
+        <option value="queue" {% if type_filter == "queue" %}selected{% endif %}>จองล่วงหน้า</option>
+      </select>
+      <select name="result">
+        <option value="">ทุกผลลัพธ์</option>
+        <option value="enrolled" {% if result_filter == "enrolled" %}selected{% endif %}>ทดลองแล้วสมัคร</option>
+        <option value="not_enrolled" {% if result_filter == "not_enrolled" %}selected{% endif %}>ทดลองแล้วไม่สมัคร</option>
+        <option value="cancelled" {% if result_filter == "cancelled" %}selected{% endif %}>ยกเลิกนัด</option>
+        <option value="pending" {% if result_filter == "pending" %}selected{% endif %}>รอผล</option>
+      </select>
+      <button type="submit">ค้นหา</button>
+      {% if search or type_filter or result_filter %}<a class="clear" href="?">ล้าง</a>{% endif %}
+    </form>
+  </div>
+
+  <div class="cardx" style="padding:0;overflow:hidden;">
+    <table>
+      <thead>
+        <tr>
+          <th>วันที่นัด</th>
+          <th>ชื่อเล่น</th>
+          <th>ชื่อ-นามสกุล</th>
+          <th>ชั้น</th>
+          <th>รอบ</th>
+          <th>ประเภท</th>
+          <th>มาเรียน</th>
+          <th>ผลลัพธ์</th>
+          <th>สถานะ</th>
+          <th>เบอร์</th>
+          <th>หมายเหตุ</th>
+          <th>วันที่ลง</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for a in inquiries %}
+          <tr>
+            <td style="white-space:nowrap;">{{ a.first_lesson_date|date:"d/m/Y" }}</td>
+            <td><b>{{ a.nickname }}</b></td>
+            <td>{{ a.full_name }}</td>
+            <td>{{ a.get_grade_level_display }}</td>
+            <td style="white-space:nowrap;">{{ a.get_preferred_time_slot_display }}</td>
+            <td>
+              {% if a.request_type == "trial" %}<span class="badge b-trial">ทดลอง</span>
+              {% elif a.request_type == "enroll" %}<span class="badge b-enroll">สมัคร</span>
+              {% else %}<span class="badge b-queue">จอง</span>{% endif %}
+            </td>
+            <td>
+              {% if a.trial_attended == "yes" %}<span class="badge b-yes">มาแล้ว</span>
+              {% elif a.trial_attended == "no" %}<span class="badge b-no">ไม่มา/ยกเลิก</span>
+              {% else %}<span class="badge b-pending">รอ</span>{% endif %}
+            </td>
+            <td>
+              {% if a.trial_result == "enrolled" %}<span class="badge b-enrolled">✅ สมัครแล้ว</span>
+              {% elif a.trial_result == "not_enrolled" %}<span class="badge b-not_enrolled">❌ ไม่สมัคร</span>
+              {% elif a.trial_result == "follow_up" %}<span class="badge b-cancelled">🔔 รอติดตาม</span>
+              {% else %}<span class="badge b-pending">รอผล</span>{% endif %}
+            </td>
+            <td>
+              {% if a.is_completed %}<span class="badge" style="background:#f1f5f9;color:#475569;">เสร็จแล้ว</span>
+              {% else %}<span class="badge" style="background:#fff7ed;color:#c2410c;">รอดำเนินการ</span>{% endif %}
+            </td>
+            <td style="white-space:nowrap;">{{ a.contact_phone }}</td>
+            <td><div class="note" title="{{ a.internal_note }}">{{ a.internal_note|default:"-" }}</div></td>
+            <td style="white-space:nowrap;color:#94a3b8;">{{ a.created_at|date:"d/m/Y" }}</td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="12" style="text-align:center;padding:24px;color:#94a3b8;">ไม่พบรายการ</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div style="text-align:center;">
+    <a href="{% url 'core:pkanoon_admin_tool' %}" style="font-size:13px;font-weight:700;color:#64748b;text-decoration:none;">← กลับหน้า Admin Tool</a>
+  </div>
+</div>
+{% endblock %}

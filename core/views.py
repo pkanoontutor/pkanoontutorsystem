@@ -7556,6 +7556,43 @@ def admin_tool_admission_action(request: HttpRequest) -> JsonResponse:
         inquiry.save(update_fields=["attended_first_lesson"])
         return JsonResponse({"ok": True, "attended_first_lesson": True})
 
+    if action == "trial_enrolled":
+        # นักเรียนทดลองแล้วสมัครเรียน
+        inquiry.trial_attended = AdmissionInquiry.TrialAttended.YES
+        inquiry.trial_result = AdmissionInquiry.TrialResult.ENROLLED
+        inquiry.attended_first_lesson = True
+        inquiry.is_completed = True
+        inquiry.completed_at = timezone.now()
+        inquiry.save(update_fields=[
+            "trial_attended", "trial_result", "attended_first_lesson",
+            "is_completed", "completed_at",
+        ])
+        return JsonResponse({"ok": True, "result": "enrolled"})
+
+    if action == "trial_not_enrolled":
+        # นักเรียนทดลองแล้วไม่สมัคร
+        inquiry.trial_attended = AdmissionInquiry.TrialAttended.YES
+        inquiry.trial_result = AdmissionInquiry.TrialResult.NOT_ENROLLED
+        inquiry.attended_first_lesson = True
+        inquiry.is_completed = True
+        inquiry.completed_at = timezone.now()
+        inquiry.save(update_fields=[
+            "trial_attended", "trial_result", "attended_first_lesson",
+            "is_completed", "completed_at",
+        ])
+        return JsonResponse({"ok": True, "result": "not_enrolled"})
+
+    if action == "cancel_appointment":
+        # ยกเลิกนัดหมายทดลอง (ไม่ได้มาเรียน)
+        inquiry.trial_attended = AdmissionInquiry.TrialAttended.NO
+        inquiry.trial_result = AdmissionInquiry.TrialResult.PENDING
+        inquiry.is_completed = True
+        inquiry.completed_at = timezone.now()
+        inquiry.save(update_fields=[
+            "trial_attended", "trial_result", "is_completed", "completed_at",
+        ])
+        return JsonResponse({"ok": True, "result": "cancelled"})
+
     if action == "cancel":
         inquiry.is_completed = True
         inquiry.completed_at = timezone.now()
@@ -7582,6 +7619,56 @@ def admin_tool_update_sheet_link(request: HttpRequest) -> JsonResponse:
     inventory.onedrive_url = onedrive_url
     inventory.save(update_fields=["onedrive_url", "updated_at"])
     return JsonResponse({"ok": True, "onedrive_url": onedrive_url})
+
+
+def admission_history(request: HttpRequest) -> HttpResponse:
+    """ประวัติการสมัครและทดลองเรียน — รายการ AdmissionInquiry ทั้งหมด"""
+    qs = AdmissionInquiry.objects.select_related("target_class").order_by("-first_lesson_date", "-created_at")
+
+    # Filters
+    result_filter = request.GET.get("result", "")
+    type_filter = request.GET.get("type", "")
+    search = request.GET.get("q", "").strip()
+
+    if result_filter == "enrolled":
+        qs = qs.filter(trial_result=AdmissionInquiry.TrialResult.ENROLLED)
+    elif result_filter == "not_enrolled":
+        qs = qs.filter(trial_result=AdmissionInquiry.TrialResult.NOT_ENROLLED)
+    elif result_filter == "pending":
+        qs = qs.filter(trial_result=AdmissionInquiry.TrialResult.PENDING)
+    elif result_filter == "cancelled":
+        qs = qs.filter(trial_attended=AdmissionInquiry.TrialAttended.NO, is_completed=True)
+
+    if type_filter:
+        qs = qs.filter(request_type=type_filter)
+
+    if search:
+        qs = qs.filter(
+            Q(nickname__icontains=search)
+            | Q(first_name__icontains=search)
+            | Q(last_name__icontains=search)
+            | Q(contact_phone__icontains=search)
+        )
+
+    # Stats
+    total = AdmissionInquiry.objects.count()
+    enrolled_count = AdmissionInquiry.objects.filter(trial_result=AdmissionInquiry.TrialResult.ENROLLED).count()
+    not_enrolled_count = AdmissionInquiry.objects.filter(trial_result=AdmissionInquiry.TrialResult.NOT_ENROLLED).count()
+    pending_count = AdmissionInquiry.objects.filter(is_completed=False).count()
+
+    return render(request, "core/admission_history.html", {
+        "inquiries": qs[:200],
+        "total": total,
+        "enrolled_count": enrolled_count,
+        "not_enrolled_count": not_enrolled_count,
+        "pending_count": pending_count,
+        "result_filter": result_filter,
+        "type_filter": type_filter,
+        "search": search,
+        "TrialResult": AdmissionInquiry.TrialResult,
+        "TrialAttended": AdmissionInquiry.TrialAttended,
+        "RequestType": AdmissionInquiry.RequestType,
+    })
 
 
 @require_POST

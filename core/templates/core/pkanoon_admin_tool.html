@@ -280,7 +280,10 @@
     <div class="rt-body">
       <div class="rt-cols">
         <div>
-          <div class="rt-block-title">🧒 มาทดลอง/เริ่มเรียน เสาร์-อาทิตย์นี้ <span class="n" id="rtAdmissionCount">{{ upcoming_admissions|length }}</span></div>
+          <div class="rt-block-title" style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+            <span>🧒 มาทดลอง/เริ่มเรียน เสาร์-อาทิตย์นี้ <span class="n" id="rtAdmissionCount">{{ upcoming_admissions|length }}</span></span>
+            <a href="{% url 'core:admission_history' %}" style="font-size:11px;font-weight:700;color:var(--accent);text-decoration:none;">📋 ประวัติทั้งหมด →</a>
+          </div>
           <div class="rt-list" id="rtAdmissionList">
             {% for a in upcoming_admissions %}
               <div class="rt-row admission {% if a.attended_first_lesson %}attended{% endif %}" data-admission-id="{{ a.id }}">
@@ -291,7 +294,12 @@
                 <div class="rt-row-actions">
                   <button class="rt-mini-btn arrive" type="button" data-mark-attended data-admission-id="{{ a.id }}" title="มาแล้ว">✅ มาแล้ว</button>
                   <a class="rt-mini-btn receipt" href="/course-payments/new/?admission_id={{ a.id }}" title="สร้างใบเสร็จ">🧾 สร้างใบเสร็จ</a>
-                  <button class="rt-mini-btn cancel" type="button" data-cancel-admission data-admission-id="{{ a.id }}" title="ยกเลิก">✕ ยกเลิก</button>
+                  <button class="rt-mini-btn" style="background:#dcfce7;border-color:#86efac;color:#15803d;font-weight:700;" type="button"
+                    data-trial-action="trial_enrolled" data-admission-id="{{ a.id }}">✅ ทดลองแล้วสมัคร</button>
+                  <button class="rt-mini-btn" style="background:#fff7ed;border-color:#fdba74;color:#c2410c;font-weight:700;" type="button"
+                    data-trial-action="trial_not_enrolled" data-admission-id="{{ a.id }}">❌ ทดลองแล้วไม่สมัคร</button>
+                  <button class="rt-mini-btn cancel" type="button"
+                    data-trial-action="cancel_appointment" data-admission-id="{{ a.id }}" title="ยกเลิกนัด">🚫 ยกเลิกนัดหมาย</button>
                 </div>
               </div>
             {% empty %}
@@ -895,6 +903,31 @@
             admissionList.appendChild(empty);
           }
         }).finally(function(){ cancelBtn.disabled=false; });
+      }
+
+      var trialBtn=e.target.closest("[data-trial-action]");
+      if(trialBtn){
+        var action=trialBtn.getAttribute("data-trial-action");
+        var row3=trialBtn.closest(".rt-row");
+        var id3=trialBtn.getAttribute("data-admission-id");
+        var confirmMsg = action==="trial_enrolled"
+          ? "บันทึก: ทดลองแล้วสมัครเรียน ใช่ไหม?"
+          : action==="trial_not_enrolled"
+          ? "บันทึก: ทดลองแล้วไม่สมัครเรียน ใช่ไหม?"
+          : "บันทึก: ยกเลิกนัดหมายทดลองเรียน ใช่ไหม?";
+        if(!confirm(confirmMsg)) return;
+        trialBtn.disabled=true;
+        api(window.PK_URLS.admissionAction,{admission_id:id3,"do":action}).then(function(){
+          row3.remove();
+          var remaining=admissionList.querySelectorAll(".rt-row").length;
+          if(admissionCount) admissionCount.textContent=remaining;
+          if(remaining===0){
+            var empty=document.createElement("div");
+            empty.className="rt-empty-mini";
+            empty.textContent="ยังไม่มีนักเรียนทดลอง/เริ่มเรียนในเสาร์-อาทิตย์นี้";
+            admissionList.appendChild(empty);
+          }
+        }).finally(function(){ trialBtn.disabled=false; });
       }
     });
   }

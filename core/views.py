@@ -6304,6 +6304,138 @@ def course_renewal_notice_detail(request: HttpRequest, pk: int) -> HttpResponse:
     })
 
 
+_THAI_MONTHS = [
+    "", "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
+    "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม",
+]
+# Monday-first, matching date.weekday().
+_THAI_WEEKDAYS = ["วันจันทร์", "วันอังคาร", "วันพุธ", "วันพฤหัสบดี", "วันศุกร์", "วันเสาร์", "วันอาทิตย์"]
+
+
+def _thai_date_label(d) -> str:
+    """"3 มกราคม 2026" -- Django's |date:"j F Y" would render the month in
+    English here because LANGUAGE_CODE is en-us, and this sheet goes to
+    parents. Year stays Gregorian to match the receipt and sessions card."""
+    if not d:
+        return "-"
+    return f"{d.day} {_THAI_MONTHS[d.month]} {d.year}"
+
+
+def _thai_weekday_label(d) -> str:
+    if not d:
+        return ""
+    return _THAI_WEEKDAYS[d.weekday()]
+
+
+def _attendance_timeline_for_enrollment(enrollment, present_limit: int = 10) -> dict:
+    """Timeline behind the attendance card that accompanies a renewal notice.
+
+    "10 ครั้งล่าสุด" counts *attended* sessions only, so the window is defined
+    by the last `present_limit` PRESENT records. Anything else that happened
+    inside that window -- ลา, ขาด, and payments -- is folded into the same
+    chronological list, because the point of the card is to let a parent see
+    what the course fee was spent on without cross-referencing two documents.
+    """
+    if not enrollment:
+        return {"rows": [], "present_count": 0, "excused_count": 0, "no_show_count": 0, "window_start": None}
+
+    present_recent = list(
+        Attendance.objects
+        .filter(enrollment=enrollment, status=Attendance.Status.PRESENT)
+        .order_by("-attendance_date", "-checked_at")[:present_limit]
+    )
+    if not present_recent:
+        return {"rows": [], "present_count": 0, "excused_count": 0, "no_show_count": 0, "window_start": None}
+
+    # present_recent is newest-first, so the last entry opens the window.
+    window_start = present_recent[-1].attendance_date
+
+    others = list(
+        Attendance.objects
+        .filter(
+            enrollment=enrollment,
+            attendance_date__gte=window_start,
+            status__in=[Attendance.Status.EXCUSED, Attendance.Status.NO_SHOW],
+        )
+        .order_by("attendance_date", "checked_at")
+    )
+
+    payments = list(
+        enrollment.course_payments
+        .filter(status=CoursePayment.ReceiptStatus.ISSUED, payment_date__gte=window_start)
+        .order_by("payment_date", "created_at")
+    )
+
+    rows = []
+    for a in present_recent:
+        rows.append({
+            "kind": "present", "date": a.attendance_date, "sort_key": (a.attendance_date, 0),
+            "date_label": _thai_date_label(a.attendance_date),
+            "weekday_label": _thai_weekday_label(a.attendance_date),
+        })
+    for a in others:
+        kind = "excused" if a.status == Attendance.Status.EXCUSED else "no_show"
+        rows.append({
+            "kind": kind, "date": a.attendance_date, "sort_key": (a.attendance_date, 1),
+            "date_label": _thai_date_label(a.attendance_date),
+            "weekday_label": _thai_weekday_label(a.attendance_date),
+        })
+    for p in payments:
+        rows.append({
+            "kind": "payment",
+            "date": p.payment_date,
+            "sort_key": (p.payment_date, 2),
+            "date_label": _thai_date_label(p.payment_date),
+            "amount": p.amount_paid,
+            "sessions": p.sessions_granted,
+            "receipt_no": p.receipt_no,
+        })
+
+    rows.sort(key=lambda r: r["sort_key"])
+
+    # Number the attended sessions 1..N in chronological order so the card
+    # reads as a count-up rather than a bare list of dates.
+    seq = 0
+    for r in rows:
+        if r["kind"] == "present":
+            seq += 1
+            r["seq"] = seq
+
+    return {
+        "rows": rows,
+        "present_count": len(present_recent),
+        "excused_count": sum(1 for r in rows if r["kind"] == "excused"),
+        "no_show_count": sum(1 for r in rows if r["kind"] == "no_show"),
+        "window_start": window_start,
+    }
+
+
+@login_required
+@xframe_options_sameorigin
+def course_renewal_notice_attendance_card(request: HttpRequest, pk: int) -> HttpResponse:
+    """Shareable companion card to the renewal notice: the last 10 attended
+    sessions with ลา/ขาด and payments folded in, styled to match the notice."""
+    notice = get_object_or_404(
+        CourseRenewalNotice.objects.select_related("student", "tutoring_class", "enrollment"),
+        pk=pk,
+    )
+    enrollment = notice.enrollment
+    timeline = _attendance_timeline_for_enrollment(enrollment)
+
+    return render(request, "core/course_renewal_attendance_card.html", {
+        "notice": notice,
+        "student": notice.student,
+        "enrollment": enrollment,
+        "tutoring_class": notice.tutoring_class,
+        "rows": timeline["rows"],
+        "present_count": timeline["present_count"],
+        "excused_count": timeline["excused_count"],
+        "no_show_count": timeline["no_show_count"],
+        "window_start": timeline["window_start"],
+        "remaining_sessions": getattr(enrollment, "remaining_sessions", 0) if enrollment else 0,
+    })
+
+
 # =========================================================
 # ✅ New Student Payment Notice (ใบแจ้งชำระค่าคอร์สสำหรับนักเรียนใหม่)
 # =========================================================

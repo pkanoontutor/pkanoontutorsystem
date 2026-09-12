@@ -81,6 +81,11 @@
           <a class="btn icon soft" title="Enrollment" href="{{ enrollment_admin_url }}">📚</a>
         </div>
 
+        <a class="btn blue" style="width:100%;" target="_blank"
+           href="{% url 'core:course_renewal_notice_attendance_card' notice.id %}">
+          📋 เปิดใบประวัติการเข้าเรียน (10 ครั้งล่าสุด)
+        </a>
+
         <div class="field">
           <label>ประเภทใบแจ้ง</label>
           <select name="notice_kind" id="noticeKind">

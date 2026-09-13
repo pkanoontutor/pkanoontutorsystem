@@ -6301,7 +6301,7 @@ def course_renewal_notice_detail(request: HttpRequest, pk: int) -> HttpResponse:
         "enrollment_admin_url": _admin_enrollment_url(notice.enrollment),
         "referral_credit_earned": _referral_credit_earned(notice.student),
         "referral_credit_max": referral_credit_max,
-        "att": _attendance_timeline_for_enrollment(notice.enrollment),
+        "att": _attendance_timeline_for_enrollment(notice.enrollment, show_count=_parse_att_count(request.GET.get("att_n"))),
     })
 
 
@@ -6328,7 +6328,16 @@ def _thai_weekday_label(d) -> str:
     return _THAI_WEEKDAYS[d.weekday()]
 
 
-def _attendance_timeline_for_enrollment(enrollment) -> dict:
+def _parse_att_count(raw) -> int | None:
+    """?att_n= override from the renewal notice page; None means "use the round"."""
+    try:
+        n = int(str(raw).strip())
+    except (TypeError, ValueError):
+        return None
+    return max(min(n, 200), 0)
+
+
+def _attendance_timeline_for_enrollment(enrollment, show_count: int | None = None) -> dict:
     """Timeline for the attendance card shown under the renewal notice.
 
     The card covers the student's *current round*, not a fixed 10:
@@ -6361,6 +6370,10 @@ def _attendance_timeline_for_enrollment(enrollment) -> dict:
 
     remaining_in_round = max(min(remaining, round_size), 0)
     used_count = max(round_size - remaining_in_round, 0)
+    default_count = used_count
+    # Parents sometimes ask to see further back than the current round.
+    if show_count is not None:
+        used_count = show_count
 
     deducted = list(
         Attendance.objects
@@ -6417,7 +6430,9 @@ def _attendance_timeline_for_enrollment(enrollment) -> dict:
         "rows": rows,
         "remaining_slots": list(range(seq + 1, seq + 1 + remaining_in_round)),
         "round_size": round_size,
-        "used_count": used_count,
+        "used_count": len(deducted),
+        "default_count": default_count,
+        "is_custom": show_count is not None and show_count != default_count,
         "remaining": remaining_in_round,
         "excused_count": sum(1 for r in rows if r["kind"] == "excused"),
         "no_show_count": sum(1 for r in rows if r["kind"] == "no_show"),

@@ -41,6 +41,28 @@
     .installment-box{display:grid;gap:8px;margin-top:12px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:20px;padding:12px}.money-row{display:flex;justify-content:space-between;gap:12px;font-weight:1000;border-bottom:1px dashed #bfdbfe;padding-bottom:7px}.money-row:last-child{border-bottom:0;padding-bottom:0}.money-row .k{color:#1d4ed8}.money-row .v{color:#0f172a}.money-row.remaining .v{font-size:24px;color:#15803d}
     .qr-zone{margin-top:12px;display:grid;grid-template-columns:130px 1fr;gap:12px;align-items:center;background:#f8fafc;border:1px solid #e2e8f0;border-radius:20px;padding:12px}.qr{width:130px;height:130px;object-fit:contain;background:#fff;border-radius:16px;padding:6px}.qr-title{font-size:15px;font-weight:1000}.qr-sub{font-size:12px;color:#64748b;font-weight:800;line-height:1.45;margin-top:4px}
     .note{margin-top:12px;border-radius:18px;background:#fff7ed;border:1px solid #fed7aa;padding:12px;color:#9a3412;font-size:13px;font-weight:900;line-height:1.55}.foot{text-align:center;margin-top:12px;color:#64748b;font-size:11px;font-weight:800}
+    .card-label{width:min(100%,440px);font-size:13px;font-weight:1000;color:#0f172a;margin-top:10px}
+    .att-sum{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+    .att-sum > div{border-radius:18px;padding:10px 6px;text-align:center}
+    .att-sum .k{font-size:11px;font-weight:1000}.att-sum .v{font-size:22px;font-weight:1000;line-height:1.1;margin-top:2px}
+    .att-sum .used{background:#dcfce7;border:1px solid #bbf7d0}.att-sum .used .k{color:#166534}.att-sum .used .v{color:#15803d}
+    .att-sum .leave{background:#eff6ff;border:1px solid #bfdbfe}.att-sum .leave .k{color:#1d4ed8}.att-sum .leave .v{color:#2563eb}
+    .att-sum .left{background:#fff7ed;border:1px solid #fed7aa}.att-sum .left .k{color:#9a3412}.att-sum .left .v{color:#ea580c}
+    .att-title{font-size:13px;font-weight:1000;margin-top:14px;display:flex;justify-content:space-between;gap:8px;align-items:center}
+    .att-title small{font-size:11px;font-weight:900;color:#94a3b8}
+    .tl{margin-top:8px;display:grid;gap:6px}
+    .tl-row{display:grid;grid-template-columns:30px 1fr auto;gap:9px;align-items:center;border-radius:14px;padding:9px 11px;border:1px solid #e2e8f0;background:#f8fafc}
+    .tl-dot{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:1000;color:#fff;background:#16a34a}
+    .tl-date{font-size:13px;font-weight:1000;line-height:1.3}.tl-sub{font-size:11px;font-weight:900;color:#64748b;margin-top:1px}
+    .tl-tag{font-size:11px;font-weight:1000;padding:3px 9px;border-radius:999px;white-space:nowrap}
+    .tl-row.present{background:#f0fdf4;border-color:#bbf7d0}.tl-row.present .tl-tag{background:#dcfce7;color:#15803d}
+    .tl-row.no_show{background:#fef2f2;border-color:#fecaca}.tl-row.no_show .tl-dot{background:#dc2626}.tl-row.no_show .tl-tag{background:#fee2e2;color:#b91c1c}
+    .tl-row.excused{background:#eff6ff;border-color:#bfdbfe}.tl-row.excused .tl-dot{background:#dbeafe;font-size:14px}.tl-row.excused .tl-tag{background:#dbeafe;color:#1d4ed8}
+    .tl-row.payment{background:#fffbeb;border-color:#fde68a}.tl-row.payment .tl-dot{background:#fef3c7;font-size:14px}.tl-row.payment .tl-date{color:#9a3412}.tl-row.payment .tl-tag{background:#fed7aa;color:#9a3412}
+    /* Sessions still to come: outlined green dot, continuing the same count. */
+    .tl-row.remain{background:#fff;border:1.5px dashed #86efac}.tl-row.remain .tl-dot{background:#fff;border:2.5px solid #22c55e;color:#16a34a}
+    .tl-row.remain .tl-date{color:#16a34a}.tl-row.remain .tl-tag{background:#dcfce7;color:#15803d}
+    .att-empty{border-radius:16px;border:1.5px dashed #cbd5e1;padding:18px;text-align:center;font-size:13px;font-weight:900;color:#94a3b8;margin-top:8px}
     @media(max-width:980px){.page{grid-template-columns:1fr}.editor{position:static}.receipt{width:min(100%,440px)}.btn{flex:1}.btn.icon{flex:0 0 38px}}
     @media(max-width:480px){.page{padding:8px}.editor{border-radius:20px;padding:12px}.receipt{border-radius:0;width:100%;padding:16px}.toolbar{position:sticky;top:6px;z-index:5}.date-row{grid-template-columns:1fr}.qr-zone{grid-template-columns:1fr;justify-items:center;text-align:center}.grid{grid-template-columns:1fr}}
   </style>
@@ -81,10 +103,6 @@
           <a class="btn icon soft" title="Enrollment" href="{{ enrollment_admin_url }}">📚</a>
         </div>
 
-        <a class="btn blue" style="width:100%;" target="_blank"
-           href="{% url 'core:course_renewal_notice_attendance_card' notice.id %}">
-          📋 เปิดใบประวัติการเข้าเรียน (10 ครั้งล่าสุด)
-        </a>
 
         <div class="field">
           <label>ประเภทใบแจ้ง</label>
@@ -181,9 +199,9 @@
 
     <div class="preview-wrap">
       <div class="toolbar">
-        <button class="btn blue" type="button" onclick="openImage()">Open Image in New Tab</button>
-        <button class="btn green" type="button" onclick="copyImage()">Copy Image</button>
-        <button class="btn soft" type="button" onclick="downloadImage()">Save Image</button>
+        <button class="btn blue" type="button" onclick="openImage('receiptCard')">Open Image in New Tab</button>
+        <button class="btn green" type="button" onclick="copyImage('receiptCard')">Copy Image</button>
+        <button class="btn soft" type="button" onclick="downloadImage('receiptCard','course-renewal-notice-{{ notice.id }}.png')">Save Image</button>
       </div>
 
       <div class="receipt" id="receiptCard">
@@ -248,6 +266,78 @@
 
         <div class="note">{{ notice.note_wording }}</div>
         <div class="foot">สร้างเมื่อ {{ notice.created_at|date:"d/m/Y H:i" }} · อัปเดตล่าสุด {{ notice.updated_at|date:"d/m/Y H:i" }}</div>
+      </div>
+
+      <div class="card-label">📋 ใบประวัติการเข้าเรียน</div>
+      <div class="toolbar">
+        <button class="btn blue" type="button" onclick="openImage('attendanceCard')">Open Image in New Tab</button>
+        <button class="btn green" type="button" onclick="copyImage('attendanceCard')">Copy Image</button>
+        <button class="btn soft" type="button" onclick="downloadImage('attendanceCard','attendance-{{ notice.id }}.png')">Save Image</button>
+      </div>
+
+      <div class="receipt" id="attendanceCard">
+        <div class="top">
+          <img class="logo" src="{% static 'core/logo2.png' %}" alt="logo">
+          <div class="doc">ประวัติการเข้าเรียน</div>
+          <div class="school">พี่ขนุนติวเตอร์</div>
+        </div>
+
+        <div class="student-card">
+          <div class="student-name">{{ student.nickname|default:"-" }} · {{ student.full_name }}</div>
+          <div class="meta">
+            คอร์สที่เรียน: {{ tutoring_class.name }}<br>
+            ระดับชั้น: {{ student.grade_level|default:"-" }}<br>
+            คอร์สรอบล่าสุด: {{ att.round_size }} ครั้ง
+          </div>
+        </div>
+
+        <div class="att-sum">
+          <div class="used"><div class="k">เรียนไปแล้ว</div><div class="v">{{ att.used_count }}</div></div>
+          <div class="leave"><div class="k">ลา</div><div class="v">{{ att.excused_count }}</div></div>
+          <div class="left"><div class="k">คงเหลือ</div><div class="v">{{ att.remaining }}</div></div>
+        </div>
+
+        <div class="att-title">
+          <span>รอบนี้ {{ att.round_size }} ครั้ง</span>
+          {% if att.window_start %}<small>ตั้งแต่ {{ att.window_start|date:"d/m/Y" }}</small>{% endif %}
+        </div>
+
+        {% if att.rows or att.remaining_slots %}
+          <div class="tl">
+            {% for r in att.rows %}
+              {% if r.kind == "present" %}
+                <div class="tl-row present"><div class="tl-dot">{{ r.seq }}</div>
+                  <div><div class="tl-date">{{ r.date_label }}</div><div class="tl-sub">{{ r.weekday_label }}</div></div>
+                  <div class="tl-tag">มาเรียน</div></div>
+              {% elif r.kind == "no_show" %}
+                <div class="tl-row no_show"><div class="tl-dot">{{ r.seq }}</div>
+                  <div><div class="tl-date">{{ r.date_label }}</div><div class="tl-sub">ไม่ได้แจ้งล่วงหน้า · หักครั้งเรียน</div></div>
+                  <div class="tl-tag">ขาด</div></div>
+              {% elif r.kind == "excused" %}
+                <div class="tl-row excused"><div class="tl-dot">📩</div>
+                  <div><div class="tl-date">{{ r.date_label }}</div><div class="tl-sub">แจ้งลา · ไม่หักครั้งเรียน</div></div>
+                  <div class="tl-tag">ลา</div></div>
+              {% else %}
+                <div class="tl-row payment"><div class="tl-dot">💰</div>
+                  <div><div class="tl-date">{{ r.date_label }}</div><div class="tl-sub">ชำระค่าคอร์ส · ใบเสร็จ {{ r.receipt_no }} · {{ r.sessions }} ครั้ง</div></div>
+                  <div class="tl-tag">฿{{ r.amount|floatformat:"0"|intcomma }}</div></div>
+              {% endif %}
+            {% endfor %}
+            {% for n in att.remaining_slots %}
+              <div class="tl-row remain"><div class="tl-dot">{{ n }}</div>
+                <div><div class="tl-date">ครั้งที่ {{ n }}</div><div class="tl-sub">ยังไม่ได้เรียน</div></div>
+                <div class="tl-tag">คงเหลือ</div></div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="att-empty">ยังไม่มีประวัติการเข้าเรียนในรอบนี้</div>
+        {% endif %}
+
+        <div class="note">
+          รอบนี้เรียนไปแล้ว {{ att.used_count }} ครั้ง{% if att.excused_count %} ลา {{ att.excused_count }} ครั้ง{% endif %} คงเหลือ {{ att.remaining }} ครั้ง
+          · การลาที่แจ้งล่วงหน้าไม่หักครั้งเรียนครับ
+        </div>
+        <div class="foot">ข้อมูล ณ วันที่ {% now "d/m/Y H:i" %}</div>
       </div>
     </div>
   </div>
@@ -346,8 +436,8 @@
       document.getElementById("endDateMinus7").addEventListener("click", function () { shiftEndBy(-7); });
     })();
 
-    async function makeCanvas() {
-      const el = document.getElementById("receiptCard");
+    async function makeCanvas(id) {
+      const el = document.getElementById(id || "receiptCard");
       return await html2canvas(el, {scale: 3, backgroundColor: "#ffffff", useCORS: true});
     }
     function canvasToBlob(canvas) {
@@ -357,9 +447,9 @@
     // Opens the window synchronously (in direct response to the click) and
     // fills it in once the canvas is ready -- iOS/desktop Safari block
     // window.open() as an unsolicited popup if it happens after an await.
-    function openImage() {
+    function openImage(id) {
       const win = window.open("", "_blank");
-      makeCanvas().then((canvas) => {
+      makeCanvas(id).then((canvas) => {
         const url = canvas.toDataURL("image/png");
         // Browsers block navigating the current tab to a data: URL (an
         // anti-phishing restriction), so if the popup didn't open there's
@@ -377,9 +467,9 @@
     // "Save Image") is the actual save path on iOS, tried first here. Falls
     // back to the classic <a download> link for browsers without Web Share
     // (desktop Chrome/Firefox etc., where it already works fine).
-    async function downloadImage() {
-      const canvas = await makeCanvas();
-      const filename = "course-renewal-notice-{{ notice.id }}.png";
+    async function downloadImage(id, filename) {
+      const canvas = await makeCanvas(id);
+      filename = filename || "course-renewal-notice-{{ notice.id }}.png";
       if (navigator.canShare && navigator.share) {
         try {
           const blob = await canvasToBlob(canvas);
@@ -404,13 +494,13 @@
     // called synchronously inside the click handler, so the ClipboardItem is
     // built from an unresolved Blob promise here rather than awaiting the
     // canvas first -- Safari's documented "future value" pattern for this.
-    function copyImage() {
+    function copyImage(id) {
       if (!navigator.clipboard || !window.ClipboardItem) {
         alert("เบราว์เซอร์นี้ไม่รองรับ Copy Image โดยตรง ให้ใช้ Open Image หรือ Save Image แทนครับ");
         return;
       }
       try {
-        const item = new ClipboardItem({"image/png": makeCanvas().then(canvasToBlob)});
+        const item = new ClipboardItem({"image/png": makeCanvas(id).then(canvasToBlob)});
         navigator.clipboard.write([item]).then(() => {
           alert("Copy รูปใบแจ้งแล้วครับ");
         }).catch((err) => {

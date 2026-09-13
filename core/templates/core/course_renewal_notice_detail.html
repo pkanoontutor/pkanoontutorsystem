@@ -42,6 +42,11 @@
     .qr-zone{margin-top:12px;display:grid;grid-template-columns:130px 1fr;gap:12px;align-items:center;background:#f8fafc;border:1px solid #e2e8f0;border-radius:20px;padding:12px}.qr{width:130px;height:130px;object-fit:contain;background:#fff;border-radius:16px;padding:6px}.qr-title{font-size:15px;font-weight:1000}.qr-sub{font-size:12px;color:#64748b;font-weight:800;line-height:1.45;margin-top:4px}
     .note{margin-top:12px;border-radius:18px;background:#fff7ed;border:1px solid #fed7aa;padding:12px;color:#9a3412;font-size:13px;font-weight:900;line-height:1.55}.foot{text-align:center;margin-top:12px;color:#64748b;font-size:11px;font-weight:800}
     .card-label{width:min(100%,440px);font-size:13px;font-weight:1000;color:#0f172a;margin-top:10px}
+    .att-count{width:min(100%,440px);display:flex;gap:6px;align-items:center;flex-wrap:wrap;background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:8px 10px}
+    .att-count label{font-size:12px;font-weight:1000;color:#334155}
+    .att-count input{width:76px;padding:7px 8px;text-align:center}
+    .att-count .btn{padding:8px 12px;font-size:12px}
+    .att-count .hint{width:100%}
     .att-sum{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
     .att-sum > div{border-radius:18px;padding:10px 6px;text-align:center}
     .att-sum .k{font-size:11px;font-weight:1000}.att-sum .v{font-size:22px;font-weight:1000;line-height:1.1;margin-top:2px}
@@ -269,6 +274,14 @@
       </div>
 
       <div class="card-label">📋 ใบประวัติการเข้าเรียน</div>
+      <form class="att-count" method="get">
+        <label for="attN">แสดงครั้งเรียนล่าสุด</label>
+        <input type="number" id="attN" name="att_n" min="0" max="200" value="{{ att.used_count }}">
+        <span class="hint" style="width:auto;">ครั้ง</span>
+        <button class="btn blue" type="submit">แสดง</button>
+        {% if att.is_custom %}<a class="btn soft" href="?">รีเซ็ต ({{ att.default_count }})</a>{% endif %}
+        <div class="hint">ค่าเริ่มต้น = ครั้งที่สมัครรอบล่าสุด − คงเหลือ ({{ att.default_count }} ครั้ง)</div>
+      </form>
       <div class="toolbar">
         <button class="btn blue" type="button" onclick="openImage('attendanceCard')">Open Image in New Tab</button>
         <button class="btn green" type="button" onclick="copyImage('attendanceCard')">Copy Image</button>
@@ -298,7 +311,7 @@
         </div>
 
         <div class="att-title">
-          <span>รอบนี้ {{ att.round_size }} ครั้ง</span>
+          <span>{% if att.is_custom %}เข้าเรียน {{ att.used_count }} ครั้งล่าสุด{% else %}รอบนี้ {{ att.round_size }} ครั้ง{% endif %}</span>
           {% if att.window_start %}<small>ตั้งแต่ {{ att.window_start|date:"d/m/Y" }}</small>{% endif %}
         </div>
 

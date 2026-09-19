@@ -91,7 +91,26 @@
         </button>
       </div>
     </form>
+
+    <div class="claim-box">
+      <div class="claim-q">ยังไม่ได้แจ้งเบอร์ผู้ปกครอง?</div>
+      <div class="claim-d">
+        ถ้าน้องยังเข้าระบบด้วยเบอร์ 0999999999 อยู่
+        กดปุ่มด้านล่างเพื่อกรอกข้อมูลและตั้งเบอร์ของผู้ปกครองเป็นรหัสผ่านได้เลยครับ
+      </div>
+      <a class="claim-btn" href="{% url 'core:student_portal_claim_phone' %}">📱 เพิ่มเบอร์โทรศัพท์</a>
+    </div>
   </div>
+
+  <style>
+    .claim-box{margin-top:16px;padding-top:15px;border-top:1px dashed #cbd5e1;text-align:center;}
+    .claim-q{font-size:14px;font-weight:900;color:#0f172a;}
+    .claim-d{font-size:12.5px;font-weight:700;color:#475569;line-height:1.6;margin-top:5px;}
+    .claim-btn{display:inline-block;margin-top:11px;background:#fef3c7;border:2px solid #fcd34d;
+      color:#92400e;border-radius:999px;padding:10px 20px;font-size:14px;font-weight:900;
+      text-decoration:none;transition:.14s;}
+    .claim-btn:hover{background:#fde68a;border-color:#f59e0b;transform:translateY(-1px);}
+  </style>
 
   <style>
     .student-search-field {

@@ -1,0 +1,204 @@
+{% extends "core/base_portal.html" %}
+{% block title %}เพิ่มเบอร์โทรศัพท์ผู้ปกครอง{% endblock %}
+{% block head %}
+<style>
+  .cp-title{font-size:22px;font-weight:900;color:#0f172a;margin:0 0 6px;}
+  .cp-lead{font-size:13.5px;font-weight:700;color:#334155;line-height:1.6;}
+  .cp-note{background:#eff6ff;border:2px solid #bfdbfe;border-radius:14px;padding:11px 13px;
+    font-size:12.5px;font-weight:800;color:#1d4ed8;line-height:1.6;margin-top:12px;}
+  .cp-field{display:flex;flex-direction:column;gap:5px;margin-top:13px;}
+  .cp-field label{font-size:12.5px;font-weight:900;color:#0f172a;}
+  .cp-field input{border:1px solid #cbd5e1;border-radius:11px;padding:11px 12px;font-size:15px;
+    font-weight:700;width:100%;}
+  .cp-field input:focus{outline:2px solid #fbbf24;outline-offset:1px;border-color:#f59e0b;}
+  .cp-two{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .cp-hint{font-size:11.5px;font-weight:700;color:#64748b;}
+
+  /* Same search-and-pick pattern as the login page. */
+  .cp-search{position:relative;}
+  .cp-results{position:absolute;left:0;right:0;top:calc(100% + 4px);background:#fff;border:1px solid #cbd5e1;
+    border-radius:12px;box-shadow:0 10px 24px rgba(15,23,42,.16);max-height:260px;overflow:auto;z-index:20;}
+  .cp-results[hidden]{display:none;}
+  .cp-item{display:block;width:100%;text-align:left;border:0;background:none;padding:10px 12px;
+    font-size:13.5px;font-weight:700;color:#0f172a;cursor:pointer;font-family:inherit;}
+  .cp-item:hover{background:#fef3c7;}
+  .cp-empty{padding:12px;font-size:13px;font-weight:700;color:#64748b;}
+  .cp-picked{font-size:12.5px;font-weight:800;color:#64748b;margin-top:5px;}
+  .cp-picked.on{color:#15803d;}
+
+  .cp-btn{border:0;border-radius:12px;padding:13px 18px;font-size:15px;font-weight:900;cursor:pointer;
+    background:#f59e0b;color:#0f172a;font-family:inherit;width:100%;margin-top:16px;}
+  .cp-btn:hover{background:#fbbf24;}
+  .cp-back{display:inline-block;margin-top:14px;font-size:13px;font-weight:900;color:#2563eb;text-decoration:none;}
+
+  .cp-err{background:#fee2e2;border:2px solid #fecaca;color:#b91c1c;border-radius:14px;padding:11px 13px;
+    font-size:13px;font-weight:800;line-height:1.6;margin-top:12px;}
+  .cp-err ul{margin:0;padding-left:18px;}
+
+  .cp-ok{background:#dcfce7;border:2px solid #86efac;border-radius:16px;padding:18px;text-align:center;}
+  .cp-ok-h{font-size:19px;font-weight:900;color:#166534;}
+  .cp-ok-b{font-size:13.5px;font-weight:800;color:#166534;line-height:1.7;margin-top:8px;}
+  .cp-ok-phone{display:inline-block;background:#fff;border:2px solid #22c55e;border-radius:12px;
+    padding:9px 18px;font-size:21px;font-weight:900;color:#15803d;letter-spacing:.04em;margin-top:10px;}
+  @media(max-width:520px){ .cp-two{grid-template-columns:1fr;} }
+</style>
+{% endblock %}
+{% block content %}
+<div class="card" style="max-width:560px;margin:0 auto;">
+  {% if saved_student %}
+    <div class="cp-ok">
+      <div class="cp-ok-h">✅ บันทึกเรียบร้อยแล้ว</div>
+      <div class="cp-ok-b">
+        ตั้งแต่นี้ไป น้อง <b>{{ saved_student.nickname|default:saved_student.full_name }}</b>
+        เข้าระบบได้ด้วยเบอร์นี้ครับ
+      </div>
+      <div class="cp-ok-phone">{{ saved_student.parent_phone }}</div>
+      <div class="cp-ok-b" style="margin-top:12px;">
+        ใช้เบอร์นี้เป็นรหัสผ่านได้ทุกระบบ — ตรวจสอบชั่วโมงคงเหลือ · คอร์สออนไลน์ · ดูคลิปย้อนหลัง
+      </div>
+    </div>
+    <div style="text-align:center;">
+      <a class="cp-back" href="{% url 'core:student_portal_login' %}">→ ไปหน้าเข้าสู่ระบบ</a>
+    </div>
+  {% else %}
+    <h1 class="cp-title">📱 เพิ่มเบอร์โทรศัพท์ผู้ปกครอง</h1>
+    <div class="cp-lead">
+      สำหรับน้องที่ยังไม่ได้แจ้งเบอร์ (เข้าระบบด้วย {{ placeholder }} อยู่)
+      กรอกข้อมูลด้านล่างเพื่อตั้งเบอร์ของผู้ปกครองเป็นรหัสผ่านเข้าระบบครับ
+    </div>
+
+    <div class="cp-note">
+      🔒 รายชื่อที่เลือกได้จะมีเฉพาะน้องที่ <b>ยังไม่เคยลงทะเบียนเบอร์</b> เท่านั้น<br>
+      ถ้าลงทะเบียนไปแล้วและต้องการเปลี่ยนเบอร์ กรุณาติดต่อพี่ขนุนติวเตอร์โดยตรงครับ
+    </div>
+
+    {% if errors %}
+      <div class="cp-err"><ul>{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul></div>
+    {% endif %}
+
+    <form method="post" id="claimForm">
+      {% csrf_token %}
+      <input type="hidden" name="student_id" id="studentId" value="{{ posted.student_id }}">
+
+      <div class="cp-field cp-search">
+        <label for="studentSearch">เลือกชื่อน้อง</label>
+        <input type="text" id="studentSearch" autocomplete="off"
+               placeholder="พิมพ์ชื่อเล่น / ชื่อจริง / รหัสนักเรียน">
+        <div class="cp-results" id="studentResults" hidden></div>
+        <div class="cp-picked" id="studentPicked">ยังไม่ได้เลือกชื่อน้อง</div>
+      </div>
+
+      <div class="cp-two">
+        <div class="cp-field">
+          <label for="firstName">ชื่อจริง</label>
+          <input type="text" name="first_name" id="firstName" value="{{ posted.first_name }}">
+        </div>
+        <div class="cp-field">
+          <label for="lastName">นามสกุล</label>
+          <input type="text" name="last_name" id="lastName" value="{{ posted.last_name }}">
+        </div>
+      </div>
+
+      <div class="cp-field">
+        <label for="schoolName">โรงเรียน</label>
+        <input type="text" name="school_name" id="schoolName" list="schoolList"
+               value="{{ posted.school_name }}" placeholder="พิมพ์ชื่อโรงเรียน">
+        <datalist id="schoolList">
+          {% for s in schools %}<option value="{{ s.name }}"></option>{% endfor %}
+        </datalist>
+        <div class="cp-hint">พิมพ์เองได้ หรือเลือกจากรายชื่อที่ขึ้นมา</div>
+      </div>
+
+      <div class="cp-field">
+        <label for="parentPhone">เบอร์โทรศัพท์ผู้ปกครอง</label>
+        <input type="tel" name="parent_phone" id="parentPhone" inputmode="numeric"
+               value="{{ posted.parent_phone }}" placeholder="เช่น 0812345678">
+        <div class="cp-hint">เบอร์นี้จะใช้เป็นรหัสผ่านเข้าระบบของน้องครับ</div>
+      </div>
+
+      <button class="cp-btn" type="submit">บันทึกและใช้เบอร์นี้เป็นรหัสผ่าน</button>
+    </form>
+
+    <div style="text-align:center;">
+      <a class="cp-back" href="{% url 'core:student_portal_login' %}">← กลับหน้าเข้าสู่ระบบ</a>
+    </div>
+  {% endif %}
+</div>
+
+{% if not saved_student %}
+<script>
+(function(){
+  var searchInput = document.getElementById("studentSearch");
+  var resultsBox  = document.getElementById("studentResults");
+  var hidden      = document.getElementById("studentId");
+  var picked      = document.getElementById("studentPicked");
+  var firstName   = document.getElementById("firstName");
+  var lastName    = document.getElementById("lastName");
+  var timer = null, controller = null;
+
+  function hide(){ resultsBox.hidden = true; resultsBox.innerHTML = ""; }
+  function msg(t){ resultsBox.innerHTML = '<div class="cp-empty">' + t + '</div>'; resultsBox.hidden = false; }
+
+  function choose(item){
+    hidden.value = item.id;
+    searchInput.value = item.text;
+    picked.textContent = "เลือกแล้ว: " + item.text;
+    picked.classList.add("on");
+    // Pre-fill the name from the record so a parent only corrects it.
+    if(item.full_name && !firstName.value && !lastName.value){
+      var parts = item.full_name.trim().split(/\s+/);
+      firstName.value = parts.shift() || "";
+      lastName.value = parts.join(" ");
+    }
+    hide();
+  }
+
+  function render(items){
+    if(!items || !items.length){
+      msg("ไม่พบน้องที่ยังไม่ได้ลงทะเบียนเบอร์ตามคำค้นนี้");
+      return;
+    }
+    resultsBox.innerHTML = "";
+    items.forEach(function(it){
+      var b = document.createElement("button");
+      b.type = "button"; b.className = "cp-item"; b.textContent = it.text;
+      b.addEventListener("click", function(){ choose(it); });
+      resultsBox.appendChild(b);
+    });
+    resultsBox.hidden = false;
+  }
+
+  searchInput.addEventListener("input", function(){
+    var term = searchInput.value.trim();
+    hidden.value = "";
+    picked.textContent = "ยังไม่ได้เลือกชื่อน้อง";
+    picked.classList.remove("on");
+    clearTimeout(timer);
+    if(term.length < 1){ hide(); return; }
+    timer = setTimeout(function(){
+      msg("กำลังค้นหา...");
+      if(controller) controller.abort();
+      controller = new AbortController();
+      fetch("{% url 'core:student_portal_claim_search' %}?q=" + encodeURIComponent(term),
+            {headers:{"X-Requested-With":"XMLHttpRequest"}, signal: controller.signal})
+        .then(function(r){ return r.json(); })
+        .then(function(d){ render(d.results || []); })
+        .catch(function(e){ if(e.name !== "AbortError") msg("ค้นหาไม่สำเร็จ กรุณาลองใหม่"); });
+    }, 220);
+  });
+
+  document.addEventListener("click", function(e){
+    if(!e.target.closest(".cp-search")) hide();
+  });
+
+  document.getElementById("claimForm").addEventListener("submit", function(e){
+    if(!hidden.value){
+      e.preventDefault();
+      msg("กรุณาเลือกชื่อน้องจากรายการก่อนบันทึก");
+      searchInput.focus();
+    }
+  });
+})();
+</script>
+{% endif %}
+{% endblock %}

@@ -11713,3 +11713,122 @@ def class_video_mark_watched(request: HttpRequest) -> JsonResponse:
         row.watch_count = (row.watch_count or 0) + 1
         row.save(update_fields=["last_watched_at", "watch_count"])
     return JsonResponse({"ok": True, "watched_at": timezone.localtime(now).strftime("%d/%m/%Y")})
+
+
+# =========================================================
+# ✅ ลงทะเบียนเบอร์ผู้ปกครอง (ใช้เบอร์เป็นรหัสผ่านเข้าระบบ)
+# =========================================================
+# Students created before their parent's number was known carry the
+# placeholder below, and the portal login tells parents to sign in with it.
+# This page lets a parent claim that record once and set a real number,
+# which then becomes their password. Only placeholder records are offered,
+# so a record that already has a real number can never be taken over here.
+PARENT_PHONE_PLACEHOLDER = "0999999999"
+
+
+def _phone_digits(value: str | None) -> str:
+    return "".join(ch for ch in (value or "") if ch.isdigit())
+
+
+def _is_unclaimed(student) -> bool:
+    """Still on the placeholder number, comparing digits only.
+
+    The column is free text, so the same placeholder is stored as both
+    "0999999999" and "099-999-9999" -- and the login compares digits too, so
+    both really are unclaimed. No SQL LIKE can express that portably, hence
+    the Python-side check.
+    """
+    return _phone_digits(student.parent_phone) == PARENT_PHONE_PLACEHOLDER
+
+
+def student_portal_claim_search(request: HttpRequest) -> JsonResponse:
+    """Search endpoint for the claim page -- placeholder records only."""
+    q = (request.GET.get("q") or "").strip()
+    qs = Student.objects.filter(is_active=True)
+    if q:
+        qs = qs.filter(
+            Q(nickname__icontains=q) | Q(full_name__icontains=q) | Q(student_code__icontains=q)
+        )
+    qs = qs.select_related("school").order_by("grade_level", "student_code")
+
+    results = []
+    for s in qs.iterator():
+        if not _is_unclaimed(s):
+            continue
+        label = f"{s.student_code} | {s.nickname or '-'} | {s.full_name}"
+        if s.grade_level:
+            label += f" | {s.grade_level}"
+        results.append({
+            "id": str(s.id),
+            "text": label,
+            "full_name": s.full_name or "",
+            "school_id": str(s.school_id or ""),
+            "grade": s.grade_level or "",
+        })
+        if len(results) >= 30:
+            break
+    return JsonResponse({"results": results})
+
+
+def student_portal_claim_phone(request: HttpRequest) -> HttpResponse:
+    """Let a parent fill in their details and set the phone they will log in with."""
+    errors: list[str] = []
+    saved_student = None
+    posted = {}
+
+    if request.method == "POST":
+        posted = {k: (request.POST.get(k) or "").strip() for k in
+                  ("student_id", "first_name", "last_name", "school_name", "parent_phone")}
+
+        student = None
+        if posted["student_id"].isdigit():
+            student = Student.objects.filter(id=int(posted["student_id"]), is_active=True).first()
+
+        # The gate is re-checked here, not just in the dropdown: a POST could
+        # name any student id at all.
+        if not student:
+            errors.append("กรุณาเลือกชื่อน้องจากรายการ")
+        elif not _is_unclaimed(student):
+            errors.append(
+                "รายชื่อนี้ลงทะเบียนเบอร์ไว้แล้ว ไม่สามารถแก้ไขจากหน้านี้ได้ "
+                "หากต้องการเปลี่ยนเบอร์ กรุณาติดต่อพี่ขนุนติวเตอร์ครับ"
+            )
+
+        phone = _phone_digits(posted["parent_phone"])
+        if not phone:
+            errors.append("กรุณากรอกเบอร์โทรศัพท์")
+        elif len(phone) < 9 or len(phone) > 10:
+            errors.append("เบอร์โทรศัพท์ต้องมี 9-10 หลัก")
+        elif phone == PARENT_PHONE_PLACEHOLDER:
+            errors.append("กรุณากรอกเบอร์โทรศัพท์จริง ไม่ใช่เบอร์ตั้งต้น 0999999999")
+
+        if not posted["first_name"]:
+            errors.append("กรุณากรอกชื่อจริง")
+        if not posted["last_name"]:
+            errors.append("กรุณากรอกนามสกุล")
+
+        if not errors and student:
+            with transaction.atomic():
+                student.full_name = f"{posted['first_name']} {posted['last_name']}".strip()
+                student.parent_phone = phone
+
+                school_name = posted["school_name"]
+                if school_name:
+                    # Match an existing school case-insensitively before making
+                    # a new one, so a public form can't fill the table with
+                    # near-duplicate spellings of the same school.
+                    school = School.objects.filter(name__iexact=school_name).first()
+                    if not school:
+                        school = School.objects.create(name=school_name)
+                    student.school = school
+
+                student.save(update_fields=["full_name", "parent_phone", "school"])
+            saved_student = student
+
+    return render(request, "core/student_portal_claim_phone.html", {
+        "errors": errors,
+        "posted": posted,
+        "saved_student": saved_student,
+        "schools": School.objects.filter(is_active=True).order_by("name"),
+        "placeholder": PARENT_PHONE_PLACEHOLDER,
+    })

@@ -25,6 +25,15 @@ urlpatterns = [
     path("pkanoon-admin-tool/admission-history/", views.admission_history, name="admission_history"),
     path("learning-record/", views.learning_record, name="learning_record"),
 
+    # Class video replay (ดูคลิปย้อนหลัง)
+    path("class-videos/", views.class_video_admin, name="class_video_admin"),
+    path("class-videos/edit/", views.class_video_edit, name="class_video_edit"),
+    path("video-replay/", views.class_video_login, name="class_video_login"),
+    path("video-replay/home/", views.class_video_home, name="class_video_home"),
+    path("video-replay/class/<int:class_id>/", views.class_video_calendar, name="class_video_calendar"),
+    path("video-replay/class/<int:class_id>/<str:lesson_date>/", views.class_video_watch, name="class_video_watch"),
+    path("video-replay/mark-watched/", views.class_video_mark_watched, name="class_video_mark_watched"),
+
     # Attendance
     path("attendance/submit/", views.attendance_submit, name="attendance_submit"),
     path("enrollment/mark-not-renewing/", views.enrollment_mark_not_renewing, name="enrollment_mark_not_renewing"),

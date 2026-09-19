@@ -72,7 +72,7 @@
                 <td><b>{{ e.sessions_total }}</b></td>
                 <td>
                   <b id="remaining-{{ e.id }}" class="{% if e.remaining_sessions <= 0 %}danger{% endif %}">
-                    {{ e.remaining_sessions }}
+                    {{ e.remaining_sessions|sessions }}
                   </b>
                 </td>
                 <td>

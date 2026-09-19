@@ -34,3 +34,23 @@ def index(seq, i):
         return seq[int(i)]
     except Exception:
         return None
+
+
+@register.filter
+def sessions(value):
+    """Session counts read as "10" and "1.5", never "10.0" or "1.50".
+
+    Half-day leave makes remaining_sessions a Decimal, and the bare Decimal
+    renders with trailing zeros everywhere it is shown to parents and staff.
+    """
+    from decimal import Decimal, InvalidOperation
+    if value in (None, ""):
+        return "0"
+    try:
+        d = Decimal(str(value))
+    except (InvalidOperation, ValueError):
+        return str(value)
+    d = d.normalize()
+    if d == d.to_integral_value():
+        return str(int(d))
+    return f"{d:.1f}"

@@ -36,7 +36,7 @@
             <b>{{ e.student.display_name }}</b>
           {% endif %}
         </td>
-        <td><b class="{% if e.remaining_sessions <= 0 %}danger{% endif %}">{{ e.remaining_sessions }}</b></td>
+        <td><b class="{% if e.remaining_sessions <= 0 %}danger{% endif %}">{{ e.remaining_sessions|sessions }}</b></td>
         <td class="muted">
           {% if e.notified_near_complete %}
             แจ้งแล้ว ({{ e.notified_at|date:"Y-m-d H:i" }})

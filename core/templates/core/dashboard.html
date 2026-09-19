@@ -307,6 +307,7 @@
   /* Status tint: pale fill + matching border, no wording needed. */
   .stu-card.is-present { background:#ecfdf5; border-color:#6ee7b7; }
   .stu-card.is-excused { background:#fffbeb; border-color:#fcd34d; }
+  .stu-card.is-excused_half { background:#fff7ed; border-color:#fdba74; }
   .stu-card.is-no_show { background:#fef2f2; border-color:#fca5a5; }
 
   /* The photo doubles as the "มา" button. No hover styling: tapping a face
@@ -346,11 +347,13 @@
   .stu-dot:hover { transform: scale(1.14); }
   .stu-dot.btn-green  { background:#10b981; }
   .stu-dot.btn-yellow { background:#f59e0b; }
+  .stu-dot.btn-orange { background:#f97316; font-size:9px; }
   .stu-dot.btn-red    { background:#ef4444; }
   .stu-dot.btn-dim    { opacity:.28; }
   .stu-dot.active-btn { box-shadow:0 0 0 3px #fff, 0 0 0 5px currentColor; }
   .stu-dot.btn-green.active-btn  { color:#059669; }
   .stu-dot.btn-yellow.active-btn { color:#d97706; }
+  .stu-dot.btn-orange.active-btn { color:#ea580c; }
   .stu-dot.btn-red.active-btn    { color:#dc2626; }
 
   /* Avatar. Sized fluidly against the card rather than fixed, so it stays
@@ -1058,7 +1061,7 @@
               {% for e in enrollments %}
                 {% if e.tutoring_class_id == cls.id %}
                   {% with a=att_map|get_item:e.id %}
-                  <div class="stu-card {% if a and a.status == 'present' %}is-present{% elif a and a.status == 'excused' %}is-excused{% elif a and a.status == 'no_show' %}is-no_show{% endif %}"
+                  <div class="stu-card {% if a and a.status == 'present' %}is-present{% elif a and a.status == 'excused' %}is-excused{% elif a and a.status == 'excused_half' %}is-excused_half{% elif a and a.status == 'no_show' %}is-no_show{% endif %}"
                        id="row-{{ e.id }}"
                        data-att-row
                        data-class="{{ cls.id }}"
@@ -1082,7 +1085,7 @@
                     <div class="stu-full" title="{{ e.student.full_name|default:'-' }}">{{ e.student.full_name|default:"-" }}</div>
 
                     <div class="stu-sessions">
-                      <span id="remaining-{{ e.id }}" class="stu-remain {% if e.remaining_sessions <= 0 %}danger{% endif %}">{{ e.remaining_sessions }}</span><span class="stu-total">/{{ e.sessions_total }}</span>
+                      <span id="remaining-{{ e.id }}" class="stu-remain {% if e.remaining_sessions <= 0 %}danger{% endif %}">{{ e.remaining_sessions|sessions }}</span><span class="stu-total">/{{ e.sessions_total }}</span>
                     </div>
 
                     <div class="stu-last" id="last-{{ e.id }}">
@@ -1093,7 +1096,9 @@
                       <button class="stu-dot btn-green {% if a and a.status == 'present' %}active-btn{% endif %}"
                               title="มา" onclick="return pickStatus({{ cls.id }},{{ e.id }},'present');">มา</button>
                       <button class="stu-dot btn-yellow {% if a and a.status == 'excused' %}active-btn{% endif %}"
-                              title="ลา" onclick="return pickStatus({{ cls.id }},{{ e.id }},'excused');">ลา</button>
+                              title="ลา (ไม่หักครั้ง)" onclick="return pickStatus({{ cls.id }},{{ e.id }},'excused');">ลา</button>
+                      <button class="stu-dot btn-orange {% if a and a.status == 'excused_half' %}active-btn{% endif %}"
+                              title="ลา หัก 0.5 ครั้ง" onclick="return pickStatus({{ cls.id }},{{ e.id }},'excused_half');">ลา½</button>
                       <button class="stu-dot btn-red {% if a and a.status == 'no_show' %}active-btn{% endif %}"
                               title="ขาด" onclick="return pickStatus({{ cls.id }},{{ e.id }},'no_show');">ขาด</button>
                     </div>
@@ -1180,23 +1185,27 @@
   /* ================================================
      BADGE & BUTTONS
   ================================================ */
+  const ATT_STATUSES=["present","excused","excused_half","no_show"];
+
   function markButtons(eid,status){
     const row=document.getElementById("row-"+eid);
     if(!row)return;
-    const g=row.querySelector(".btn-green"),y=row.querySelector(".btn-yellow"),r=row.querySelector(".btn-red");
-    const btns=[g,y,r].filter(Boolean);
+    const g=row.querySelector(".btn-green"),y=row.querySelector(".btn-yellow"),
+          o=row.querySelector(".btn-orange"),r=row.querySelector(".btn-red");
+    const btns=[g,y,o,r].filter(Boolean);
     btns.forEach(b=>{b.classList.remove("active-btn","btn-dim");});
     let active=null;
     if(status==="present")active=g;
     if(status==="excused")active=y;
+    if(status==="excused_half")active=o;
     if(status==="no_show")active=r;
     if(active){
       active.classList.add("active-btn");
       btns.forEach(b=>{if(b!==active)b.classList.add("btn-dim");});
     }
     // Tint the whole card so the status reads at a glance without wording.
-    row.classList.remove("is-present","is-excused","is-no_show");
-    if(status==="present"||status==="excused"||status==="no_show"){
+    row.classList.remove("is-present","is-excused","is-excused_half","is-no_show");
+    if(ATT_STATUSES.indexOf(status)>=0){
       row.classList.add("is-"+status);
     }
   }
@@ -1295,8 +1304,9 @@
     const counts={present:0,excused:0,no_show:0,none:0,total:0};
     document.querySelectorAll(`.stu-card[data-class="${cid}"]`).forEach(row=>{
       const st=row.dataset.status||"none";
-      if(st==="present"||st==="excused"||st==="no_show"){
-        counts[st]+=1;
+      if(ATT_STATUSES.indexOf(st)>=0){
+        // Half-day leave is still ลา in this tally; it just also burns 0.5.
+        counts[st==="excused_half" ? "excused" : st]+=1;
         counts.total+=1;
       }else{
         counts.none+=1;
@@ -1439,7 +1449,8 @@
     const fT=classFilters[cid].text,fS=classFilters[cid].status;
     document.querySelectorAll(`.stu-card[data-class="${cid}"]`).forEach(row=>{
       const okT=!fT||(row.dataset.search||"").toLowerCase().includes(fT);
-      const okS=fS==="all"||row.dataset.status===fS;
+      const st=row.dataset.status;
+      const okS=fS==="all"||st===fS||(fS==="excused"&&st==="excused_half");
       row.style.display=(okT&&okS)?"":"none";
     });
   }

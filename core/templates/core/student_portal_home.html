@@ -1,4 +1,5 @@
 {% extends "core/base_portal.html" %}
+{% load extras %}
 {% block title %}Student Portal{% endblock %}
 
 {% block header_actions %}
@@ -163,7 +164,7 @@
             <div class="ring" style="--pct:{{ e.ring_percent }};">
               <div class="ring-in">
                 <div class="ring-lbl">เหลือ</div>
-                <div class="ring-num">{{ remaining }}</div>
+                <div class="ring-num">{{ remaining|sessions }}</div>
                 <div class="ring-lbl">ครั้ง</div>
               </div>
             </div>

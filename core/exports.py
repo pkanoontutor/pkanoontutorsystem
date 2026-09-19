@@ -153,7 +153,7 @@ def build_full_workbook() -> tuple[BytesIO, str]:
     def _student_rows():
         for s in students:
             remaining = sum(
-                int(e.remaining_sessions or 0)
+                float(e.remaining_sessions or 0)
                 for e in s.enrollments.all()
                 if e.is_active
             )
@@ -186,7 +186,7 @@ def build_full_workbook() -> tuple[BytesIO, str]:
              getattr(e.tutoring_class, "name", "") or "",
              e.get_enrollment_type_display() if hasattr(e, "get_enrollment_type_display") else "",
              int(e.sessions_total or 0),
-             int(e.remaining_sessions or 0) if e.remaining_sessions is not None else 0,
+             float(e.remaining_sessions or 0) if e.remaining_sessions is not None else 0,
              _money(e.course_price), _money(e.discount_amount), _money(e.net_price),
              bool(e.is_active), _fmt_dt(e.created_at)]
             for e in enrollments

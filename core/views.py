@@ -443,7 +443,7 @@ def dashboard(request: HttpRequest) -> HttpResponse:
         atts = todays_att.filter(enrollment__in=cls_enrollments)
 
         present = atts.filter(status=Attendance.Status.PRESENT).count()
-        excused = atts.filter(status=Attendance.Status.EXCUSED).count()
+        excused = atts.filter(status__in=LEAVE_STATUSES).count()
         no_show = atts.filter(status=Attendance.Status.NO_SHOW).count()
 
         summary_by_class_id[cls.id] = {
@@ -3244,7 +3244,7 @@ def _attendance_weekly_series(start: date, end: date) -> dict:
         ws, we = cur, cur + timedelta(days=1)
         qs = Attendance.objects.filter(attendance_date__gte=ws, attendance_date__lte=we)
         p = qs.filter(status=Attendance.Status.PRESENT).count()
-        e = qs.filter(status=Attendance.Status.EXCUSED).count()
+        e = qs.filter(status__in=LEAVE_STATUSES).count()
         n = qs.filter(status=Attendance.Status.NO_SHOW).count()
         labels.append(f"{ws.strftime('%d/%m')}–{we.strftime('%d/%m')}")
         present.append(p)
@@ -3257,7 +3257,9 @@ def _attendance_weekly_series(start: date, end: date) -> dict:
 
 def _finance_summary_for_range(start: date, end: date) -> dict:
     revenue_per_student = _finance_setting("revenue_per_student_per_week", Decimal("360"), "Revenue per deducted attendance")
-    deducted_count = Attendance.objects.filter(attendance_date__gte=start, attendance_date__lte=end, deducted=True).count()
+    deducted_count = Attendance.objects.filter(
+        attendance_date__gte=start, attendance_date__lte=end, deducted=True,
+    ).aggregate(n=Sum("deducted_units"))["n"] or Decimal("0")
     estimated_revenue = Decimal(deducted_count) * revenue_per_student
     cash_revenue = CoursePayment.objects.filter(
         payment_date__gte=start,
@@ -3595,9 +3597,9 @@ def export_excel(request: HttpRequest) -> HttpResponse:
     )
 
     for s in students:
-        remaining_total = sum(
-            int(e.remaining_sessions or 0) for e in s.enrollments.all() if e.is_active
-        )
+        remaining_total = _sessions_num(sum(
+            (e.remaining_sessions or Decimal("0")) for e in s.enrollments.all() if e.is_active
+        ))
         ws2.append([
             s.id,
             getattr(s, "student_code", "") or "",
@@ -3688,6 +3690,7 @@ def attendance_submit(request: HttpRequest) -> JsonResponse:
     valid_status = {
         Attendance.Status.PRESENT,
         Attendance.Status.EXCUSED,
+        Attendance.Status.EXCUSED_HALF,
         Attendance.Status.NO_SHOW
     }
 
@@ -3788,7 +3791,7 @@ def attendance_submit(request: HttpRequest) -> JsonResponse:
     # remaining_sessions is a Python property, not a database field.
     # Do not use .only("remaining_sessions") because it can make the AJAX response fail with FieldError.
     refreshed = Enrollment.objects.filter(id__in=list(enroll_map.keys()))
-    remaining_map = {e.id: int(e.remaining_sessions or 0) for e in refreshed}
+    remaining_map = {e.id: _sessions_num(e.remaining_sessions) for e in refreshed}
 
     submitted_eids = [it["enrollment_id"] for it in normalized_items]
     checked_at_qs = Attendance.objects.filter(
@@ -3968,7 +3971,7 @@ def attendance_details(request: HttpRequest) -> HttpResponse:
         recs = att_list_map.get(e.id, [])
 
         present_cnt = sum(1 for r in recs if r.get("status") == Attendance.Status.PRESENT)
-        excused_cnt = sum(1 for r in recs if r.get("status") == Attendance.Status.EXCUSED)
+        excused_cnt = sum(1 for r in recs if r.get("status") in LEAVE_STATUSES)
         noshow_cnt = sum(1 for r in recs if r.get("status") == Attendance.Status.NO_SHOW)
 
         grouped_rows.setdefault(e.tutoring_class_id, []).append({
@@ -3978,7 +3981,7 @@ def attendance_details(request: HttpRequest) -> HttpResponse:
             "excused_cnt": excused_cnt,
             "noshow_cnt": noshow_cnt,
             "total_sessions": int(getattr(e, "sessions_total", 0) or 0),
-            "remaining_sessions": int(getattr(e, "remaining_sessions", 0) or 0),
+            "remaining_sessions": _sessions_num(getattr(e, "remaining_sessions", 0)),
         })
 
     session_cols = list(range(1, 23))
@@ -4028,9 +4031,9 @@ def remaining_attendance_search(request: HttpRequest) -> HttpResponse:
             selected_enrollment = enrollments[0]
 
         if selected_enrollment:
-            remaining_sessions = int(selected_enrollment.remaining_sessions or 0)
+            remaining_sessions = Decimal(selected_enrollment.remaining_sessions or 0)
             hours_per_session = float(selected_enrollment.tutoring_class.hours_per_session or 0)
-            remaining_hours_display = _q_hours(Decimal(remaining_sessions) * Decimal(str(hours_per_session)))
+            remaining_hours_display = _q_hours(remaining_sessions * Decimal(str(hours_per_session)))
             completion = _expected_course_completion_date(selected_enrollment)
             expected_completion_label = _thai_schedule_date(completion) if completion else "ครบคอร์สแล้ว"
 
@@ -4729,7 +4732,7 @@ def student_portal_home(request: HttpRequest) -> HttpResponse:
     # Headline counts for the attendance summary strip.
     attendance_list = _portal_attendance_rows(attendance_rows)
     present_count = sum(1 for a in attendance_list if a.status == Attendance.Status.PRESENT)
-    excused_count = sum(1 for a in attendance_list if a.status == Attendance.Status.EXCUSED)
+    excused_count = sum(1 for a in attendance_list if a.status in LEAVE_STATUSES)
     no_show_count = sum(1 for a in attendance_list if a.status == Attendance.Status.NO_SHOW)
 
     used_sessions = selected_enrollment.used_sessions() if selected_enrollment else 0
@@ -5153,6 +5156,30 @@ def _year_range(anchor: date) -> tuple[date, date]:
     return date(anchor.year, 1, 1), date(anchor.year, 12, 31)
 
 
+# Renewal notices appear once an enrollment is at or below this many
+# sessions. 1.5 rather than 1 so a course ending on a half-day leave still
+# prompts staff to send the notice.
+RENEWAL_NOTICE_REMAINING_MAX = Decimal("1.5")
+
+
+# Both kinds of leave; half-day leave is still ลา in any headcount, it just
+# also burns half a session.
+LEAVE_STATUSES = ("excused", "excused_half")
+
+
+def _sessions_num(value) -> float:
+    """Session count for JSON/JS: keeps the .5, drops Decimal's trailing zeros.
+
+    int() would silently turn 1.5 remaining sessions into 1, which is the
+    exact mistake half-day leave makes easy to introduce.
+    """
+    try:
+        d = Decimal(str(value or 0))
+    except Exception:
+        return 0.0
+    return float(d)
+
+
 def _safe_date(s: str | None) -> date | None:
     if not s:
         return None
@@ -5568,8 +5595,13 @@ def school_overview(request: HttpRequest) -> HttpResponse:
             item["present"] += 1
             item["deducted_count"] += 1
             item["class_ids"].add(a.enrollment.tutoring_class_id)
-        elif a.status == Attendance.Status.EXCUSED:
+        elif a.status in LEAVE_STATUSES:
             item["excused"] += 1
+            # A half-day leave still consumes half a session, so it has to
+            # reach the revenue estimate even though it reads as ลา above.
+            if a.status == Attendance.Status.EXCUSED_HALF:
+                item["deducted_count"] += Decimal("0.5")
+                item["class_ids"].add(a.enrollment.tutoring_class_id)
         elif a.status == Attendance.Status.NO_SHOW:
             item["no_show"] += 1
             item["deducted_count"] += 1
@@ -5629,8 +5661,13 @@ def school_overview(request: HttpRequest) -> HttpResponse:
             item["present"] += 1
             item["deducted_count"] += 1
             item["class_ids"].add(a.enrollment.tutoring_class_id)
-        elif a.status == Attendance.Status.EXCUSED:
+        elif a.status in LEAVE_STATUSES:
             item["excused"] += 1
+            # A half-day leave still consumes half a session, so it has to
+            # reach the revenue estimate even though it reads as ลา above.
+            if a.status == Attendance.Status.EXCUSED_HALF:
+                item["deducted_count"] += Decimal("0.5")
+                item["class_ids"].add(a.enrollment.tutoring_class_id)
         elif a.status == Attendance.Status.NO_SHOW:
             item["no_show"] += 1
             item["deducted_count"] += 1
@@ -5712,7 +5749,7 @@ def _school_finance_filtered_data(request: HttpRequest):
         enrollment__tutoring_class__is_active=True,
         status__in=[Attendance.Status.PRESENT, Attendance.Status.NO_SHOW],
     )
-    deducted_count = att_qs.count()
+    deducted_count = att_qs.aggregate(n=Sum("deducted_units"))["n"] or Decimal("0")
     estimated_revenue = Decimal(deducted_count) * revenue_per_student
 
     expense_rows = (
@@ -5802,7 +5839,7 @@ def _expected_course_completion_date(enrollment: Enrollment | None) -> date | No
     """
     if not enrollment or not enrollment.tutoring_class_id:
         return None
-    remaining = int(enrollment.remaining_sessions or 0)
+    remaining = Decimal(enrollment.remaining_sessions or 0)
     if remaining <= 0:
         return None
 
@@ -6013,8 +6050,10 @@ def course_renewal_notice_list(request: HttpRequest) -> HttpResponse:
     notified_rows = []
 
     for enrollment in enrollments_qs:
-        remaining_sessions = int(enrollment.remaining_sessions or 0)
-        if remaining_sessions >= 2:
+        remaining_sessions = Decimal(enrollment.remaining_sessions or 0)
+        # Half-day leave can leave 1.5 on the clock, which still means "this
+        # course is nearly done" -- so the cut-off is 1.5, not 2.
+        if remaining_sessions > RENEWAL_NOTICE_REMAINING_MAX:
             continue
 
         # Do NOT apply date filters here.
@@ -6131,7 +6170,7 @@ def course_renewal_notice_list(request: HttpRequest) -> HttpResponse:
                 "enrollment": enrollment,
                 "student": enrollment.student,
                 "tutoring_class": enrollment.tutoring_class,
-                "remaining": int(enrollment.remaining_sessions or 0),
+                "remaining": _sessions_num(enrollment.remaining_sessions),
                 "default_expected_end": expected_end,
                 "default_next_start": next_start,
             })
@@ -6332,28 +6371,37 @@ def _thai_weekday_label(d) -> str:
     return _THAI_WEEKDAYS[d.weekday()]
 
 
-def _parse_att_count(raw) -> int | None:
-    """?att_n= override from the renewal notice page; None means "use the round"."""
+def _parse_att_count(raw):
+    """?att_n= override from the renewal notice page; None means "use the round".
+
+    Accepts halves (8.5) since a half-day leave can leave the count on a .5.
+    """
     try:
-        n = int(str(raw).strip())
-    except (TypeError, ValueError):
+        n = Decimal(str(raw).strip())
+    except Exception:
         return None
-    return max(min(n, 200), 0)
+    # Snap to the nearest half; anything finer is meaningless here.
+    n = (n * 2).to_integral_value() / 2
+    return max(min(n, Decimal("200")), Decimal("0"))
 
 
-def _attendance_timeline_for_enrollment(enrollment, show_count: int | None = None) -> dict:
+def _attendance_timeline_for_enrollment(enrollment, show_count=None) -> dict:
     """Timeline for the attendance card shown under the renewal notice.
 
     The card covers the student's *current round*, not a fixed 10:
       round_size = sessions granted by the latest issued receipt
       used       = round_size - remaining_sessions
-    so a 10-session round with 1 left shows the 9 most recent sessions that
-    consumed a credit (มา and ขาด both deduct), with any ลา inside that span
-    slotted in by date, then one green "remaining" dot per session left.
+
+    Everything counts in *units* rather than rows, because a half-day leave
+    burns 0.5: a 10-session round with 1.5 left is 8.5 used, i.e. eight full
+    days plus one half-day leave. Rows are walked newest-first until their
+    units add up to that figure.
     """
     empty = {
-        "rows": [], "remaining_slots": [], "round_size": 0, "used_count": 0,
-        "remaining": 0, "excused_count": 0, "no_show_count": 0, "window_start": None,
+        "rows": [], "remaining_slots": [], "round_size": Decimal("0"),
+        "used_count": Decimal("0"), "default_count": Decimal("0"), "is_custom": False,
+        "remaining": Decimal("0"), "excused_count": 0, "no_show_count": 0,
+        "half_leave_count": 0, "window_start": None,
     }
     if not enrollment:
         return empty
@@ -6364,50 +6412,64 @@ def _attendance_timeline_for_enrollment(enrollment, show_count: int | None = Non
         .order_by("-payment_date", "-created_at")
         .first()
     )
-    remaining = int(enrollment.remaining_sessions or 0)
+    remaining = Decimal(enrollment.remaining_sessions or 0)
     if latest_payment and latest_payment.sessions_granted:
-        round_size = int(latest_payment.sessions_granted)
+        round_size = Decimal(latest_payment.sessions_granted)
     else:
         # No receipt on file (legacy enrollment) -- best guess is the
         # enrollment's own total.
-        round_size = int(enrollment.sessions_total or 0)
+        round_size = Decimal(enrollment.sessions_total or 0)
 
-    remaining_in_round = max(min(remaining, round_size), 0)
-    used_count = max(round_size - remaining_in_round, 0)
-    default_count = used_count
+    remaining_in_round = max(min(remaining, round_size), Decimal("0"))
+    default_count = max(round_size - remaining_in_round, Decimal("0"))
     # Parents sometimes ask to see further back than the current round.
-    if show_count is not None:
-        used_count = show_count
+    used_target = default_count if show_count is None else Decimal(show_count)
 
-    deducted = list(
-        Attendance.objects
-        .filter(enrollment=enrollment, deducted=True)
-        .order_by("-attendance_date", "-checked_at")[:used_count]
-    ) if used_count else []
-    deducted.reverse()  # chronological
+    consumed = []
+    used_total = Decimal("0")
+    if used_target > 0:
+        for a in (
+            Attendance.objects
+            .filter(enrollment=enrollment, deducted=True)
+            .order_by("-attendance_date", "-checked_at")
+            .iterator()
+        ):
+            consumed.append(a)
+            used_total += Decimal(a.deducted_units or 0)
+            if used_total >= used_target:
+                break
+    consumed.reverse()  # chronological
 
-    window_start = deducted[0].attendance_date if deducted else None
+    window_start = consumed[0].attendance_date if consumed else None
     if latest_payment and (window_start is None or latest_payment.payment_date < window_start):
         payment_floor = latest_payment.payment_date
     else:
         payment_floor = window_start
 
     rows = []
-    for a in deducted:
+    for a in consumed:
+        if a.status == Attendance.Status.PRESENT:
+            kind = "present"
+        elif a.status == Attendance.Status.EXCUSED_HALF:
+            kind = "half_leave"
+        else:
+            kind = "no_show"
         rows.append({
-            "kind": "present" if a.status == Attendance.Status.PRESENT else "no_show",
-            "date": a.attendance_date, "sort_key": (a.attendance_date, 0),
+            "kind": kind, "date": a.attendance_date, "sort_key": (a.attendance_date, 0),
+            "units": Decimal(a.deducted_units or 0),
             "date_label": _thai_date_label(a.attendance_date),
             "weekday_label": _thai_weekday_label(a.attendance_date),
         })
     if window_start:
         for a in (
             Attendance.objects
-            .filter(enrollment=enrollment, status=Attendance.Status.EXCUSED, attendance_date__gte=window_start)
+            .filter(enrollment=enrollment, status=Attendance.Status.EXCUSED,
+                    attendance_date__gte=window_start)
             .order_by("attendance_date", "checked_at")
         ):
             rows.append({
                 "kind": "excused", "date": a.attendance_date, "sort_key": (a.attendance_date, 1),
+                "units": Decimal("0"),
                 "date_label": _thai_date_label(a.attendance_date),
                 "weekday_label": _thai_weekday_label(a.attendance_date),
             })
@@ -6419,27 +6481,49 @@ def _attendance_timeline_for_enrollment(enrollment, show_count: int | None = Non
         ):
             rows.append({
                 "kind": "payment", "date": p.payment_date, "sort_key": (p.payment_date, -1),
+                "units": Decimal("0"),
                 "date_label": _thai_date_label(p.payment_date),
-                "amount": p.amount_paid, "sessions": p.sessions_granted, "receipt_no": p.receipt_no,
+                "amount": p.amount_paid, "sessions": p.sessions_granted,
+                "receipt_no": p.receipt_no,
             })
 
     rows.sort(key=lambda r: r["sort_key"])
-    seq = 0
+
+    # Full sessions get a running number; a half-day leave shows ½ instead, so
+    # the numbering never implies it consumed a whole session.
+    seq = Decimal("0")
     for r in rows:
         if r["kind"] in ("present", "no_show"):
             seq += 1
-            r["seq"] = seq
+            r["seq"] = int(seq)
+        elif r["kind"] == "half_leave":
+            seq += Decimal("0.5")
+            r["seq"] = "½"
+
+    # Remaining dots: one per whole session left, plus a half dot for the .5.
+    whole_left = int(remaining_in_round)
+    slots = []
+    n = seq
+    for _ in range(whole_left):
+        n += 1
+        slots.append({"label": str(int(n)), "half": False})
+    if remaining_in_round - whole_left >= Decimal("0.5"):
+        slots.append({"label": "½", "half": True})
 
     return {
         "rows": rows,
-        "remaining_slots": list(range(seq + 1, seq + 1 + remaining_in_round)),
+        "remaining_slots": slots,
         "round_size": round_size,
-        "used_count": len(deducted),
+        "used_count": used_total,
         "default_count": default_count,
-        "is_custom": show_count is not None and show_count != default_count,
+        "is_custom": show_count is not None and Decimal(show_count) != default_count,
         "remaining": remaining_in_round,
         "excused_count": sum(1 for r in rows if r["kind"] == "excused"),
         "no_show_count": sum(1 for r in rows if r["kind"] == "no_show"),
+        "half_leave_count": sum(1 for r in rows if r["kind"] == "half_leave"),
+        # A trailing .5 is not billed; the parent is offered one catch-up clip
+        # instead, so both documents need to say so.
+        "has_half_left": (remaining_in_round - int(remaining_in_round)) >= Decimal("0.5"),
         "window_start": window_start,
     }
 
@@ -6752,7 +6836,7 @@ def _weekly_test_attendance_status(att: Attendance | None) -> str:
         return WeeklyTestScore.AttendanceStatus.NOT_CHECKED
     if att.status == Attendance.Status.PRESENT:
         return WeeklyTestScore.AttendanceStatus.PRESENT
-    if att.status == Attendance.Status.EXCUSED:
+    if att.status in LEAVE_STATUSES:
         return WeeklyTestScore.AttendanceStatus.EXCUSED
     if att.status == Attendance.Status.NO_SHOW:
         return WeeklyTestScore.AttendanceStatus.NO_SHOW
@@ -7636,7 +7720,7 @@ def _active_enrollment_summaries_by_student() -> dict:
         out.setdefault(e.student_id, []).append({
             "id": e.id,
             "class_name": e.tutoring_class.name,
-            "remaining_sessions": int(e.remaining_sessions or 0),
+            "remaining_sessions": _sessions_num(e.remaining_sessions),
         })
     return out
 

@@ -1,3 +1,4 @@
+{% load extras %}
 {% load static %}
 {% load humanize %}
 <!doctype html>
@@ -130,7 +131,7 @@
           <div class="hero">
             <div class="hero-label">คงเหลือตอนนี้</div>
             <div class="hero-figure">
-              <div class="hero-num">{{ remaining_sessions }}</div>
+              <div class="hero-num">{{ remaining_sessions|sessions }}</div>
               <div class="hero-unit">ครั้ง</div>
             </div>
             <div class="hero-asof">ข้อมูล ณ วันที่ {% now "d/m/Y" %}</div>

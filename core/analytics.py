@@ -612,8 +612,10 @@ def recognized_revenue_rows(start: date, end: date, class_ids=None) -> list[dict
     """Revenue earned per attended session, valued at that student's own rate.
 
     Revenue is recognised when a session is consumed (`deducted=True`, i.e.
-    present or no-show) -- not when the receipt is issued. That matches how the
-    service is actually delivered, and is what makes weekly revenue meaningful.
+    present, no-show, or a half-day leave) -- not when the receipt is issued.
+    That matches how the service is actually delivered, and is what makes
+    weekly revenue meaningful. A half-day leave earns half a session's hours,
+    so `deducted_units` scales the row rather than counting it as a full one.
     """
     from .models import Attendance
 
@@ -627,25 +629,27 @@ def recognized_revenue_rows(start: date, end: date, class_ids=None) -> list[dict
     rows = list(qs.values_list(
         "student_id", "attendance_date",
         "enrollment__tutoring_class_id", "enrollment__tutoring_class__name",
+        "deducted_units",
     ))
     timeline = build_rate_timeline({r[0] for r in rows if r[0]})
     fallback = school_average_hourly_rate(timeline)
 
     out = []
-    for student_id, att_date, cls_id, cls_name in rows:
+    for student_id, att_date, cls_id, cls_name, units in rows:
         rate = rate_on(timeline, student_id, att_date)
         estimated = rate is None
         if estimated:
             rate = fallback
         rate = rate or ZERO
+        hours = SESSION_HOURS * _d(units if units is not None else 1)
         out.append({
             "student_id": student_id,
             "date": att_date,
             "class_id": cls_id,
             "class_name": cls_name or "-",
             "rate": rate,
-            "hours": SESSION_HOURS,
-            "revenue": rate * SESSION_HOURS,
+            "hours": hours,
+            "revenue": rate * hours,
             "estimated": estimated,
         })
     return out

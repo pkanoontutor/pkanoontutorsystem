@@ -1,4 +1,5 @@
 {% extends "core/base.html" %}
+{% load extras %}
 {% block title %}Remaining Attendance{% endblock %}
 
 {% block head %}
@@ -118,7 +119,7 @@
 
         <div class="stat-grid">
           <div class="stat {% if remaining_sessions <= 2 %}low{% elif remaining_sessions <= 5 %}warn{% else %}ok{% endif %}">
-            <b>{{ remaining_sessions }}</b><span>ครั้งที่เหลือ</span>
+            <b>{{ remaining_sessions|sessions }}</b><span>ครั้งที่เหลือ</span>
           </div>
           <div class="stat">
             <b>{{ remaining_hours_display }}</b><span>ชั่วโมงที่เหลือ</span>

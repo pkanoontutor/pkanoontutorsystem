@@ -631,11 +631,13 @@ class Enrollment(models.Model):
         super().save(*args, **kwargs)
 
     def used_sessions(self):
-        return self.attendances.filter(deducted=True).count()
+        """Sessions consumed, as a Decimal -- a half-day leave burns 0.5."""
+        total = self.attendances.aggregate(n=models.Sum("deducted_units"))["n"]
+        return Decimal(total or 0)
 
     @property
     def remaining_sessions(self):
-        return self.sessions_total - self.used_sessions()
+        return Decimal(self.sessions_total or 0) - self.used_sessions()
 
 
 # -----------------------
@@ -1056,11 +1058,11 @@ class CourseRenewalNotice(models.Model):
         super().save(*args, **kwargs)
 
     @property
-    def remaining_sessions_snapshot(self) -> int:
+    def remaining_sessions_snapshot(self) -> Decimal:
         try:
-            return int(self.enrollment.remaining_sessions)
+            return Decimal(self.enrollment.remaining_sessions)
         except Exception:
-            return 0
+            return Decimal("0")
 
 
 # -----------------------
@@ -1070,7 +1072,17 @@ class Attendance(models.Model):
     class Status(models.TextChoices):
         PRESENT = "present", "มาเรียน (หัก 1 ครั้ง)"
         EXCUSED = "excused", "ลาเรียน (ไม่หักครั้ง)"
+        EXCUSED_HALF = "excused_half", "ลาเรียน (หัก 0.5 ครั้ง)"
         NO_SHOW = "no_show", "ขาดเรียนโดยไม่แจ้ง (หัก 1 ครั้ง)"
+
+    # How much of a session each status consumes. Kept as the single source
+    # of truth so the value on a row and every total agree.
+    DEDUCT_UNITS = {
+        "present": Decimal("1"),
+        "excused": Decimal("0"),
+        "excused_half": Decimal("0.5"),
+        "no_show": Decimal("1"),
+    }
 
     student = models.ForeignKey(Student, on_delete=models.PROTECT, related_name="attendances")
     enrollment = models.ForeignKey(Enrollment, on_delete=models.PROTECT, related_name="attendances")
@@ -1079,6 +1091,10 @@ class Attendance(models.Model):
     status = models.CharField("สถานะ", max_length=20, choices=Status.choices, default=Status.PRESENT)
 
     deducted = models.BooleanField("หักครั้ง", default=True)
+    deducted_units = models.DecimalField(
+        "จำนวนครั้งที่หัก", max_digits=4, decimal_places=1, default=Decimal("1"),
+        help_text="1 = หักเต็มครั้ง, 0.5 = ลาแบบหักครึ่ง, 0 = ลาแบบไม่หัก",
+    )
     checked_at = models.DateTimeField(default=timezone.now)
 
     class Meta:
@@ -1093,7 +1109,10 @@ class Attendance(models.Model):
         ordering = ("-attendance_date", "-checked_at")
 
     def save(self, *args, **kwargs):
-        self.deducted = self.status in (self.Status.PRESENT, self.Status.NO_SHOW)
+        self.deducted_units = self.DEDUCT_UNITS.get(self.status, Decimal("1"))
+        # Kept in sync for the older boolean reports; "did this consume any
+        # part of a session" is still a meaningful question.
+        self.deducted = self.deducted_units > 0
         super().save(*args, **kwargs)
 
     def __str__(self) -> str:

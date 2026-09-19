@@ -1,3 +1,4 @@
+{% load extras %}
 {% load static %}
 <!doctype html>
 <html>
@@ -62,7 +63,7 @@
       <span>
         {{ tutoring_class.name }} |
         Enrollment: {{ enrollment.sale_run_no }}
-        <span class="muted"> (เหลือ {{ remaining_sessions }} ครั้ง)</span>
+        <span class="muted"> (เหลือ {{ remaining_sessions|sessions }} ครั้ง)</span>
       </span>
     </div>
 

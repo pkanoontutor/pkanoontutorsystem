@@ -1,3 +1,4 @@
+{% load extras %}
 {% load static %}
 {% load humanize %}
 <!doctype html>
@@ -65,7 +66,14 @@
     .tl-row.excused{background:#eff6ff;border-color:#bfdbfe}.tl-row.excused .tl-dot{background:#dbeafe;font-size:14px}.tl-row.excused .tl-tag{background:#dbeafe;color:#1d4ed8}
     .tl-row.payment{background:#fffbeb;border-color:#fde68a}.tl-row.payment .tl-dot{background:#fef3c7;font-size:14px}.tl-row.payment .tl-date{color:#9a3412}.tl-row.payment .tl-tag{background:#fed7aa;color:#9a3412}
     /* Sessions still to come: outlined green dot, continuing the same count. */
+    .tl-row.half{background:#fff7ed;border-color:#fdba74}
+    .tl-row.half .tl-dot{background:#f97316}
+    .tl-row.half .tl-tag{background:#fed7aa;color:#9a3412}
     .tl-row.remain{background:#fff;border:1.5px dashed #86efac}.tl-row.remain .tl-dot{background:#fff;border:2.5px solid #22c55e;color:#16a34a}
+    .tl-row.remain-half{border-color:#fdba74;background:#fffbf5}
+    .tl-row.remain-half .tl-dot{border-color:#f97316;color:#ea580c}
+    .tl-row.remain-half .tl-date{color:#c2410c}
+    .tl-row.remain-half .tl-tag{background:#fed7aa;color:#9a3412}
     .tl-row.remain .tl-date{color:#16a34a}.tl-row.remain .tl-tag{background:#dcfce7;color:#15803d}
     .att-empty{border-radius:16px;border:1.5px dashed #cbd5e1;padding:18px;text-align:center;font-size:13px;font-weight:900;color:#94a3b8;margin-top:8px}
     @media(max-width:980px){.page{grid-template-columns:1fr}.editor{position:static}.receipt{width:min(100%,440px)}.btn{flex:1}.btn.icon{flex:0 0 38px}}
@@ -269,6 +277,12 @@
           </div>
         </div>
 
+        {% if att.has_half_left %}
+          <div class="note" style="background:#eff6ff;border-color:#bfdbfe;color:#1d4ed8;">
+            🎬 คอร์สนี้เหลือ {{ att.remaining|sessions }} ครั้ง — เศษ 0.5 ครั้งไม่ถูกนำมาคิดเงินในราคาต่อคอร์สด้านบน
+            น้องสามารถดูคลิปเรียนย้อนหลังเพิ่มอีก 1 คลิปเพื่อเรียนให้ครบส่วนที่เหลือได้ครับ
+          </div>
+        {% endif %}
         <div class="note">{{ notice.note_wording }}</div>
         <div class="foot">สร้างเมื่อ {{ notice.created_at|date:"d/m/Y H:i" }} · อัปเดตล่าสุด {{ notice.updated_at|date:"d/m/Y H:i" }}</div>
       </div>
@@ -276,11 +290,11 @@
       <div class="card-label">📋 ใบประวัติการเข้าเรียน</div>
       <form class="att-count" method="get">
         <label for="attN">แสดงครั้งเรียนล่าสุด</label>
-        <input type="number" id="attN" name="att_n" min="0" max="200" value="{{ att.used_count }}">
+        <input type="number" id="attN" name="att_n" min="0" max="200" value="{{ att.used_count|sessions }}">
         <span class="hint" style="width:auto;">ครั้ง</span>
         <button class="btn blue" type="submit">แสดง</button>
-        {% if att.is_custom %}<a class="btn soft" href="?">รีเซ็ต ({{ att.default_count }})</a>{% endif %}
-        <div class="hint">ค่าเริ่มต้น = ครั้งที่สมัครรอบล่าสุด − คงเหลือ ({{ att.default_count }} ครั้ง)</div>
+        {% if att.is_custom %}<a class="btn soft" href="?">รีเซ็ต ({{ att.default_count|sessions }})</a>{% endif %}
+        <div class="hint">ค่าเริ่มต้น = ครั้งที่สมัครรอบล่าสุด − คงเหลือ ({{ att.default_count|sessions }} ครั้ง)</div>
       </form>
       <div class="toolbar">
         <button class="btn blue" type="button" onclick="openImage('attendanceCard')">Open Image in New Tab</button>
@@ -300,18 +314,18 @@
           <div class="meta">
             คอร์สที่เรียน: {{ tutoring_class.name }}<br>
             ระดับชั้น: {{ student.grade_level|default:"-" }}<br>
-            คอร์สรอบล่าสุด: {{ att.round_size }} ครั้ง
+            คอร์สรอบล่าสุด: {{ att.round_size|sessions }} ครั้ง
           </div>
         </div>
 
         <div class="att-sum">
-          <div class="used"><div class="k">เรียนไปแล้ว</div><div class="v">{{ att.used_count }}</div></div>
-          <div class="leave"><div class="k">ลา</div><div class="v">{{ att.excused_count }}</div></div>
-          <div class="left"><div class="k">คงเหลือ</div><div class="v">{{ att.remaining }}</div></div>
+          <div class="used"><div class="k">เรียนไปแล้ว</div><div class="v">{{ att.used_count|sessions }}</div></div>
+          <div class="leave"><div class="k">ลา</div><div class="v">{{ att.excused_count|add:att.half_leave_count }}</div></div>
+          <div class="left"><div class="k">คงเหลือ</div><div class="v">{{ att.remaining|sessions }}</div></div>
         </div>
 
         <div class="att-title">
-          <span>{% if att.is_custom %}เข้าเรียน {{ att.used_count }} ครั้งล่าสุด{% else %}รอบนี้ {{ att.round_size }} ครั้ง{% endif %}</span>
+          <span>{% if att.is_custom %}เข้าเรียน {{ att.used_count|sessions }} ครั้งล่าสุด{% else %}รอบนี้ {{ att.round_size|sessions }} ครั้ง{% endif %}</span>
           {% if att.window_start %}<small>ตั้งแต่ {{ att.window_start|date:"d/m/Y" }}</small>{% endif %}
         </div>
 
@@ -326,6 +340,10 @@
                 <div class="tl-row no_show"><div class="tl-dot">{{ r.seq }}</div>
                   <div><div class="tl-date">{{ r.date_label }}</div><div class="tl-sub">ไม่ได้แจ้งล่วงหน้า · หักครั้งเรียน</div></div>
                   <div class="tl-tag">ขาด</div></div>
+              {% elif r.kind == "half_leave" %}
+                <div class="tl-row half"><div class="tl-dot">{{ r.seq }}</div>
+                  <div><div class="tl-date">{{ r.date_label }}</div><div class="tl-sub">ลาแบบหักครึ่ง · หัก 0.5 ครั้ง</div></div>
+                  <div class="tl-tag">ลา ½</div></div>
               {% elif r.kind == "excused" %}
                 <div class="tl-row excused"><div class="tl-dot">📩</div>
                   <div><div class="tl-date">{{ r.date_label }}</div><div class="tl-sub">แจ้งลา · ไม่หักครั้งเรียน</div></div>
@@ -337,8 +355,11 @@
               {% endif %}
             {% endfor %}
             {% for n in att.remaining_slots %}
-              <div class="tl-row remain"><div class="tl-dot">{{ n }}</div>
-                <div><div class="tl-date">ครั้งที่ {{ n }}</div><div class="tl-sub">ยังไม่ได้เรียน</div></div>
+              <div class="tl-row remain{% if n.half %} remain-half{% endif %}"><div class="tl-dot">{{ n.label }}</div>
+                <div>
+                  <div class="tl-date">{% if n.half %}อีกครึ่งครั้ง{% else %}ครั้งที่ {{ n.label }}{% endif %}</div>
+                  <div class="tl-sub">{% if n.half %}ดูคลิปย้อนหลังได้ 1 คลิปเพื่อเรียนให้ครบ{% else %}ยังไม่ได้เรียน{% endif %}</div>
+                </div>
                 <div class="tl-tag">คงเหลือ</div></div>
             {% endfor %}
           </div>
@@ -347,8 +368,9 @@
         {% endif %}
 
         <div class="note">
-          รอบนี้เรียนไปแล้ว {{ att.used_count }} ครั้ง{% if att.excused_count %} ลา {{ att.excused_count }} ครั้ง{% endif %} คงเหลือ {{ att.remaining }} ครั้ง
-          · การลาที่แจ้งล่วงหน้าไม่หักครั้งเรียนครับ
+          รอบนี้เรียนไปแล้ว {{ att.used_count|sessions }} ครั้ง{% if att.excused_count %} ลา {{ att.excused_count }} ครั้ง{% endif %}{% if att.half_leave_count %} ลาแบบหักครึ่ง {{ att.half_leave_count }} ครั้ง{% endif %} คงเหลือ {{ att.remaining|sessions }} ครั้ง
+          · การลาที่แจ้งล่วงหน้าไม่หักครั้งเรียน ส่วนการลาแบบหักครึ่งจะหัก 0.5 ครั้งครับ{% if att.has_half_left %}
+          <br>🎬 เศษ 0.5 ครั้งที่เหลือ ดูคลิปเรียนย้อนหลังเพิ่มได้ 1 คลิปครับ{% endif %}
         </div>
         <div class="foot">ข้อมูล ณ วันที่ {% now "d/m/Y H:i" %}</div>
       </div>

@@ -152,37 +152,40 @@
     .section-head{display:flex;align-items:baseline;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:18px}
     .section-title{font-size:clamp(20px,2.6vw,26px);font-weight:700;letter-spacing:-.02em;margin:0}
     .section-note{font-size:13.5px;color:var(--ink-soft)}
+    /* Two entry points only: current students sign in, new students apply.
+       Everything else now lives behind the portal hub. */
     .service-grid{
       display:grid;
-      grid-template-columns:repeat(auto-fit,minmax(212px,1fr));
-      gap:14px;
+      grid-template-columns:repeat(auto-fit,minmax(300px,1fr));
+      gap:18px;
     }
     .service{
-      display:flex;flex-direction:column;gap:10px;
-      background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
-      padding:20px 18px 18px;text-decoration:none;color:inherit;
+      display:flex;flex-direction:column;gap:12px;
+      background:var(--card);border:2px solid var(--line);border-radius:22px;
+      padding:30px 26px 26px;text-decoration:none;color:inherit;
       box-shadow:var(--shadow-sm);
       transition:transform .18s ease, box-shadow .18s ease, border-color .18s ease;
     }
-    .service:hover{transform:translateY(-3px);box-shadow:var(--shadow-md);border-color:#e0e3e9}
+    .service:hover{transform:translateY(-4px);box-shadow:var(--shadow-md);border-color:var(--gold-deep)}
     .service-icon{
-      width:46px;height:46px;border-radius:14px;
-      display:grid;place-items:center;font-size:23px;
+      width:64px;height:64px;border-radius:19px;
+      display:grid;place-items:center;font-size:32px;
     }
     .i-apply{background:#fff1e2}
-    .i-hours{background:#e6f7ee}
-    .i-score{background:#efeaff}
-    .i-online{background:#e4f0ff}
-    .i-star{background:#fef6dc}
-    .i-replay{background:#ffe9e4}
-    .service-name{font-size:16px;font-weight:700;line-height:1.3;letter-spacing:-.01em}
-    .service-desc{font-size:13px;color:var(--ink-soft);line-height:1.55;flex:1}
+    .i-current{background:#e6f7ee}
+    .service-name{font-size:22px;font-weight:700;line-height:1.3;letter-spacing:-.01em}
+    .service-desc{font-size:14.5px;color:var(--ink-soft);line-height:1.6;flex:1}
     .service-go{
-      font-size:13px;font-weight:600;color:var(--gold-deep);
-      display:inline-flex;align-items:center;gap:5px;
+      font-size:15px;font-weight:700;color:var(--gold-deep);
+      display:inline-flex;align-items:center;gap:6px;margin-top:2px;
     }
-    .service:hover .service-go .arrow{transform:translateX(3px)}
+    .service:hover .service-go .arrow{transform:translateX(4px)}
     .service-go .arrow{transition:transform .18s ease}
+    @media(max-width:560px){
+      .service{padding:24px 20px 20px}
+      .service-name{font-size:19px}
+      .service-icon{width:56px;height:56px;font-size:28px}
+    }
 
     /* ---------------- footer ---------------- */
     .site-footer{margin-top:52px;border-top:1px solid var(--line);background:#fff;
@@ -284,48 +287,24 @@
       </div>
 
       <div class="service-grid">
+        <a class="service" href="/portal/">
+          <span class="service-icon i-current">👨‍🎓</span>
+          <span class="service-name">เข้าสู่ระบบนักเรียนปัจจุบัน</span>
+          <span class="service-desc">
+            เช็คชั่วโมงเรียนคงเหลือ ดูคลิปเรียนย้อนหลัง และเข้าคอร์สเรียนออนไลน์
+            — เข้าสู่ระบบครั้งเดียว ใช้ได้ทุกระบบ
+          </span>
+          <span class="service-go">เข้าสู่ระบบ <span class="arrow">→</span></span>
+        </a>
+
         <a class="service" href="/admission/">
           <span class="service-icon i-apply">📝</span>
-          <span class="service-name">สมัครเรียน / จองทดลองเรียน</span>
-          <span class="service-desc">กรอกข้อมูลจองรอบเรียน ทดลองเรียน หรือจองที่นั่งล่วงหน้า</span>
+          <span class="service-name">นักเรียนใหม่ สมัครเรียน / จองทดลองเรียน</span>
+          <span class="service-desc">
+            กรอกข้อมูลเพื่อจองรอบเรียน ทดลองเรียน หรือจองที่นั่งล่วงหน้า
+          </span>
           <span class="service-go">เริ่มเลย <span class="arrow">→</span></span>
         </a>
-
-        <a class="service" href="/student-portal/">
-          <span class="service-icon i-hours">⏳</span>
-          <span class="service-name">ตรวจสอบชั่วโมงคงเหลือ</span>
-          <span class="service-desc">ดูจำนวนครั้งเรียนคงเหลือและประวัติการเข้าเรียนของน้อง</span>
-          <span class="service-go">เข้าดู <span class="arrow">→</span></span>
-        </a>
-
-        <a class="service" href="/test-scores/">
-          <span class="service-icon i-score">🏆</span>
-          <span class="service-name">ระบบประกาศผลการสอบ</span>
-          <span class="service-desc">ตรวจสอบคะแนนสอบ อันดับ และสรุปผลรายบุคคล</span>
-          <span class="service-go">ดูผลสอบ <span class="arrow">→</span></span>
-        </a>
-
-        <a class="service" href="/online-course-p6/">
-          <span class="service-icon i-online">🎓</span>
-          <span class="service-name">คอร์สติวออนไลน์ ป.6</span>
-          <span class="service-desc">เข้าเรียนออนไลน์ เอกสารประกอบการเรียน และคลิปย้อนหลัง</span>
-          <span class="service-go">เข้าเรียน <span class="arrow">→</span></span>
-        </a>
-
-        <a class="service" href="/video-replay/">
-          <span class="service-icon i-replay">🎬</span>
-          <span class="service-name">ดูคลิปเรียนย้อนหลัง</span>
-          <span class="service-desc">เลือกวันที่เรียนจากปฏิทิน แล้วดูคลิปย้อนหลังของคาบเรียนวันนั้น</span>
-          <span class="service-go">เข้าดู <span class="arrow">→</span></span>
-        </a>
-
-        <a class="service" href="/star-quiz/">
-          <span class="service-icon i-star">⭐</span>
-          <span class="service-name">ระบบเทสเก็บดาว</span>
-          <span class="service-desc">ทำแบบทดสอบรายสัปดาห์ สะสมดาวไว้แลกของรางวัล</span>
-          <span class="service-go">ทำเทส <span class="arrow">→</span></span>
-        </a>
-      </div>
     </section>
   </main>
 

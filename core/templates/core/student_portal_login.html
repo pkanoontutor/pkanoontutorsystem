@@ -4,7 +4,13 @@
 {% block content %}
   <div class="card" style="max-width:520px;margin:0 auto;">
 
-    {% if request.path == '/online-course-p6/' %}
+    {% if request.path == '/portal/' %}
+      <h2 style="margin:0 0 8px 0;">👨‍🎓 เข้าสู่ระบบนักเรียนปัจจุบัน</h2>
+
+      <div style="opacity:.8;font-weight:700;margin-bottom:14px;">
+        เลือก <b>ชื่อน้อง</b> และกรอก <b>เบอร์ผู้ปกครอง</b> — เข้าครั้งเดียวใช้ได้ทั้ง 3 ระบบ
+      </div>
+    {% elif request.path == '/online-course-p6/' %}
       <h2 style="margin:0 0 8px 0;">เข้าสู่ระบบคอร์สติวออนไลน์ ป.6</h2>
 
       <div style="opacity:.8;font-weight:700;margin-bottom:14px;">

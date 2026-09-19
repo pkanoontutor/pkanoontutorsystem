@@ -159,6 +159,7 @@ urlpatterns = [
     path("test-score-admin/admission-search/", views.test_score_admission_search, name="test_score_admission_search"),
 
     # Student Portal
+    path("portal/", views.student_hub, name="student_hub"),
     path("student-portal/", views.student_portal_login, name="student_portal_login"),
     path("student-portal/student-search/", views.student_portal_student_search, name="student_portal_student_search"),
     path("student-portal/add-phone/", views.student_portal_claim_phone, name="student_portal_claim_phone"),

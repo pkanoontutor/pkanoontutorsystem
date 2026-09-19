@@ -7,7 +7,7 @@ import logging
 import os
 import re
 from datetime import date, timedelta, datetime
-from decimal import Decimal
+from decimal import Decimal, ROUND_CEILING
 from io import BytesIO
 from urllib.parse import quote
 
@@ -4500,6 +4500,10 @@ def student_portal_login(request: HttpRequest) -> HttpResponse:
             if request.path == "/video-replay/":
                 return redirect("core:class_video_home")
 
+            # ✅ ถ้า Login จากหน้ารวมของนักเรียนปัจจุบัน ให้กลับไปที่หน้ารวม
+            if request.path == "/portal/":
+                return redirect("core:student_hub")
+
             # ✅ ถ้า Login จาก Student Portal ปกติ ให้ไปหน้า Student Portal Home
             return redirect("core:student_portal_home")
 
@@ -4526,6 +4530,19 @@ def _get_portal_student(request: HttpRequest) -> Student | None:
 
     except Student.DoesNotExist:
         return None
+
+
+def student_hub(request: HttpRequest) -> HttpResponse:
+    """One door for current students.
+
+    Not signed in -> the ordinary portal login form (this same path, so the
+    POST lands back here). Signed in -> the three systems, each entered on
+    the session that already exists so nobody logs in twice.
+    """
+    student = _get_portal_student(request)
+    if not student:
+        return student_portal_login(request)
+    return render(request, "core/student_hub.html", {"student": student})
 
 
 def student_portal_logout(request: HttpRequest) -> HttpResponse:
@@ -4720,11 +4737,15 @@ def student_portal_home(request: HttpRequest) -> HttpResponse:
             .all()
         )
 
-    remaining_sessions = selected_enrollment.remaining_sessions if selected_enrollment else 0
+    remaining_sessions = (
+        Decimal(selected_enrollment.remaining_sessions) if selected_enrollment else Decimal("0")
+    )
 
+    # Decimal throughout: remaining_sessions became fractional when half-day
+    # leave arrived, and Decimal * float raises.
     hours_per_session = (
-        float(selected_enrollment.tutoring_class.hours_per_session)
-        if selected_enrollment else 0.0
+        Decimal(str(selected_enrollment.tutoring_class.hours_per_session or 0))
+        if selected_enrollment else Decimal("0")
     )
 
     remaining_hours = remaining_sessions * hours_per_session
@@ -4735,9 +4756,9 @@ def student_portal_home(request: HttpRequest) -> HttpResponse:
     excused_count = sum(1 for a in attendance_list if a.status in LEAVE_STATUSES)
     no_show_count = sum(1 for a in attendance_list if a.status == Attendance.Status.NO_SHOW)
 
-    used_sessions = selected_enrollment.used_sessions() if selected_enrollment else 0
+    used_sessions = selected_enrollment.used_sessions() if selected_enrollment else Decimal("0")
     total_sessions = selected_enrollment.sessions_total if selected_enrollment else 0
-    used_percent = round(used_sessions / total_sessions * 100) if total_sessions else 0
+    used_percent = round(used_sessions / Decimal(total_sessions) * 100) if total_sessions else 0
 
     context = {
         "student": student,
@@ -5852,7 +5873,10 @@ def _expected_course_completion_date(enrollment: Enrollment | None) -> date | No
 
     days_ahead = (target_weekday - today.weekday()) % 7
     next_session_date = today + timedelta(days=days_ahead)
-    return next_session_date + timedelta(days=7 * (remaining - 1))
+    # A trailing half session still occupies a whole week on the calendar,
+    # so round the remaining count up before turning it into weeks.
+    weeks_left = int(remaining.to_integral_value(rounding=ROUND_CEILING))
+    return next_session_date + timedelta(days=7 * (weeks_left - 1))
 
 
 def _decimal_from_post(value, default: Decimal) -> Decimal:

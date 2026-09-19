@@ -161,6 +161,8 @@ urlpatterns = [
     # Student Portal
     path("student-portal/", views.student_portal_login, name="student_portal_login"),
     path("student-portal/student-search/", views.student_portal_student_search, name="student_portal_student_search"),
+    path("student-portal/add-phone/", views.student_portal_claim_phone, name="student_portal_claim_phone"),
+    path("student-portal/add-phone/search/", views.student_portal_claim_search, name="student_portal_claim_search"),
     path("student-portal/home/", views.student_portal_home, name="student_portal_home"),
     path("student-portal/logout/", views.student_portal_logout, name="student_portal_logout"),
 

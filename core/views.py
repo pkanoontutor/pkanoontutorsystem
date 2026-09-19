@@ -4493,6 +4493,10 @@ def student_portal_login(request: HttpRequest) -> HttpResponse:
             if request.path == "/star-quiz/":
                 return redirect("core:star_quiz_home")
 
+            # ✅ ถ้า Login จากปุ่มดูคลิปย้อนหลัง ให้ไปหน้าเลือกคอร์ส
+            if request.path == "/video-replay/":
+                return redirect("core:class_video_home")
+
             # ✅ ถ้า Login จาก Student Portal ปกติ ให้ไปหน้า Student Portal Home
             return redirect("core:student_portal_home")
 
@@ -11228,3 +11232,424 @@ def revenue_analysis_weekly_data(request: HttpRequest) -> JsonResponse:
         "spread_fixed": spread_fixed,
     })
     return JsonResponse(data)
+
+
+# =========================================================
+# ✅ Class video replay (ดูคลิปย้อนหลัง)
+# =========================================================
+# Clips are unlisted YouTube played through the IFrame API with controls=0,
+# because the parent-facing player must never reveal a clip's length: subjects
+# run long or short and a visible duration invites questions we don't want to
+# field. Google Drive's /preview iframe can't be driven by JS at all, so its
+# own control bar (which prints mm:ss) would be the only way to seek.
+
+CLASS_VIDEO_SLOTS = 4
+
+
+def _class_video_periods(lesson_date: date, tutoring_class) -> list[dict]:
+    """The 4 teaching periods for a class on a date, from the daily schedule.
+
+    Falls back to empty labels when no schedule exists for that date, so a
+    clip can still be filled in by hand.
+    """
+    from .models import DailyScheduleCell
+
+    cells = (
+        DailyScheduleCell.objects
+        .filter(schedule__date=lesson_date, tutoring_class=tutoring_class)
+        .select_related("tutor")
+        .order_by("time_index")
+    )
+    by_time = {c.time_index: c for c in cells}
+
+    # A class sits either in the morning block (time_index 0-3) or the
+    # afternoon one (5-8); index 4 is the lunch break.
+    slot_name = getattr(tutoring_class, "time_slot", "") or ""
+    base = 5 if "afternoon" in slot_name else 0
+    if not by_time:
+        pass
+    elif min(by_time) >= 5:
+        base = 5
+    else:
+        base = 0
+
+    periods = []
+    for i in range(CLASS_VIDEO_SLOTS):
+        ti = base + i
+        cell = by_time.get(ti)
+        slot = TEACHING_SCHEDULE_SLOTS[ti] if ti < len(TEACHING_SCHEDULE_SLOTS) else {"label": ""}
+        periods.append({
+            "slot_index": i + 1,
+            "time_index": ti,
+            "time_label": slot.get("label", ""),
+            "subject": (cell.subject_label if cell else "") or "",
+            "tutor": cell.tutor if (cell and cell.tutor_id) else None,
+            "tutor_name": (cell.tutor.name if (cell and cell.tutor_id) else ""),
+        })
+    return periods
+
+
+def _class_video_student_classes(student) -> list:
+    return list(
+        TutoringClass.objects
+        .filter(
+            enrollments__student=student,
+            enrollments__is_active=True,
+            is_active=True,
+        )
+        .distinct()
+        .order_by("time_slot", "name")
+    )
+
+
+def _class_video_enrollment_window(student, tutoring_class) -> date | None:
+    """Earliest lesson date the student is allowed to watch.
+
+    Enrollment has no start-date field, so the anchor is the earlier of the
+    enrollment row's created_at and the student's first attendance in that
+    class: staff often key an enrollment in a few days after the child's
+    first Saturday, and using created_at alone would hide that first day's
+    clips from the very parent who paid for it.
+    """
+    created = (
+        Enrollment.objects
+        .filter(student=student, tutoring_class=tutoring_class, is_active=True)
+        .order_by("created_at")
+        .values_list("created_at", flat=True)
+        .first()
+    )
+    if not created:
+        return None
+    created_date = timezone.localtime(created).date() if timezone.is_aware(created) else created.date()
+
+    first_attended = (
+        Attendance.objects
+        .filter(student=student, enrollment__tutoring_class=tutoring_class)
+        .order_by("attendance_date")
+        .values_list("attendance_date", flat=True)
+        .first()
+    )
+    return min(created_date, first_attended) if first_attended else created_date
+
+
+# ---------- staff side ----------
+
+@login_required
+def class_video_admin(request: HttpRequest) -> HttpResponse:
+    """List of video sessions + entry point to create one."""
+    from .models import ClassVideoSession
+
+    sessions = (
+        ClassVideoSession.objects
+        .select_related("tutoring_class")
+        .prefetch_related("clips")
+        .order_by("-lesson_date", "tutoring_class__name")[:120]
+    )
+    rows = []
+    for s in sessions:
+        clips = list(s.clips.all())
+        rows.append({
+            "session": s,
+            "filled": sum(1 for c in clips if c.has_video),
+            "total": CLASS_VIDEO_SLOTS,
+            "off_schedule": sum(1 for c in clips if c.is_off_schedule),
+        })
+
+    today = timezone.localdate()
+    recent_weekend = [d for d in (today - timedelta(days=i) for i in range(0, 15)) if d.weekday() in (5, 6)][:4]
+
+    return render(request, "core/class_video_admin.html", {
+        "rows": rows,
+        "classes": TutoringClass.objects.filter(is_active=True).order_by("time_slot", "name"),
+        "recent_dates": recent_weekend,
+        "today": today,
+    })
+
+
+@login_required
+def class_video_edit(request: HttpRequest) -> HttpResponse:
+    """Fill in the 4 clips for one class on one date."""
+    from .models import ClassVideoSession, ClassVideoClip
+
+    class_id = (request.GET.get("class_id") or request.POST.get("class_id") or "").strip()
+    lesson_date = _safe_date(request.GET.get("date") or request.POST.get("date"))
+    tutoring_class = TutoringClass.objects.filter(id=class_id).first() if class_id else None
+
+    if not (tutoring_class and lesson_date):
+        return redirect("core:class_video_admin")
+
+    session, _ = ClassVideoSession.objects.get_or_create(
+        tutoring_class=tutoring_class, lesson_date=lesson_date,
+    )
+    periods = _class_video_periods(lesson_date, tutoring_class)
+
+    if request.method == "POST":
+        if (request.POST.get("action") or "") == "delete":
+            session.delete()
+            return redirect("core:class_video_admin")
+
+        with transaction.atomic():
+            session.is_published = request.POST.get("is_published") == "on"
+            session.note = (request.POST.get("note") or "").strip()
+            session.save(update_fields=["is_published", "note", "updated_at"])
+
+            for p in periods:
+                i = p["slot_index"]
+                # "resync" wipes the slot's overrides back to the schedule.
+                if request.POST.get(f"resync_{i}") == "1":
+                    subject, tutor_id = p["subject"], (p["tutor"].id if p["tutor"] else None)
+                else:
+                    subject = (request.POST.get(f"subject_{i}") or "").strip()
+                    tutor_id = (request.POST.get(f"tutor_{i}") or "").strip() or None
+                clip, _created = ClassVideoClip.objects.get_or_create(
+                    session=session, slot_index=i,
+                )
+                clip.time_index = p["time_index"]
+                clip.video_url = (request.POST.get(f"video_url_{i}") or "").strip()
+                clip.subject_label = subject
+                clip.tutor_id = tutor_id
+                # Snapshot the schedule so the mismatch warning survives a
+                # later edit to the schedule itself.
+                clip.schedule_subject = p["subject"]
+                clip.schedule_tutor_name = p["tutor_name"]
+                clip.save()
+        return redirect(f"{reverse('core:class_video_edit')}?class_id={tutoring_class.id}&date={lesson_date.isoformat()}&saved=1")
+
+    existing = {c.slot_index: c for c in session.clips.all()}
+    slots = []
+    for p in periods:
+        clip = existing.get(p["slot_index"])
+        slots.append({
+            **p,
+            "clip": clip,
+            "video_url": clip.video_url if clip else "",
+            "cur_subject": (clip.subject_label if clip else p["subject"]),
+            "cur_tutor_id": (clip.tutor_id if clip else (p["tutor"].id if p["tutor"] else None)),
+            "youtube_id": clip.youtube_id if clip else "",
+        })
+
+    return render(request, "core/class_video_edit.html", {
+        "session": session,
+        "tutoring_class": tutoring_class,
+        "lesson_date": lesson_date,
+        "slots": slots,
+        "tutors": TeachingTutor.objects.filter(is_active=True).order_by("name"),
+        "has_schedule": any(p["subject"] or p["tutor_name"] for p in periods),
+        "saved": request.GET.get("saved") == "1",
+    })
+
+
+# ---------- parent side ----------
+
+def class_video_login(request: HttpRequest) -> HttpResponse:
+    return student_portal_login(request)
+
+
+def class_video_home(request: HttpRequest) -> HttpResponse:
+    """Pick which class's recordings to watch."""
+    student = _get_portal_student(request)
+    if not student:
+        return redirect("core:class_video_login")
+
+    from .models import ClassVideoSession
+
+    classes = _class_video_student_classes(student)
+    rows = []
+    for c in classes:
+        since = _class_video_enrollment_window(student, c)
+        qs = ClassVideoSession.objects.filter(tutoring_class=c, is_published=True)
+        if since:
+            qs = qs.filter(lesson_date__gte=since)
+        latest = qs.order_by("-lesson_date").first()
+        rows.append({
+            "tutoring_class": c,
+            "count": qs.count(),
+            "latest": latest.lesson_date if latest else None,
+        })
+
+    return render(request, "core/class_video_home.html", {
+        "student": student,
+        "rows": rows,
+    })
+
+
+def _class_video_month_grid(year: int, month: int, sessions_by_date: dict,
+                            attendance_by_date: dict, watched_dates: set) -> list[list[dict]]:
+    """Weeks of the month as rows of 7 day cells (Mon..Sun), blanks padded."""
+    import calendar as _cal
+
+    cal = _cal.Calendar(firstweekday=0)  # Monday
+    weeks = []
+    for week in cal.monthdatescalendar(year, month):
+        row = []
+        for d in week:
+            in_month = (d.month == month)
+            session = sessions_by_date.get(d) if in_month else None
+            row.append({
+                "date": d,
+                "in_month": in_month,
+                "day": d.day,
+                "session": session,
+                "has_video": bool(session),
+                "watched": d in watched_dates,
+                "attendance": attendance_by_date.get(d, ""),
+            })
+        weeks.append(row)
+    return weeks
+
+
+def class_video_calendar(request: HttpRequest, class_id: int) -> HttpResponse:
+    """Month calendar of the dates that have published clips."""
+    student = _get_portal_student(request)
+    if not student:
+        return redirect("core:class_video_login")
+
+    from .models import ClassVideoSession, ClassVideoWatch
+
+    tutoring_class = get_object_or_404(TutoringClass, id=class_id)
+    if tutoring_class not in _class_video_student_classes(student):
+        return redirect("core:class_video_home")
+
+    since = _class_video_enrollment_window(student, tutoring_class)
+    sessions_qs = ClassVideoSession.objects.filter(tutoring_class=tutoring_class, is_published=True)
+    if since:
+        sessions_qs = sessions_qs.filter(lesson_date__gte=since)
+    sessions = list(sessions_qs.order_by("lesson_date"))
+    if not sessions:
+        return render(request, "core/class_video_calendar.html", {
+            "student": student, "tutoring_class": tutoring_class,
+            "weeks": [], "no_sessions": True,
+        })
+
+    today = timezone.localdate()
+    month_anchor = _safe_date(request.GET.get("month")) or sessions[-1].lesson_date
+    year, month = month_anchor.year, month_anchor.month
+
+    sessions_by_date = {s.lesson_date: s for s in sessions}
+    dates = [s.lesson_date for s in sessions]
+
+    attendance_by_date = dict(
+        Attendance.objects
+        .filter(student=student, enrollment__tutoring_class=tutoring_class, attendance_date__in=dates)
+        .values_list("attendance_date", "status")
+    )
+    watched_dates = set(
+        ClassVideoWatch.objects
+        .filter(student=student, clip__session__in=sessions)
+        .values_list("clip__session__lesson_date", flat=True)
+    )
+
+    # Months that actually contain clips, for the prev/next jumps.
+    months = sorted({(d.year, d.month) for d in dates})
+    cur = (year, month)
+    idx = months.index(cur) if cur in months else len(months) - 1
+    prev_m = months[idx - 1] if idx > 0 else None
+    next_m = months[idx + 1] if idx < len(months) - 1 else None
+
+    return render(request, "core/class_video_calendar.html", {
+        "student": student,
+        "tutoring_class": tutoring_class,
+        "weeks": _class_video_month_grid(year, month, sessions_by_date, attendance_by_date, watched_dates),
+        "month_label": f"{_THAI_MONTHS[month]} {year}",
+        "prev_month": date(prev_m[0], prev_m[1], 1) if prev_m else None,
+        "next_month": date(next_m[0], next_m[1], 1) if next_m else None,
+        "total_sessions": len(sessions),
+        "watched_count": len(watched_dates),
+        "today": today,
+        "no_sessions": False,
+    })
+
+
+def class_video_watch(request: HttpRequest, class_id: int, lesson_date: str) -> HttpResponse:
+    """Player page: 4 clips with a YouTube-style side list."""
+    student = _get_portal_student(request)
+    if not student:
+        return redirect("core:class_video_login")
+
+    from .models import ClassVideoSession, ClassVideoWatch
+
+    tutoring_class = get_object_or_404(TutoringClass, id=class_id)
+    if tutoring_class not in _class_video_student_classes(student):
+        return redirect("core:class_video_home")
+
+    d = _safe_date(lesson_date)
+    since = _class_video_enrollment_window(student, tutoring_class)
+    if not d or (since and d < since):
+        return redirect("core:class_video_calendar", class_id=class_id)
+
+    session = get_object_or_404(
+        ClassVideoSession, tutoring_class=tutoring_class, lesson_date=d, is_published=True,
+    )
+    clips = [c for c in session.clips.select_related("tutor").order_by("slot_index") if c.has_video]
+
+    watched = dict(
+        ClassVideoWatch.objects
+        .filter(student=student, clip__in=clips)
+        .values_list("clip_id", "last_watched_at")
+    )
+    items = [{
+        "id": c.id,
+        "slot_index": c.slot_index,
+        "youtube_id": c.youtube_id,
+        "subject": c.subject_label or f"คาบที่ {c.slot_index}",
+        "tutor": c.tutor_name,
+        "watched_at": watched.get(c.id),
+    } for c in clips]
+
+    # Neighbouring dates for the quick day-switcher.
+    sib_qs = ClassVideoSession.objects.filter(tutoring_class=tutoring_class, is_published=True)
+    if since:
+        sib_qs = sib_qs.filter(lesson_date__gte=since)
+    prev_date = sib_qs.filter(lesson_date__lt=d).order_by("-lesson_date").values_list("lesson_date", flat=True).first()
+    next_date = sib_qs.filter(lesson_date__gt=d).order_by("lesson_date").values_list("lesson_date", flat=True).first()
+    nearby = list(sib_qs.order_by("-lesson_date").values_list("lesson_date", flat=True)[:12])
+
+    attendance = (
+        Attendance.objects
+        .filter(student=student, enrollment__tutoring_class=tutoring_class, attendance_date=d)
+        .values_list("status", flat=True)
+        .first()
+    )
+
+    return render(request, "core/class_video_watch.html", {
+        "student": student,
+        "tutoring_class": tutoring_class,
+        "session": session,
+        "lesson_date": d,
+        "date_label": _thai_date_label(d),
+        "weekday_label": _thai_weekday_label(d),
+        "items": items,
+        "items_json": json.dumps(items, ensure_ascii=False, default=str),
+        "prev_date": prev_date,
+        "next_date": next_date,
+        "nearby": sorted(nearby, reverse=True),
+        "attendance": attendance or "",
+    })
+
+
+@require_POST
+def class_video_mark_watched(request: HttpRequest) -> JsonResponse:
+    """Called by the player when a clip actually starts playing."""
+    student = _get_portal_student(request)
+    if not student:
+        return JsonResponse({"ok": False}, status=403)
+
+    from .models import ClassVideoClip, ClassVideoWatch
+
+    clip = ClassVideoClip.objects.filter(id=(request.POST.get("clip_id") or "")).first()
+    if not clip:
+        return JsonResponse({"ok": False}, status=404)
+    # Only for a class the student is actually enrolled in.
+    if clip.session.tutoring_class not in _class_video_student_classes(student):
+        return JsonResponse({"ok": False}, status=403)
+
+    now = timezone.now()
+    row, created = ClassVideoWatch.objects.get_or_create(
+        student=student, clip=clip,
+        defaults={"first_watched_at": now, "last_watched_at": now, "watch_count": 1},
+    )
+    if not created:
+        row.last_watched_at = now
+        row.watch_count = (row.watch_count or 0) + 1
+        row.save(update_fields=["last_watched_at", "watch_count"])
+    return JsonResponse({"ok": True, "watched_at": timezone.localtime(now).strftime("%d/%m/%Y")})

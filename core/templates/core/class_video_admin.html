@@ -1,0 +1,99 @@
+{% extends "core/base.html" %}
+{% block title %}คลิปเรียนย้อนหลัง{% endblock %}
+{% block head %}
+<style>
+  .wrap{max-width:1080px;margin:0 auto;display:grid;gap:14px;}
+  .cardx{background:#fff;border-radius:18px;padding:16px 18px;box-shadow:0 4px 14px rgba(15,23,42,.07);}
+  .page-title{font-size:22px;font-weight:900;}
+  .sub{font-size:12.5px;color:#64748b;font-weight:700;margin-top:4px;line-height:1.5;}
+  .newbar{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-top:12px;}
+  .f{display:flex;flex-direction:column;gap:4px;}
+  .f label{font-size:11px;font-weight:900;color:#475569;}
+  select,input[type=date]{border:1px solid #e2e8f0;border-radius:10px;padding:8px 10px;font-size:13px;font-weight:700;font-family:inherit;}
+  .btn{border:0;border-radius:10px;padding:9px 15px;font-size:13px;font-weight:800;background:#0f172a;color:#fff;cursor:pointer;font-family:inherit;text-decoration:none;display:inline-flex;align-items:center;gap:6px;}
+  .btn.rose{background:#e11d48;}
+  .quick{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;}
+  .quick button{border:1px solid #fecdd3;background:#fff1f2;color:#be123c;border-radius:999px;padding:5px 11px;font-size:12px;font-weight:800;cursor:pointer;font-family:inherit;}
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  th{background:#f8fafc;padding:9px 10px;text-align:left;font-size:11.5px;font-weight:900;color:#475569;border-bottom:2px solid #e2e8f0;white-space:nowrap;}
+  td{padding:9px 10px;border-bottom:1px solid #f1f5f9;}
+  tr:hover td{background:#f8fafc;}
+  .pill{display:inline-flex;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:800;white-space:nowrap;}
+  .p-live{background:#dcfce7;color:#15803d;}
+  .p-draft{background:#f1f5f9;color:#64748b;}
+  .p-warn{background:#fff7ed;color:#c2410c;}
+  .p-full{background:#dbeafe;color:#1d4ed8;}
+  @media(max-width:720px){table{display:block;overflow-x:auto;}}
+</style>
+{% endblock %}
+{% block content %}
+<div class="wrap">
+  <div class="cardx">
+    <div class="page-title">🎬 คลิปเรียนย้อนหลัง</div>
+    <div class="sub">
+      ใส่ลิงก์ YouTube (ตั้งเป็น <b>ไม่แสดงต่อสาธารณะ / Unlisted</b>) 4 คาบต่อวันต่อคลาส
+      ระบบจะดึงชื่อวิชาและติวเตอร์จากตารางสอนของวันนั้นมาให้อัตโนมัติ
+      ผู้ปกครองดูได้ที่ <b>/video-replay/</b> และจะเห็นเฉพาะวันที่ติ๊ก “เผยแพร่” แล้ว
+    </div>
+
+    <form class="newbar" method="get" action="{% url 'core:class_video_edit' %}">
+      <div class="f">
+        <label>คลาส</label>
+        <select name="class_id" required>
+          <option value="">— เลือกคลาส —</option>
+          {% for c in classes %}<option value="{{ c.id }}">{{ c.name }} ({{ c.get_time_slot_display }})</option>{% endfor %}
+        </select>
+      </div>
+      <div class="f">
+        <label>วันที่เรียน</label>
+        <input type="date" name="date" id="dateInput" value="{{ today|date:'Y-m-d' }}" required>
+      </div>
+      <button class="btn rose" type="submit">＋ สร้าง / แก้ไขคลิปของวันนี้</button>
+    </form>
+    <div class="quick">
+      <span style="font-size:12px;font-weight:800;color:#64748b;align-self:center;">วันเรียนล่าสุด:</span>
+      {% for d in recent_dates %}
+        <button type="button" onclick="document.getElementById('dateInput').value='{{ d|date:"Y-m-d" }}';">{{ d|date:"d/m/Y" }}</button>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="cardx" style="padding:0;overflow:hidden;">
+    <table>
+      <thead>
+        <tr><th>วันที่</th><th>คลาส</th><th>คลิป</th><th>สถานะ</th><th>ตารางสอน</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+          <tr>
+            <td style="white-space:nowrap;font-weight:800;">{{ r.session.lesson_date|date:"d/m/Y" }}</td>
+            <td>{{ r.session.tutoring_class.name }}</td>
+            <td>
+              {% if r.filled == r.total %}<span class="pill p-full">ครบ {{ r.total }} คลิป</span>
+              {% else %}<span class="pill p-draft">{{ r.filled }}/{{ r.total }}</span>{% endif %}
+            </td>
+            <td>
+              {% if r.session.is_published %}<span class="pill p-live">เผยแพร่แล้ว</span>
+              {% else %}<span class="pill p-draft">ยังไม่เผยแพร่</span>{% endif %}
+            </td>
+            <td>
+              {% if r.off_schedule %}<span class="pill p-warn">แก้เอง {{ r.off_schedule }} ช่อง</span>
+              {% else %}<span style="color:#94a3b8;font-size:12px;font-weight:700;">ตรงตาราง</span>{% endif %}
+            </td>
+            <td style="text-align:right;">
+              <a class="btn" style="padding:6px 12px;font-size:12px;"
+                 href="{% url 'core:class_video_edit' %}?class_id={{ r.session.tutoring_class_id }}&date={{ r.session.lesson_date|date:'Y-m-d' }}">แก้ไข</a>
+            </td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="6" style="text-align:center;padding:26px;color:#94a3b8;font-weight:700;">ยังไม่มีคลิป — เลือกคลาสและวันที่ด้านบนเพื่อเริ่ม</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div style="text-align:center;">
+    <a href="{% url 'core:pkanoon_admin_tool' %}" style="font-size:13px;font-weight:800;color:#64748b;text-decoration:none;">← กลับหน้า Admin Tool</a>
+  </div>
+</div>
+{% endblock %}

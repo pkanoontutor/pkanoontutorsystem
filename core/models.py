@@ -3016,3 +3016,139 @@ class CostScenarioClass(models.Model):
 
     def __str__(self) -> str:
         return f"{self.scenario_id} - {self.tutoring_class_id}"
+
+
+# =========================================================
+# ✅ Class video replay (ดูคลิปย้อนหลัง)
+# =========================================================
+class ClassVideoSession(models.Model):
+    """คลิปเรียนย้อนหลังของ 1 คลาส ใน 1 วัน (ปกติ 4 คาบ = 4 คลิป)"""
+    tutoring_class = models.ForeignKey(
+        TutoringClass, verbose_name="คลาส", on_delete=models.CASCADE,
+        related_name="video_sessions",
+    )
+    lesson_date = models.DateField("วันที่เรียน")
+    is_published = models.BooleanField(
+        "เผยแพร่ให้ผู้ปกครองดู", default=False,
+        help_text="ติ๊กเมื่อใส่ลิงก์ครบแล้ว ถ้ายังไม่ติ๊กผู้ปกครองจะไม่เห็นวันนี้",
+    )
+    note = models.CharField("หมายเหตุ", max_length=255, blank=True)
+    created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Class Video Session"
+        verbose_name_plural = "Class Video Sessions"
+        ordering = ("-lesson_date", "tutoring_class__name")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["tutoring_class", "lesson_date"],
+                name="uniq_class_video_session_per_class_date",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.tutoring_class} | {self.lesson_date}"
+
+
+class ClassVideoClip(models.Model):
+    """หนึ่งคาบเรียน = หนึ่งคลิป ผูกกับ session"""
+    session = models.ForeignKey(
+        ClassVideoSession, on_delete=models.CASCADE, related_name="clips",
+    )
+    slot_index = models.PositiveIntegerField("คาบที่ (1-4)", default=1)
+    time_index = models.PositiveIntegerField(
+        "ลำดับคาบในตารางสอน", default=0,
+        help_text="index ของ TEACHING_SCHEDULE_SLOTS ใช้จับคู่กับตารางสอน",
+    )
+    video_url = models.URLField("ลิงก์ YouTube", max_length=500, blank=True)
+    subject_label = models.CharField("วิชา", max_length=120, blank=True)
+    tutor = models.ForeignKey(
+        TeachingTutor, verbose_name="ติวเตอร์", on_delete=models.SET_NULL,
+        null=True, blank=True, related_name="video_clips",
+    )
+    # Snapshot of what the schedule said when this clip was saved. Comparing
+    # the live schedule against this is how the "ไม่ตรงกับตารางสอน" warning
+    # is derived -- it stays correct even if the schedule is edited later.
+    schedule_subject = models.CharField("วิชาตามตารางสอน", max_length=120, blank=True)
+    schedule_tutor_name = models.CharField("ติวเตอร์ตามตารางสอน", max_length=120, blank=True)
+    created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Class Video Clip"
+        verbose_name_plural = "Class Video Clips"
+        ordering = ("session", "slot_index")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["session", "slot_index"],
+                name="uniq_class_video_clip_per_slot",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.session} | คาบ {self.slot_index} | {self.subject_label}"
+
+    @property
+    def tutor_name(self) -> str:
+        return self.tutor.name if self.tutor_id else ""
+
+    @property
+    def youtube_id(self) -> str:
+        """Accepts watch?v=, youtu.be/, /embed/, /shorts/ and a bare id."""
+        raw = (self.video_url or "").strip()
+        if not raw:
+            return ""
+        for pattern in (
+            r"[?&]v=([A-Za-z0-9_-]{6,})",
+            r"youtu\.be/([A-Za-z0-9_-]{6,})",
+            r"/embed/([A-Za-z0-9_-]{6,})",
+            r"/shorts/([A-Za-z0-9_-]{6,})",
+            r"/live/([A-Za-z0-9_-]{6,})",
+        ):
+            m = re.search(pattern, raw)
+            if m:
+                return m.group(1)
+        if re.fullmatch(r"[A-Za-z0-9_-]{6,}", raw):
+            return raw
+        return ""
+
+    @property
+    def has_video(self) -> bool:
+        return bool(self.youtube_id)
+
+    @property
+    def is_off_schedule(self) -> bool:
+        """True when subject/tutor differ from what the schedule held."""
+        if not (self.schedule_subject or self.schedule_tutor_name):
+            return False
+        return (
+            (self.subject_label or "") != (self.schedule_subject or "")
+            or (self.tutor_name or "") != (self.schedule_tutor_name or "")
+        )
+
+
+class ClassVideoWatch(models.Model):
+    """บันทึกว่านักเรียนคนนี้เปิดดูคลิปไหนไปแล้วเมื่อไหร่"""
+    student = models.ForeignKey(
+        Student, on_delete=models.CASCADE, related_name="video_watches",
+    )
+    clip = models.ForeignKey(
+        ClassVideoClip, on_delete=models.CASCADE, related_name="watches",
+    )
+    first_watched_at = models.DateTimeField("ดูครั้งแรก", default=timezone.now)
+    last_watched_at = models.DateTimeField("ดูล่าสุด", default=timezone.now)
+    watch_count = models.PositiveIntegerField("จำนวนครั้งที่เปิด", default=1)
+
+    class Meta:
+        verbose_name = "Class Video Watch"
+        verbose_name_plural = "Class Video Watches"
+        ordering = ("-last_watched_at",)
+        constraints = [
+            models.UniqueConstraint(
+                fields=["student", "clip"], name="uniq_class_video_watch_per_student_clip",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.student} | {self.clip_id} | {self.last_watched_at:%d/%m/%Y}"

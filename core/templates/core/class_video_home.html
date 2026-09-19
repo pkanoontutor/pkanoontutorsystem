@@ -1,0 +1,64 @@
+{% load static %}
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>คลิปเรียนย้อนหลัง</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *{box-sizing:border-box}
+    body{margin:0;background:#0f172a;color:#f8fafc;font-family:"IBM Plex Sans Thai",system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}
+    .wrap{max-width:660px;margin:0 auto;padding:18px 14px 40px;}
+    .top{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;}
+    .who{font-size:12.5px;font-weight:700;color:rgba(248,250,252,.66);}
+    .out{font-size:12px;font-weight:700;color:rgba(248,250,252,.66);text-decoration:none;border:1px solid rgba(248,250,252,.22);border-radius:999px;padding:5px 12px;}
+    h1{font-size:23px;font-weight:700;margin:16px 0 4px;letter-spacing:-.02em;}
+    .lead{font-size:13px;font-weight:500;color:rgba(248,250,252,.62);line-height:1.55;}
+    .list{display:grid;gap:11px;margin-top:18px;}
+    .row{display:block;text-decoration:none;color:inherit;background:#1e293b;border:1px solid rgba(248,250,252,.09);
+      border-radius:18px;padding:15px 16px;transition:.14s;}
+    .row:hover{background:#243044;transform:translateY(-1px);}
+    .row-name{font-size:17px;font-weight:700;letter-spacing:-.01em;}
+    .row-meta{font-size:12px;font-weight:500;color:rgba(248,250,252,.58);margin-top:5px;line-height:1.5;}
+    .chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px;}
+    .chip{font-size:11px;font-weight:700;border-radius:999px;padding:3px 10px;background:rgba(56,189,248,.14);color:#7dd3fc;}
+    .chip.warn{background:rgba(148,163,184,.16);color:#cbd5e1;}
+    .empty{background:#1e293b;border:1.5px dashed rgba(248,250,252,.2);border-radius:18px;padding:28px 16px;
+      text-align:center;font-size:13.5px;font-weight:600;color:rgba(248,250,252,.6);line-height:1.6;margin-top:18px;}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="top">
+      <div class="who">👋 {{ student.nickname|default:student.full_name }}</div>
+      <a class="out" href="{% url 'core:student_portal_logout' %}">ออกจากระบบ</a>
+    </div>
+
+    <h1>🎬 คลิปเรียนย้อนหลัง</h1>
+    <div class="lead">เลือกคอร์สที่ต้องการดู แล้วเลือกวันที่เรียนจากปฏิทินครับ</div>
+
+    {% if rows %}
+      <div class="list">
+        {% for r in rows %}
+          <a class="row" href="{% url 'core:class_video_calendar' r.tutoring_class.id %}">
+            <div class="row-name">{{ r.tutoring_class.name }}</div>
+            <div class="row-meta">{{ r.tutoring_class.get_time_slot_display }}</div>
+            <div class="chips">
+              {% if r.count %}
+                <span class="chip">มีคลิป {{ r.count }} วัน</span>
+                <span class="chip warn">ล่าสุด {{ r.latest|date:"d/m/Y" }}</span>
+              {% else %}
+                <span class="chip warn">ยังไม่มีคลิป</span>
+              {% endif %}
+            </div>
+          </a>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="empty">ยังไม่พบคอร์สที่กำลังเรียนอยู่<br>หากคิดว่าไม่ถูกต้อง กรุณาติดต่อพี่ขนุนติวเตอร์ครับ</div>
+    {% endif %}
+  </div>
+</body>
+</html>

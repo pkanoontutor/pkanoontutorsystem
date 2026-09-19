@@ -1,0 +1,207 @@
+{% extends "core/base.html" %}
+{% block title %}คลิป {{ tutoring_class.name }} {{ lesson_date|date:"d/m/Y" }}{% endblock %}
+{% block head %}
+<style>
+  .wrap{max-width:900px;margin:0 auto;display:grid;gap:14px;}
+  .cardx{background:#fff;border-radius:18px;padding:16px 18px;box-shadow:0 4px 14px rgba(15,23,42,.07);}
+  .page-title{font-size:21px;font-weight:900;}
+  .sub{font-size:12.5px;color:#64748b;font-weight:700;margin-top:4px;line-height:1.5;}
+  .saved{background:#dcfce7;border:1px solid #86efac;color:#166534;border-radius:14px;padding:10px 12px;font-weight:800;font-size:13px;}
+  .warnbox{background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;border-radius:14px;padding:10px 12px;font-weight:800;font-size:12.5px;line-height:1.5;}
+  .slot{border:1px solid #e2e8f0;border-radius:16px;padding:13px;display:grid;gap:9px;background:#fff;}
+  .slot.off{border-color:#fdba74;background:#fffbf5;}
+  .slot-head{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;}
+  .slot-no{font-size:14px;font-weight:900;}
+  .slot-time{font-size:11.5px;font-weight:800;color:#64748b;}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:9px;}
+  .f{display:flex;flex-direction:column;gap:4px;}
+  .f label{font-size:11px;font-weight:900;color:#475569;}
+  input,select{border:1px solid #e2e8f0;border-radius:10px;padding:9px 10px;font-size:13px;font-weight:700;font-family:inherit;width:100%;}
+  input:focus,select:focus{outline:2px solid #fca5a5;outline-offset:1px;}
+  .alert{display:none;background:#fff7ed;border:1px solid #fdba74;color:#c2410c;border-radius:10px;padding:7px 10px;font-size:11.5px;font-weight:800;line-height:1.45;}
+  .alert.show{display:block;}
+  .alert .resync{background:none;border:0;color:#9a3412;text-decoration:underline;font-weight:900;cursor:pointer;font-family:inherit;font-size:11.5px;padding:0;margin-left:4px;}
+  .thumb{display:none;align-items:center;gap:9px;background:#f8fafc;border-radius:10px;padding:7px;}
+  .thumb.show{display:flex;}
+  .thumb img{width:92px;height:52px;object-fit:cover;border-radius:7px;background:#e2e8f0;}
+  .thumb .ok{font-size:11.5px;font-weight:800;color:#15803d;}
+  .thumb .bad{font-size:11.5px;font-weight:800;color:#b91c1c;}
+  .btn{border:0;border-radius:12px;padding:11px 16px;font-size:13px;font-weight:900;background:#0f172a;color:#fff;cursor:pointer;font-family:inherit;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:6px;}
+  .btn.rose{background:#e11d48;}.btn.soft{background:#fff;color:#334155;border:1px solid #cbd5e1;}
+  .btn.danger{background:#fee2e2;color:#991b1b;border:1px solid #fecaca;}
+  .pubrow{display:flex;align-items:center;gap:9px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:14px;padding:11px 13px;}
+  .pubrow input{width:auto;}
+  .pubrow label{font-size:13.5px;font-weight:900;color:#166534;cursor:pointer;}
+  .actions{display:flex;gap:8px;flex-wrap:wrap;}
+  @media(max-width:640px){.row2{grid-template-columns:1fr;}.btn{flex:1;}}
+</style>
+{% endblock %}
+{% block content %}
+<div class="wrap">
+  <div class="cardx">
+    <div class="page-title">🎬 {{ tutoring_class.name }}</div>
+    <div class="sub">
+      วันที่ {{ lesson_date|date:"d/m/Y" }} · {{ tutoring_class.get_time_slot_display }}<br>
+      วาง <b>ลิงก์ YouTube</b> ของแต่ละคาบ (ตั้งคลิปเป็น “ไม่แสดงต่อสาธารณะ / Unlisted”) —
+      ผู้ปกครองจะไม่เห็นความยาวคลิป แต่เลื่อนดูได้
+    </div>
+  </div>
+
+  {% if saved %}<div class="cardx saved">✅ บันทึกแล้ว</div>{% endif %}
+
+  {% if not has_schedule %}
+    <div class="cardx warnbox">
+      ⚠️ ยังไม่มีตารางสอนของวันที่ {{ lesson_date|date:"d/m/Y" }} สำหรับคลาสนี้ — กรอกวิชาและติวเตอร์เองได้เลย
+      หรือไปสร้างตารางสอนก่อนที่ <a href="/teaching-schedule/edit/?date={{ lesson_date|date:'Y-m-d' }}" style="color:#9a3412;">หน้าตารางสอน</a>
+    </div>
+  {% endif %}
+
+  <form method="post" id="clipForm">
+    {% csrf_token %}
+    <input type="hidden" name="class_id" value="{{ tutoring_class.id }}">
+    <input type="hidden" name="date" value="{{ lesson_date|date:'Y-m-d' }}">
+
+    <div style="display:grid;gap:11px;">
+      {% for s in slots %}
+        <div class="slot{% if s.clip and s.clip.is_off_schedule %} off{% endif %}" data-slot="{{ s.slot_index }}">
+          <div class="slot-head">
+            <div class="slot-no">คาบที่ {{ s.slot_index }}</div>
+            <div class="slot-time">{{ s.time_label }}</div>
+          </div>
+
+          <div class="f">
+            <label>ลิงก์ YouTube</label>
+            <input type="url" name="video_url_{{ s.slot_index }}" value="{{ s.video_url }}"
+                   placeholder="https://www.youtube.com/watch?v=..." class="js-url" data-slot="{{ s.slot_index }}">
+          </div>
+          <div class="thumb" id="thumb{{ s.slot_index }}">
+            <img id="thumbimg{{ s.slot_index }}" alt="">
+            <div id="thumbtxt{{ s.slot_index }}"></div>
+          </div>
+
+          <div class="row2">
+            <div class="f">
+              <label>วิชา</label>
+              <input type="text" name="subject_{{ s.slot_index }}" value="{{ s.cur_subject }}"
+                     class="js-subject" data-slot="{{ s.slot_index }}" data-schedule="{{ s.subject }}">
+            </div>
+            <div class="f">
+              <label>ติวเตอร์</label>
+              <select name="tutor_{{ s.slot_index }}" class="js-tutor" data-slot="{{ s.slot_index }}"
+                      data-schedule="{% if s.tutor %}{{ s.tutor.id }}{% endif %}">
+                <option value="">— ไม่ระบุ —</option>
+                {% for t in tutors %}
+                  <option value="{{ t.id }}" {% if s.cur_tutor_id == t.id %}selected{% endif %}>{{ t.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+
+          <div class="alert" id="alert{{ s.slot_index }}">
+            ⚠️ ช่องนี้แก้เอง ไม่ตรงกับตารางสอน
+            (ตาราง: <b>{{ s.subject|default:"—" }}</b> · <b>{{ s.tutor_name|default:"—" }}</b>)
+            <button type="button" class="resync" data-slot="{{ s.slot_index }}">ดึงค่าจากตารางสอนกลับมา</button>
+          </div>
+          <input type="hidden" name="resync_{{ s.slot_index }}" id="resync{{ s.slot_index }}" value="0">
+        </div>
+      {% endfor %}
+    </div>
+
+    <div class="cardx" style="margin-top:12px;display:grid;gap:11px;">
+      <div class="pubrow">
+        <input type="checkbox" name="is_published" id="pub" {% if session.is_published %}checked{% endif %}>
+        <label for="pub">เผยแพร่ให้ผู้ปกครองดูได้</label>
+      </div>
+      <div class="f">
+        <label>หมายเหตุ (ผู้ปกครองจะเห็น)</label>
+        <input type="text" name="note" value="{{ session.note }}" placeholder="เช่น คาบ 3 เสียงเบาช่วงต้น">
+      </div>
+      <div class="actions">
+        <button class="btn rose" type="submit">บันทึก</button>
+        <a class="btn soft" href="{% url 'core:class_video_admin' %}">← กลับรายการ</a>
+        <button class="btn danger" type="submit" name="action" value="delete"
+                onclick="return confirm('ลบคลิปทั้งวันนี้ออกจากระบบ? ผู้ปกครองจะไม่เห็นวันนี้อีก');">ลบวันนี้</button>
+      </div>
+    </div>
+  </form>
+</div>
+
+<script>
+(function(){
+  // The schedule values are rendered into data-schedule on each field; the
+  // warning is recomputed live so staff see it the moment they type, not
+  // only after saving.
+  function ytId(raw){
+    raw = (raw || '').trim();
+    if(!raw) return '';
+    var pats = [/[?&]v=([A-Za-z0-9_-]{6,})/, /youtu\.be\/([A-Za-z0-9_-]{6,})/,
+                /\/embed\/([A-Za-z0-9_-]{6,})/, /\/shorts\/([A-Za-z0-9_-]{6,})/,
+                /\/live\/([A-Za-z0-9_-]{6,})/];
+    for(var i=0;i<pats.length;i++){ var m = raw.match(pats[i]); if(m) return m[1]; }
+    return /^[A-Za-z0-9_-]{6,}$/.test(raw) ? raw : '';
+  }
+
+  function refreshAlert(slot){
+    var subj = document.querySelector('.js-subject[data-slot="'+slot+'"]');
+    var tut  = document.querySelector('.js-tutor[data-slot="'+slot+'"]');
+    var box  = document.getElementById('alert'+slot);
+    var card = document.querySelector('.slot[data-slot="'+slot+'"]');
+    if(!subj || !tut || !box) return;
+    var schedSubj = subj.getAttribute('data-schedule') || '';
+    var schedTut  = tut.getAttribute('data-schedule') || '';
+    // Nothing in the schedule for this period -> nothing to disagree with.
+    var hasSched = !!(schedSubj || schedTut);
+    var differs = hasSched && ((subj.value || '') !== schedSubj || (tut.value || '') !== schedTut);
+    box.classList.toggle('show', differs);
+    card.classList.toggle('off', differs);
+  }
+
+  function refreshThumb(slot){
+    var inp = document.querySelector('.js-url[data-slot="'+slot+'"]');
+    var box = document.getElementById('thumb'+slot);
+    var img = document.getElementById('thumbimg'+slot);
+    var txt = document.getElementById('thumbtxt'+slot);
+    var raw = (inp.value || '').trim();
+    if(!raw){ box.classList.remove('show'); return; }
+    var id = ytId(raw);
+    box.classList.add('show');
+    if(id){
+      img.src = 'https://i.ytimg.com/vi/' + id + '/mqdefault.jpg';
+      img.style.display = '';
+      txt.innerHTML = '<span class="ok">✅ อ่านลิงก์ได้ · ' + id + '</span>';
+    }else{
+      img.style.display = 'none';
+      txt.innerHTML = '<span class="bad">❌ อ่านลิงก์ไม่ได้ — ต้องเป็นลิงก์ YouTube</span>';
+    }
+  }
+
+  document.querySelectorAll('.js-subject, .js-tutor').forEach(function(el){
+    ['input','change'].forEach(function(ev){
+      el.addEventListener(ev, function(){ refreshAlert(el.getAttribute('data-slot')); });
+    });
+  });
+  document.querySelectorAll('.js-url').forEach(function(el){
+    ['input','change'].forEach(function(ev){
+      el.addEventListener(ev, function(){ refreshThumb(el.getAttribute('data-slot')); });
+    });
+  });
+  document.querySelectorAll('.resync').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var slot = btn.getAttribute('data-slot');
+      var subj = document.querySelector('.js-subject[data-slot="'+slot+'"]');
+      var tut  = document.querySelector('.js-tutor[data-slot="'+slot+'"]');
+      subj.value = subj.getAttribute('data-schedule') || '';
+      tut.value  = tut.getAttribute('data-schedule') || '';
+      document.getElementById('resync'+slot).value = '1';
+      refreshAlert(slot);
+    });
+  });
+
+  document.querySelectorAll('.slot').forEach(function(card){
+    var slot = card.getAttribute('data-slot');
+    refreshAlert(slot);
+    refreshThumb(slot);
+  });
+})();
+</script>
+{% endblock %}

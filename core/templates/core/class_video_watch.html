@@ -1,0 +1,344 @@
+{% load static %}
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>{{ date_label }} · {{ tutoring_class.name }}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    /* The player deliberately exposes NO time anywhere: YouTube's own chrome
+       is switched off with controls=0 and the bar below is a pure percentage.
+       Subjects run long or short and a visible duration invites questions we
+       don't want parents asking, so nothing here may print seconds. */
+    *{box-sizing:border-box}
+    body{margin:0;background:#0f172a;color:#f8fafc;font-family:"IBM Plex Sans Thai",system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}
+    .wrap{max-width:1180px;margin:0 auto;padding:14px 14px 40px;}
+    .top{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;}
+    .back{font-size:12.5px;font-weight:700;color:rgba(248,250,252,.68);text-decoration:none;}
+    .out{font-size:12px;font-weight:700;color:rgba(248,250,252,.6);text-decoration:none;border:1px solid rgba(248,250,252,.22);border-radius:999px;padding:5px 12px;}
+
+    .head{margin:12px 0 4px;display:flex;align-items:baseline;gap:9px;flex-wrap:wrap;}
+    .head h1{font-size:20px;font-weight:700;margin:0;letter-spacing:-.02em;}
+    .head .sub{font-size:12.5px;font-weight:600;color:rgba(248,250,252,.58);}
+    .tagline{display:flex;gap:6px;flex-wrap:wrap;margin-top:7px;}
+    .tag{font-size:11px;font-weight:700;border-radius:999px;padding:3px 10px;background:rgba(56,189,248,.14);color:#7dd3fc;}
+    .tag.note{background:rgba(251,146,60,.16);color:#fdba74;}
+
+    .cols{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:14px;margin-top:14px;align-items:start;}
+
+    .stage{background:#000;border-radius:16px;overflow:hidden;position:relative;}
+    .frame{position:relative;width:100%;aspect-ratio:16/9;background:#000;}
+    .frame iframe{position:absolute;inset:0;width:100%;height:100%;border:0;}
+    /* Swallows clicks on the iframe so YouTube's own click-to-pause, its
+       context menu ("Copy video URL at current time") and any hover chrome
+       never reach the player -- our buttons drive it instead. */
+    .shield{position:absolute;inset:0;cursor:pointer;background:transparent;}
+
+    .bar{background:#111827;padding:10px 12px;display:grid;gap:9px;}
+    .seek{position:relative;height:16px;display:flex;align-items:center;cursor:pointer;touch-action:none;}
+    .seek-track{position:absolute;left:0;right:0;height:5px;border-radius:999px;background:rgba(248,250,252,.16);}
+    .seek-fill{position:absolute;left:0;height:5px;border-radius:999px;background:#ef4444;width:0%;}
+    .seek-knob{position:absolute;width:13px;height:13px;border-radius:50%;background:#ef4444;left:0;transform:translateX(-50%);
+      box-shadow:0 1px 5px rgba(0,0,0,.5);}
+    .ctrls{display:flex;align-items:center;gap:7px;flex-wrap:wrap;}
+    .cbtn{border:0;background:rgba(248,250,252,.1);color:#f8fafc;border-radius:9px;padding:8px 12px;font-size:13px;
+      font-weight:700;cursor:pointer;font-family:inherit;line-height:1;}
+    .cbtn:hover{background:rgba(248,250,252,.2);}
+    .cbtn.play{background:#ef4444;min-width:52px;}
+    .cbtn.play:hover{background:#dc2626;}
+    .spacer{flex:1;}
+    .pct{font-size:12px;font-weight:700;color:rgba(248,250,252,.5);min-width:38px;text-align:right;}
+
+    .now{margin-top:11px;background:#1e293b;border:1px solid rgba(248,250,252,.09);border-radius:14px;padding:13px 15px;}
+    .now-subj{font-size:17px;font-weight:700;letter-spacing:-.01em;}
+    .now-meta{font-size:12.5px;font-weight:600;color:rgba(248,250,252,.6);margin-top:4px;}
+
+    .side{display:grid;gap:9px;}
+    .side-h{font-size:12px;font-weight:700;color:rgba(248,250,252,.5);letter-spacing:.06em;text-transform:uppercase;}
+    .item{display:grid;grid-template-columns:30px 1fr;gap:10px;align-items:center;background:#1e293b;
+      border:1px solid rgba(248,250,252,.08);border-radius:13px;padding:10px 12px;cursor:pointer;transition:.13s;}
+    .item:hover{background:#243044;}
+    .item.active{background:rgba(239,68,68,.14);border-color:#ef4444;}
+    .item-n{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:700;
+      background:rgba(248,250,252,.12);color:#f8fafc;}
+    .item.active .item-n{background:#ef4444;}
+    .item.done .item-n{background:#16a34a;}
+    .item-subj{font-size:13.5px;font-weight:700;line-height:1.3;}
+    .item-tutor{font-size:11.5px;font-weight:600;color:rgba(248,250,252,.55);margin-top:2px;}
+    .item-seen{font-size:10.5px;font-weight:700;color:#4ade80;margin-top:2px;}
+
+    .daynav{margin-top:12px;background:#1e293b;border:1px solid rgba(248,250,252,.08);border-radius:14px;padding:11px 12px;}
+    .daynav-h{font-size:11.5px;font-weight:700;color:rgba(248,250,252,.5);margin-bottom:8px;}
+    .daynav-row{display:flex;gap:6px;margin-bottom:8px;}
+    .daynav-row a,.daynav-row span{flex:1;text-align:center;font-size:12px;font-weight:700;border-radius:9px;padding:7px 4px;text-decoration:none;}
+    .daynav-row a{background:rgba(248,250,252,.1);color:#f8fafc;}
+    .daynav-row span{background:transparent;color:rgba(248,250,252,.22);}
+    .days{display:flex;gap:5px;flex-wrap:wrap;}
+    .days a,.days b{font-size:11.5px;font-weight:700;border-radius:8px;padding:5px 9px;text-decoration:none;
+      background:rgba(248,250,252,.08);color:rgba(248,250,252,.8);}
+    .days b{background:#ef4444;color:#fff;}
+    .allbtn{display:block;text-align:center;margin-top:9px;font-size:12px;font-weight:700;color:rgba(248,250,252,.6);text-decoration:none;}
+
+    .empty{background:#1e293b;border:1.5px dashed rgba(248,250,252,.2);border-radius:16px;padding:30px 16px;
+      text-align:center;font-size:13.5px;font-weight:600;color:rgba(248,250,252,.6);line-height:1.6;}
+
+    @media(max-width:900px){
+      .cols{grid-template-columns:1fr;}
+      .side{order:2;}
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="top">
+      <a class="back" href="{% url 'core:class_video_calendar' tutoring_class.id %}">← ปฏิทิน</a>
+      <a class="out" href="{% url 'core:student_portal_logout' %}">ออกจากระบบ</a>
+    </div>
+
+    <div class="head">
+      <h1>{{ date_label }}</h1>
+      <div class="sub">{{ weekday_label }} · {{ tutoring_class.name }}</div>
+    </div>
+    <div class="tagline">
+      {% if attendance == "excused" %}<span class="tag">📩 วันนี้น้องลา</span>
+      {% elif attendance == "no_show" %}<span class="tag">วันนี้น้องไม่ได้มาเรียน</span>
+      {% elif attendance == "present" %}<span class="tag">✅ วันนี้น้องมาเรียน</span>{% endif %}
+      {% if session.note %}<span class="tag note">{{ session.note }}</span>{% endif %}
+    </div>
+
+    {% if items %}
+      <div class="cols">
+        <div>
+          <div class="stage">
+            <div class="frame" id="frame">
+              <div id="ytplayer"></div>
+              <div class="shield" id="shield"></div>
+            </div>
+            <div class="bar">
+              <div class="seek" id="seek">
+                <div class="seek-track"></div>
+                <div class="seek-fill" id="seekFill"></div>
+                <div class="seek-knob" id="seekKnob"></div>
+              </div>
+              <div class="ctrls">
+                <button class="cbtn play" id="playBtn" type="button">▶</button>
+                <button class="cbtn" id="back10" type="button">↺ 10</button>
+                <button class="cbtn" id="fwd10" type="button">10 ↻</button>
+                <button class="cbtn" id="speedBtn" type="button">1x</button>
+                <div class="spacer"></div>
+                <div class="pct" id="pct">0%</div>
+                <button class="cbtn" id="fsBtn" type="button">⛶</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="now">
+            <div class="now-subj" id="nowSubj">—</div>
+            <div class="now-meta" id="nowMeta">—</div>
+          </div>
+        </div>
+
+        <div class="side">
+          <div class="side-h">คาบเรียนวันนี้</div>
+          {% for it in items %}
+            <div class="item{% if it.watched_at %} done{% endif %}" data-idx="{{ forloop.counter0 }}" data-clip="{{ it.id }}">
+              <div class="item-n">{{ it.slot_index }}</div>
+              <div>
+                <div class="item-subj">{{ it.subject }}</div>
+                <div class="item-tutor">{{ it.tutor|default:"—" }}</div>
+                {% if it.watched_at %}<div class="item-seen">ดูแล้วเมื่อ {{ it.watched_at|date:"d/m/Y" }}</div>{% endif %}
+              </div>
+            </div>
+          {% endfor %}
+
+          <div class="daynav">
+            <div class="daynav-h">เปลี่ยนวัน</div>
+            <div class="daynav-row">
+              {% if prev_date %}<a href="{% url 'core:class_video_watch' tutoring_class.id prev_date|date:'Y-m-d' %}">‹ ก่อนหน้า</a>{% else %}<span>‹ ก่อนหน้า</span>{% endif %}
+              {% if next_date %}<a href="{% url 'core:class_video_watch' tutoring_class.id next_date|date:'Y-m-d' %}">ถัดไป ›</a>{% else %}<span>ถัดไป ›</span>{% endif %}
+            </div>
+            <div class="days">
+              {% for d in nearby %}
+                {% if d == lesson_date %}<b>{{ d|date:"d/m" }}</b>
+                {% else %}<a href="{% url 'core:class_video_watch' tutoring_class.id d|date:'Y-m-d' %}">{{ d|date:"d/m" }}</a>{% endif %}
+              {% endfor %}
+            </div>
+            <a class="allbtn" href="{% url 'core:class_video_calendar' tutoring_class.id %}">ดูปฏิทินทั้งหมด →</a>
+          </div>
+        </div>
+      </div>
+    {% else %}
+      <div class="empty" style="margin-top:16px;">ยังไม่มีคลิปของวันนี้ครับ</div>
+    {% endif %}
+  </div>
+
+{% if items %}
+<script id="clipData" type="application/json">{{ items_json|safe }}</script>
+<script>
+(function(){
+  var CLIPS = JSON.parse(document.getElementById('clipData').textContent);
+  var CSRF = "{{ csrf_token }}";
+  var MARK_URL = "{% url 'core:class_video_mark_watched' %}";
+  var SPEEDS = [1, 1.25, 1.5, 0.75];
+
+  var player = null, ready = false, idx = 0, speedI = 0, dragging = false, ticker = null;
+  var marked = {};
+
+  var $ = function(id){ return document.getElementById(id); };
+
+  function setActive(i){
+    document.querySelectorAll('.item').forEach(function(el){
+      el.classList.toggle('active', +el.getAttribute('data-idx') === i);
+    });
+    var c = CLIPS[i];
+    $('nowSubj').textContent = c.subject;
+    $('nowMeta').textContent = c.tutor ? ('สอนโดย ' + c.tutor) : 'คาบที่ ' + c.slot_index;
+  }
+
+  function markWatched(i){
+    var c = CLIPS[i];
+    if(!c || marked[c.id]) return;
+    marked[c.id] = true;
+    var body = new URLSearchParams({clip_id: c.id});
+    fetch(MARK_URL, {
+      method: 'POST',
+      headers: {'X-CSRFToken': CSRF, 'Content-Type': 'application/x-www-form-urlencoded'},
+      body: body.toString(),
+credentials: 'same-origin'
+    }).then(function(r){ return r.ok ? r.json() : null; }).then(function(d){
+      if(!d || !d.ok) return;
+      var row = document.querySelector('.item[data-clip="' + c.id + '"]');
+      if(row && !row.classList.contains('done')){
+        row.classList.add('done');
+        var seen = document.createElement('div');
+        seen.className = 'item-seen';
+        seen.textContent = 'ดูแล้วเมื่อ ' + d.watched_at;
+        row.lastElementChild.appendChild(seen);
+      }
+    }).catch(function(){ /* logging is best-effort; never block playback */ });
+  }
+
+  // Percentage only -- getDuration() is used as a denominator and must never
+  // be rendered anywhere on screen.
+  function paint(){
+    if(!ready || dragging) return;
+    var dur = player.getDuration();
+    if(!dur || !isFinite(dur) || dur <= 0) return;
+    var p = Math.max(0, Math.min(100, (player.getCurrentTime() / dur) * 100));
+    $('seekFill').style.width = p + '%';
+    $('seekKnob').style.left = p + '%';
+    $('pct').textContent = Math.round(p) + '%';
+  }
+
+  function seekToRatio(ratio){
+    if(!ready) return;
+    var dur = player.getDuration();
+    if(!dur || !isFinite(dur)) return;
+    ratio = Math.max(0, Math.min(1, ratio));
+    player.seekTo(dur * ratio, true);
+    $('seekFill').style.width = (ratio * 100) + '%';
+    $('seekKnob').style.left = (ratio * 100) + '%';
+    $('pct').textContent = Math.round(ratio * 100) + '%';
+  }
+
+  function ratioFromEvent(e){
+    var r = $('seek').getBoundingClientRect();
+    var x = (e.touches ? e.touches[0].clientX : e.clientX) - r.left;
+    return r.width ? (x / r.width) : 0;
+  }
+
+  function load(i, autoplay){
+    idx = i; setActive(i);
+    if(!ready){ return; }
+    player.loadVideoById(CLIPS[i].youtube_id);
+    if(!autoplay) player.pauseVideo();
+    $('seekFill').style.width = '0%'; $('seekKnob').style.left = '0%'; $('pct').textContent = '0%';
+  }
+
+  window.onYouTubeIframeAPIReady = function(){
+    player = new YT.Player('ytplayer', {
+      videoId: CLIPS[0].youtube_id,
+      playerVars: {
+        controls: 0,        // no YouTube control bar -> no time readout
+        disablekb: 1,       // arrow-key seeking would surface a time tooltip
+        modestbranding: 1,
+        rel: 0,
+        iv_load_policy: 3,
+        playsinline: 1,
+        fs: 0
+      },
+      events: {
+        onReady: function(){
+          ready = true;
+          setActive(0);
+          ticker = setInterval(paint, 250);
+        },
+        onStateChange: function(e){
+          if(e.data === YT.PlayerState.PLAYING){
+            $('playBtn').textContent = '❚❚';
+            markWatched(idx);
+          }else{
+            $('playBtn').textContent = '▶';
+          }
+          if(e.data === YT.PlayerState.ENDED && idx < CLIPS.length - 1){
+            load(idx + 1, true);
+          }
+        }
+      }
+    });
+  };
+
+  // ---- controls ----
+  $('playBtn').addEventListener('click', function(){
+    if(!ready) return;
+    var s = player.getPlayerState();
+    if(s === YT.PlayerState.PLAYING) player.pauseVideo(); else player.playVideo();
+  });
+  $('shield').addEventListener('click', function(){ $('playBtn').click(); });
+  // Blocks "Copy video URL at current time", which would leak a timestamp.
+  $('frame').addEventListener('contextmenu', function(e){ e.preventDefault(); });
+
+  $('back10').addEventListener('click', function(){
+    if(ready) player.seekTo(Math.max(0, player.getCurrentTime() - 10), true);
+  });
+  $('fwd10').addEventListener('click', function(){
+    if(ready) player.seekTo(player.getCurrentTime() + 10, true);
+  });
+  $('speedBtn').addEventListener('click', function(){
+    if(!ready) return;
+    speedI = (speedI + 1) % SPEEDS.length;
+    player.setPlaybackRate(SPEEDS[speedI]);
+    $('speedBtn').textContent = SPEEDS[speedI] + 'x';
+  });
+  $('fsBtn').addEventListener('click', function(){
+    var el = $('frame');
+    if(document.fullscreenElement){ document.exitFullscreen(); }
+    else if(el.requestFullscreen){ el.requestFullscreen(); }
+    else if(el.webkitRequestFullscreen){ el.webkitRequestFullscreen(); }
+  });
+
+  var seek = $('seek');
+  function startDrag(e){ dragging = true; seekToRatio(ratioFromEvent(e)); e.preventDefault(); }
+  function moveDrag(e){ if(dragging) seekToRatio(ratioFromEvent(e)); }
+  function endDrag(){ dragging = false; }
+  seek.addEventListener('mousedown', startDrag);
+  window.addEventListener('mousemove', moveDrag);
+  window.addEventListener('mouseup', endDrag);
+  seek.addEventListener('touchstart', startDrag, {passive:false});
+  window.addEventListener('touchmove', moveDrag, {passive:false});
+  window.addEventListener('touchend', endDrag);
+
+  document.querySelectorAll('.item').forEach(function(el){
+    el.addEventListener('click', function(){ load(+el.getAttribute('data-idx'), true); });
+  });
+
+  var tag = document.createElement('script');
+  tag.src = 'https://www.youtube.com/iframe_api';
+  document.head.appendChild(tag);
+})();
+</script>
+{% endif %}
+</body>
+</html>

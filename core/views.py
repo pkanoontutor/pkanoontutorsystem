@@ -11557,33 +11557,12 @@ def class_video_home(request: HttpRequest) -> HttpResponse:
     })
 
 
-def _class_video_month_grid(year: int, month: int, sessions_by_date: dict,
-                            attendance_by_date: dict, watched_dates: set) -> list[list[dict]]:
-    """Weeks of the month as rows of 7 day cells (Mon..Sun), blanks padded."""
-    import calendar as _cal
-
-    cal = _cal.Calendar(firstweekday=0)  # Monday
-    weeks = []
-    for week in cal.monthdatescalendar(year, month):
-        row = []
-        for d in week:
-            in_month = (d.month == month)
-            session = sessions_by_date.get(d) if in_month else None
-            row.append({
-                "date": d,
-                "in_month": in_month,
-                "day": d.day,
-                "session": session,
-                "has_video": bool(session),
-                "watched": d in watched_dates,
-                "attendance": attendance_by_date.get(d, ""),
-            })
-        weeks.append(row)
-    return weeks
-
-
 def class_video_calendar(request: HttpRequest, class_id: int) -> HttpResponse:
-    """Month calendar of the dates that have published clips."""
+    """The dates that have published clips, grouped by month.
+
+    A real month grid was almost entirely empty squares -- classes only run
+    at the weekend -- so this lists just the dates that exist.
+    """
     student = _get_portal_student(request)
     if not student:
         return redirect("core:class_video_login")
@@ -11598,20 +11577,14 @@ def class_video_calendar(request: HttpRequest, class_id: int) -> HttpResponse:
     sessions_qs = ClassVideoSession.objects.filter(tutoring_class=tutoring_class, is_published=True)
     if since:
         sessions_qs = sessions_qs.filter(lesson_date__gte=since)
-    sessions = list(sessions_qs.order_by("lesson_date"))
+    sessions = list(sessions_qs.order_by("-lesson_date"))
     if not sessions:
         return render(request, "core/class_video_calendar.html", {
             "student": student, "tutoring_class": tutoring_class,
-            "weeks": [], "no_sessions": True,
+            "date_groups": [], "no_sessions": True,
         })
 
-    today = timezone.localdate()
-    month_anchor = _safe_date(request.GET.get("month")) or sessions[-1].lesson_date
-    year, month = month_anchor.year, month_anchor.month
-
-    sessions_by_date = {s.lesson_date: s for s in sessions}
     dates = [s.lesson_date for s in sessions]
-
     attendance_by_date = dict(
         Attendance.objects
         .filter(student=student, enrollment__tutoring_class=tutoring_class, attendance_date__in=dates)
@@ -11623,23 +11596,26 @@ def class_video_calendar(request: HttpRequest, class_id: int) -> HttpResponse:
         .values_list("clip__session__lesson_date", flat=True)
     )
 
-    # Months that actually contain clips, for the prev/next jumps.
-    months = sorted({(d.year, d.month) for d in dates})
-    cur = (year, month)
-    idx = months.index(cur) if cur in months else len(months) - 1
-    prev_m = months[idx - 1] if idx > 0 else None
-    next_m = months[idx + 1] if idx < len(months) - 1 else None
+    # Newest month first, newest date first within it.
+    groups = []
+    for d in dates:
+        label = f"{_THAI_MONTHS[d.month]} {d.year}"
+        if not groups or groups[-1]["label"] != label:
+            groups.append({"label": label, "days": []})
+        groups[-1]["days"].append({
+            "date": d,
+            "date_label": _thai_date_label(d),
+            "weekday_label": _thai_weekday_label(d),
+            "watched": d in watched_dates,
+            "attendance": attendance_by_date.get(d, ""),
+        })
 
     return render(request, "core/class_video_calendar.html", {
         "student": student,
         "tutoring_class": tutoring_class,
-        "weeks": _class_video_month_grid(year, month, sessions_by_date, attendance_by_date, watched_dates),
-        "month_label": f"{_THAI_MONTHS[month]} {year}",
-        "prev_month": date(prev_m[0], prev_m[1], 1) if prev_m else None,
-        "next_month": date(next_m[0], next_m[1], 1) if next_m else None,
+        "date_groups": groups,
         "total_sessions": len(sessions),
         "watched_count": len(watched_dates),
-        "today": today,
         "no_sessions": False,
     })
 

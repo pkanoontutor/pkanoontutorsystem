@@ -1,101 +1,78 @@
-{% load static %}
-<!doctype html>
-<html lang="th">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <title>เลือกวันที่ · {{ tutoring_class.name }}</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <style>
-    *{box-sizing:border-box}
-    body{margin:0;background:#0f172a;color:#f8fafc;font-family:"IBM Plex Sans Thai",system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}
-    .wrap{max-width:660px;margin:0 auto;padding:18px 14px 40px;}
-    .top{display:flex;align-items:center;justify-content:space-between;gap:10px;}
-    .back{font-size:12.5px;font-weight:700;color:rgba(248,250,252,.68);text-decoration:none;}
-    .out{font-size:12px;font-weight:700;color:rgba(248,250,252,.6);text-decoration:none;border:1px solid rgba(248,250,252,.22);border-radius:999px;padding:5px 12px;}
-    h1{font-size:21px;font-weight:700;margin:14px 0 3px;letter-spacing:-.02em;}
-    .lead{font-size:12.5px;font-weight:500;color:rgba(248,250,252,.6);line-height:1.5;}
-    .prog{margin-top:12px;background:#1e293b;border:1px solid rgba(248,250,252,.09);border-radius:14px;padding:11px 13px;
-      display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:12.5px;font-weight:700;}
-    .prog b{color:#4ade80;}
-    .mnav{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:16px;}
-    .mnav .m{font-size:16px;font-weight:700;}
-    .mnav a,.mnav span{font-size:13px;font-weight:700;text-decoration:none;border-radius:10px;padding:7px 13px;}
-    .mnav a{color:#f8fafc;background:#1e293b;border:1px solid rgba(248,250,252,.12);}
-    .mnav span{color:rgba(248,250,252,.26);border:1px solid transparent;}
-    .cal{margin-top:10px;background:#1e293b;border:1px solid rgba(248,250,252,.09);border-radius:18px;padding:12px;}
-    .dow{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:6px;}
-    .dow div{text-align:center;font-size:10.5px;font-weight:700;color:rgba(248,250,252,.42);padding:3px 0;}
-    .grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;}
-    .cell{aspect-ratio:1;border-radius:11px;display:flex;flex-direction:column;align-items:center;justify-content:center;
-      gap:3px;font-size:13px;font-weight:600;color:rgba(248,250,252,.34);text-decoration:none;position:relative;}
-    .cell.out{opacity:.25;}
-    .cell.has{background:#334155;color:#f8fafc;font-weight:700;border:1px solid rgba(248,250,252,.14);}
-    .cell.has:hover{background:#3f5170;}
-    .cell.watched{background:rgba(22,163,74,.2);border-color:#22c55e;}
-    .cell.today{outline:2px solid #38bdf8;outline-offset:-2px;}
-    .dot{width:5px;height:5px;border-radius:50%;background:#fb923c;}
-    .dot.green{background:#22c55e;}
-    .dot.blue{background:#38bdf8;}
-    .dots{display:flex;gap:3px;height:5px;}
-    .legend{display:flex;gap:12px;flex-wrap:wrap;margin-top:12px;font-size:11.5px;font-weight:600;color:rgba(248,250,252,.6);}
-    .legend i{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:4px;}
-    .empty{background:#1e293b;border:1.5px dashed rgba(248,250,252,.2);border-radius:18px;padding:28px 16px;
-      text-align:center;font-size:13.5px;font-weight:600;color:rgba(248,250,252,.6);line-height:1.6;margin-top:18px;}
-  </style>
-</head>
-<body>
-  <div class="wrap">
-    <div class="top">
-      <a class="back" href="{% url 'core:class_video_home' %}">← เลือกคอร์สอื่น</a>
-      <a class="out" href="{% url 'core:student_portal_logout' %}">ออกจากระบบ</a>
-    </div>
+{% extends "core/base_portal.html" %}
+{% block title %}เลือกวันที่ · {{ tutoring_class.name }}{% endblock %}
+{% block head %}
+<style>
+  .vr-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:14px;}
+  .vr-back{font-size:12.5px;font-weight:900;color:#0f172a;text-decoration:none;background:#fff;
+    border:1px solid #cbd5e1;border-radius:999px;padding:7px 14px;}
+  .vr-out{font-size:12.5px;font-weight:900;color:#475569;text-decoration:none;background:#fff;
+    border:1px solid #cbd5e1;border-radius:999px;padding:7px 14px;}
+  .vr-title{font-size:22px;font-weight:900;color:#0f172a;margin:0 0 3px;}
+  .vr-lead{font-size:13px;font-weight:700;color:#334155;line-height:1.5;}
 
-    <h1>{{ tutoring_class.name }}</h1>
-    <div class="lead">แตะวันที่มีจุดสีส้มเพื่อดูคลิปของวันนั้นครับ</div>
+  .vr-prog{margin-top:12px;background:#f0fdf4;border:2px solid #bbf7d0;border-radius:14px;
+    padding:11px 14px;font-size:13.5px;font-weight:900;color:#166534;}
+  .vr-prog b{font-size:17px;}
+
+  .vr-month{font-size:13px;font-weight:900;color:#92400e;background:#fef3c7;border-radius:999px;
+    padding:5px 14px;display:inline-block;margin:18px 0 10px;}
+  /* A plain list of the dates that actually have clips -- a real month grid
+     was mostly empty squares, since classes only run at the weekend. */
+  .vr-days{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;}
+  .vr-day{display:block;text-decoration:none;color:inherit;background:#fff;border:2px solid #bfdbfe;
+    border-radius:16px;padding:13px 14px;box-shadow:0 3px 10px rgba(15,23,42,.07);transition:.14s;}
+  .vr-day:hover{border-color:#3b82f6;transform:translateY(-2px);box-shadow:0 8px 18px rgba(59,130,246,.22);}
+  .vr-day.seen{border-color:#86efac;background:#f7fef9;}
+  .vr-day.seen:hover{border-color:#22c55e;box-shadow:0 8px 18px rgba(34,197,94,.22);}
+  .vr-d-date{font-size:17px;font-weight:900;color:#0f172a;line-height:1.25;}
+  .vr-d-dow{font-size:12px;font-weight:800;color:#64748b;margin-top:2px;}
+  .vr-d-tags{display:flex;gap:5px;flex-wrap:wrap;margin-top:9px;}
+  .vr-tag{font-size:10.5px;font-weight:900;border-radius:999px;padding:3px 9px;}
+  .vr-tag.seen{background:#dcfce7;color:#15803d;}
+  .vr-tag.leave{background:#dbeafe;color:#1d4ed8;}
+  .vr-tag.miss{background:#fee2e2;color:#b91c1c;}
+  .vr-tag.new{background:#ffedd5;color:#c2410c;}
+
+  .vr-empty{background:#fff;border:2px dashed #cbd5e1;border-radius:18px;padding:30px 16px;text-align:center;
+    font-size:14px;font-weight:800;color:#64748b;line-height:1.7;margin-top:16px;}
+</style>
+{% endblock %}
+{% block content %}
+  <div class="vr-head">
+    <a class="vr-back" href="{% url 'core:class_video_home' %}">← เลือกคอร์สอื่น</a>
+    <a class="vr-out" href="{% url 'core:student_portal_logout' %}">ออกจากระบบ</a>
+  </div>
+
+  <div class="card">
+    <h1 class="vr-title">{{ tutoring_class.name }}</h1>
+    <div class="vr-lead">แตะวันที่ที่ต้องการ เพื่อดูคลิปของคาบเรียนวันนั้นครับ</div>
 
     {% if no_sessions %}
-      <div class="empty">ยังไม่มีคลิปของคอร์สนี้<br>เมื่อพี่ขนุนอัปโหลดแล้วจะขึ้นที่นี่ครับ</div>
+      <div class="vr-empty">ยังไม่มีคลิปของคอร์สนี้<br>เมื่อพี่ขนุนอัปโหลดแล้วจะขึ้นที่นี่ครับ</div>
     {% else %}
-      <div class="prog">
-        <span>ดูไปแล้ว <b>{{ watched_count }}</b> / {{ total_sessions }} วัน</span>
-      </div>
+      <div class="vr-prog">ดูไปแล้ว <b>{{ watched_count }}</b> จาก {{ total_sessions }} วัน</div>
 
-      <div class="mnav">
-        {% if prev_month %}<a href="?month={{ prev_month|date:'Y-m-d' }}">‹ ก่อนหน้า</a>{% else %}<span>‹ ก่อนหน้า</span>{% endif %}
-        <div class="m">{{ month_label }}</div>
-        {% if next_month %}<a href="?month={{ next_month|date:'Y-m-d' }}">ถัดไป ›</a>{% else %}<span>ถัดไป ›</span>{% endif %}
-      </div>
-
-      <div class="cal">
-        <div class="dow"><div>จ</div><div>อ</div><div>พ</div><div>พฤ</div><div>ศ</div><div>ส</div><div>อา</div></div>
-        <div class="grid">
-          {% for week in weeks %}
-            {% for c in week %}
-              {% if c.has_video %}
-                <a class="cell has{% if c.watched %} watched{% endif %}{% if c.date == today %} today{% endif %}"
-                   href="{% url 'core:class_video_watch' tutoring_class.id c.date|date:'Y-m-d' %}">
-                  {{ c.day }}
-                  <div class="dots">
-                    <span class="dot{% if c.watched %} green{% endif %}"></span>
-                    {% if c.attendance == "excused" or c.attendance == "no_show" %}<span class="dot blue"></span>{% endif %}
-                  </div>
-                </a>
-              {% else %}
-                <div class="cell{% if not c.in_month %} out{% endif %}{% if c.date == today %} today{% endif %}">{{ c.day }}</div>
-              {% endif %}
-            {% endfor %}
+      {% for group in date_groups %}
+        <div class="vr-month">{{ group.label }}</div>
+        <div class="vr-days">
+          {% for d in group.days %}
+            <a class="vr-day{% if d.watched %} seen{% endif %}"
+               href="{% url 'core:class_video_watch' tutoring_class.id d.date|date:'Y-m-d' %}">
+              <div class="vr-d-date">{{ d.date_label }}</div>
+              <div class="vr-d-dow">{{ d.weekday_label }}</div>
+              <div class="vr-d-tags">
+                {% if d.watched %}<span class="vr-tag seen">✓ ดูแล้ว</span>
+                {% else %}<span class="vr-tag new">ยังไม่ได้ดู</span>{% endif %}
+                {% if d.attendance == "excused" or d.attendance == "excused_half" %}
+                  <span class="vr-tag leave">น้องลา</span>
+                {% elif d.attendance == "no_show" %}
+                  <span class="vr-tag miss">ไม่ได้มาเรียน</span>
+                {% endif %}
+              </div>
+            </a>
           {% endfor %}
         </div>
-      </div>
-
-      <div class="legend">
-        <span><i style="background:#fb923c;"></i>มีคลิป</span>
-        <span><i style="background:#22c55e;"></i>ดูแล้ว</span>
-        <span><i style="background:#38bdf8;"></i>วันที่น้องลา/ขาด</span>
-      </div>
+      {% endfor %}
     {% endif %}
   </div>
-</body>
-</html>
+{% endblock %}

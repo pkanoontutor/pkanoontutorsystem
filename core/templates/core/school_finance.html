@@ -1,4 +1,5 @@
 {% extends "core/base.html" %}
+{% load humanize %}
 {% load extras %}
 {% block title %}รายรับรายจ่ายโรงเรียน{% endblock %}
 
@@ -948,6 +949,92 @@
     </form>
   </section>
 
+  <section class="finance-card">
+    <div class="card-head">
+      <div>
+        <h2 class="section-title">➕ เพิ่มรายรับอื่น ๆ <small>นอกเหนือจากค่าคอร์สที่ออกใบเสร็จ</small></h2>
+        <div class="hint">ค่าคอร์สที่ออกใบเสร็จถูกนับให้อยู่แล้ว — ช่องนี้สำหรับเงินที่รับนอกใบเสร็จ เช่น ขายชีทแยก ค่าเรียนชดเชย ค่าค่าย เงินมัดจำ</div>
+      </div>
+    </div>
+    <form method="post" class="expense-form">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="add_income">
+      <div class="field">
+        <label>วันที่รับเงิน</label>
+        <input type="date" name="income_date" value="{{ selected_date|date:'Y-m-d' }}" required>
+      </div>
+      <div class="field">
+        <label>ประเภทรายรับ</label>
+        <select name="category" required>
+          {% for c in income_categories %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label>จำนวนเงิน</label>
+        <input type="number" name="amount" step="0.01" min="0" required>
+      </div>
+      <div class="field">
+        <label>ช่องทางรับเงิน</label>
+        <select name="payment_method">
+          {% for value,label in payment_method_choices %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="field wide">
+        <label>ผู้จ่าย / ลูกค้า</label>
+        <input type="text" name="payer" placeholder="เช่น ผู้ปกครองน้องเอ">
+      </div>
+      <div class="field wide">
+        <label>รายละเอียด</label>
+        <input type="text" name="description" placeholder="เช่น ขายชีท ป.6 จำนวน 2 เล่ม">
+      </div>
+      <div class="field full">
+        <label>หมายเหตุ</label>
+        <textarea name="note" placeholder="รายละเอียดเพิ่มเติม"></textarea>
+      </div>
+      <div class="field full">
+        <button class="btnx primary" type="submit">💾 บันทึกรายรับ</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="finance-card">
+    <div class="card-head">
+      <div>
+        <h2 class="section-title">💚 รายการรายรับอื่น ๆ <span class="badge">{{ other_income_rows|length }} รายการ</span></h2>
+        <div class="hint">รวม {{ other_income_total|floatformat:0|intcomma }} บาท ในช่วงวันที่ที่เลือก</div>
+      </div>
+    </div>
+    {% if other_income_rows %}
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>วันที่</th><th>ประเภท</th><th>ผู้จ่าย</th><th>รายละเอียด</th><th>ช่องทาง</th><th class="num">จำนวนเงิน</th><th></th></tr>
+          </thead>
+          <tbody>
+            {% for i in other_income_rows %}
+              <tr>
+                <td>{{ i.income_date|date:"d/m/Y" }}</td>
+                <td>{{ i.category.name }}</td>
+                <td>{{ i.payer|default:"-" }}</td>
+                <td>{{ i.description|default:"-" }}</td>
+                <td>{{ i.get_payment_method_display }}</td>
+                <td class="num" style="color:#15803d;font-weight:900;">+{{ i.amount|floatformat:0|intcomma }}</td>
+                <td>
+                  <form method="post" action="{% url 'core:other_income_delete' i.id %}" onsubmit="return confirm('ลบรายการนี้ใช่ไหม?')">
+                    {% csrf_token %}
+                    <button class="btnx danger" type="submit">ลบ</button>
+                  </form>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="empty">ยังไม่มีรายรับอื่น ๆ ในช่วงวันที่นี้</div>
+    {% endif %}
+  </section>
+
   <section class="finance-card payroll-section">
     <div class="payroll-head">
       <div class="payroll-toolbar">
@@ -1005,6 +1092,11 @@
               <label class="special-toggle">
                 <input class="js-special-rate" type="checkbox" name="special_rate_325_{{ tutor.id }}" value="yes" {% if entry %}{% if entry.special_rate_325 %}checked{% endif %}{% elif tutor.default_special_rate_325 %}checked{% endif %}>
                 <span>เรทพิเศษ 325<br>เมื่อ onsite ≥ 4 ชม.</span>
+              </label>
+
+              <label class="special-toggle">
+                <input class="js-special-350" type="checkbox" name="special_rate_350_{{ tutor.id }}" value="yes" {% if entry and entry.special_rate_350 %}checked{% endif %}>
+                <span>ห้อง 350<br>คงที่ทุกชั่วโมง</span>
               </label>
 
               <div class="field">
@@ -1240,9 +1332,10 @@
 </div>
 
 <script>
-  function rateForHours(hours, specialRate){
+  function rateForHours(hours, specialRate, flat350){
     hours = Number(hours || 0);
     if(hours <= 0) return 0;
+    if(flat350) return 350;          // ป.5 rooms, whatever the hours
     if(hours <= 1) return 550;
     if(hours < 4) return 350;
     return specialRate ? 325 : 300;
@@ -1261,7 +1354,8 @@
     const onlineH = Number(row.querySelector('.js-online-hours')?.value || 0);
     const idle = Number(row.querySelector('.js-idle')?.value || 0);
     const specialRate = !!row.querySelector('.js-special-rate')?.checked;
-    const rate = rateForHours(h, specialRate);
+    const flat350 = !!row.querySelector('.js-special-350')?.checked;
+    const rate = rateForHours(h, specialRate, flat350);
     const travel = travelForHours(h);
     const onsiteFee = h * rate;
     // Blank online rate = use the 300/hr default (shown as the placeholder).

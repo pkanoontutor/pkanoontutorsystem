@@ -47,6 +47,8 @@ from .models import (
     AdmissionInquiry,
     FinanceSetting,
     ExpenseCategory,
+    IncomeCategory,
+    OtherIncome,
     SchoolExpense,
     Tutor,
     TutorPayrollEntry,
@@ -3261,11 +3263,18 @@ def _finance_summary_for_range(start: date, end: date) -> dict:
         attendance_date__gte=start, attendance_date__lte=end, deducted=True,
     ).aggregate(n=Sum("deducted_units"))["n"] or Decimal("0")
     estimated_revenue = Decimal(deducted_count) * revenue_per_student
-    cash_revenue = CoursePayment.objects.filter(
+    course_revenue = CoursePayment.objects.filter(
         payment_date__gte=start,
         payment_date__lte=end,
         status=CoursePayment.ReceiptStatus.ISSUED,
     ).aggregate(total=Sum("amount_paid"))["total"] or Decimal("0")
+    # Money taken outside a course receipt -- sheets sold, make-up lessons,
+    # camp fees -- had nowhere to be recorded before, so it never reached the
+    # cash figure at all.
+    other_income = OtherIncome.objects.filter(
+        income_date__gte=start, income_date__lte=end,
+    ).aggregate(total=Sum("amount"))["total"] or Decimal("0")
+    cash_revenue = Decimal(course_revenue) + Decimal(other_income)
     general_expense = SchoolExpense.objects.filter(
         expense_date__gte=start,
         expense_date__lte=end,
@@ -3280,6 +3289,8 @@ def _finance_summary_for_range(start: date, end: date) -> dict:
         "end": end,
         "deducted_count": deducted_count,
         "estimated_revenue": estimated_revenue,
+        "course_revenue": Decimal(course_revenue),
+        "other_income": Decimal(other_income),
         "cash_revenue": cash_revenue,
         "general_expense": general_expense,
         "tutor_payroll": tutor_payroll,
@@ -5796,9 +5807,19 @@ def _school_finance_filtered_data(request: HttpRequest):
         .order_by("-payment_date", "-created_at")
     )
 
+    other_income_rows = (
+        OtherIncome.objects
+        .select_related("category")
+        .filter(income_date__gte=date_from, income_date__lte=date_to)
+        .order_by("-income_date", "-created_at")
+    )
+
     general_expense_total = expense_rows.aggregate(total=Sum("amount")).get("total") or Decimal("0")
     tutor_payroll_total = payroll_rows.aggregate(total=Sum("total_amount")).get("total") or Decimal("0")
-    cash_revenue_total = course_payment_rows.aggregate(total=Sum("amount_paid")).get("total") or Decimal("0")
+    course_revenue_total = course_payment_rows.aggregate(total=Sum("amount_paid")).get("total") or Decimal("0")
+    other_income_total = other_income_rows.aggregate(total=Sum("amount")).get("total") or Decimal("0")
+    # Cash in = course receipts + everything taken outside a receipt.
+    cash_revenue_total = Decimal(course_revenue_total) + Decimal(other_income_total)
     total_expense = general_expense_total + tutor_payroll_total
     net_estimated = estimated_revenue - total_expense
     net_cash_basis = cash_revenue_total - total_expense
@@ -5811,6 +5832,9 @@ def _school_finance_filtered_data(request: HttpRequest):
         "deducted_count": deducted_count,
         "estimated_revenue": estimated_revenue,
         "cash_revenue_total": cash_revenue_total,
+        "course_revenue_total": Decimal(course_revenue_total),
+        "other_income_total": Decimal(other_income_total),
+        "other_income_rows": other_income_rows,
         "expense_rows": expense_rows,
         "payroll_rows": payroll_rows,
         "course_payment_rows": course_payment_rows,
@@ -7765,6 +7789,7 @@ def pkanoon_admin_tool(request: HttpRequest) -> HttpResponse:
         "default_print_due_date": timezone.localdate() + timedelta(days=3),
         "students_json": json.dumps(_allocation_students_json(), ensure_ascii=False),
         "student_enrollments_json": json.dumps(_active_enrollment_summaries_by_student(), ensure_ascii=False),
+        **_money_widget_context(),
     })
 
 
@@ -8360,6 +8385,22 @@ def school_finance(request: HttpRequest) -> HttpResponse:
                 pass
             return redirect(request.META.get("HTTP_REFERER", "core:school_finance"))
 
+        if action == "add_income":
+            category = IncomeCategory.objects.filter(
+                id=request.POST.get("category"), is_active=True,
+            ).first()
+            if category:
+                OtherIncome.objects.create(
+                    income_date=_parse_date(request.POST.get("income_date")),
+                    category=category,
+                    payer=(request.POST.get("payer") or "").strip(),
+                    description=(request.POST.get("description") or "").strip(),
+                    amount=_money(request.POST.get("amount")),
+                    payment_method=(request.POST.get("payment_method") or OtherIncome.PaymentMethod.TRANSFER),
+                    note=(request.POST.get("note") or "").strip(),
+                )
+            return redirect(request.META.get("HTTP_REFERER", "core:school_finance"))
+
         if action == "save_payroll":
             work_date = _parse_date(request.POST.get("work_date"))
             single_tutor_id = (request.POST.get("single_tutor_id") or "").strip()
@@ -8374,6 +8415,7 @@ def school_finance(request: HttpRequest) -> HttpResponse:
                 idle_raw = (request.POST.get(f"idle_{tid}") or "").strip()
                 note_raw = (request.POST.get(f"note_{tid}") or "").strip()
                 special_rate_325 = request.POST.get(f"special_rate_325_{tid}") == "yes"
+                special_rate_350 = request.POST.get(f"special_rate_350_{tid}") == "yes"
 
                 # Skip blank rows when saving all.
                 if (
@@ -8383,6 +8425,7 @@ def school_finance(request: HttpRequest) -> HttpResponse:
                     and idle_raw == ""
                     and note_raw == ""
                     and not special_rate_325
+                    and not special_rate_350
                 ):
                     continue
 
@@ -8405,6 +8448,7 @@ def school_finance(request: HttpRequest) -> HttpResponse:
                         "teaching_hours": hours,
                         "online_teaching_hours": online_hours,
                         "special_rate_325": special_rate_325,
+                        "special_rate_350": special_rate_350,
                         "idle_fee": idle_fee,
                         "note": note_raw,
                     },
@@ -8418,6 +8462,7 @@ def school_finance(request: HttpRequest) -> HttpResponse:
                 except Exception:
                     entry.online_hourly_rate_override = None
                 entry.special_rate_325 = special_rate_325
+                entry.special_rate_350 = special_rate_350
                 entry.idle_fee = idle_fee
                 entry.note = note_raw
                 entry.save()
@@ -8443,6 +8488,10 @@ def school_finance(request: HttpRequest) -> HttpResponse:
         "tutors": tutors,
         "payroll_map": payroll_map,
         "expense_rows": data["expense_rows"],
+        "other_income_rows": data["other_income_rows"],
+        "other_income_total": data["other_income_total"],
+        "course_revenue_total": data["course_revenue_total"],
+        "income_categories": IncomeCategory.objects.filter(is_active=True).order_by("sort_order", "name"),
         "payroll_rows": data["payroll_rows"],
         "weekend_tutor_summary": weekend_tutor_summary,
         "deducted_count": data["deducted_count"],
@@ -8735,6 +8784,13 @@ def course_payment_cancel(request: HttpRequest, pk: int) -> HttpResponse:
 def school_expense_delete(request: HttpRequest, pk: int) -> HttpResponse:
     expense = get_object_or_404(SchoolExpense, pk=pk)
     expense.delete()
+    return redirect(request.META.get("HTTP_REFERER", "core:school_finance"))
+
+
+@require_POST
+@login_required
+def other_income_delete(request: HttpRequest, pk: int) -> HttpResponse:
+    get_object_or_404(OtherIncome, pk=pk).delete()
     return redirect(request.META.get("HTTP_REFERER", "core:school_finance"))
 
 
@@ -10091,6 +10147,11 @@ def _thai_date_short_be(d: date) -> str:
     return f"{d.day} {_THAI_MONTHS_ABBR[d.month]} {(d.year + 543) % 100:02d}"
 
 
+# Rooms on the flat 350/hr tutor rate. The payroll popup pre-ticks the box
+# for these and staff can untick it before sending.
+RATE_350_GRADES = {"ป.5"}
+
+
 def _grade_from_class_name(name: str) -> str:
     """Extract a grade label like 'ม.1' / 'ป.6' from a class name."""
     m = re.search(r"(ม\.|ป\.)\s*(\d+)", name or "")
@@ -10610,8 +10671,14 @@ def _schedule_tutor_day_summary(schedule) -> list:
     from .models import TutorPayrollEntry
     break_idx = {i for i, s in enumerate(TEACHING_SCHEDULE_SLOTS) if s["is_break"]}
     by_tutor = {}
-    for c in schedule.cells.select_related("tutor", "tutor__payroll_tutor").filter(tutor__isnull=False):
+    grades_by_tutor: dict[object, set[str]] = {}
+    for c in schedule.cells.select_related("tutor", "tutor__payroll_tutor", "tutoring_class").filter(tutor__isnull=False):
         by_tutor.setdefault(c.tutor, set()).add(c.time_index)
+        grade = (c.grade_label or "").strip() or _grade_from_class_name(
+            getattr(c.tutoring_class, "name", "") or ""
+        )
+        if grade:
+            grades_by_tutor.setdefault(c.tutor, set()).add(grade)
 
     from .models import Tutor
 
@@ -10650,7 +10717,17 @@ def _schedule_tutor_day_summary(schedule) -> list:
         else:
             special = bool(getattr(payroll_tutor, "default_special_rate_325", False))
 
-        default_rate = TutorPayrollEntry.calculate_hourly_rate(Decimal(taught), special)
+        # ป.5 rooms pay a flat 350, so the box starts ticked whenever the tutor
+        # taught one that day. A saved entry wins, so unticking it and sending
+        # sticks when the popup is reopened.
+        taught_grades = sorted(grades_by_tutor.get(tutor, set()))
+        matches_350 = any(g in RATE_350_GRADES for g in taught_grades)
+        if entry is not None:
+            special_350 = bool(entry.special_rate_350)
+        else:
+            special_350 = matches_350
+
+        default_rate = TutorPayrollEntry.calculate_hourly_rate(Decimal(taught), special, special_350)
         default_travel_fee = TutorPayrollEntry.calculate_travel_fee(Decimal(taught))
         # A previously-saved override wins over the default preview, same as
         # special_rate_325 above -- reopening the popup shows what was sent.
@@ -10677,6 +10754,9 @@ def _schedule_tutor_day_summary(schedule) -> list:
             "default_travel_fee": default_travel_fee,
             "travel_fee_override": travel_override,
             "special_rate_325": special,
+            "special_rate_350": special_350,
+            "matches_350": matches_350,
+            "taught_grades": ", ".join(taught_grades),
             "teaching_fee": rate * taught,
             "has_existing": bool(entry),
             "existing_total": (entry.total_amount if entry else None),
@@ -10720,6 +10800,7 @@ def teaching_schedule_send_payroll(request: HttpRequest, pk: int) -> HttpRespons
             # Checkbox is pre-ticked from the tutor's default but can be changed
             # per send, so trust what was submitted for the approved rows.
             entry.special_rate_325 = request.POST.get(f"special_{tid}") == "yes"
+            entry.special_rate_350 = request.POST.get(f"special350_{tid}") == "yes"
 
             # Rate / travel fee inputs are pre-filled with the computed default
             # but editable; blank means "keep using the automatic default",
@@ -11856,3 +11937,126 @@ def student_portal_claim_phone(request: HttpRequest) -> HttpResponse:
         "schools": School.objects.filter(is_active=True).order_by("name"),
         "placeholder": PARENT_PHONE_PLACEHOLDER,
     })
+
+
+# =========================================================
+# ✅ Widget บันทึกรายรับ-รายจ่ายด่วน (ในหน้า Admin Tool)
+# =========================================================
+def _money_widget_context() -> dict:
+    """Month-to-date figures plus the last few entries, for the admin-tool
+    widget. Deliberately month-scoped: the widget is for "did I record
+    today's spending", the finance page is for analysis."""
+    today = timezone.localdate()
+    month_start = today.replace(day=1)
+
+    course_revenue = CoursePayment.objects.filter(
+        payment_date__gte=month_start, payment_date__lte=today,
+        status=CoursePayment.ReceiptStatus.ISSUED,
+    ).aggregate(t=Sum("amount_paid"))["t"] or Decimal("0")
+    other_income = OtherIncome.objects.filter(
+        income_date__gte=month_start, income_date__lte=today,
+    ).aggregate(t=Sum("amount"))["t"] or Decimal("0")
+    general_expense = SchoolExpense.objects.filter(
+        expense_date__gte=month_start, expense_date__lte=today,
+    ).exclude(category__is_tutor_payroll=True).aggregate(t=Sum("amount"))["t"] or Decimal("0")
+    tutor_payroll = TutorPayrollEntry.objects.filter(
+        work_date__gte=month_start, work_date__lte=today,
+    ).aggregate(t=Sum("total_amount"))["t"] or Decimal("0")
+
+    income_total = Decimal(course_revenue) + Decimal(other_income)
+    expense_total = Decimal(general_expense) + Decimal(tutor_payroll)
+
+    recent = []
+    for e in OtherIncome.objects.select_related("category")[:6]:
+        recent.append({
+            "kind": "income", "id": e.id, "date": e.income_date,
+            "category": e.category.name, "who": e.payer,
+            "desc": e.description, "amount": e.amount,
+        })
+    for x in SchoolExpense.objects.select_related("category")[:6]:
+        recent.append({
+            "kind": "expense", "id": x.id, "date": x.expense_date,
+            "category": x.category.name, "who": x.vendor,
+            "desc": x.description, "amount": x.amount,
+        })
+    recent.sort(key=lambda r: r["date"], reverse=True)
+
+    return {
+        "money_today": today,
+        "money_month_label": f"{_THAI_MONTHS[today.month]} {today.year}",
+        "money_income_categories": IncomeCategory.objects.filter(is_active=True).order_by("sort_order", "name"),
+        "money_expense_categories": ExpenseCategory.objects.filter(is_active=True).order_by("sort_order", "name"),
+        "money_course_revenue": Decimal(course_revenue),
+        "money_other_income": Decimal(other_income),
+        "money_income_total": income_total,
+        "money_general_expense": Decimal(general_expense),
+        "money_tutor_payroll": Decimal(tutor_payroll),
+        "money_expense_total": expense_total,
+        "money_net": income_total - expense_total,
+        "money_recent": recent[:8],
+        "money_payment_methods": SchoolExpense.PaymentMethod.choices,
+    }
+
+
+@require_POST
+def admin_tool_money_add(request: HttpRequest) -> JsonResponse:
+    """Quick income/expense entry from the admin-tool widget."""
+    denied = _admin_tool_staff_denied(request)
+    if denied:
+        return denied
+
+    payload = _admin_tool_card_payload(request)
+    kind = str(payload.get("kind") or "").strip()
+    amount = _money(payload.get("amount"))
+    if amount <= 0:
+        return JsonResponse({"ok": False, "error": "กรุณากรอกจำนวนเงินให้ถูกต้อง"}, status=400)
+
+    entry_date = _parse_date(payload.get("entry_date"))
+    desc = str(payload.get("description") or "").strip()
+    who = str(payload.get("who") or "").strip()
+    method = str(payload.get("payment_method") or "transfer").strip()
+    note = str(payload.get("note") or "").strip()
+
+    if kind == "income":
+        category = IncomeCategory.objects.filter(
+            id=payload.get("category"), is_active=True,
+        ).first()
+        if not category:
+            return JsonResponse({"ok": False, "error": "กรุณาเลือกประเภทรายรับ"}, status=400)
+        OtherIncome.objects.create(
+            income_date=entry_date, category=category, payer=who,
+            description=desc, amount=amount, payment_method=method, note=note,
+        )
+    elif kind == "expense":
+        category = ExpenseCategory.objects.filter(
+            id=payload.get("category"), is_active=True,
+        ).first()
+        if not category:
+            return JsonResponse({"ok": False, "error": "กรุณาเลือกประเภทรายจ่าย"}, status=400)
+        SchoolExpense.objects.create(
+            expense_date=entry_date, category=category, vendor=who,
+            description=desc, amount=amount, payment_method=method, note=note,
+        )
+    else:
+        return JsonResponse({"ok": False, "error": "ไม่รู้จักประเภทรายการนี้"}, status=400)
+
+    return JsonResponse({"ok": True})
+
+
+@require_POST
+def admin_tool_money_delete(request: HttpRequest) -> JsonResponse:
+    """Undo a mistyped entry straight from the widget."""
+    denied = _admin_tool_staff_denied(request)
+    if denied:
+        return denied
+
+    payload = _admin_tool_card_payload(request)
+    kind = str(payload.get("kind") or "").strip()
+    row_id = str(payload.get("id") or "").strip()
+    if kind == "income":
+        OtherIncome.objects.filter(id=row_id).delete()
+    elif kind == "expense":
+        SchoolExpense.objects.filter(id=row_id).delete()
+    else:
+        return JsonResponse({"ok": False, "error": "ไม่รู้จักประเภทรายการนี้"}, status=400)
+    return JsonResponse({"ok": True})

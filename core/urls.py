@@ -23,6 +23,8 @@ urlpatterns = [
     path("pkanoon-admin-tool/low-stock-sheets/update-link/", views.admin_tool_update_sheet_link, name="admin_tool_update_sheet_link"),
     path("pkanoon-admin-tool/low-stock-sheets/print/", views.admin_tool_create_print_order, name="admin_tool_create_print_order"),
     path("pkanoon-admin-tool/admission-history/", views.admission_history, name="admission_history"),
+    path("pkanoon-admin-tool/money/add/", views.admin_tool_money_add, name="admin_tool_money_add"),
+    path("pkanoon-admin-tool/money/delete/", views.admin_tool_money_delete, name="admin_tool_money_delete"),
     path("learning-record/", views.learning_record, name="learning_record"),
 
     # Class video replay (ดูคลิปย้อนหลัง)
@@ -59,6 +61,7 @@ urlpatterns = [
     path("revenue-analysis/weekly-data/", views.revenue_analysis_weekly_data, name="revenue_analysis_weekly_data"),
     path("school-finance/export/", views.school_finance_export, name="school_finance_export"),
     path("school-finance/delete-expense/<int:pk>/", views.school_expense_delete, name="school_expense_delete"),
+    path("school-finance/delete-income/<int:pk>/", views.other_income_delete, name="other_income_delete"),
     path("school-finance/delete-payroll/<int:pk>/", views.tutor_payroll_delete, name="tutor_payroll_delete"),
 
     # Sheet Inventory

@@ -1,4 +1,5 @@
 {% extends "core/base.html" %}
+{% load humanize %}
 {% block title %}Pkanoon Admin Tool{% endblock %}
 
 {% block head %}
@@ -17,6 +18,66 @@
     --shadow:0 1px 2px rgba(0,0,0,.3), 0 4px 14px rgba(0,0,0,.25);
     --shadow-hi:0 6px 22px rgba(0,0,0,.4);
   }
+
+
+  /* ---- Quick income/expense widget (collapsed by default) ---- */
+  .mn-details{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius-lg);
+    box-shadow:var(--shadow);overflow:hidden;}
+  .mn-summary{cursor:pointer;list-style:none;padding:18px 22px;display:flex;align-items:center;
+    justify-content:space-between;gap:12px;flex-wrap:wrap;}
+  .mn-summary::-webkit-details-marker{display:none;}
+  .mn-summary-title{font-size:18px;font-weight:700;color:var(--ink);display:flex;align-items:center;gap:9px;}
+  .mn-summary-hint{font-size:12px;font-weight:600;color:var(--ink-faint);}
+  .mn-chips{display:flex;gap:7px;flex-wrap:wrap;}
+  .mn-chip{font-size:12px;font-weight:700;border-radius:999px;padding:4px 11px;border:1px solid var(--line-strong);}
+  .mn-chip.in{background:#e7f6ec;color:#15803d;border-color:#b8e6c6;}
+  .mn-chip.out{background:#fdeceb;color:#b42318;border-color:#f6c9c4;}
+  .mn-chip.net{background:var(--accent-soft);color:var(--accent-strong);border-color:var(--accent);}
+  .mn-body{padding:0 22px 22px;display:grid;gap:16px;}
+
+  .mn-tabs{display:flex;gap:8px;flex-wrap:wrap;}
+  .mn-tab{border:1px solid var(--line-strong);background:var(--panel-2);color:var(--ink-soft);
+    border-radius:999px;padding:8px 18px;font-size:13.5px;font-weight:700;cursor:pointer;font-family:inherit;}
+  .mn-tab.on{background:var(--accent);border-color:var(--accent);color:#fff;}
+
+  .mn-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;align-items:end;}
+  .mn-f{display:flex;flex-direction:column;gap:4px;min-width:0;}
+  .mn-f label{font-size:11px;font-weight:800;color:var(--ink-soft);}
+  .mn-f input,.mn-f select{border:1px solid var(--line-strong);background:var(--panel);color:var(--ink);
+    border-radius:10px;padding:9px 10px;font-size:13.5px;font-weight:600;font-family:inherit;width:100%;}
+  .mn-f input:focus,.mn-f select:focus{outline:2px solid var(--accent);outline-offset:1px;}
+  .mn-f.amount input{font-size:16px;font-weight:800;text-align:right;}
+  .mn-save{border:0;border-radius:11px;padding:11px 20px;font-size:14px;font-weight:800;cursor:pointer;
+    background:var(--accent);color:#fff;font-family:inherit;}
+  .mn-save:hover{background:var(--accent-strong);}
+  .mn-save:disabled{opacity:.55;cursor:default;}
+  .mn-msg{font-size:12.5px;font-weight:700;}
+  .mn-msg.ok{color:#15803d;} .mn-msg.err{color:#b42318;}
+
+  .mn-sum{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;}
+  .mn-box{background:var(--panel-2);border:1px solid var(--line);border-radius:13px;padding:11px 13px;}
+  .mn-box .k{font-size:11px;font-weight:800;color:var(--ink-faint);}
+  .mn-box .v{font-size:19px;font-weight:800;margin-top:3px;}
+  .mn-box .sub{font-size:10.5px;font-weight:600;color:var(--ink-faint);margin-top:2px;}
+  .mn-box.in .v{color:#15803d;} .mn-box.out .v{color:#b42318;}
+  .mn-box.net .v{color:var(--accent-strong);}
+
+  .mn-recent{display:grid;gap:6px;}
+  .mn-row{display:grid;grid-template-columns:auto 1fr auto auto;gap:10px;align-items:center;
+    background:var(--panel-2);border:1px solid var(--line);border-radius:11px;padding:8px 11px;font-size:12.5px;}
+  .mn-dot{font-size:14px;}
+  .mn-row-main{min-width:0;}
+  .mn-row-cat{font-weight:800;color:var(--ink);}
+  .mn-row-sub{font-size:11px;font-weight:600;color:var(--ink-faint);margin-top:1px;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .mn-amt{font-weight:800;white-space:nowrap;}
+  .mn-amt.in{color:#15803d;} .mn-amt.out{color:#b42318;}
+  .mn-del{border:1px solid var(--line-strong);background:var(--panel);color:var(--ink-faint);
+    border-radius:8px;padding:3px 8px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;}
+  .mn-del:hover{color:#b42318;border-color:#f6c9c4;}
+  .mn-empty{font-size:12.5px;color:var(--ink-faint);padding:12px;text-align:center;
+    border:1.5px dashed var(--line-strong);border-radius:11px;}
+  @media(max-width:560px){ .mn-form{grid-template-columns:1fr;} }
 
   .tool-wrap{max-width:1120px;margin:0 auto;display:grid;gap:22px;
     font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--ink);}
@@ -341,6 +402,112 @@
     </div>
   </details>
 
+
+  <details class="mn-details" id="moneyWidget">
+    <summary class="mn-summary">
+      <span class="mn-summary-title">💰 บันทึกรายรับ-รายจ่ายด่วน</span>
+      <span class="mn-chips">
+        <span class="mn-chip in">รับ {{ money_income_total|floatformat:0|intcomma }}</span>
+        <span class="mn-chip out">จ่าย {{ money_expense_total|floatformat:0|intcomma }}</span>
+        <span class="mn-chip net">คงเหลือ {{ money_net|floatformat:0|intcomma }}</span>
+        <span class="mn-summary-hint">{{ money_month_label }} — กดเพื่อเปิด/ปิด</span>
+      </span>
+    </summary>
+
+    <div class="mn-body">
+      <div class="mn-tabs">
+        <button type="button" class="mn-tab on" data-kind="expense">➖ บันทึกรายจ่าย</button>
+        <button type="button" class="mn-tab" data-kind="income">➕ บันทึกรายรับ</button>
+      </div>
+
+      <form id="mnForm" class="mn-form" autocomplete="off">
+        <input type="hidden" name="kind" id="mnKind" value="expense">
+        <div class="mn-f">
+          <label>วันที่</label>
+          <input type="date" name="entry_date" id="mnDate" value="{{ money_today|date:'Y-m-d' }}">
+        </div>
+        <div class="mn-f">
+          <label id="mnCatLabel">ประเภทรายจ่าย</label>
+          <select name="category" id="mnCategory">
+            <optgroup label="รายจ่าย" id="mnOptExpense">
+              {% for c in money_expense_categories %}<option value="{{ c.id }}" data-kind="expense">{{ c.name }}</option>{% endfor %}
+            </optgroup>
+            <optgroup label="รายรับ" id="mnOptIncome">
+              {% for c in money_income_categories %}<option value="{{ c.id }}" data-kind="income">{{ c.name }}</option>{% endfor %}
+            </optgroup>
+          </select>
+        </div>
+        <div class="mn-f">
+          <label id="mnWhoLabel">ผู้รับเงิน / ร้านค้า</label>
+          <input type="text" name="who" id="mnWho" placeholder="ไม่บังคับ">
+        </div>
+        <div class="mn-f">
+          <label>รายละเอียด</label>
+          <input type="text" name="description" placeholder="เช่น ค่าหมึกปริ้นเตอร์">
+        </div>
+        <div class="mn-f">
+          <label>ช่องทาง</label>
+          <select name="payment_method">
+            {% for value, label in money_payment_methods %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="mn-f amount">
+          <label>จำนวนเงิน (บาท)</label>
+          <input type="number" name="amount" id="mnAmount" step="0.01" min="0" placeholder="0">
+        </div>
+        <div class="mn-f">
+          <label>&nbsp;</label>
+          <button class="mn-save" type="submit" id="mnSave">บันทึก</button>
+        </div>
+      </form>
+      <div class="mn-msg" id="mnMsg"></div>
+
+      <div class="mn-sum">
+        <div class="mn-box in">
+          <div class="k">รายรับเดือนนี้</div>
+          <div class="v">{{ money_income_total|floatformat:0|intcomma }}</div>
+          <div class="sub">ค่าคอร์ส {{ money_course_revenue|floatformat:0|intcomma }} · อื่น ๆ {{ money_other_income|floatformat:0|intcomma }}</div>
+        </div>
+        <div class="mn-box out">
+          <div class="k">รายจ่ายเดือนนี้</div>
+          <div class="v">{{ money_expense_total|floatformat:0|intcomma }}</div>
+          <div class="sub">ทั่วไป {{ money_general_expense|floatformat:0|intcomma }} · ค่าติวเตอร์ {{ money_tutor_payroll|floatformat:0|intcomma }}</div>
+        </div>
+        <div class="mn-box net">
+          <div class="k">คงเหลือ</div>
+          <div class="v">{{ money_net|floatformat:0|intcomma }}</div>
+          <div class="sub">{{ money_month_label }}</div>
+        </div>
+        <div class="mn-box">
+          <div class="k">ดูรายงานเต็ม</div>
+          <div class="v" style="font-size:14px;"><a href="{% url 'core:school_finance' %}" style="color:var(--accent-strong);text-decoration:none;">การเงินโรงเรียน →</a></div>
+          <div class="sub">กราฟ · ย้อนหลัง · export</div>
+        </div>
+      </div>
+
+      <div>
+        <div class="rt-block-title" style="margin-bottom:8px;">🧾 รายการล่าสุด</div>
+        <div class="mn-recent" id="mnRecent">
+          {% for r in money_recent %}
+            <div class="mn-row">
+              <span class="mn-dot">{% if r.kind == "income" %}🟢{% else %}🔴{% endif %}</span>
+              <span class="mn-row-main">
+                <span class="mn-row-cat">{{ r.category }}</span>
+                <span class="mn-row-sub">{{ r.date|date:"d/m/Y" }}{% if r.who %} · {{ r.who }}{% endif %}{% if r.desc %} · {{ r.desc }}{% endif %}</span>
+              </span>
+              <span class="mn-amt {% if r.kind == 'income' %}in{% else %}out{% endif %}">
+                {% if r.kind == "income" %}+{% else %}-{% endif %}{{ r.amount|floatformat:0|intcomma }}
+              </span>
+              <button type="button" class="mn-del" data-kind="{{ r.kind }}" data-id="{{ r.id }}">ลบ</button>
+            </div>
+          {% empty %}
+            <div class="mn-empty">ยังไม่มีรายการในระบบ</div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </details>
+
   <div class="pk-toolbar">
     <div class="pk-search">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
@@ -453,7 +620,9 @@
     dismissLowStock: "{% url 'core:admin_tool_dismiss_low_stock_sheet' %}",
     admissionAction: "{% url 'core:admin_tool_admission_action' %}",
     updateSheetLink: "{% url 'core:admin_tool_update_sheet_link' %}",
-    createPrintOrder: "{% url 'core:admin_tool_create_print_order' %}"
+    createPrintOrder: "{% url 'core:admin_tool_create_print_order' %}",
+    moneyAdd: "{% url 'core:admin_tool_money_add' %}",
+    moneyDelete: "{% url 'core:admin_tool_money_delete' %}"
   };
 </script>
 
@@ -864,6 +1033,77 @@
       }
     });
   }
+
+
+  // ---------- quick income/expense widget ----------
+  (function(){
+    var form = $("mnForm");
+    if(!form) return;
+    var kindInput = $("mnKind"), cat = $("mnCategory"), msg = $("mnMsg"),
+        saveBtn = $("mnSave"), catLabel = $("mnCatLabel"), whoLabel = $("mnWhoLabel");
+
+    // One <select> holds both category lists; only the active kind's optgroup
+    // is attached, so the wrong category can never be submitted.
+    var groups = {
+      expense: $("mnOptExpense"),
+      income: $("mnOptIncome")
+    };
+    var detached = {};
+
+    function setKind(kind){
+      kindInput.value = kind;
+      document.querySelectorAll(".mn-tab").forEach(function(b){
+        b.classList.toggle("on", b.getAttribute("data-kind") === kind);
+      });
+      catLabel.textContent = kind === "income" ? "ประเภทรายรับ" : "ประเภทรายจ่าย";
+      whoLabel.textContent = kind === "income" ? "ผู้จ่าย / ลูกค้า" : "ผู้รับเงิน / ร้านค้า";
+      saveBtn.textContent = kind === "income" ? "บันทึกรายรับ" : "บันทึกรายจ่าย";
+
+      ["expense","income"].forEach(function(k){
+        if(k === kind){
+          if(detached[k]){ cat.appendChild(detached[k]); delete detached[k]; }
+        }else if(groups[k] && groups[k].parentNode){
+          detached[k] = groups[k];
+          groups[k].parentNode.removeChild(groups[k]);
+        }
+      });
+      cat.selectedIndex = 0;
+    }
+
+    document.querySelectorAll(".mn-tab").forEach(function(b){
+      b.addEventListener("click", function(){ setKind(b.getAttribute("data-kind")); });
+    });
+    setKind("expense");
+
+    function show(text, ok){
+      msg.textContent = text;
+      msg.className = "mn-msg " + (ok ? "ok" : "err");
+    }
+
+    form.addEventListener("submit", function(e){
+      e.preventDefault();
+      var amount = parseFloat($("mnAmount").value || "0");
+      if(!(amount > 0)){ show("กรุณากรอกจำนวนเงิน", false); return; }
+      saveBtn.disabled = true;
+      show("กำลังบันทึก...", true);
+      api(window.PK_URLS.moneyAdd, Object.fromEntries(new FormData(form)))
+        .then(function(){ location.reload(); })
+        .catch(function(err){
+          show((err && err.message) || "บันทึกไม่สำเร็จ", false);
+          saveBtn.disabled = false;
+        });
+    });
+
+    $("mnRecent").addEventListener("click", function(e){
+      var btn = e.target.closest(".mn-del");
+      if(!btn) return;
+      if(!confirm("ลบรายการนี้?")) return;
+      btn.disabled = true;
+      api(window.PK_URLS.moneyDelete, {kind: btn.getAttribute("data-kind"), id: btn.getAttribute("data-id")})
+        .then(function(){ location.reload(); })
+        .catch(function(){ btn.disabled = false; });
+    });
+  })();
 
   // ---------- Real-time overview: upcoming-admission actions ----------
   var admissionList=$("rtAdmissionList"), admissionCount=$("rtAdmissionCount");

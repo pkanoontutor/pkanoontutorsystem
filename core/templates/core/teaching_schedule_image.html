@@ -184,6 +184,7 @@
             <th class="num">ชม.แหว่ง</th>
             <th class="num">ค่าแหว่ง</th>
             <th class="num">เรทพิเศษ<br>325</th>
+            <th class="num">ห้อง 350<br><small style="font-weight:600;opacity:.7;">(ป.5)</small></th>
             <th class="num">เรท/ชม.<br><small style="font-weight:600;opacity:.7;">(แก้ไขได้)</small></th>
             <th class="num">ชม.ออนไลน์<br><small style="font-weight:600;opacity:.7;">(กรอกเอง)</small></th>
             <th class="num">เรทออนไลน์/ชม.<br><small style="font-weight:600;opacity:.7;">(แก้ไขได้)</small></th>
@@ -204,6 +205,12 @@
               <td class="num">
                 <input type="checkbox" class="chk js-special" name="special_{{ r.tutor.id }}" value="yes"
                        {% if r.special_rate_325 %}checked{% endif %}>
+              </td>
+              <td class="num">
+                <input type="checkbox" class="chk js-special350" name="special350_{{ r.tutor.id }}" value="yes"
+                       {% if r.special_rate_350 %}checked{% endif %}
+                       title="{% if r.taught_grades %}สอน {{ r.taught_grades }}{% endif %}">
+                {% if r.matches_350 %}<div style="font-size:9px;font-weight:700;color:#c2410c;margin-top:2px;">{{ r.taught_grades }}</div>{% endif %}
               </td>
               <td class="num">
                 <input type="number" step="0.01" min="0" class="js-rate-input" name="rate_override_{{ r.tutor.id }}"
@@ -235,7 +242,8 @@
       </table>
       </div>
       <p class="sub" style="margin-top:8px;">
-        เรทพิเศษ 325 บาท/ชม. จะมีผลเมื่อสอนตั้งแต่ 4 ชม.ขึ้นไป (ต่ำกว่านั้นใช้เรทปกติ 550/350 ตามชั่วโมง)
+        เรทพิเศษ 325 บาท/ชม. จะมีผลเมื่อสอนตั้งแต่ 4 ชม.ขึ้นไป (ต่ำกว่านั้นใช้เรทปกติ 550/350 ตามชั่วโมง)<br>
+        ห้อง 350 = จ่าย 350 บาท/ชม. คงที่ทุกช่วงชั่วโมง ระบบติ๊กให้อัตโนมัติเมื่อสอน ป.5 — เอาติ๊กออกก่อนกดส่งได้
         · ช่องนี้ติ๊กมาให้ตามค่าเริ่มต้นของติวเตอร์แต่ละคน แก้เฉพาะครั้งนี้ได้<br>
         <b>เรท/ชม.</b> และ <b>ค่าเดินทาง</b> ช่องว่าง = ใช้ค่าเริ่มต้นตามชั่วโมงสอน (เลขจาง ๆ ที่เห็นในช่อง) · กรอกตัวเลขเพื่อ override เฉพาะติวเตอร์คนนั้น
         · ลบตัวเลขออกให้ว่างเพื่อกลับไปใช้ค่าเริ่มต้นอีกครั้ง<br>
@@ -256,22 +264,30 @@
 
     // Mirrors TutorPayrollEntry.calculate_hourly_rate so the previewed rate
     // updates the moment the 325 box is ticked, before anything is submitted.
-    function rateFor(hours, special){
+    function rateFor(hours, special, flat350){
       if(hours <= 0) return 0;
+      if(flat350) return 350;          // ป.5 rooms, whatever the hours
       if(hours <= 1) return 550;
       if(hours < 4) return 350;
       return special ? 325 : 300;
     }
     // Keep the rate input's placeholder (the greyed-out default shown when the
-    // field is empty) in sync with the 325 checkbox -- never touch .value,
+    // field is empty) in sync with both checkboxes -- never touch .value,
     // since that would silently overwrite a manual override the user typed.
-    document.querySelectorAll(".js-special").forEach(function(box){
-      box.addEventListener("change", function(){
-        var tr = box.closest("tr");
-        if(!tr) return;
-        var input = tr.querySelector(".js-rate-input");
-        if(input) input.placeholder = rateFor(parseFloat(tr.dataset.hours || "0"), box.checked);
-      });
+    function syncRate(tr){
+      if(!tr) return;
+      var input = tr.querySelector(".js-rate-input");
+      if(!input) return;
+      var s325 = tr.querySelector(".js-special");
+      var s350 = tr.querySelector(".js-special350");
+      input.placeholder = rateFor(
+        parseFloat(tr.dataset.hours || "0"),
+        !!(s325 && s325.checked),
+        !!(s350 && s350.checked)
+      );
+    }
+    document.querySelectorAll(".js-special, .js-special350").forEach(function(box){
+      box.addEventListener("change", function(){ syncRate(box.closest("tr")); });
     });
     document.addEventListener("keydown",function(e){if(e.key==="Escape")closePay();});
     var bg=document.getElementById("payBg");

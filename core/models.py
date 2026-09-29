@@ -1585,6 +1585,10 @@ class AdmissionInquiry(models.Model):
         SAT_AFTERNOON = "sat_afternoon", "เสาร์บ่าย (13.30-17.30)"
         SUN_MORNING = "sun_morning", "อาทิตย์เช้า (08.30-12.30)"
         SUN_AFTERNOON = "sun_afternoon", "อาทิตย์บ่าย (13.30-17.30)"
+        # Holiday-season weekday courses have no matching TutoringClass
+        # (those are all weekend slots), so seat-demand matching simply finds
+        # nothing for this value -- which is the right answer.
+        WEEKDAY_HOLIDAY = "weekday_holiday", "รอบปิดเทอมวันธรรมดา (จันทร์-ศุกร์)"
 
     class TrialAttended(models.TextChoices):
         PENDING = "pending", "ยังไม่ระบุ"
@@ -1905,6 +1909,10 @@ class TutorPayrollEntry(models.Model):
         default=False,
         help_text="ติ๊กเฉพาะติวเตอร์ที่ได้เรทพิเศษ กรณีสอน onsite ตั้งแต่ 4 ชั่วโมงขึ้นไป",
     )
+    special_rate_350 = models.BooleanField(
+        "เรทห้องพิเศษ 350/ชม.", default=False,
+        help_text="ห้องที่จ่าย 350 บาท/ชม. คงที่ (ตั้งต้นติ๊กให้ห้อง ป.5)",
+    )
     hourly_rate = models.DecimalField("เรท onsite ต่อชั่วโมง", max_digits=10, decimal_places=2, default=0)
     hourly_rate_override = models.DecimalField(
         "เรทค่าสอนที่กำหนดเอง", max_digits=10, decimal_places=2, null=True, blank=True,
@@ -1938,10 +1946,16 @@ class TutorPayrollEntry(models.Model):
         ]
 
     @staticmethod
-    def calculate_hourly_rate(hours: Decimal, special_rate_325: bool = False) -> Decimal:
+    def calculate_hourly_rate(
+        hours: Decimal, special_rate_325: bool = False, special_rate_350: bool = False,
+    ) -> Decimal:
         hours = Decimal(str(hours or 0))
         if hours <= 0:
             return Decimal("0")
+        # Some rooms (ป.5) pay a flat 350 whatever the length of the day, so
+        # this wins over the hours-based ladder below.
+        if special_rate_350:
+            return Decimal("350")
         if hours <= 1:
             return Decimal("550")
         if hours < 4:
@@ -1981,7 +1995,7 @@ class TutorPayrollEntry(models.Model):
         self.hourly_rate = (
             Decimal(str(self.hourly_rate_override))
             if self.hourly_rate_override is not None
-            else self.calculate_hourly_rate(hours, self.special_rate_325)
+            else self.calculate_hourly_rate(hours, self.special_rate_325, self.special_rate_350)
         )
         self.teaching_fee = hours * self.hourly_rate
         self.online_teaching_hours = online_hours
@@ -3171,3 +3185,59 @@ class ClassVideoWatch(models.Model):
 
     def __str__(self) -> str:
         return f"{self.student} | {self.clip_id} | {self.last_watched_at:%d/%m/%Y}"
+
+
+# =========================================================
+# ✅ รายรับอื่น ๆ (นอกเหนือจากค่าคอร์สที่ออกใบเสร็จ)
+# =========================================================
+class IncomeCategory(models.Model):
+    """Income that does not come through a CoursePayment receipt.
+
+    Course fees are already captured as receipts; this covers everything a
+    tutoring school also takes money for -- selling sheets, make-up lessons,
+    camp fees, deposits -- which until now had nowhere to live.
+    """
+    name = models.CharField("ประเภทรายรับ", max_length=120, unique=True)
+    is_active = models.BooleanField("ใช้งาน", default=True)
+    sort_order = models.PositiveIntegerField("ลำดับ", default=0)
+
+    class Meta:
+        verbose_name = "Income Category"
+        verbose_name_plural = "Income Categories"
+        ordering = ("sort_order", "name")
+
+    def __str__(self) -> str:
+        return self.name
+
+
+class OtherIncome(models.Model):
+    class PaymentMethod(models.TextChoices):
+        CASH = "cash", "เงินสด"
+        TRANSFER = "transfer", "โอนเงิน"
+        PROMPTPAY = "promptpay", "พร้อมเพย์ / QR"
+        OTHER = "other", "อื่น ๆ"
+
+    income_date = models.DateField("วันที่รับเงิน", default=timezone.localdate)
+    category = models.ForeignKey(
+        IncomeCategory, verbose_name="ประเภทรายรับ",
+        on_delete=models.PROTECT, related_name="incomes",
+    )
+    payer = models.CharField("ผู้จ่าย / ลูกค้า", max_length=255, blank=True)
+    description = models.CharField("รายละเอียด", max_length=255, blank=True)
+    amount = models.DecimalField("จำนวนเงิน", max_digits=12, decimal_places=2)
+    payment_method = models.CharField(
+        "ช่องทางรับเงิน", max_length=20,
+        choices=PaymentMethod.choices, default=PaymentMethod.TRANSFER,
+    )
+    note = models.TextField("หมายเหตุ", blank=True)
+    created_at = models.DateTimeField("วันที่บันทึก", default=timezone.now)
+    updated_at = models.DateTimeField("อัปเดตล่าสุด", auto_now=True)
+
+    class Meta:
+        verbose_name = "Other Income"
+        verbose_name_plural = "Other Incomes"
+        ordering = ("-income_date", "-created_at")
+        indexes = [models.Index(fields=["income_date"])]
+
+    def __str__(self) -> str:
+        return f"{self.income_date} | {self.category} | {self.amount}"

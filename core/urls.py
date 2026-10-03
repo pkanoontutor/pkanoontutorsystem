@@ -71,6 +71,7 @@ urlpatterns = [
     # Weekly small test
     path("weekly-tests/", views.weekly_test_admin, name="weekly_test_admin"),
     path("weekly-tests/export/", views.weekly_test_export, name="weekly_test_export"),
+    path("weekly-tests/attendance/", views.weekly_test_set_attendance, name="weekly_test_set_attendance"),
 
     path("sheet-inventory/", views.sheet_inventory_dashboard, name="sheet_inventory_dashboard"),
     path("sheet-inventory/count/", views.sheet_inventory_count, name="sheet_inventory_count"),

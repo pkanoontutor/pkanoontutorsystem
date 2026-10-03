@@ -6510,7 +6510,12 @@ def course_renewal_notice_detail(request: HttpRequest, pk: int) -> HttpResponse:
         "enrollment_admin_url": _admin_enrollment_url(notice.enrollment),
         "referral_credit_earned": _referral_credit_earned(notice.student),
         "referral_credit_max": referral_credit_max,
-        "att": _attendance_round_view(notice.enrollment, _parse_round_index(request.GET.get("round"))),
+        "att": (
+            _attendance_window_view(notice.enrollment, _parse_att_count(request.GET.get("att_n")))
+            if _parse_att_count(request.GET.get("att_n")) is not None
+            else _attendance_round_view(notice.enrollment, _parse_round_index(request.GET.get("round")))
+        ),
+        "current_round_used": _attendance_round_view(notice.enrollment).get("used", 0) if notice.enrollment else 0,
     })
 
 
@@ -6855,6 +6860,98 @@ def _attendance_round_view(enrollment, round_index: int | None = None) -> dict:
         "has_half_left": sel == cur and (remaining_in_round - int(remaining_in_round)) >= Decimal("0.5"),
         "window_start": window_start,
     }
+
+
+def _attendance_window_view(enrollment, count) -> dict:
+    """"Show the last N sessions" -- a flat window across rounds, for when a
+    parent asks to see further back than the current round. Same row
+    vocabulary as the round view (plus receipt rows), one group, no open
+    places."""
+    if not enrollment:
+        return {"has_round": False, "rounds_count": 0}
+    target = Decimal(count)
+    consumed, used = [], Decimal("0")
+    if target > 0:
+        for a in (
+            Attendance.objects.filter(enrollment=enrollment, deducted=True)
+            .order_by("-attendance_date", "-checked_at").iterator()
+        ):
+            consumed.append(a)
+            used += Decimal(a.deducted_units or 0)
+            if used >= target:
+                break
+    consumed.reverse()
+    start = consumed[0].attendance_date if consumed else None
+
+    timeline = []
+    seq = 0
+    for a in consumed:
+        if a.status == Attendance.Status.EXCUSED_HALF:
+            kind, label = "half_leave", "½"
+        else:
+            seq += 1
+            kind = "present" if a.status == Attendance.Status.PRESENT else "no_show"
+            label = str(seq)
+        timeline.append((a.attendance_date, 0, {
+            "kind": kind, "label": label, "date": a.attendance_date,
+            "date_label": _thai_date_label(a.attendance_date),
+            "weekday_label": _thai_weekday_label(a.attendance_date),
+        }))
+    excused = 0
+    if start:
+        for a in Attendance.objects.filter(
+            enrollment=enrollment, status=Attendance.Status.EXCUSED, attendance_date__gte=start,
+        ).order_by("attendance_date"):
+            excused += 1
+            timeline.append((a.attendance_date, 1, {
+                "kind": "excused", "label": "", "date": a.attendance_date,
+                "date_label": _thai_date_label(a.attendance_date),
+                "weekday_label": _thai_weekday_label(a.attendance_date),
+            }))
+        for p in enrollment.course_payments.filter(
+            status=CoursePayment.ReceiptStatus.ISSUED, payment_date__gte=start,
+        ).order_by("payment_date"):
+            timeline.append((p.payment_date, -1, {
+                "kind": "payment", "label": "💰", "date": p.payment_date,
+                "date_label": _thai_date_label(p.payment_date),
+                "receipt_no": p.receipt_no, "sessions": p.sessions_granted, "amount": p.amount_paid,
+            }))
+        for adj in enrollment.session_adjustments.all():
+            d = timezone.localtime(adj.created_at).date() if timezone.is_aware(adj.created_at) else adj.created_at.date()
+            if d >= start:
+                timeline.append((d, 2, {
+                    "kind": "adjust", "label": ("+" if adj.delta >= 0 else "") + _sessions_label(adj.delta),
+                    "date": d, "date_label": _thai_date_label(d), "reason": adj.reason,
+                    "is_increase": adj.delta >= 0,
+                }))
+    timeline.sort(key=lambda t: (t[0], t[1]))
+    remaining = Decimal(enrollment.remaining_sessions or 0)
+    rows = [t[2] for t in timeline]
+    return {
+        "has_round": True, "rounds_count": 1, "is_window": True, "window_count": target,
+        "groups": [{
+            "no": None, "sessions": used, "amount": Decimal("0"), "paid": True,
+            "tone": "green", "rows": rows, "open_slots": [], "is_bonus": False, "is_window": True,
+        }],
+        "is_installment": False, "total_sessions": used, "total_amount": Decimal("0"),
+        "used": used, "remaining": remaining,
+        "present_count": sum(1 for r in rows if r["kind"] == "present"),
+        "excused_count": excused,
+        "no_show_count": sum(1 for r in rows if r["kind"] == "no_show"),
+        "half_leave_count": sum(1 for r in rows if r["kind"] == "half_leave"),
+        "has_half_left": (remaining - int(remaining)) >= Decimal("0.5"),
+        "window_start": start,
+    }
+
+
+def _parse_att_count(raw):
+    """?att_n= -- a whole or half number of sessions; None if absent/junk."""
+    try:
+        n = Decimal(str(raw).strip())
+    except Exception:
+        return None
+    n = (n * 2).to_integral_value() / 2
+    return max(min(n, Decimal("200")), Decimal("0.5")) if n > 0 else None
 
 
 def _sessions_label(value) -> str:
@@ -12592,4 +12689,55 @@ def session_adjustment_slip(request: HttpRequest, pk: int) -> HttpResponse:
         "student": adj.enrollment.student,
         "tutoring_class": adj.enrollment.tutoring_class,
         "abs_delta": abs(adj.delta),
+    })
+
+
+# Label the weekly-test page shows for each attendance status.
+_WEEKLY_ATT_LABELS = {
+    "present": "มา", "excused": "ลา", "excused_half": "ลา½", "no_show": "ขาด",
+}
+
+
+@require_POST
+@login_required
+def weekly_test_set_attendance(request: HttpRequest) -> JsonResponse:
+    """Correct one student's check-in for that week straight from the
+    weekly-test page -- e.g. marked ลา but actually came, which also unlocks
+    their score. Writes the same Attendance row the dashboard does, so the
+    session count and every report follow."""
+    try:
+        payload = json.loads(request.body.decode("utf-8") or "{}")
+    except ValueError:
+        payload = {}
+    enrollment = (
+        Enrollment.objects.select_related("student")
+        .filter(id=payload.get("enrollment_id")).first()
+    )
+    att_date = _safe_date(payload.get("date"))
+    status = str(payload.get("status") or "").strip()
+    if not enrollment or not att_date:
+        return JsonResponse({"ok": False, "error": "ไม่พบข้อมูลนักเรียนหรือวันที่"}, status=400)
+
+    if status == "clear":
+        Attendance.objects.filter(enrollment=enrollment, attendance_date=att_date).delete()
+    elif status in _WEEKLY_ATT_LABELS:
+        att, _ = Attendance.objects.get_or_create(
+            student=enrollment.student, enrollment=enrollment, attendance_date=att_date,
+            defaults={"status": status},
+        )
+        if att.status != status:
+            att.status = status
+            att.checked_at = timezone.now()
+            att.save()      # save() re-derives deducted / deducted_units
+    else:
+        return JsonResponse({"ok": False, "error": "สถานะไม่ถูกต้อง"}, status=400)
+
+    enrollment.refresh_from_db()
+    return JsonResponse({
+        "ok": True,
+        "status": "not_checked" if status == "clear" else status,
+        "label": "ยังไม่เช็คชื่อ" if status == "clear" else _WEEKLY_ATT_LABELS[status],
+        # scores can only be entered for a student who was actually there
+        "can_score": status == "present",
+        "remaining": _sessions_num(enrollment.remaining_sessions),
     })

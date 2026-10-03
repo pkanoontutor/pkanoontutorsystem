@@ -45,6 +45,14 @@
     .num{text-align:right;}
     .item-total div{font-size:13px;font-weight:700;padding:9px;border-top:1px solid #f1e0ad;background:#fff8e6;}
     .item-total.grand div{font-size:16px;background:#fff1d6;color:#e0722b;}
+    .inst-box{margin-top:10px;border:1px solid #f1e0ad;border-radius:14px;overflow:hidden;background:#fffdf6;}
+    .inst-row{display:flex;justify-content:space-between;gap:10px;padding:9px 12px;font-size:13px;font-weight:700;
+      color:#5b4630;border-bottom:1px solid #f6ecc9;}
+    .inst-row:last-child{border-bottom:0;}
+    .inst-row b{color:#3a2a14;white-space:nowrap;}
+    .inst-row.due{background:#fff1d6;} .inst-row.due b{color:#e0722b;font-size:15px;}
+    .inst-row.next{background:#fff8e6;} .inst-row.next b{color:#b45309;}
+    .inst-row.done{background:#ecfdf3;color:#166534;} .inst-row.done b{color:#166534;}
     .paid-box{margin-top:12px;border:2px solid #f6c445;border-radius:16px;padding:12px;text-align:center;background:linear-gradient(180deg,#fffdf6,#fff8e6);}
     .paid-label{font-size:12px;font-weight:700;color:#8a6a3a;text-transform:uppercase;letter-spacing:.06em;}
     .paid-amount{font-size:34px;line-height:1.05;font-weight:700;color:#e0722b;letter-spacing:-.02em;margin-top:3px;}
@@ -113,6 +121,11 @@
             <div class="info-row"><div class="label">ชื่อเล่น</div><div class="value">{{ payment.student.nickname|default:"-" }}</div></div>
             <div class="info-row"><div class="label">ระดับชั้น</div><div class="value">{{ payment.student.grade_level|default:"-" }}</div></div>
             <div class="info-row"><div class="label">วิธีชำระเงิน</div><div class="value">{{ payment.get_payment_method_display }}</div></div>
+            {% if plan %}
+              <div class="info-row"><div class="label">ประเภทการชำระ</div><div class="value">แบ่งชำระ · งวดที่ {{ plan.this_no }} จาก {{ plan.count }}</div></div>
+            {% else %}
+              <div class="info-row"><div class="label">ประเภทการชำระ</div><div class="value">ชำระเต็มจำนวน</div></div>
+            {% endif %}
           </div>
 
           <div class="item-table">
@@ -122,8 +135,8 @@
                 <div>{{ payment.item_description|default:"รายการอื่น" }}</div>
                 <div class="num">1</div>
               {% else %}
-                <div>ค่าเรียน {{ payment.tutoring_class.name }}</div>
-                <div class="num">{{ payment.sessions_granted }} ครั้ง</div>
+                <div>ค่าเรียน {{ payment.tutoring_class.name }}{% if plan %} (ทั้งคอร์ส){% endif %}</div>
+                <div class="num">{% if plan %}{{ plan.total_sessions }}{% else %}{{ payment.sessions_granted }}{% endif %} ครั้ง</div>
               {% endif %}
               <div class="num">{{ payment.course_price|floatformat:"0g" }}</div>
             </div>
@@ -132,9 +145,26 @@
           </div>
 
           <div class="paid-box">
-            <div class="paid-label">ยอดรับชำระ</div>
+            <div class="paid-label">{% if plan %}ยอดรับชำระงวดที่ {{ plan.this_no }}{% else %}ยอดรับชำระ{% endif %}</div>
             <div class="paid-amount">฿{{ payment.amount_paid|floatformat:"0g" }}</div>
           </div>
+
+          {% if plan %}
+            <div class="inst-box">
+              <div class="inst-row"><span>งวดที่ {{ plan.this_no }} นี้ได้เรียน</span><b>{{ payment.sessions_granted }} ครั้ง</b></div>
+              <div class="inst-row"><span>ยอดเต็มทั้งคอร์ส ({{ plan.total_sessions }} ครั้ง)</span><b>฿{{ plan.total_amount|floatformat:"0g" }}</b></div>
+              <div class="inst-row"><span>ชำระแล้วรวม</span><b>฿{{ plan.paid_amount|floatformat:"0g" }}</b></div>
+              <div class="inst-row due"><span>ยอดคงเหลือชำระงวดถัดไป</span><b>฿{{ plan.outstanding|floatformat:"0g" }}</b></div>
+              {% if plan.next %}
+                <div class="inst-row next">
+                  <span>งวดที่ {{ plan.next.installment_no }} · {{ plan.next.sessions }} ครั้ง</span>
+                  <b>{% if plan.next.due_date %}ครบกำหนด {{ plan.next.due_date|date:"d/m/Y" }}{% else %}-{% endif %}</b>
+                </div>
+              {% else %}
+                <div class="inst-row done"><span>ชำระครบทุกงวดแล้ว</span><b>✓</b></div>
+              {% endif %}
+            </div>
+          {% endif %}
 
           {% if payment.note %}<div class="note">หมายเหตุ: {{ payment.note }}</div>{% endif %}
           <div class="foot">ขอบคุณที่ไว้วางใจพี่ขนุนติวเตอร์ · เอกสารนี้ออกโดยระบบ Lookmak System</div>

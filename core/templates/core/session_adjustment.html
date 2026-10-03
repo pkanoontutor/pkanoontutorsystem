@@ -1,0 +1,143 @@
+{% extends "core/base.html" %}
+{% load extras %}
+{% block title %}ปรับจำนวนครั้งเรียน{% endblock %}
+{% block head %}
+<style>
+  .wrap{max-width:860px;margin:0 auto;display:grid;gap:14px;}
+  .cardx{background:#fff;border-radius:18px;padding:16px 18px;box-shadow:0 4px 14px rgba(15,23,42,.07);}
+  .page-title{font-size:21px;font-weight:900;}
+  .sub{font-size:12.5px;color:#64748b;font-weight:700;margin-top:4px;line-height:1.5;}
+  .search{display:flex;gap:8px;margin-top:12px;}
+  .search input{flex:1;border:1px solid #e2e8f0;border-radius:11px;padding:10px 12px;font-size:14px;font-weight:700;font-family:inherit;}
+  .btn{border:0;border-radius:11px;padding:10px 16px;font-size:13.5px;font-weight:900;cursor:pointer;
+    background:#0f172a;color:#fff;font-family:inherit;text-decoration:none;display:inline-flex;align-items:center;gap:6px;}
+  .btn.amber{background:#d97706;} .btn.soft{background:#fff;color:#334155;border:1px solid #cbd5e1;}
+  .match{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 12px;border:1px solid #e2e8f0;
+    border-radius:12px;text-decoration:none;color:inherit;margin-top:6px;}
+  .match:hover{background:#f8fafc;border-color:#94a3b8;}
+  .match b{font-size:14px;} .match small{font-size:12px;color:#64748b;font-weight:700;}
+  .pill{font-size:12px;font-weight:900;border-radius:999px;padding:4px 11px;background:#fff7ed;color:#c2410c;}
+  .who{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;background:#f8fafc;border:1px solid #e2e8f0;
+    border-radius:14px;padding:12px 14px;}
+  .who-name{font-size:16px;font-weight:900;} .who-meta{font-size:12.5px;color:#64748b;font-weight:700;margin-top:2px;}
+  .big{font-size:26px;font-weight:900;color:#ea580c;text-align:right;line-height:1;}
+  .big small{display:block;font-size:11px;color:#64748b;font-weight:800;margin-top:3px;}
+  .dir{display:flex;gap:8px;margin-top:12px;}
+  .dir label{flex:1;border:2px solid #e2e8f0;border-radius:14px;padding:12px;font-weight:900;cursor:pointer;text-align:center;}
+  .dir label:has(input:checked).add{border-color:#16a34a;background:#f0fdf4;color:#166534;}
+  .dir label:has(input:checked).sub{border-color:#dc2626;background:#fef2f2;color:#991b1b;}
+  .dir input{display:none;}
+  .f{display:flex;flex-direction:column;gap:5px;margin-top:12px;}
+  .f label{font-size:12px;font-weight:900;color:#334155;}
+  .f input,.f textarea{border:1px solid #e2e8f0;border-radius:11px;padding:10px 12px;font-size:14px;font-weight:700;font-family:inherit;}
+  .f textarea{min-height:80px;resize:vertical;}
+  .preview{margin-top:12px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:14px;padding:11px 13px;
+    font-size:13px;font-weight:800;color:#1e3a8a;line-height:1.6;}
+  .err{background:#fee2e2;border:1px solid #fecaca;color:#991b1b;border-radius:12px;padding:10px 12px;font-weight:800;font-size:13px;}
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  th{text-align:left;font-size:11.5px;font-weight:900;color:#475569;padding:8px;border-bottom:2px solid #e2e8f0;}
+  td{padding:8px;border-bottom:1px solid #f1f5f9;}
+  .plus{color:#15803d;font-weight:900;} .minus{color:#b91c1c;font-weight:900;}
+  @media(max-width:600px){table{display:block;overflow-x:auto;}}
+</style>
+{% endblock %}
+{% block content %}
+<div class="wrap">
+  <div class="cardx">
+    <div class="page-title">✏️ ปรับจำนวนครั้งเรียน</div>
+    <div class="sub">เพิ่มหรือลดจำนวนครั้งเรียนพร้อมเหตุผล ระบบจะออกใบแจ้งการปรับให้ Copy / Save ส่งผู้ปกครองได้ทันที</div>
+    <form method="get" class="search">
+      <input type="text" name="q" value="{{ q }}" placeholder="ค้นหาชื่อเล่น / ชื่อจริง / รหัสนักเรียน" autofocus>
+      <button class="btn" type="submit">ค้นหา</button>
+    </form>
+    {% for e in matches %}
+      <a class="match" href="?enrollment_id={{ e.id }}">
+        <span><b>{{ e.student.nickname|default:"-" }}</b> · {{ e.student.full_name }}<br><small>{{ e.tutoring_class.name }}</small></span>
+        <span class="pill">เหลือ {{ e.remaining_sessions|sessions }} ครั้ง</span>
+      </a>
+    {% empty %}
+      {% if q %}<div class="sub" style="margin-top:10px;">ไม่พบนักเรียนที่ตรงกับ “{{ q }}”</div>{% endif %}
+    {% endfor %}
+  </div>
+
+  {% if enrollment %}
+    <div class="cardx">
+      <div class="who">
+        <div>
+          <div class="who-name">{{ enrollment.student.nickname|default:"-" }} · {{ enrollment.student.full_name }}</div>
+          <div class="who-meta">{{ enrollment.tutoring_class.name }}{% if expected_end %} · คาดว่าครบคอร์ส {{ expected_end|date:"d/m/Y" }}{% endif %}</div>
+        </div>
+        <div class="big">{{ enrollment.remaining_sessions|sessions }}<small>ครั้งคงเหลือ</small></div>
+      </div>
+
+      {% if errors %}<div class="err" style="margin-top:12px;">{% for e in errors %}{{ e }}<br>{% endfor %}</div>{% endif %}
+
+      <form method="post" id="adjForm">
+        {% csrf_token %}
+        <input type="hidden" name="enrollment_id" value="{{ enrollment.id }}">
+        <div class="dir">
+          <label class="add"><input type="radio" name="direction" value="add" {% if posted.direction != "sub" %}checked{% endif %}>➕ เพิ่มครั้งเรียน</label>
+          <label class="sub"><input type="radio" name="direction" value="sub" {% if posted.direction == "sub" %}checked{% endif %}>➖ ลดครั้งเรียน</label>
+        </div>
+        <div class="f">
+          <label>จำนวนครั้ง</label>
+          <input type="number" name="delta" id="adjDelta" step="0.5" min="0.5" value="{{ posted.delta|default:'1' }}">
+        </div>
+        <div class="f">
+          <label>เหตุผล (จะแสดงในใบที่ส่งผู้ปกครอง)</label>
+          <textarea name="reason" placeholder="เช่น ชดเชยวันหยุดนักขัตฤกษ์ / ปรับตามที่ตกลงกับผู้ปกครอง">{{ posted.reason }}</textarea>
+        </div>
+        <div class="preview" id="adjPreview"></div>
+        <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;">
+          <button class="btn amber" type="submit">บันทึกและออกใบแจ้ง</button>
+          <a class="btn soft" href="?">เลือกนักเรียนคนอื่น</a>
+        </div>
+      </form>
+    </div>
+  {% endif %}
+
+  <div class="cardx" style="padding:0;overflow:hidden;">
+    <div style="padding:14px 16px 6px;font-size:14px;font-weight:900;">🧾 ใบปรับล่าสุด</div>
+    <table>
+      <thead><tr><th>วันที่</th><th>นักเรียน</th><th>ปรับ</th><th>คงเหลือ</th><th>เหตุผล</th><th></th></tr></thead>
+      <tbody>
+        {% for a in recent %}
+          <tr>
+            <td style="white-space:nowrap;">{{ a.created_at|date:"d/m/Y" }}</td>
+            <td>{{ a.enrollment.student.nickname|default:a.enrollment.student.full_name }}</td>
+            <td class="{% if a.is_increase %}plus{% else %}minus{% endif %}">{% if a.is_increase %}+{% endif %}{{ a.delta|sessions }}</td>
+            <td style="white-space:nowrap;">{{ a.remaining_before|sessions }} → <b>{{ a.remaining_after|sessions }}</b></td>
+            <td>{{ a.reason|truncatechars:40 }}</td>
+            <td><a class="btn soft" style="padding:5px 10px;font-size:12px;" href="{% url 'core:session_adjustment_slip' a.id %}">เปิดใบ</a></td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="6" style="text-align:center;color:#94a3b8;padding:18px;font-weight:700;">ยังไม่มีการปรับจำนวนครั้ง</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% if enrollment %}
+<script>
+(function(){
+  var before = {{ enrollment.remaining_sessions|sessions }};
+  var delta = document.getElementById('adjDelta');
+  var out = document.getElementById('adjPreview');
+  function fmt(n){ return (Math.round(n*2)/2).toString(); }
+  function paint(){
+    var sub = document.querySelector('input[name="direction"]:checked').value === 'sub';
+    var d = Math.max(Number(delta.value||0), 0) * (sub ? -1 : 1);
+    var after = before + d;
+    out.innerHTML = 'คงเหลือเดิม <b>' + fmt(before) + '</b> ครั้ง → ' +
+      (sub ? 'ลด ' : 'เพิ่ม ') + '<b>' + fmt(Math.abs(d)) + '</b> ครั้ง → ' +
+      'คงเหลือใหม่ <b>' + fmt(after) + '</b> ครั้ง' +
+      (after < 0 ? '<br><span style="color:#b91c1c;">ลดเกินจำนวนที่เหลืออยู่</span>' : '');
+  }
+  delta.addEventListener('input', paint);
+  document.querySelectorAll('input[name="direction"]').forEach(function(r){ r.addEventListener('change', paint); });
+  paint();
+})();
+</script>
+{% endif %}
+{% endblock %}

@@ -630,14 +630,50 @@ class Enrollment(models.Model):
 
         super().save(*args, **kwargs)
 
+    # Pages read remaining_sessions several times per enrollment (a CSS class
+    # check, the number itself, a progress bar...), and each read used to be
+    # its own aggregate query. Both sums are cached on the instance;
+    # refresh_from_db() clears them, so anything that changes attendance and
+    # then refreshes still sees the new figure.
+    def refresh_from_db(self, *args, **kwargs):
+        self.__dict__.pop("_session_sums", None)
+        return super().refresh_from_db(*args, **kwargs)
+
+    def _sums(self) -> dict:
+        cache = self.__dict__.get("_session_sums")
+        if cache is None:
+            cache = {}
+            self.__dict__["_session_sums"] = cache
+        return cache
+
     def used_sessions(self):
         """Sessions consumed, as a Decimal -- a half-day leave burns 0.5."""
-        total = self.attendances.aggregate(n=models.Sum("deducted_units"))["n"]
-        return Decimal(total or 0)
+        cache = self._sums()
+        if "used" not in cache:
+            total = self.attendances.aggregate(n=models.Sum("deducted_units"))["n"]
+            cache["used"] = Decimal(total or 0)
+        return cache["used"]
+
+    def adjusted_sessions(self):
+        """Net manual +/- from SessionAdjustment slips.
+
+        Kept out of sessions_total on purpose: sessions_total means "bought
+        through receipts" and receipt cancellation restores it from a
+        snapshot, which would silently wipe any adjustment folded into it.
+        """
+        cache = self._sums()
+        if "adjusted" not in cache:
+            total = self.session_adjustments.aggregate(n=models.Sum("delta"))["n"]
+            cache["adjusted"] = Decimal(total or 0)
+        return cache["adjusted"]
+
+    @property
+    def effective_sessions_total(self):
+        return Decimal(self.sessions_total or 0) + self.adjusted_sessions()
 
     @property
     def remaining_sessions(self):
-        return Decimal(self.sessions_total or 0) - self.used_sessions()
+        return self.effective_sessions_total - self.used_sessions()
 
 
 # -----------------------
@@ -1663,6 +1699,11 @@ class AdmissionInquiry(models.Model):
         "มาเรียนแล้ว (รอสร้างใบเสร็จ)",
         default=False,
         help_text="ติ๊กจากปุ่ม “มาแล้ว” ในภาพรวมเรียลไทม์ของ Admin Tool -- การ์ดยังอยู่ต่อจนกว่าจะสร้างใบเสร็จ",
+    )
+
+    paid_on_signup = models.BooleanField(
+        "สมัครและจ่ายเงินแล้ว", default=False,
+        help_text="ติ๊กจากปุ่มในภาพรวม Admin Tool -- การ์ดยังอยู่ จนกว่าจะปิดเอง",
     )
 
     is_completed = models.BooleanField("ดำเนินการเสร็จแล้ว", default=False)
@@ -3241,3 +3282,126 @@ class OtherIncome(models.Model):
 
     def __str__(self) -> str:
         return f"{self.income_date} | {self.category} | {self.amount}"
+
+
+
+# =========================================================
+# ✅ แพ็กเกจคอร์ส + งวดแบ่งชำระ
+# =========================================================
+class CoursePackage(models.Model):
+    """One purchase of a course round, paid in full or in installments.
+
+    A round is what the parent bought in one go -- say "10 แถม 2" for 3,990 --
+    even when it is paid over several receipts. Each installment carries its
+    own share of the sessions, so the attendance view can lay the whole round
+    out up front and colour it by installment.
+    """
+    enrollment = models.ForeignKey(
+        Enrollment, on_delete=models.CASCADE, related_name="packages",
+    )
+    total_sessions = models.PositiveIntegerField("จำนวนครั้งทั้งแพ็กเกจ")
+    total_amount = models.DecimalField("ยอดเต็มทั้งแพ็กเกจ", max_digits=12, decimal_places=2)
+    installment_count = models.PositiveIntegerField("จำนวนงวด", default=1)
+    note = models.CharField("หมายเหตุ", max_length=255, blank=True)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        verbose_name = "Course Package"
+        verbose_name_plural = "Course Packages"
+        ordering = ("-created_at",)
+
+    def __str__(self) -> str:
+        return f"{self.enrollment} | {self.total_sessions} ครั้ง | {self.installment_count} งวด"
+
+    @property
+    def is_installment(self) -> bool:
+        return (self.installment_count or 1) > 1
+
+    def ordered_installments(self):
+        return list(self.installments.select_related("receipt").order_by("installment_no"))
+
+    @property
+    def paid_amount(self) -> Decimal:
+        return sum((i.amount for i in self.ordered_installments() if i.is_paid), Decimal("0"))
+
+    @property
+    def outstanding_amount(self) -> Decimal:
+        return max(Decimal(self.total_amount or 0) - self.paid_amount, Decimal("0"))
+
+    def next_unpaid(self):
+        for i in self.ordered_installments():
+            if not i.is_paid:
+                return i
+        return None
+
+
+class CoursePackageInstallment(models.Model):
+    package = models.ForeignKey(
+        CoursePackage, on_delete=models.CASCADE, related_name="installments",
+    )
+    installment_no = models.PositiveIntegerField("งวดที่")
+    sessions = models.PositiveIntegerField("จำนวนครั้งของงวดนี้")
+    amount = models.DecimalField("ยอดงวดนี้", max_digits=12, decimal_places=2)
+    due_date = models.DateField("กำหนดชำระ", null=True, blank=True)
+    receipt = models.OneToOneField(
+        "CoursePayment", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="package_installment",
+    )
+
+    class Meta:
+        verbose_name = "Course Package Installment"
+        verbose_name_plural = "Course Package Installments"
+        ordering = ("package", "installment_no")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["package", "installment_no"], name="uniq_package_installment_no",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.package} | งวด {self.installment_no}"
+
+    @property
+    def is_paid(self) -> bool:
+        # A cancelled receipt un-pays the installment rather than leaving a
+        # paid-looking row pointing at a void receipt.
+        return bool(
+            self.receipt_id
+            and self.receipt.status == CoursePayment.ReceiptStatus.ISSUED
+        )
+
+
+# =========================================================
+# ✅ ใบปรับจำนวนครั้งเรียน (เพิ่ม / ลด)
+# =========================================================
+class SessionAdjustment(models.Model):
+    """A manual +/- to an enrollment's sessions, with a reason and a slip
+    that can be sent to the parent. remaining/expected-end are snapshotted
+    so the slip keeps saying what it said when it was issued."""
+    enrollment = models.ForeignKey(
+        Enrollment, on_delete=models.CASCADE, related_name="session_adjustments",
+    )
+    delta = models.DecimalField("ปรับเพิ่ม / ลด (ครั้ง)", max_digits=5, decimal_places=1)
+    reason = models.TextField("เหตุผล")
+    remaining_before = models.DecimalField("คงเหลือก่อนปรับ", max_digits=6, decimal_places=1)
+    remaining_after = models.DecimalField("คงเหลือหลังปรับ", max_digits=6, decimal_places=1)
+    expected_end_before = models.DateField("คาดว่าครบคอร์ส (ก่อน)", null=True, blank=True)
+    expected_end_after = models.DateField("คาดว่าครบคอร์ส (หลัง)", null=True, blank=True)
+    created_by = models.ForeignKey(
+        "auth.User", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="session_adjustments",
+    )
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        verbose_name = "Session Adjustment"
+        verbose_name_plural = "Session Adjustments"
+        ordering = ("-created_at",)
+
+    def __str__(self) -> str:
+        sign = "+" if self.delta >= 0 else ""
+        return f"{self.enrollment} | {sign}{self.delta} | {self.created_at:%d/%m/%Y}"
+
+    @property
+    def is_increase(self) -> bool:
+        return self.delta >= 0

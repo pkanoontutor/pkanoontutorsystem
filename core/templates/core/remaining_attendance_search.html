@@ -114,6 +114,13 @@
               <span>รหัส {{ student.student_code }}</span>
               <span>{{ selected_enrollment.tutoring_class.name }}</span>
             </div>
+            {% if user.is_staff and selected_enrollment.is_active %}
+              <a href="{% url 'core:session_adjustment_page' %}?enrollment_id={{ selected_enrollment.id }}"
+                 style="display:inline-block;margin-top:8px;font-size:12px;font-weight:900;text-decoration:none;
+                        background:#fef3c7;border:1px solid #fcd34d;color:#92400e;border-radius:999px;padding:5px 12px;">
+                ✏️ ปรับจำนวนครั้งเรียน
+              </a>
+            {% endif %}
           </div>
         </div>
 
@@ -132,23 +139,13 @@
 
       <details class="panel">
         <summary>
-          <span class="section-title">📅 การเข้าเรียนล่าสุด 15 ครั้ง</span>
+          <span class="section-title">📅 ประวัติการเข้าเรียนรอบนี้</span>
           <span class="chev">▸</span>
         </summary>
         <div class="body">
-          {% if attendance_rows %}
-            <div class="att-list">
-              {% for a in attendance_rows %}
-                <div class="att-row {% if a.status == 'present' %}p{% elif a.status == 'excused' %}e{% else %}n{% endif %}">
-                  <span><span class="att-date">{{ a.thai_day }}</span><span class="att-day">{{ a.thai_weekday }}</span></span>
-                  <span class="att-tag">
-                    {% if a.status == 'present' %}มาเรียน
-                    {% elif a.status == 'excused' %}ลา
-                    {% else %}ขาด{% endif %}
-                  </span>
-                </div>
-              {% endfor %}
-            </div>
+          {% if att.has_round %}
+            {% include "core/_attendance_round_nav.html" with att=att round_qs=round_qs %}
+            <div style="margin-top:10px;">{% include "core/_attendance_round.html" with att=att %}</div>
           {% else %}
             <div class="empty">ยังไม่มีประวัติการเข้าเรียนของคอร์สนี้</div>
           {% endif %}

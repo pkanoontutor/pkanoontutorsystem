@@ -1085,7 +1085,7 @@
                     <div class="stu-full" title="{{ e.student.full_name|default:'-' }}">{{ e.student.full_name|default:"-" }}</div>
 
                     <div class="stu-sessions">
-                      <span id="remaining-{{ e.id }}" class="stu-remain {% if e.remaining_sessions <= 0 %}danger{% endif %}">{{ e.remaining_sessions|sessions }}</span><span class="stu-total">/{{ e.sessions_total }}</span>
+                      <span id="remaining-{{ e.id }}" class="stu-remain {% if e.remaining_sessions <= 0 %}danger{% endif %}">{{ e.remaining_sessions|sessions }}</span><span class="stu-total">/{{ e.effective_sessions_total|sessions }}</span>
                     </div>
 
                     <div class="stu-last" id="last-{{ e.id }}">

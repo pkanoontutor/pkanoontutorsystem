@@ -1,0 +1,158 @@
+{% load humanize extras %}
+{% comment %}
+  One purchase round, laid out by installment. Shared by the parent portal,
+  remaining-attendance and the renewal notice so all three always agree.
+  Self-contained styles (prefixed .ar-) and nothing html2canvas can't paint,
+  because the renewal notice exports this as an image.
+  Expects: att = _attendance_round_view(...)
+{% endcomment %}
+<style>
+  .ar{font-family:inherit;color:#0f172a;}
+  .ar-sum{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+  .ar-sum > div{border-radius:16px;padding:10px 6px;text-align:center;}
+  .ar-sum .k{font-size:11px;font-weight:800;}
+  .ar-sum .v{font-size:21px;font-weight:900;line-height:1.1;margin-top:2px;}
+  .ar-sum .used{background:#dcfce7;border:1px solid #bbf7d0;} .ar-sum .used .k{color:#166534;} .ar-sum .used .v{color:#15803d;}
+  .ar-sum .leave{background:#eff6ff;border:1px solid #bfdbfe;} .ar-sum .leave .k{color:#1d4ed8;} .ar-sum .leave .v{color:#2563eb;}
+  .ar-sum .left{background:#fff7ed;border:1px solid #fed7aa;} .ar-sum .left .k{color:#9a3412;} .ar-sum .left .v{color:#ea580c;}
+  .ar-meta{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px;
+    font-size:12.5px;font-weight:800;color:#334155;}
+  .ar-meta small{font-size:11px;font-weight:700;color:#94a3b8;}
+
+  .ar-group{margin-top:10px;border-radius:16px;overflow:hidden;border:1.5px solid #e2e8f0;}
+  .ar-head{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;padding:9px 12px;}
+  .ar-head .t{font-size:13px;font-weight:900;}
+  .ar-head .s{font-size:11.5px;font-weight:800;opacity:.85;margin-top:1px;}
+  .ar-head .amt{font-size:14px;font-weight:900;white-space:nowrap;}
+  .ar-badge{font-size:10.5px;font-weight:900;border-radius:999px;padding:2px 9px;margin-left:5px;vertical-align:1px;}
+  .ar-body{padding:8px;display:grid;gap:5px;background:#fff;}
+
+  .ar-row{display:grid;grid-template-columns:28px 1fr auto;gap:9px;align-items:center;border-radius:12px;
+    padding:7px 10px;border:1px solid #e2e8f0;background:#f8fafc;}
+  .ar-dot{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:900;
+    color:#fff;background:#16a34a;}
+  .ar-date{font-size:12.5px;font-weight:900;line-height:1.3;}
+  .ar-sub{font-size:10.5px;font-weight:700;color:#64748b;margin-top:1px;}
+  .ar-tag{font-size:10.5px;font-weight:900;padding:3px 9px;border-radius:999px;white-space:nowrap;}
+
+  .ar-row.present .ar-tag{background:#dcfce7;color:#15803d;}
+  .ar-row.no_show{background:#fef2f2;border-color:#fecaca;} .ar-row.no_show .ar-dot{background:#dc2626;}
+  .ar-row.no_show .ar-tag{background:#fee2e2;color:#b91c1c;}
+  .ar-row.half_leave{background:#fff7ed;border-color:#fdba74;} .ar-row.half_leave .ar-dot{background:#f97316;}
+  .ar-row.half_leave .ar-tag{background:#fed7aa;color:#9a3412;}
+  .ar-row.excused{background:#eff6ff;border-color:#bfdbfe;} .ar-row.excused .ar-dot{background:#dbeafe;font-size:13px;}
+  .ar-row.excused .ar-tag{background:#dbeafe;color:#1d4ed8;}
+  .ar-row.adjust{background:#fefce8;border-color:#fde047;} .ar-row.adjust .ar-dot{background:#eab308;font-size:11px;}
+  .ar-row.adjust .ar-tag{background:#fef08a;color:#854d0e;}
+  .ar-row.open{background:#fff;border:1.5px dashed #cbd5e1;}
+  .ar-row.open .ar-dot{background:#fff;border:2.5px solid #94a3b8;color:#64748b;}
+  .ar-row.open .ar-date{color:#64748b;}
+  .ar-row.open .ar-tag{background:#f1f5f9;color:#475569;}
+  .ar-row.wait{background:#fffbeb;border:1.5px dashed #fcd34d;}
+  .ar-row.wait .ar-dot{background:#fff;border:2.5px dashed #f59e0b;color:#b45309;}
+  .ar-row.wait .ar-date{color:#92400e;}
+  .ar-row.wait .ar-tag{background:#fef3c7;color:#92400e;}
+
+  /* One colour family per installment, so two halves of a round read as two parts. */
+  .ar-group.green{border-color:#86efac;}  .ar-group.green .ar-head{background:#dcfce7;color:#14532d;}
+  .ar-group.green .ar-row.present .ar-dot{background:#16a34a;}
+  .ar-group.green .ar-row.open .ar-dot{border-color:#22c55e;color:#15803d;}
+  .ar-group.blue{border-color:#93c5fd;}   .ar-group.blue .ar-head{background:#dbeafe;color:#1e3a8a;}
+  .ar-group.blue .ar-row.present .ar-dot{background:#2563eb;}
+  .ar-group.blue .ar-row.present .ar-tag{background:#dbeafe;color:#1d4ed8;}
+  .ar-group.blue .ar-row.open .ar-dot{border-color:#3b82f6;color:#1d4ed8;}
+  .ar-group.violet{border-color:#c4b5fd;} .ar-group.violet .ar-head{background:#ede9fe;color:#4c1d95;}
+  .ar-group.violet .ar-row.present .ar-dot{background:#7c3aed;}
+  .ar-group.violet .ar-row.present .ar-tag{background:#ede9fe;color:#6d28d9;}
+  .ar-group.violet .ar-row.open .ar-dot{border-color:#8b5cf6;color:#6d28d9;}
+  .ar-group.teal{border-color:#5eead4;}   .ar-group.teal .ar-head{background:#ccfbf1;color:#134e4a;}
+  .ar-group.teal .ar-row.present .ar-dot{background:#0d9488;}
+  .ar-group.teal .ar-row.present .ar-tag{background:#ccfbf1;color:#0f766e;}
+  .ar-group.amber{border-color:#fcd34d;}  .ar-group.amber .ar-head{background:#fef3c7;color:#78350f;}
+  .ar-group.unpaid .ar-head{background:#fffbeb;color:#92400e;}
+  .ar-group.unpaid{border-style:dashed;border-color:#fbbf24;}
+
+  .ar-badge.paid{background:#16a34a;color:#fff;}
+  .ar-badge.due{background:#f59e0b;color:#fff;}
+  .ar-empty{border-radius:14px;border:1.5px dashed #cbd5e1;padding:16px;text-align:center;font-size:12.5px;
+    font-weight:800;color:#94a3b8;margin-top:8px;}
+</style>
+
+<div class="ar">
+  {% if not att.has_round %}
+    <div class="ar-empty">ยังไม่มีข้อมูลคอร์สเรียน</div>
+  {% else %}
+    <div class="ar-sum">
+      <div class="used"><div class="k">เรียนไปแล้ว</div><div class="v">{{ att.used|sessions }}</div></div>
+      <div class="leave"><div class="k">ลา</div><div class="v">{{ att.excused_count|add:att.half_leave_count }}</div></div>
+      <div class="left"><div class="k">คงเหลือ</div><div class="v">{{ att.remaining|sessions }}</div></div>
+    </div>
+
+    <div class="ar-meta">
+      <span>
+        {% if att.rounds_count > 1 %}รอบที่ {{ att.round_number }} · {% endif %}คอร์ส {{ att.total_sessions|sessions }} ครั้ง
+        {% if att.is_installment %} · แบ่งชำระ {{ att.groups|length }} ส่วน{% endif %}
+      </span>
+      {% if att.window_start %}<small>เริ่ม {{ att.window_start|date:"d/m/Y" }}</small>{% endif %}
+    </div>
+
+    {% for g in att.groups %}
+      <div class="ar-group {{ g.tone }}{% if not g.paid %} unpaid{% endif %}">
+        <div class="ar-head">
+          <div>
+            {% if g.is_bonus %}
+              <div class="t">ครั้งเรียนที่ได้รับเพิ่ม</div>
+              <div class="s">จากการปรับจำนวนครั้ง</div>
+            {% elif att.is_installment %}
+              <div class="t">ส่วนที่ {{ g.no }} · {{ g.sessions|sessions }} ครั้ง
+                {% if g.paid %}<span class="ar-badge paid">ชำระแล้ว</span>{% else %}<span class="ar-badge due">รอชำระ</span>{% endif %}
+              </div>
+              <div class="s">
+                {% if g.paid %}ใบเสร็จ {{ g.receipt_no }}{% if g.payment_date %} · {{ g.payment_date|date:"d/m/Y" }}{% endif %}
+                {% else %}กำหนดชำระ{% if g.due_date %} {{ g.due_date|date:"d/m/Y" }}{% endif %}{% endif %}
+              </div>
+            {% else %}
+              <div class="t">{% if g.amount %}ชำระเต็ม{% else %}คอร์สเรียน{% endif %} · {{ g.sessions|sessions }} ครั้ง</div>
+              {% if g.receipt_no %}<div class="s">ใบเสร็จ {{ g.receipt_no }}{% if g.payment_date %} · {{ g.payment_date|date:"d/m/Y" }}{% endif %}</div>{% endif %}
+            {% endif %}
+          </div>
+          {% if g.amount %}<div class="amt">฿{{ g.amount|floatformat:0|intcomma }}</div>{% endif %}
+        </div>
+
+        <div class="ar-body">
+          {% for r in g.rows %}
+            {% if r.kind == "excused" %}
+              <div class="ar-row excused"><div class="ar-dot">📩</div>
+                <div><div class="ar-date">{{ r.date_label }}</div><div class="ar-sub">แจ้งลา · ไม่หักครั้งเรียน</div></div>
+                <div class="ar-tag">ลา</div></div>
+            {% elif r.kind == "adjust" %}
+              <div class="ar-row adjust"><div class="ar-dot">{{ r.label }}</div>
+                <div><div class="ar-date">{{ r.date_label }}</div><div class="ar-sub">{{ r.reason|truncatechars:60 }}</div></div>
+                <div class="ar-tag">{% if r.is_increase %}ปรับเพิ่ม{% else %}ปรับลด{% endif %}</div></div>
+            {% else %}
+              <div class="ar-row {{ r.kind }}"><div class="ar-dot">{{ r.label }}</div>
+                <div><div class="ar-date">{{ r.date_label }}</div>
+                  <div class="ar-sub">{% if r.kind == "half_leave" %}ลาแบบหักครึ่ง · หัก 0.5 ครั้ง{% elif r.kind == "no_show" %}ไม่ได้แจ้งล่วงหน้า · หักครั้งเรียน{% else %}{{ r.weekday_label }}{% endif %}</div></div>
+                <div class="ar-tag">{% if r.kind == "present" %}มาเรียน{% elif r.kind == "half_leave" %}ลา ½{% else %}ขาด{% endif %}</div></div>
+            {% endif %}
+          {% endfor %}
+          {% for n in g.open_slots %}
+            {% if g.paid %}
+              <div class="ar-row open"><div class="ar-dot">{{ n.label }}</div>
+                <div><div class="ar-date">{% if n.half %}อีกครึ่งครั้ง{% else %}ครั้งที่ {{ n.label }}{% endif %}</div>
+                  <div class="ar-sub">{% if n.half %}ดูคลิปย้อนหลังได้ 1 คลิปเพื่อเรียนให้ครบ{% else %}ยังไม่ได้เรียน{% endif %}</div></div>
+                <div class="ar-tag">คงเหลือ</div></div>
+            {% else %}
+              <div class="ar-row wait"><div class="ar-dot">{{ n.label }}</div>
+                <div><div class="ar-date">ครั้งที่ {{ n.label }}</div><div class="ar-sub">เริ่มเรียนได้เมื่อชำระส่วนที่ {{ g.no }}</div></div>
+                <div class="ar-tag">รอชำระ</div></div>
+            {% endif %}
+          {% endfor %}
+          {% if not g.rows and not g.open_slots %}
+            <div class="ar-sub" style="padding:4px 6px;">—</div>
+          {% endif %}
+        </div>
+      </div>
+    {% endfor %}
+  {% endif %}
+</div>

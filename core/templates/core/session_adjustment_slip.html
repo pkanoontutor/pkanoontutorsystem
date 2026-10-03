@@ -1,0 +1,150 @@
+{% load static extras %}
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>ใบแจ้งการปรับจำนวนครั้งเรียน · {{ student.nickname }}</title>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    /* Same visual family as the renewal notice and attendance card -- these
+       all go to the same parent, so they should read as one set. */
+    *{box-sizing:border-box}
+    body{margin:0;background:#e0f2fe;font-family:"IBM Plex Sans Thai",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:#0f172a}
+    .page{min-height:100vh;padding:14px;display:grid;gap:12px;justify-items:center;align-content:start}
+    .toolbar{width:min(100%,440px);display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+    .btn{border:0;border-radius:999px;padding:11px 15px;font-weight:700;cursor:pointer;background:#0f172a;color:#fff;
+      text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:6px;font-family:inherit;font-size:13px}
+    .btn.green{background:#16a34a}.btn.blue{background:#2563eb}.btn.soft{background:#fff;color:#0f172a;border:1px solid #cbd5e1}
+    .receipt{width:440px;max-width:100%;padding:20px;background:#fff;border-radius:26px;
+      box-shadow:0 14px 32px rgba(15,23,42,.16)}
+    .top{text-align:center;border-bottom:2px solid #e2e8f0;padding-bottom:12px}
+    .logo{max-height:74px;max-width:190px;object-fit:contain}
+    .doc{font-size:22px;font-weight:700;margin-top:8px;color:#ea580c}
+    .school{font-size:13px;font-weight:700;color:#475569;margin-top:3px}
+    .student-card{margin-top:12px;background:linear-gradient(135deg,#fff7ed,#fffbeb);border:1px solid #fed7aa;
+      border-radius:20px;padding:12px;display:grid;gap:6px}
+    .student-name{font-size:19px;font-weight:700;line-height:1.25}
+    .meta{font-size:12px;color:#475569;font-weight:600;line-height:1.5}
+
+    .flow{margin-top:12px;display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:center}
+    .box{border-radius:18px;padding:12px 8px;text-align:center}
+    .box .k{font-size:11px;font-weight:700}
+    .box .v{font-size:30px;font-weight:700;line-height:1.05;margin-top:3px}
+    .box .u{font-size:11px;font-weight:600;margin-top:2px}
+    .box.before{background:#f1f5f9;border:1px solid #e2e8f0} .box.before .k,.box.before .u{color:#475569}
+    .box.after{background:#fff7ed;border:1px solid #fed7aa} .box.after .k,.box.after .u{color:#9a3412} .box.after .v{color:#ea580c}
+    .delta{border-radius:999px;padding:8px 12px;font-size:16px;font-weight:700;white-space:nowrap;text-align:center}
+    .delta.plus{background:#dcfce7;color:#15803d} .delta.minus{background:#fee2e2;color:#b91c1c}
+
+    .reason{margin-top:12px;border-radius:18px;border:1px solid #e2e8f0;background:#f8fafc;padding:12px}
+    .reason .k{font-size:11px;font-weight:700;color:#64748b}
+    .reason .v{font-size:14px;font-weight:600;line-height:1.6;margin-top:3px;white-space:pre-line}
+
+    .dates{margin-top:12px;display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    .dbox{border-radius:16px;padding:10px;text-align:center}
+    .dbox .k{font-size:10.5px;font-weight:700}
+    .dbox .v{font-size:15px;font-weight:700;margin-top:3px}
+    .dbox.old{background:#f8fafc;border:1px solid #e2e8f0} .dbox.old .k{color:#64748b} .dbox.old .v{color:#64748b;text-decoration:line-through}
+    .dbox.new{background:#dcfce7;border:1px solid #bbf7d0} .dbox.new .k{color:#166534} .dbox.new .v{color:#15803d}
+    .dates.single{grid-template-columns:1fr}
+
+    .foot{text-align:center;margin-top:12px;color:#64748b;font-size:11px;font-weight:600}
+    @media(max-width:480px){.page{padding:8px}.receipt{border-radius:0;width:100%;padding:16px}.btn{flex:1}}
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="toolbar">
+      <button class="btn blue" type="button" onclick="openImage()">Open Image in New Tab</button>
+      <button class="btn green" type="button" onclick="copyImage()">Copy Image</button>
+      <button class="btn soft" type="button" onclick="downloadImage()">Save Image</button>
+      <a class="btn soft" href="{% url 'core:session_adjustment_page' %}">← กลับ</a>
+    </div>
+
+    <div class="receipt" id="slip">
+      <div class="top">
+        <img class="logo" src="{% static 'core/logo2.png' %}" alt="logo">
+        <div class="doc">ใบแจ้งการปรับจำนวนครั้งเรียน</div>
+        <div class="school">พี่ขนุนติวเตอร์</div>
+      </div>
+
+      <div class="student-card">
+        <div class="student-name">{{ student.nickname|default:"-" }} · {{ student.full_name }}</div>
+        <div class="meta">
+          คอร์สที่เรียน: {{ tutoring_class.name }}<br>
+          วันที่ปรับ: {{ adj.created_at|date:"d/m/Y" }}
+        </div>
+      </div>
+
+      <div class="flow">
+        <div class="box before"><div class="k">คงเหลือเดิม</div><div class="v">{{ adj.remaining_before|sessions }}</div><div class="u">ครั้ง</div></div>
+        <div class="delta {% if adj.is_increase %}plus{% else %}minus{% endif %}">
+          {% if adj.is_increase %}+ เพิ่ม{% else %}− ลด{% endif %}<br>{{ abs_delta|sessions }} ครั้ง
+        </div>
+        <div class="box after"><div class="k">คงเหลือใหม่</div><div class="v">{{ adj.remaining_after|sessions }}</div><div class="u">ครั้ง</div></div>
+      </div>
+
+      <div class="reason">
+        <div class="k">เหตุผลการปรับ</div>
+        <div class="v">{{ adj.reason }}</div>
+      </div>
+
+      {% if adj.expected_end_after %}
+        <div class="dates{% if not adj.expected_end_before or adj.expected_end_before == adj.expected_end_after %} single{% endif %}">
+          {% if adj.expected_end_before and adj.expected_end_before != adj.expected_end_after %}
+            <div class="dbox old"><div class="k">คาดว่าครบคอร์ส (เดิม)</div><div class="v">{{ adj.expected_end_before|date:"d/m/Y" }}</div></div>
+          {% endif %}
+          <div class="dbox new"><div class="k">คาดว่าจะครบคอร์ส</div><div class="v">{{ adj.expected_end_after|date:"d/m/Y" }}</div></div>
+        </div>
+      {% endif %}
+
+      <div class="foot">ออกเมื่อ {{ adj.created_at|date:"d/m/Y H:i" }} · Lookmak System</div>
+    </div>
+  </div>
+
+  <script>
+    // Same export path as the renewal notice, so it behaves the same on a
+    // parent's phone -- notably the iOS share sheet for Save Image.
+    async function makeCanvas(){
+      return await html2canvas(document.getElementById("slip"), {scale: 3, backgroundColor: "#ffffff", useCORS: true});
+    }
+    function canvasToBlob(canvas){ return new Promise((r) => canvas.toBlob(r, "image/png")); }
+    function openImage(){
+      const win = window.open("", "_blank");
+      makeCanvas().then((canvas) => {
+        const url = canvas.toDataURL("image/png");
+        if (win && !win.closed) { win.document.write('<img src="' + url + '" style="max-width:100%;height:auto;">'); }
+        else { alert("เบราว์เซอร์บล็อกการเปิดแท็บใหม่ กรุณาอนุญาต popup หรือใช้ปุ่ม Save Image แทนครับ"); }
+      });
+    }
+    async function downloadImage(){
+      const canvas = await makeCanvas();
+      const filename = "session-adjustment-{{ adj.id }}.png";
+      if (navigator.canShare && navigator.share) {
+        try {
+          const blob = await canvasToBlob(canvas);
+          const file = new File([blob], filename, {type: "image/png"});
+          if (navigator.canShare({files: [file]})) { await navigator.share({files: [file]}); return; }
+        } catch (e) { if (e && e.name === "AbortError") return; }
+      }
+      const a = document.createElement("a");
+      a.href = canvas.toDataURL("image/png"); a.download = filename;
+      document.body.appendChild(a); a.click(); a.remove();
+    }
+    function copyImage(){
+      if (!navigator.clipboard || !window.ClipboardItem) {
+        alert("เบราว์เซอร์นี้ไม่รองรับ Copy Image โดยตรง ให้ใช้ Open Image หรือ Save Image แทนครับ"); return;
+      }
+      try {
+        const item = new ClipboardItem({"image/png": makeCanvas().then(canvasToBlob)});
+        navigator.clipboard.write([item]).then(() => alert("Copy รูปใบแจ้งแล้วครับ"))
+          .catch((err) => alert("Copy ไม่สำเร็จ ลองใช้ Save Image แทนครับ" + (err && err.message ? "\n(" + err.message + ")" : "")));
+      } catch (e) { alert("เบราว์เซอร์นี้ไม่รองรับ Copy Image โดยตรง ให้ใช้ Open Image หรือ Save Image แทนครับ"); }
+    }
+  </script>
+</body>
+</html>

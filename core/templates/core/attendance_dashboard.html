@@ -69,7 +69,7 @@
                   {% endif %}
                   <div class="muted">{{ e.get_enrollment_type_display }}</div>
                 </td>
-                <td><b>{{ e.sessions_total }}</b></td>
+                <td><b>{{ e.effective_sessions_total|sessions }}</b></td>
                 <td>
                   <b id="remaining-{{ e.id }}" class="{% if e.remaining_sessions <= 0 %}danger{% endif %}">
                     {{ e.remaining_sessions|sessions }}

@@ -1,0 +1,26 @@
+{% comment %}
+  Earlier-round navigation, outside the exported card. Replaces the old
+  "show the last N sessions" box: looking further back now means opening
+  the previous purchase round, which keeps its installment structure.
+  Expects: att, and optionally round_qs (current querystring minus "round").
+{% endcomment %}
+{% if att.has_round and att.rounds_count > 1 %}
+  <div style="width:min(100%,440px);display:flex;gap:6px;align-items:center;flex-wrap:wrap;
+              background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:8px 10px;
+              font-size:12.5px;font-weight:900;color:#334155;">
+    <span>รอบที่ {{ att.round_number }} จาก {{ att.rounds_count }}</span>
+    <span style="flex:1;"></span>
+    {% if att.prev_index is not None %}
+      <a href="?{% if round_qs %}{{ round_qs }}&{% endif %}round={{ att.prev_index }}"
+         style="text-decoration:none;background:#f1f5f9;color:#0f172a;border-radius:999px;padding:6px 12px;">‹ รอบก่อนหน้า</a>
+    {% endif %}
+    {% if att.next_index is not None %}
+      <a href="?{% if round_qs %}{{ round_qs }}&{% endif %}round={{ att.next_index }}"
+         style="text-decoration:none;background:#f1f5f9;color:#0f172a;border-radius:999px;padding:6px 12px;">รอบถัดไป ›</a>
+    {% endif %}
+    {% if not att.is_current %}
+      <a href="?{{ round_qs }}"
+         style="text-decoration:none;background:#2563eb;color:#fff;border-radius:999px;padding:6px 12px;">รอบปัจจุบัน</a>
+    {% endif %}
+  </div>
+{% endif %}

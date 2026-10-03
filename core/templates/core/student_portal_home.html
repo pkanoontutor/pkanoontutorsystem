@@ -209,33 +209,12 @@
         </form>
       {% endif %}
 
-      {% if attendance_rows %}
-        <div class="att-summary">
-          <div class="asum all"><b>{{ attended_total }}</b><span>ทั้งหมด</span></div>
-          <div class="asum p"><b>{{ present_count }}</b><span>มาเรียน</span></div>
-          <div class="asum e"><b>{{ excused_count }}</b><span>ลา</span></div>
-          <div class="asum n"><b>{{ no_show_count }}</b><span>ขาด</span></div>
-        </div>
-
-        <div class="att-list" id="attList">
-          {% for a in attendance_rows %}
-            <div class="att-row {% if a.status == 'present' %}p{% elif a.status == 'excused' %}e{% else %}n{% endif %}">
-              <span class="att-main">
-                <span class="att-dot">{% if a.status == 'present' %}{{ a.present_seq }}{% endif %}</span>
-                <span class="att-date">{{ a.thai_day }}</span>
-                <span class="att-day">{{ a.thai_weekday }}</span>
-              </span>
-              <span class="att-tag">
-                {% if a.status == 'present' %}มาเรียน
-                {% elif a.status == 'excused' %}ลา
-                {% else %}ขาด{% endif %}
-              </span>
-            </div>
-          {% endfor %}
-        </div>
-
+      {% if att.has_round %}
+        {% include "core/_attendance_round_nav.html" with att=att round_qs=round_qs %}
+        <div style="margin-top:10px;">{% include "core/_attendance_round.html" with att=att %}</div>
         <div class="sp-note">
-          “ลา” ไม่ถูกหักครั้งเรียน ส่วน “มาเรียน” และ “ขาด” จะหัก 1 ครั้งตามระเบียบของโรงเรียน
+          “ลา” ไม่ถูกหักครั้งเรียน · “ลาแบบหักครึ่ง” หัก 0.5 ครั้ง · “มาเรียน” และ “ขาด” หัก 1 ครั้งตามระเบียบของโรงเรียน
+          {% if att.has_half_left %}<br>🎬 เศษ 0.5 ครั้งที่เหลือ ดูคลิปเรียนย้อนหลังเพิ่มได้ 1 คลิปครับ{% endif %}
         </div>
       {% else %}
         <div class="sp-empty">ยังไม่มีประวัติการเข้าเรียนของคอร์สนี้</div>

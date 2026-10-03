@@ -7,7 +7,7 @@ import logging
 import os
 import re
 from datetime import date, timedelta, datetime
-from decimal import Decimal, ROUND_CEILING
+from decimal import Decimal, ROUND_CEILING, ROUND_FLOOR
 from io import BytesIO
 from urllib.parse import quote
 
@@ -49,6 +49,9 @@ from .models import (
     ExpenseCategory,
     IncomeCategory,
     OtherIncome,
+    CoursePackage,
+    CoursePackageInstallment,
+    SessionAdjustment,
     SchoolExpense,
     Tutor,
     TutorPayrollEntry,
@@ -4072,6 +4075,8 @@ def remaining_attendance_search(request: HttpRequest) -> HttpResponse:
             ]
 
     return render(request, "core/remaining_attendance_search.html", {
+        "att": _attendance_round_view(selected_enrollment, _parse_round_index(request.GET.get("round"))) if selected_enrollment else {"has_round": False},
+        "round_qs": _querystring_without(request, "round"),
         "students_json": json.dumps(_allocation_students_json(), ensure_ascii=False),
         "student": student,
         "enrollments": enrollments,
@@ -4775,6 +4780,10 @@ def student_portal_home(request: HttpRequest) -> HttpResponse:
         "student": student,
         "enrollments": enrollments,
         "selected_enrollment": selected_enrollment,
+        # The current purchase round, laid out by installment -- the same
+        # view the renewal notice and remaining-attendance use.
+        "att": _attendance_round_view(selected_enrollment, _parse_round_index(request.GET.get("round"))) if selected_enrollment else {"has_round": False},
+        "round_qs": _querystring_without(request, "round"),
         "attendance_rows": attendance_list,
         "remaining_sessions": remaining_sessions,
         "hours_per_session": hours_per_session,
@@ -5359,6 +5368,35 @@ def _active_enrollments_for_payment(student_id: str | None = None):
     return qs
 
 
+def _pending_installments_by_enrollment(enrollment_ids) -> dict:
+    """Next unpaid installment per enrollment, for the receipt form's
+    "pay the next installment" shortcut."""
+    out: dict[int, dict] = {}
+    if not enrollment_ids:
+        return out
+    rows = (
+        CoursePackageInstallment.objects
+        .select_related("package", "receipt")
+        .filter(package__enrollment_id__in=enrollment_ids)
+        .order_by("package__enrollment_id", "-package__created_at", "installment_no")
+    )
+    for inst in rows:
+        eid = inst.package.enrollment_id
+        if eid in out or inst.is_paid:
+            continue
+        out[eid] = {
+            "id": inst.id,
+            "no": inst.installment_no,
+            "count": inst.package.installment_count,
+            "sessions": inst.sessions,
+            "amount": str(inst.amount),
+            "due_date": inst.due_date.strftime("%d/%m/%Y") if inst.due_date else "",
+            "package_total": str(inst.package.total_amount),
+            "package_sessions": inst.package.total_sessions,
+        }
+    return out
+
+
 def _default_payment_form_context(request: HttpRequest, errors: list[str] | None = None, posted: dict | None = None):
     students = list(_active_students_for_payment())
     classes = list(TutoringClass.objects.filter(is_active=True).order_by("time_slot", "name"))
@@ -5397,8 +5435,13 @@ def _default_payment_form_context(request: HttpRequest, errors: list[str] | None
         for s in students
     ]
 
+    pending_by_enrollment = _pending_installments_by_enrollment([e.id for e in enrollments])
+
     enrollments_lookup_json = [
         {
+            "pending_installment": pending_by_enrollment.get(e.id),
+            "weekday": _class_weekday(e.tutoring_class),
+            "remaining_num": _sessions_num(e.remaining_sessions),
             "id": e.id,
             "student_id": e.student_id,
             "student_label": f"{e.student.nickname or '-'} | {e.student.full_name or '-'} | {e.student.student_code or '-'}",
@@ -5874,33 +5917,73 @@ def _default_renewal_dates(enrollment: Enrollment) -> tuple[date, date]:
     return expected_end, next_start
 
 
-def _expected_course_completion_date(enrollment: Enrollment | None) -> date | None:
+def _class_weekday(tutoring_class) -> int:
+    """Weekday a class meets on (5 = Saturday, 6 = Sunday)."""
+    time_slot = getattr(tutoring_class, "time_slot", "") or ""
+    return 6 if time_slot in (
+        TutoringClass.TimeSlot.SUN_MORNING,
+        TutoringClass.TimeSlot.SUN_AFTERNOON,
+    ) else 5
+
+
+def _nth_session_date(tutoring_class, n, from_date: date | None = None) -> date | None:
+    """Date of the n-th upcoming class meeting, counting from_date's own
+    weekday as meeting 1 if it falls on the class day.
+
+    The one rule behind every "expected" date in the system -- course end on
+    the portal, installment due dates on receipts, and the adjustment slip --
+    so they can never disagree with each other. A trailing half session still
+    occupies a whole week, hence the ceiling.
+    """
+    if not tutoring_class:
+        return None
+    n = Decimal(str(n or 0))
+    if n <= 0:
+        return None
+    start = from_date or timezone.localdate()
+    days_ahead = (_class_weekday(tutoring_class) - start.weekday()) % 7
+    first = start + timedelta(days=days_ahead)
+    weeks = int(n.to_integral_value(rounding=ROUND_CEILING))
+    return first + timedelta(days=7 * (weeks - 1))
+
+
+def _expected_course_completion_date(enrollment: Enrollment | None,
+                                     remaining_override=None) -> date | None:
     """Estimated date an enrollment's remaining sessions run out.
 
     A class meets once a week on a fixed weekday (Sat or Sun, per its
     time_slot), so remaining sessions play out one every 7 days starting
     from that class's next upcoming meeting date. Returns None once the
     course is already complete (remaining <= 0) or has no class.
+    `remaining_override` lets the adjustment slip ask "and after the change?"
     """
     if not enrollment or not enrollment.tutoring_class_id:
         return None
-    remaining = Decimal(enrollment.remaining_sessions or 0)
+    remaining = Decimal(
+        enrollment.remaining_sessions if remaining_override is None else remaining_override
+    )
     if remaining <= 0:
         return None
+    return _nth_session_date(enrollment.tutoring_class, remaining)
 
-    today = timezone.localdate()
-    time_slot = enrollment.tutoring_class.time_slot
-    target_weekday = 6 if time_slot in (
-        TutoringClass.TimeSlot.SUN_MORNING,
-        TutoringClass.TimeSlot.SUN_AFTERNOON,
-    ) else 5  # Saturday
 
-    days_ahead = (target_weekday - today.weekday()) % 7
-    next_session_date = today + timedelta(days=days_ahead)
-    # A trailing half session still occupies a whole week on the calendar,
-    # so round the remaining count up before turning it into weeks.
-    weeks_left = int(remaining.to_integral_value(rounding=ROUND_CEILING))
-    return next_session_date + timedelta(days=7 * (weeks_left - 1))
+def _split_sessions(total: int, parts: int) -> list[int]:
+    """12 over 2 -> [6, 6]; 10 over 3 -> [3, 3, 4]. Remainder goes last."""
+    total, parts = int(total or 0), max(int(parts or 1), 1)
+    base = total // parts
+    out = [base] * parts
+    out[-1] += total - base * parts
+    return out
+
+
+def _split_amount(total, parts: int) -> list[Decimal]:
+    """Whole-baht shares; the odd baht lands on the last installment."""
+    total = Decimal(str(total or 0))
+    parts = max(int(parts or 1), 1)
+    base = (total / parts).quantize(Decimal("1"), rounding=ROUND_FLOOR)
+    out = [base] * parts
+    out[-1] += total - base * parts
+    return out
 
 
 def _decimal_from_post(value, default: Decimal) -> Decimal:
@@ -6392,7 +6475,7 @@ def course_renewal_notice_detail(request: HttpRequest, pk: int) -> HttpResponse:
         "enrollment_admin_url": _admin_enrollment_url(notice.enrollment),
         "referral_credit_earned": _referral_credit_earned(notice.student),
         "referral_credit_max": referral_credit_max,
-        "att": _attendance_timeline_for_enrollment(notice.enrollment, show_count=_parse_att_count(request.GET.get("att_n"))),
+        "att": _attendance_round_view(notice.enrollment, _parse_round_index(request.GET.get("round"))),
     })
 
 
@@ -6419,161 +6502,329 @@ def _thai_weekday_label(d) -> str:
     return _THAI_WEEKDAYS[d.weekday()]
 
 
-def _parse_att_count(raw):
-    """?att_n= override from the renewal notice page; None means "use the round".
+def _querystring_without(request: HttpRequest, *keys: str) -> str:
+    """Current querystring minus some keys, for links that change only those."""
+    q = request.GET.copy()
+    for k in keys:
+        q.pop(k, None)
+    return q.urlencode()
 
-    Accepts halves (8.5) since a half-day leave can leave the count on a .5.
-    """
+
+def _parse_round_index(raw):
+    """?round= selector (0-based); None means the current round."""
     try:
-        n = Decimal(str(raw).strip())
-    except Exception:
+        return max(int(str(raw).strip()), 0)
+    except (TypeError, ValueError):
         return None
-    # Snap to the nearest half; anything finer is meaningless here.
-    n = (n * 2).to_integral_value() / 2
-    return max(min(n, Decimal("200")), Decimal("0"))
 
 
-def _attendance_timeline_for_enrollment(enrollment, show_count=None) -> dict:
-    """Timeline for the attendance card shown under the renewal notice.
+def _enrollment_rounds(enrollment) -> list[dict]:
+    """Every purchase round on an enrollment, oldest first.
 
-    The card covers the student's *current round*, not a fixed 10:
-      round_size = sessions granted by the latest issued receipt
-      used       = round_size - remaining_sessions
-
-    Everything counts in *units* rather than rows, because a half-day leave
-    burns 0.5: a 10-session round with 1.5 left is 8.5 used, i.e. eight full
-    days plus one half-day leave. Rows are walked newest-first until their
-    units add up to that figure.
+    A round is one CoursePackage -- what the parent bought in one go, however
+    many receipts it took. Receipts issued before packages existed each
+    become a one-installment round of their own, and an enrollment with no
+    receipts at all gets a single round sized to its sessions_total, so old
+    data still renders.
     """
-    empty = {
-        "rows": [], "remaining_slots": [], "round_size": Decimal("0"),
-        "used_count": Decimal("0"), "default_count": Decimal("0"), "is_custom": False,
-        "remaining": Decimal("0"), "excused_count": 0, "no_show_count": 0,
-        "half_leave_count": 0, "window_start": None,
-    }
+    rounds: list[dict] = []
     if not enrollment:
-        return empty
+        return rounds
 
-    latest_payment = (
+    packages = list(
+        enrollment.packages.prefetch_related("installments__receipt").order_by("created_at", "id")
+    )
+    linked_receipts = set()
+    for p in packages:
+        insts = []
+        for i in sorted(p.installments.all(), key=lambda x: x.installment_no):
+            if i.receipt_id:
+                linked_receipts.add(i.receipt_id)
+            insts.append({
+                "no": i.installment_no,
+                "sessions": Decimal(i.sessions),
+                "amount": Decimal(i.amount),
+                "due_date": i.due_date,
+                "paid": i.is_paid,
+                "receipt_no": i.receipt.receipt_no if i.is_paid else "",
+                "payment_date": i.receipt.payment_date if i.is_paid else None,
+            })
+        rounds.append({
+            "start": p.created_at,
+            "total_sessions": Decimal(p.total_sessions),
+            "total_amount": Decimal(p.total_amount),
+            "is_installment": p.is_installment,
+            "installments": insts,
+        })
+
+    legacy = (
         enrollment.course_payments
         .filter(status=CoursePayment.ReceiptStatus.ISSUED)
-        .order_by("-payment_date", "-created_at")
-        .first()
+        .exclude(id__in=linked_receipts)
+        .order_by("created_at", "id")
     )
-    remaining = Decimal(enrollment.remaining_sessions or 0)
-    if latest_payment and latest_payment.sessions_granted:
-        round_size = Decimal(latest_payment.sessions_granted)
-    else:
-        # No receipt on file (legacy enrollment) -- best guess is the
-        # enrollment's own total.
-        round_size = Decimal(enrollment.sessions_total or 0)
+    for r in legacy:
+        rounds.append({
+            "start": r.created_at,
+            "total_sessions": Decimal(r.sessions_granted or 0),
+            "total_amount": Decimal(r.amount_paid or 0),
+            "is_installment": False,
+            "installments": [{
+                "no": 1, "sessions": Decimal(r.sessions_granted or 0),
+                "amount": Decimal(r.amount_paid or 0), "due_date": r.payment_date,
+                "paid": True, "receipt_no": r.receipt_no, "payment_date": r.payment_date,
+            }],
+        })
 
-    remaining_in_round = max(min(remaining, round_size), Decimal("0"))
-    default_count = max(round_size - remaining_in_round, Decimal("0"))
-    # Parents sometimes ask to see further back than the current round.
-    used_target = default_count if show_count is None else Decimal(show_count)
+    if not rounds and (enrollment.sessions_total or 0) > 0:
+        rounds.append({
+            "start": enrollment.created_at,
+            "total_sessions": Decimal(enrollment.sessions_total),
+            "total_amount": Decimal("0"),
+            "is_installment": False,
+            "installments": [{
+                "no": 1, "sessions": Decimal(enrollment.sessions_total), "amount": Decimal("0"),
+                "due_date": None, "paid": True, "receipt_no": "", "payment_date": None,
+            }],
+        })
+
+    rounds.sort(key=lambda x: x["start"])
+    return rounds
+
+
+# Installment tones: one colour family per installment, cycling.
+_ROUND_TONES = ["green", "blue", "violet", "teal"]
+
+
+def _attendance_round_view(enrollment, round_index: int | None = None) -> dict:
+    """Shared attendance display for the portal, remaining-attendance and the
+    renewal notice: one purchase round, laid out by installment.
+
+    A "10 แถม 2" round paid in two halves renders as twelve places in two
+    colour groups. Each group opens with its payment line -- paid, or due
+    on a date for an amount -- and the places fill with attendance as it
+    happens, so the structure never shifts mid-round. ลา and manual
+    adjustments are slotted in by date.
+
+    Which attendance belongs to which round is worked out backwards from the
+    remaining balance (attendance is not linked to receipts): the newest
+    consumed units belong to the current round, the ones before those to the
+    round before, and so on. That stays correct for legacy data and for
+    sessions_total edited by hand.
+    """
+    empty = {"has_round": False, "rounds_count": 0}
+    rounds = _enrollment_rounds(enrollment)
+    if not rounds:
+        return empty
+
+    adjustments = list(
+        enrollment.session_adjustments.order_by("created_at")
+    )
+
+    # Capacity of each round = what its paid installments bought + manual
+    # adjustments made while it was the current round.
+    for idx, r in enumerate(rounds):
+        nxt_start = rounds[idx + 1]["start"] if idx + 1 < len(rounds) else None
+        r_adj = [
+            a for a in adjustments
+            if a.created_at >= r["start"] and (nxt_start is None or a.created_at < nxt_start)
+        ]
+        r["adjustments"] = r_adj
+        r["adj_total"] = sum((Decimal(a.delta) for a in r_adj), Decimal("0"))
+        r["paid_sessions"] = sum((i["sessions"] for i in r["installments"] if i["paid"]), Decimal("0"))
+        r["capacity"] = max(r["paid_sessions"] + r["adj_total"], Decimal("0"))
+
+    cur = len(rounds) - 1
+    sel = cur if round_index is None else max(0, min(int(round_index), cur))
+    R = rounds[sel]
+
+    remaining = Decimal(enrollment.remaining_sessions or 0)
+    cur_round = rounds[cur]
+    remaining_in_cur = max(min(remaining, cur_round["capacity"]), Decimal("0"))
+    used_in_cur = cur_round["capacity"] - remaining_in_cur
+
+    # Units consumed by rounds newer than the selected one.
+    if sel == cur:
+        skip, take = Decimal("0"), used_in_cur
+        remaining_in_round = remaining_in_cur
+    else:
+        skip = used_in_cur + sum((rounds[k]["capacity"] for k in range(sel + 1, cur)), Decimal("0"))
+        take = R["capacity"]
+        remaining_in_round = Decimal("0")
 
     consumed = []
-    used_total = Decimal("0")
-    if used_target > 0:
+    if take > 0:
+        seen = Decimal("0")
+        got = Decimal("0")
         for a in (
             Attendance.objects
             .filter(enrollment=enrollment, deducted=True)
             .order_by("-attendance_date", "-checked_at")
             .iterator()
         ):
+            u = Decimal(a.deducted_units or 0)
+            if seen < skip:
+                seen += u
+                continue
             consumed.append(a)
-            used_total += Decimal(a.deducted_units or 0)
-            if used_total >= used_target:
+            got += u
+            if got >= take:
                 break
-    consumed.reverse()  # chronological
+    consumed.reverse()
+    used_in_round = sum((Decimal(a.deducted_units or 0) for a in consumed), Decimal("0"))
 
-    window_start = consumed[0].attendance_date if consumed else None
-    if latest_payment and (window_start is None or latest_payment.payment_date < window_start):
-        payment_floor = latest_payment.payment_date
-    else:
-        payment_floor = window_start
+    # Display groups: installments in order, then any bonus from adjustments.
+    groups = []
+    for n, inst in enumerate(R["installments"]):
+        groups.append({
+            **inst, "tone": _ROUND_TONES[n % len(_ROUND_TONES)], "rows": [], "is_bonus": False,
+        })
+    if R["adj_total"] > 0:
+        groups.append({
+            "no": None, "sessions": R["adj_total"], "amount": Decimal("0"),
+            "due_date": None, "paid": True, "receipt_no": "", "payment_date": None,
+            "tone": "amber", "rows": [], "is_bonus": True,
+        })
 
-    rows = []
+    # Attendance can only be spent on places that exist yet -- paid
+    # installments and bonus -- so positions are counted over those alone.
+    # An unpaid installment in the middle therefore never swallows a lesson.
+    upos = Decimal("0")
+    usable = [g for g in groups if g["paid"]]
+    for g in usable:
+        g["ulo"], g["uhi"] = upos, upos + g["sessions"]
+        upos = g["uhi"]
+    capacity = R["capacity"]
+
+    def group_for(pos: Decimal):
+        for g in usable:
+            if pos <= g["uhi"]:
+                return g
+        return usable[-1] if usable else groups[0]
+
+    # Consumed attendance, numbered across the round.
+    pos = Decimal("0")
+    seq = 0
+    timeline = []   # (date, sortkey, group, row)
     for a in consumed:
+        u = Decimal(a.deducted_units or 0)
+        pos += u
         if a.status == Attendance.Status.PRESENT:
             kind = "present"
         elif a.status == Attendance.Status.EXCUSED_HALF:
             kind = "half_leave"
         else:
             kind = "no_show"
-        rows.append({
-            "kind": kind, "date": a.attendance_date, "sort_key": (a.attendance_date, 0),
-            "units": Decimal(a.deducted_units or 0),
+        if kind == "half_leave":
+            label = "½"
+        else:
+            seq += 1
+            label = str(seq)
+        timeline.append((a.attendance_date, 0, group_for(pos), {
+            "kind": kind, "label": label, "date": a.attendance_date,
             "date_label": _thai_date_label(a.attendance_date),
             "weekday_label": _thai_weekday_label(a.attendance_date),
-        })
+        }))
+
+    window_start = consumed[0].attendance_date if consumed else None
+    window_end = consumed[-1].attendance_date if consumed else None
+
+    # Plain ลา inside the round's span, attached to whichever group was
+    # running on that date.
+    leave_qs = Attendance.objects.filter(enrollment=enrollment, status=Attendance.Status.EXCUSED)
     if window_start:
-        for a in (
-            Attendance.objects
-            .filter(enrollment=enrollment, status=Attendance.Status.EXCUSED,
-                    attendance_date__gte=window_start)
-            .order_by("attendance_date", "checked_at")
-        ):
-            rows.append({
-                "kind": "excused", "date": a.attendance_date, "sort_key": (a.attendance_date, 1),
-                "units": Decimal("0"),
-                "date_label": _thai_date_label(a.attendance_date),
-                "weekday_label": _thai_weekday_label(a.attendance_date),
-            })
-    if payment_floor:
-        for p in (
-            enrollment.course_payments
-            .filter(status=CoursePayment.ReceiptStatus.ISSUED, payment_date__gte=payment_floor)
-            .order_by("payment_date", "created_at")
-        ):
-            rows.append({
-                "kind": "payment", "date": p.payment_date, "sort_key": (p.payment_date, -1),
-                "units": Decimal("0"),
-                "date_label": _thai_date_label(p.payment_date),
-                "amount": p.amount_paid, "sessions": p.sessions_granted,
-                "receipt_no": p.receipt_no,
-            })
+        leave_qs = leave_qs.filter(attendance_date__gte=window_start)
+        if sel != cur and window_end:
+            leave_qs = leave_qs.filter(attendance_date__lte=window_end)
+    else:
+        leave_qs = leave_qs.none()
+    excused_rows = list(leave_qs.order_by("attendance_date"))
+    for a in excused_rows:
+        before = [t for t in timeline if t[0] <= a.attendance_date and t[3]["kind"] != "excused"]
+        g = before[-1][2] if before else groups[0]
+        timeline.append((a.attendance_date, 1, g, {
+            "kind": "excused", "label": "", "date": a.attendance_date,
+            "date_label": _thai_date_label(a.attendance_date),
+            "weekday_label": _thai_weekday_label(a.attendance_date),
+        }))
 
-    rows.sort(key=lambda r: r["sort_key"])
+    for adj in R["adjustments"]:
+        d = timezone.localtime(adj.created_at).date() if timezone.is_aware(adj.created_at) else adj.created_at.date()
+        before = [t for t in timeline if t[0] <= d]
+        g = before[-1][2] if before else groups[0]
+        timeline.append((d, 2, g, {
+            "kind": "adjust", "label": ("+" if adj.delta >= 0 else "") + _sessions_label(adj.delta),
+            "date": d, "date_label": _thai_date_label(d), "reason": adj.reason,
+            "is_increase": adj.delta >= 0,
+        }))
 
-    # Full sessions get a running number; a half-day leave shows ½ instead, so
-    # the numbering never implies it consumed a whole session.
-    seq = Decimal("0")
-    for r in rows:
-        if r["kind"] in ("present", "no_show"):
-            seq += 1
-            r["seq"] = int(seq)
-        elif r["kind"] == "half_leave":
-            seq += Decimal("0.5")
-            r["seq"] = "½"
+    timeline.sort(key=lambda t: (t[0], t[1]))
+    for _, _, g, row in timeline:
+        g["rows"].append(row)
 
-    # Remaining dots: one per whole session left, plus a half dot for the .5.
-    whole_left = int(remaining_in_round)
-    slots = []
-    n = seq
-    for _ in range(whole_left):
-        n += 1
-        slots.append({"label": str(int(n)), "half": False})
-    if remaining_in_round - whole_left >= Decimal("0.5"):
-        slots.append({"label": "½", "half": True})
+    # Places not yet attended. Every place in a round has a fixed number --
+    # installment 2 of a 12-place round *is* places 7-12 -- so open places
+    # are labelled by position, not by a running lesson count (which lags
+    # behind after a half-day leave). A half-used place shows as ½.
+    ppos = Decimal("0")
+    for g in groups:
+        g["plo"], g["phi"] = ppos, ppos + g["sessions"]
+        ppos = g["phi"]
 
+    def place_slots(a: Decimal, b: Decimal) -> list[dict]:
+        out = []
+        if b <= a:
+            return out
+        whole_a = a.to_integral_value(rounding=ROUND_CEILING)
+        if whole_a != a:                      # a half-used place first
+            out.append({"label": "½", "half": True})
+        k = int(whole_a)
+        while k + 1 <= b:
+            k += 1
+            out.append({"label": str(k), "half": False})
+        if b - k >= Decimal("0.5") and k < b:  # capacity ends on a half
+            out.append({"label": "½", "half": True})
+        return out
+
+    for g in groups:
+        if g["paid"]:
+            # usable and plan positions coincide for paid groups, since
+            # installments are paid in order
+            shift = g["plo"] - g["ulo"]
+            a = max(g["ulo"], used_in_round) + shift
+            b = min(g["uhi"], capacity) + shift
+            g["open_slots"] = place_slots(a, b)
+        else:
+            g["open_slots"] = place_slots(g["plo"], g["phi"])
+        g["state"] = "paid" if g["paid"] else "unpaid"
+
+    present_count = sum(1 for t in timeline if t[3]["kind"] == "present")
     return {
-        "rows": rows,
-        "remaining_slots": slots,
-        "round_size": round_size,
-        "used_count": used_total,
-        "default_count": default_count,
-        "is_custom": show_count is not None and Decimal(show_count) != default_count,
+        "has_round": True,
+        "rounds_count": len(rounds),
+        "round_index": sel,
+        "round_number": sel + 1,
+        "is_current": sel == cur,
+        "prev_index": sel - 1 if sel > 0 else None,
+        "next_index": sel + 1 if sel < cur else None,
+        "groups": groups,
+        "is_installment": R["is_installment"],
+        "total_sessions": R["total_sessions"] + max(R["adj_total"], Decimal("0")),
+        "total_amount": R["total_amount"],
+        "used": used_in_round,
         "remaining": remaining_in_round,
-        "excused_count": sum(1 for r in rows if r["kind"] == "excused"),
-        "no_show_count": sum(1 for r in rows if r["kind"] == "no_show"),
-        "half_leave_count": sum(1 for r in rows if r["kind"] == "half_leave"),
-        # A trailing .5 is not billed; the parent is offered one catch-up clip
-        # instead, so both documents need to say so.
-        "has_half_left": (remaining_in_round - int(remaining_in_round)) >= Decimal("0.5"),
+        "present_count": present_count,
+        "excused_count": len(excused_rows),
+        "no_show_count": sum(1 for t in timeline if t[3]["kind"] == "no_show"),
+        "half_leave_count": sum(1 for t in timeline if t[3]["kind"] == "half_leave"),
+        "has_half_left": sel == cur and (remaining_in_round - int(remaining_in_round)) >= Decimal("0.5"),
         "window_start": window_start,
     }
+
+
+def _sessions_label(value) -> str:
+    d = Decimal(str(value or 0)).normalize()
+    return str(int(d)) if d == d.to_integral_value() else f"{d:.1f}"
 
 
 # =========================================================
@@ -7732,6 +7983,7 @@ def _upcoming_weekend_admissions() -> list[dict]:
             "date": inq.first_lesson_date,
             "date_label": _thai_schedule_date(inq.first_lesson_date),
             "attended_first_lesson": inq.attended_first_lesson,
+            "paid_on_signup": inq.paid_on_signup,
         })
     return rows
 
@@ -7828,6 +8080,15 @@ def admin_tool_admission_action(request: HttpRequest) -> JsonResponse:
         inquiry.attended_first_lesson = True
         inquiry.save(update_fields=["attended_first_lesson"])
         return JsonResponse({"ok": True, "attended_first_lesson": True})
+
+    if action == "paid_on_signup":
+        # Registered and paid on the spot. Recorded as an enrolment outcome,
+        # but the card deliberately stays -- staff still have the first
+        # lesson and receipt to see through -- until they close it.
+        inquiry.paid_on_signup = True
+        inquiry.trial_result = AdmissionInquiry.TrialResult.ENROLLED
+        inquiry.save(update_fields=["paid_on_signup", "trial_result"])
+        return JsonResponse({"ok": True, "paid_on_signup": True})
 
     if action == "trial_enrolled":
         # นักเรียนทดลองแล้วสมัครเรียน
@@ -8653,6 +8914,69 @@ def course_payment_create(request: HttpRequest) -> HttpResponse:
                 if not selected_class:
                     errors.append("กรุณาเลือก Class")
 
+            pay_installment = None
+            pay_installment_id = (post.get("pay_installment_id") or "").strip()
+            if pay_installment_id and not is_other_receipt:
+                pay_installment = (
+                    CoursePackageInstallment.objects
+                    .select_related("package__enrollment__tutoring_class", "package__enrollment__student", "receipt")
+                    .filter(id=pay_installment_id)
+                    .first()
+                )
+                if not pay_installment or pay_installment.is_paid:
+                    errors.append("งวดที่เลือกถูกชำระไปแล้ว หรือไม่พบงวดนี้")
+                    pay_installment = None
+                else:
+                    pkg = pay_installment.package
+                    existing_enrollment = pkg.enrollment
+                    student = existing_enrollment.student
+                    selected_class = existing_enrollment.tutoring_class
+                    enrollment_action = CoursePayment.EnrollmentAction.ADD_EXISTING
+                    payment_type = CoursePayment.PaymentType.INSTALLMENT
+                    sessions_granted = int(pay_installment.sessions)
+                    course_price = Decimal(pkg.total_amount)
+                    discount_amount = Decimal("0")
+                    net_amount = Decimal(pkg.total_amount)
+                    amount_paid = Decimal(pay_installment.amount)
+                    package = str(sessions_granted)
+
+            # New installment plan: the session package chosen above is the
+            # whole round; this receipt pays only installment 1 of it.
+            plan = None
+            if (not is_other_receipt and pay_installment is None
+                    and payment_type == CoursePayment.PaymentType.INSTALLMENT):
+                try:
+                    count = int(post.get("installment_count") or 2)
+                except (TypeError, ValueError):
+                    count = 2
+                count = max(min(count, 24), 2)
+                d_sessions = _split_sessions(sessions_granted, count)
+                d_amounts = _split_amount(net_amount, count)
+                plan = []
+                for k in range(1, count + 1):
+                    try:
+                        sess = int(post.get(f"inst_sessions_{k}") or d_sessions[k - 1])
+                    except (TypeError, ValueError):
+                        sess = d_sessions[k - 1]
+                    raw_amt = (post.get(f"inst_amount_{k}") or "").strip()
+                    amt = _money(raw_amt) if raw_amt else d_amounts[k - 1]
+                    plan.append({
+                        "no": k, "sessions": sess, "amount": amt,
+                        "due": _safe_date(post.get(f"inst_due_{k}")),
+                    })
+                if any(r["sessions"] <= 0 for r in plan):
+                    errors.append("จำนวนครั้งของแต่ละงวดต้องมากกว่า 0")
+                if sum(r["sessions"] for r in plan) != sessions_granted:
+                    errors.append(
+                        f"จำนวนครั้งรวมทุกงวด ({sum(r['sessions'] for r in plan)}) "
+                        f"ต้องเท่ากับจำนวนครั้งทั้งแพ็กเกจ ({sessions_granted})"
+                    )
+                if sum(r["amount"] for r in plan) != net_amount:
+                    errors.append(
+                        f"ยอดรวมทุกงวด ({sum(r['amount'] for r in plan):,.0f}) "
+                        f"ต้องเท่ากับยอดสุทธิ ({net_amount:,.0f})"
+                    )
+
             if is_other_receipt:
                 if net_amount <= 0:
                     errors.append("กรุณากรอกจำนวนเงินให้มากกว่า 0")
@@ -8683,7 +9007,48 @@ def course_payment_create(request: HttpRequest) -> HttpResponse:
                         created_by=request.user if request.user.is_authenticated else None,
                     )
                     if not is_other_receipt:
-                        _apply_payment_to_enrollment(payment, enrollment_action, existing_enrollment)
+                        remaining_before = (
+                            Decimal(existing_enrollment.remaining_sessions)
+                            if existing_enrollment is not None else Decimal("0")
+                        )
+                        if plan is not None:
+                            # The receipt itself grants installment 1 only, and
+                            # records what that installment cost.
+                            payment.sessions_granted = plan[0]["sessions"]
+                            payment.amount_paid = plan[0]["amount"]
+                            payment.save(update_fields=["sessions_granted", "amount_paid"])
+                        enrollment = _apply_payment_to_enrollment(payment, enrollment_action, existing_enrollment)
+
+                        if pay_installment is not None:
+                            pay_installment.receipt = payment
+                            pay_installment.save(update_fields=["receipt"])
+                        else:
+                            rows = plan or [{
+                                "no": 1, "sessions": sessions_granted,
+                                "amount": amount_paid, "due": payment_date,
+                            }]
+                            pkg = CoursePackage.objects.create(
+                                enrollment=enrollment,
+                                total_sessions=sum(r["sessions"] for r in rows),
+                                total_amount=net_amount if plan else amount_paid,
+                                installment_count=len(rows),
+                            )
+                            covered = remaining_before
+                            for r in rows:
+                                due = r["due"]
+                                if r["no"] == 1:
+                                    due = due or payment_date
+                                elif due is None:
+                                    # Due on the last class the earlier
+                                    # installments pay for, counting the
+                                    # first class as week one.
+                                    due = _nth_session_date(selected_class, covered, payment_date)
+                                CoursePackageInstallment.objects.create(
+                                    package=pkg, installment_no=r["no"],
+                                    sessions=r["sessions"], amount=r["amount"], due_date=due,
+                                    receipt=payment if r["no"] == 1 else None,
+                                )
+                                covered += r["sessions"]
                     if referrer_student is not None:
                         from .models import FriendReferral
                         prior_referrals = FriendReferral.objects.filter(referrer=referrer_student).count()
@@ -8725,6 +9090,34 @@ def course_payment_detail(request: HttpRequest, pk: int) -> HttpResponse:
     return render(request, "core/course_payment_detail.html", {"payment": payment})
 
 
+def _receipt_installment_plan(payment: CoursePayment) -> dict | None:
+    """Installment block for a receipt, frozen at that receipt.
+
+    Totals count only installments up to and including this one, so
+    re-opening installment 1's receipt after installment 2 is paid still
+    shows what was outstanding on the day it was issued.
+    """
+    inst = getattr(payment, "package_installment", None)
+    if inst is None or not inst.package.is_installment:
+        return None
+    rows = inst.package.ordered_installments()
+    paid_to_date = sum(
+        (r.amount for r in rows if r.installment_no <= inst.installment_no and r.is_paid),
+        Decimal("0"),
+    )
+    total = Decimal(inst.package.total_amount)
+    nxt = next((r for r in rows if r.installment_no == inst.installment_no + 1), None)
+    return {
+        "this_no": inst.installment_no,
+        "count": inst.package.installment_count,
+        "total_amount": total,
+        "total_sessions": inst.package.total_sessions,
+        "paid_amount": paid_to_date,
+        "outstanding": max(total - paid_to_date, Decimal("0")),
+        "next": nxt,
+    }
+
+
 @login_required
 @xframe_options_sameorigin
 def course_payment_receipt_image(request: HttpRequest, pk: int) -> HttpResponse:
@@ -8732,7 +9125,10 @@ def course_payment_receipt_image(request: HttpRequest, pk: int) -> HttpResponse:
         CoursePayment.objects.select_related("student", "student__school", "tutoring_class", "enrollment"),
         pk=pk,
     )
-    return render(request, "core/course_payment_receipt_image.html", {"payment": payment})
+    return render(request, "core/course_payment_receipt_image.html", {
+        "payment": payment,
+        "plan": _receipt_installment_plan(payment),
+    })
 
 
 @login_required
@@ -8776,7 +9172,21 @@ def course_payment_cancel(request: HttpRequest, pk: int) -> HttpResponse:
             payment.cancelled_by = request.user if request.user.is_authenticated else None
             payment.save()
             _reverse_payment_enrollment_effect(payment)
+            _void_package_if_first_installment_cancelled(payment)
     return redirect("core:course_payment_detail", pk=payment.pk)
+
+
+def _void_package_if_first_installment_cancelled(payment: CoursePayment) -> None:
+    """Cancelling installment 1 means the purchase never happened, so the
+    whole plan goes -- otherwise the attendance view would keep showing a
+    round nobody bought. A later installment simply reverts to unpaid, which
+    is what CoursePackageInstallment.is_paid already reports."""
+    inst = getattr(payment, "package_installment", None)
+    if inst is None or inst.installment_no != 1:
+        return
+    pkg = inst.package
+    if not any(i.is_paid for i in pkg.ordered_installments()):
+        pkg.delete()
 
 
 @require_POST
@@ -12060,3 +12470,91 @@ def admin_tool_money_delete(request: HttpRequest) -> JsonResponse:
     else:
         return JsonResponse({"ok": False, "error": "ไม่รู้จักประเภทรายการนี้"}, status=400)
     return JsonResponse({"ok": True})
+
+
+# =========================================================
+# ✅ ใบปรับจำนวนครั้งเรียน (เพิ่ม / ลด)
+# =========================================================
+@login_required
+def session_adjustment_page(request: HttpRequest) -> HttpResponse:
+    """Find an enrollment, add or remove sessions with a reason, and get a
+    slip to send the parent."""
+    q = (request.GET.get("q") or "").strip()
+    enrollment = None
+    eid = (request.GET.get("enrollment_id") or request.POST.get("enrollment_id") or "").strip()
+    if eid.isdigit():
+        enrollment = (
+            Enrollment.objects.select_related("student", "tutoring_class")
+            .filter(id=int(eid), is_active=True).first()
+        )
+
+    errors: list[str] = []
+    if request.method == "POST" and enrollment:
+        raw = (request.POST.get("delta") or "").strip()
+        direction = (request.POST.get("direction") or "add").strip()
+        reason = (request.POST.get("reason") or "").strip()
+        try:
+            amount = Decimal(raw)
+        except Exception:
+            amount = Decimal("0")
+        # whole or half sessions only -- the same granularity attendance uses
+        if amount <= 0 or (amount * 2) != (amount * 2).to_integral_value():
+            errors.append("จำนวนครั้งต้องมากกว่า 0 และเป็นจำนวนเต็มหรือครึ่ง (เช่น 1 หรือ 0.5)")
+        if not reason:
+            errors.append("กรุณาใส่เหตุผลการปรับ")
+        delta = amount if direction == "add" else -amount
+        before = Decimal(enrollment.remaining_sessions)
+        if not errors and before + delta < 0:
+            errors.append(f"ลดได้ไม่เกินจำนวนครั้งคงเหลือ ({_sessions_label(before)} ครั้ง)")
+
+        if not errors:
+            with transaction.atomic():
+                end_before = _expected_course_completion_date(enrollment)
+                adj = SessionAdjustment.objects.create(
+                    enrollment=enrollment, delta=delta, reason=reason,
+                    remaining_before=before, remaining_after=before + delta,
+                    expected_end_before=end_before,
+                    expected_end_after=_expected_course_completion_date(
+                        enrollment, remaining_override=before + delta,
+                    ),
+                    created_by=request.user if request.user.is_authenticated else None,
+                )
+            return redirect("core:session_adjustment_slip", pk=adj.pk)
+
+    matches = []
+    if q and not enrollment:
+        matches = list(
+            Enrollment.objects.select_related("student", "tutoring_class")
+            .filter(is_active=True, student__is_active=True)
+            .filter(
+                Q(student__nickname__icontains=q) | Q(student__full_name__icontains=q)
+                | Q(student__student_code__icontains=q)
+            )
+            .order_by("student__nickname")[:40]
+        )
+
+    return render(request, "core/session_adjustment.html", {
+        "q": q,
+        "enrollment": enrollment,
+        "matches": matches,
+        "errors": errors,
+        "posted": request.POST if request.method == "POST" else {},
+        "expected_end": _expected_course_completion_date(enrollment) if enrollment else None,
+        "recent": SessionAdjustment.objects.select_related(
+            "enrollment__student", "enrollment__tutoring_class",
+        )[:15],
+    })
+
+
+@login_required
+def session_adjustment_slip(request: HttpRequest, pk: int) -> HttpResponse:
+    adj = get_object_or_404(
+        SessionAdjustment.objects.select_related("enrollment__student", "enrollment__tutoring_class"),
+        pk=pk,
+    )
+    return render(request, "core/session_adjustment_slip.html", {
+        "adj": adj,
+        "student": adj.enrollment.student,
+        "tutoring_class": adj.enrollment.tutoring_class,
+        "abs_delta": abs(adj.delta),
+    })

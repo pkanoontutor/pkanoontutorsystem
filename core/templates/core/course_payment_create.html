@@ -23,6 +23,30 @@
   .actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;}
   .search-note{border:1px solid #bfdbfe;background:#eff6ff;color:#1d4ed8;border-radius:14px;padding:9px 10px;font-size:12px;font-weight:900;line-height:1.45;}
   .mini-card{border:1px solid #e2e8f0;background:#f8fafc;border-radius:16px;padding:11px;color:#334155;font-size:12px;line-height:1.5;}
+  /* ---- installment plan ---- */
+  .plan-box{border:1px solid #c7d2fe;background:#eef2ff;border-radius:18px;padding:14px;display:grid;gap:11px;}
+  .plan-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;}
+  .plan-title{font-size:14px;font-weight:1000;color:#3730a3;}
+  .plan-count{display:flex;gap:6px;align-items:center;flex-wrap:wrap;}
+  .plan-count button{border:1px solid #a5b4fc;background:#fff;color:#3730a3;border-radius:999px;padding:6px 14px;
+    font-weight:1000;cursor:pointer;font-family:inherit;}
+  .plan-count button.on{background:#4f46e5;border-color:#4f46e5;color:#fff;}
+  .plan-count input{width:70px;border:1px solid #a5b4fc;border-radius:10px;padding:6px 8px;font-weight:900;text-align:center;}
+  .plan-table{width:100%;border-collapse:separate;border-spacing:0 6px;}
+  .plan-table th{font-size:11px;font-weight:1000;color:#4338ca;text-align:left;padding:0 6px;}
+  .plan-table td{background:#fff;padding:7px 6px;}
+  .plan-table td:first-child{border-radius:12px 0 0 12px;font-weight:1000;color:#3730a3;white-space:nowrap;}
+  .plan-table td:last-child{border-radius:0 12px 12px 0;}
+  .plan-table input{border:1px solid #e2e8f0;border-radius:9px;padding:7px 8px;font-weight:800;width:100%;font-family:inherit;}
+  .plan-table tr.this td{background:#e0e7ff;}
+  .plan-tag{font-size:10.5px;font-weight:1000;border-radius:999px;padding:2px 8px;background:#4f46e5;color:#fff;margin-left:4px;}
+  .plan-sum{display:flex;gap:14px;flex-wrap:wrap;font-size:12.5px;font-weight:900;color:#334155;}
+  .plan-sum b{color:#0f172a;} .plan-sum .bad{color:#b91c1c;} .plan-sum .ok{color:#15803d;}
+  .pending-box{border:2px solid #fbbf24;background:#fffbeb;border-radius:16px;padding:12px;display:grid;gap:8px;}
+  .pending-box .t{font-size:13.5px;font-weight:1000;color:#92400e;}
+  .pending-box .d{font-size:12.5px;font-weight:800;color:#78350f;line-height:1.55;}
+  .pending-box.on{border-color:#16a34a;background:#f0fdf4;}
+  .pending-box.on .t{color:#166534;}
   .mini-card b{color:#0f172a;}
   .payment-method-toggle{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;}
   .payment-method-card{justify-content:center;text-align:center;background:#fff;}
@@ -170,9 +194,9 @@
       <div id="newEnrollmentBox" class="grid" style="margin-top:10px;">
         <div class="field span2">
           <label>Class</label>
-          <select name="tutoring_class_id" id="classSelect" onchange="applyClassPrice()">
+          <select name="tutoring_class_id" id="classSelect" onchange="applyClassPrice(); togglePlan();">
             <option value="">-- เลือก Class --</option>
-            {% for c in classes %}<option value="{{ c.id }}" data-price="{{ c.course_price }}">{{ c.name }} | {{ c.get_time_slot_display }} | ราคา {{ c.course_price|floatformat:"0g" }}</option>{% endfor %}
+            {% for c in classes %}<option value="{{ c.id }}" data-price="{{ c.course_price }}" data-weekday="{% if 'sun' in c.time_slot %}6{% else %}5{% endif %}">{{ c.name }} | {{ c.get_time_slot_display }} | ราคา {{ c.course_price|floatformat:"0g" }}</option>{% endfor %}
           </select>
         </div>
         <div class="hint full">ใช้กรณีนักเรียนใหม่ / ดึงจากใบสมัคร / หรืออยากสร้าง Enrollment ใหม่ให้เด็กเดิม</div>
@@ -191,7 +215,7 @@
     <section class="cardx">
       <div class="section-title">4) รายละเอียดการรับเงิน</div>
       <div class="grid">
-        <div class="field"><label>วันที่รับเงิน</label><input type="date" name="payment_date" value="{{ today|date:'Y-m-d' }}" required></div>
+        <div class="field"><label>วันที่รับเงิน</label><input type="date" name="payment_date" value="{{ today|date:'Y-m-d' }}" required onchange="togglePlan()"></div>
         <div class="field" id="paymentTypeField"><label>รูปแบบการชำระ</label><select name="payment_type" id="paymentType" onchange="applyPaymentTypeDefault()">{% for value,label in payment_type_choices %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</select></div>
         <div class="field span2">
           <label>วิธีชำระเงิน</label>
@@ -202,6 +226,42 @@
                 {{ label }}
               </label>
             {% endfor %}
+          </div>
+        </div>
+
+        <div class="field full hidden" id="pendingInstallmentBox">
+          <div class="pending-box" id="pendingBoxInner">
+            <div class="t" id="pendingTitle">มีงวดที่ยังค้างชำระ</div>
+            <div class="d" id="pendingDetail"></div>
+            <div>
+              <button type="button" class="btnx soft" id="pendingUseBtn" onclick="togglePayPending()">ชำระงวดนี้</button>
+            </div>
+          </div>
+          <input type="hidden" name="pay_installment_id" id="payInstallmentId" value="">
+        </div>
+
+        <div class="field full hidden" id="planField">
+          <div class="plan-box">
+            <div class="plan-head">
+              <div class="plan-title">📅 แผนแบ่งชำระ</div>
+              <div class="plan-count">
+                <span style="font-size:12px;font-weight:900;color:#4338ca;">จำนวนงวด</span>
+                <button type="button" data-n="2" onclick="setInstallmentCount(2)">2 งวด</button>
+                <button type="button" data-n="3" onclick="setInstallmentCount(3)">3 งวด</button>
+                <span style="font-size:12px;font-weight:900;color:#4338ca;">หรือ</span>
+                <input type="number" min="2" max="24" id="customCount" placeholder="อื่นๆ" oninput="onCustomCount()">
+              </div>
+            </div>
+            <input type="hidden" name="installment_count" id="installmentCount" value="2">
+            <div class="hint" style="color:#4338ca;">
+              แพ็กเกจที่เลือกด้านล่างคือ <b>จำนวนครั้งทั้งหมดที่ควรได้</b> — ใบเสร็จนี้จะเป็น <b>งวดที่ 1</b>
+              ระบบแบ่งครั้งเรียนและยอดเงินให้เท่าๆ กัน แก้ไขได้ทุกช่อง
+            </div>
+            <table class="plan-table">
+              <thead><tr><th>งวด</th><th>ครั้งเรียน</th><th>ยอดเงิน (บาท)</th><th>ครบกำหนดชำระ</th></tr></thead>
+              <tbody id="planRows"></tbody>
+            </table>
+            <div class="plan-sum" id="planSum"></div>
           </div>
         </div>
 
@@ -428,6 +488,8 @@ function toggleEnrollmentMode(){
   const mode=document.querySelector('input[name="enrollment_action"]:checked').value;
   document.getElementById('newEnrollmentBox').classList.toggle('hidden',mode!=='new');
   document.getElementById('existingEnrollmentBox').classList.toggle('hidden',mode!=='add_existing');
+  // remaining sessions and class weekday both feed the due dates
+  if(typeof refreshPendingBox==='function'){ refreshPendingBox(); togglePlan(); }
 }
 function selectStudentFromSearch(){
   const txt=document.getElementById('studentSearch').value;
@@ -510,6 +572,7 @@ function selectEnrollmentCard(id){
     }
     document.getElementById('coursePrice').value=Number(e.course_price||0).toFixed(2);
     updateSummary(true);
+    refreshPendingBox();
   }
 }
 function applyClassPrice(){
@@ -525,9 +588,172 @@ function setSessionPackage(value){
   if(radio){ radio.checked = true; }
   applySessionPackage(false);
 }
+
+// ================= installment plan =================
+// The session package is the whole round; this receipt pays installment 1.
+let planCount = 2;
+let planTouched = {};   // "s3" / "a2" / "d2" -> the user typed in that cell
+
+function packageSessions(){
+  const radio=selectedSessionRadio();
+  const pack=radio ? radio.value : '10';
+  const base=pack==='custom'?Number(document.getElementById('customSessions').value||0):Number((radio && radio.dataset.sessions)||10);
+  return base + Number(document.getElementById('bonusSessions').value||0);
+}
+function packageNet(){
+  const price=Number(document.getElementById('coursePrice').value||0);
+  const disc=Number(document.getElementById('discountAmount').value||0);
+  return Math.max(price-disc,0);
+}
+function splitInt(total, n){
+  const base=Math.floor(total/n); const out=Array(n).fill(base);
+  out[n-1]+=total-base*n; return out;
+}
+function classWeekday(){
+  const enr=ENROLLMENTS.find(x=>String(x.id)===document.getElementById('existingEnrollmentId').value);
+  if(isAddExisting() && enr) return Number(enr.weekday);
+  const opt=document.getElementById('classSelect').selectedOptions[0];
+  return opt && opt.dataset.weekday ? Number(opt.dataset.weekday) : 5;
+}
+function remainingBefore(){
+  if(!isAddExisting()) return 0;
+  const enr=ENROLLMENTS.find(x=>String(x.id)===document.getElementById('existingEnrollmentId').value);
+  return enr ? Number(enr.remaining_num||0) : 0;
+}
+function isAddExisting(){
+  const r=document.querySelector('input[name="enrollment_action"]:checked');
+  return r && r.value==='add_existing';
+}
+// Same rule as the server's _nth_session_date: the class day on/after the
+// receipt date is meeting 1, and each later meeting is a week further on.
+function nthSession(n){
+  if(n<=0) return '';
+  const raw=document.querySelector('input[name="payment_date"]').value;
+  const d=raw ? new Date(raw+'T00:00:00') : new Date();
+  const ahead=(classWeekday() - ((d.getDay()+6)%7) + 7) % 7;
+  d.setDate(d.getDate()+ahead+7*(Math.ceil(n)-1));
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+function setInstallmentCount(n){
+  planCount=Math.max(2,Math.min(24,Number(n)||2));
+  document.getElementById('installmentCount').value=planCount;
+  document.querySelectorAll('.plan-count button').forEach(b=>b.classList.toggle('on',Number(b.dataset.n)===planCount));
+  if(planCount>3) document.getElementById('customCount').value=planCount;
+  else document.getElementById('customCount').value='';
+  planTouched={};
+  renderPlan();
+}
+function onCustomCount(){
+  const v=Number(document.getElementById('customCount').value||0);
+  if(v>=2) setInstallmentCount(v);
+}
+function renderPlan(){
+  const body=document.getElementById('planRows');
+  if(!body) return;
+  const total=packageSessions(), net=packageNet();
+  const sess=splitInt(total, planCount);
+  const amts=splitInt(Math.round(net), planCount);
+  // keep anything typed by hand; recompute the rest
+  const prev={};
+  body.querySelectorAll('input').forEach(i=>{prev[i.name]=i.value;});
+  let html='', covered=remainingBefore();
+  const today=document.querySelector('input[name="payment_date"]').value;
+  for(let k=1;k<=planCount;k++){
+    const sv=planTouched['s'+k] ? prev['inst_sessions_'+k] : sess[k-1];
+    const av=planTouched['a'+k] ? prev['inst_amount_'+k] : amts[k-1];
+    const dv=planTouched['d'+k] ? prev['inst_due_'+k] : (k===1 ? today : nthSession(covered));
+    html+=`<tr class="${k===1?'this':''}">
+      <td>งวด ${k}${k===1?'<span class="plan-tag">ใบนี้</span>':''}</td>
+      <td><input type="number" min="1" name="inst_sessions_${k}" value="${sv}" data-key="s${k}" oninput="planEdit(this)"></td>
+      <td><input type="number" min="0" step="0.01" name="inst_amount_${k}" value="${av}" data-key="a${k}" oninput="planEdit(this)"></td>
+      <td><input type="date" name="inst_due_${k}" value="${dv}" data-key="d${k}" oninput="planEdit(this)" ${k===1?'readonly':''}></td>
+    </tr>`;
+    covered += Number(sv||0);
+  }
+  body.innerHTML=html;
+  updatePlanSum();
+}
+function planEdit(el){
+  planTouched[el.dataset.key]=true;
+  // a changed session count moves every later due date
+  if(el.dataset.key.startsWith('s')){
+    let covered=remainingBefore();
+    for(let k=1;k<=planCount;k++){
+      const s=document.querySelector(`[name="inst_sessions_${k}"]`);
+      const d=document.querySelector(`[name="inst_due_${k}"]`);
+      if(k>1 && d && !planTouched['d'+k]) d.value=nthSession(covered);
+      covered+=Number(s ? s.value||0 : 0);
+    }
+  }
+  updatePlanSum();
+}
+function updatePlanSum(){
+  let s=0,a=0;
+  for(let k=1;k<=planCount;k++){
+    s+=Number((document.querySelector(`[name="inst_sessions_${k}"]`)||{}).value||0);
+    a+=Number((document.querySelector(`[name="inst_amount_${k}"]`)||{}).value||0);
+  }
+  const total=packageSessions(), net=packageNet();
+  const first=Number((document.querySelector('[name="inst_amount_1"]')||{}).value||0);
+  const sOk=s===total, aOk=Math.abs(a-net)<0.005;
+  document.getElementById('planSum').innerHTML=
+    `<span>ครั้งรวม <b class="${sOk?'ok':'bad'}">${s}</b> / ${total} ครั้ง</span>`+
+    `<span>ยอดรวม <b class="${aOk?'ok':'bad'}">${a.toLocaleString()}</b> / ${net.toLocaleString()} บาท</span>`+
+    `<span>ชำระใบนี้ <b>${first.toLocaleString()}</b> บาท</span>`+
+    `<span>คงค้าง <b>${Math.max(net-first,0).toLocaleString()}</b> บาท</span>`;
+  if(isInstallment()) document.getElementById('amountPaid').value=first.toFixed(2);
+}
+function isInstallment(){ return document.getElementById('paymentType').value==='installment' && !document.getElementById('payInstallmentId').value; }
+function togglePlan(){
+  const show=isInstallment() && !isOtherReceipt();
+  document.getElementById('planField').classList.toggle('hidden', !show);
+  if(show) renderPlan();
+}
+
+// ---- paying the next installment of an existing plan ----
+function refreshPendingBox(){
+  const box=document.getElementById('pendingInstallmentBox');
+  const enr=ENROLLMENTS.find(x=>String(x.id)===document.getElementById('existingEnrollmentId').value);
+  const p=enr && isAddExisting() ? enr.pending_installment : null;
+  if(!p){ box.classList.add('hidden'); clearPayPending(); return; }
+  box.classList.remove('hidden');
+  document.getElementById('pendingTitle').textContent=`มีงวดที่ยังค้างชำระ · งวดที่ ${p.no} จาก ${p.count}`;
+  document.getElementById('pendingDetail').innerHTML=
+    `${p.sessions} ครั้ง · ยอด <b>${Number(p.amount).toLocaleString()}</b> บาท`+
+    (p.due_date?` · ครบกำหนด ${p.due_date}`:'')+
+    `<br>แพ็กเกจเต็ม ${p.package_sessions} ครั้ง / ${Number(p.package_total).toLocaleString()} บาท`;
+}
+function togglePayPending(){
+  const enr=ENROLLMENTS.find(x=>String(x.id)===document.getElementById('existingEnrollmentId').value);
+  const p=enr ? enr.pending_installment : null;
+  const hid=document.getElementById('payInstallmentId');
+  if(!p) return;
+  if(hid.value){ clearPayPending(); return; }
+  hid.value=p.id;
+  document.getElementById('pendingBoxInner').classList.add('on');
+  document.getElementById('pendingUseBtn').textContent='✓ กำลังชำระงวดนี้ (กดอีกครั้งเพื่อยกเลิก)';
+  document.getElementById('paymentType').value='installment';
+  document.getElementById('amountPaid').value=Number(p.amount).toFixed(2);
+  document.getElementById('netSummary').textContent=
+    `งวดที่ ${p.no}: ${Number(p.amount).toLocaleString()} บาท / ${p.sessions} ครั้ง`;
+  document.getElementById('sessionsField').classList.add('hidden');
+  togglePlan();
+}
+function clearPayPending(){
+  const hid=document.getElementById('payInstallmentId');
+  if(!hid || !hid.value) return;
+  hid.value='';
+  document.getElementById('pendingBoxInner').classList.remove('on');
+  document.getElementById('pendingUseBtn').textContent='ชำระงวดนี้';
+  document.getElementById('sessionsField').classList.remove('hidden');
+  updateSummary(true);
+  togglePlan();
+}
+
 function applyPaymentTypeDefault(){
-  const type=document.getElementById('paymentType').value;
-  setSessionPackage(type === 'installment' ? '5' : '10');
+  // The package is now always the whole round -- installments split it --
+  // so switching type no longer swaps the session count to 5.
+  togglePlan();
 }
 function applySessionPackage(){
   const radio=selectedSessionRadio();
@@ -558,6 +784,7 @@ function updateSummary(forceAmount){
   const sessions=baseSessions+bonus;
   document.getElementById('netSummary').textContent=net.toLocaleString('en-US',{maximumFractionDigits:2})+' บาท / '+sessions+' ครั้ง';
   document.getElementById('amountPaid').value=net.toFixed(2);
+  if(typeof togglePlan==='function' && !document.getElementById('payInstallmentId').value) togglePlan();
 }
 // Clicking a "ใบแจ้งต่อคอร์สล่าสุด" quick-pick card: jump straight to that
 // student's existing enrollment, pre-filled as if searched by hand, plus

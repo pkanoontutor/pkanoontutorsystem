@@ -4596,7 +4596,9 @@ def student_hub(request: HttpRequest) -> HttpResponse:
 
 def student_portal_logout(request: HttpRequest) -> HttpResponse:
     request.session.pop("portal_student_id", None)
-    return redirect("core:student_portal_login")
+    # /portal/ is the one front door now; sending people to the hours
+    # system's own login meant signing back in dropped them on the hours page.
+    return redirect("core:student_hub")
 
 
 # Distinct chip colours for subject/tutor tags on the E-Learning page.

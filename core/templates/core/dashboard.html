@@ -347,13 +347,32 @@
   .stu-dot:hover { transform: scale(1.14); }
   .stu-dot.btn-green  { background:#10b981; }
   .stu-dot.btn-yellow { background:#f59e0b; }
-  .stu-dot.btn-orange { background:#f97316; font-size:9px; }
+  /* Half-day leave is a triangle, so it can't be mistaken for the round
+     status dots. The shape is drawn on ::before with borders, which keeps
+     the button's full square as the tap target. */
+  .stu-dot.btn-orange { background:transparent; border-radius:0; position:relative; }
+  .stu-dot.btn-orange::before { content:""; position:absolute; left:50%; top:50%;
+    transform:translate(-50%,-58%); width:0; height:0;
+    border-left:11px solid transparent; border-right:11px solid transparent;
+    border-bottom:19px solid #f97316; }
   .stu-dot.btn-red    { background:#ef4444; }
   .stu-dot.btn-dim    { opacity:.28; }
   .stu-dot.active-btn { box-shadow:0 0 0 3px #fff, 0 0 0 5px currentColor; }
   .stu-dot.btn-green.active-btn  { color:#059669; }
   .stu-dot.btn-yellow.active-btn { color:#d97706; }
-  .stu-dot.btn-orange.active-btn { color:#ea580c; }
+  /* a ring can't follow a triangle, so the picked one grows instead */
+  .stu-dot.btn-orange.active-btn { box-shadow:none; transform:scale(1.3); }
+  .stu-dot.btn-orange.active-btn::before { border-bottom-color:#ea580c; }
+
+  .stu-leave { font-size:9.5px; font-weight:800; color:#64748b; text-align:center;
+    display:flex; align-items:center; justify-content:center; gap:3px; min-height:13px; }
+  .stu-leave.warn { color:#a16207; }
+  /* Yellow warning triangle: three or more leaves in a row up to the date shown. */
+  .leave-warn { position:relative; isolation:isolate; display:inline-block; width:14px; height:12px; flex:none;
+    color:#422006; font-size:8px; font-weight:1000; line-height:13px; text-align:center; }
+  .leave-warn::before { content:""; position:absolute; left:0; top:0; width:0; height:0;
+    border-left:7px solid transparent; border-right:7px solid transparent;
+    border-bottom:12px solid #facc15; z-index:-1; }
   .stu-dot.btn-red.active-btn    { color:#dc2626; }
 
   /* Avatar. Sized fluidly against the card rather than fixed, so it stays
@@ -707,6 +726,7 @@
     .stu-total{ font-size:9px; }
     .stu-last{ font-size:8px; }
     .stu-dot{ width:15px; height:15px; }
+    .stu-dot.btn-orange::before{ border-left-width:8px; border-right-width:8px; border-bottom-width:14px; }
     .stu-picker{ gap:2px; }
 
     .student-actions{ display:none; }
@@ -1092,15 +1112,21 @@
                       {% if a and a.checked_at %}{{ a.checked_at|date:"d/m H:i" }}{% else %}—{% endif %}
                     </div>
 
+                    <div class="stu-leave{% if e.leave_warn %} warn{% endif %}"
+                         title="ลาสะสม {{ e.leave_total }} ครั้ง{% if e.leave_warn %} · ลาติดกัน {{ e.leave_streak }} ครั้งล่าสุด{% endif %}">
+                      {% if e.leave_warn %}<span class="leave-warn" aria-label="ลาติดกัน {{ e.leave_streak }} ครั้ง">!</span>{% endif %}
+                      ลา {{ e.leave_total }}
+                    </div>
+
                     <div class="stu-picker">
                       <button class="stu-dot btn-green {% if a and a.status == 'present' %}active-btn{% endif %}"
                               title="มา" onclick="return pickStatus({{ cls.id }},{{ e.id }},'present');">มา</button>
                       <button class="stu-dot btn-yellow {% if a and a.status == 'excused' %}active-btn{% endif %}"
                               title="ลา (ไม่หักครั้ง)" onclick="return pickStatus({{ cls.id }},{{ e.id }},'excused');">ลา</button>
-                      <button class="stu-dot btn-orange {% if a and a.status == 'excused_half' %}active-btn{% endif %}"
-                              title="ลา หัก 0.5 ครั้ง" onclick="return pickStatus({{ cls.id }},{{ e.id }},'excused_half');">ลา½</button>
                       <button class="stu-dot btn-red {% if a and a.status == 'no_show' %}active-btn{% endif %}"
                               title="ขาด" onclick="return pickStatus({{ cls.id }},{{ e.id }},'no_show');">ขาด</button>
+                      <button class="stu-dot btn-orange {% if a and a.status == 'excused_half' %}active-btn{% endif %}"
+                              title="ลา หัก 0.5 ครั้ง" onclick="return pickStatus({{ cls.id }},{{ e.id }},'excused_half');">ลา½</button>
                     </div>
 
                     <div class="stu-more-wrap">

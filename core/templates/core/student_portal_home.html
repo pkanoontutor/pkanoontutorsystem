@@ -3,6 +3,7 @@
 {% block title %}Student Portal{% endblock %}
 
 {% block header_actions %}
+  <a class="btn btn-dark" href="{% url 'core:student_hub' %}">← เลือกระบบ</a>
   <a class="btn btn-dark" href="{% url 'core:student_portal_logout' %}">ออกจากระบบ</a>
 {% endblock %}
 

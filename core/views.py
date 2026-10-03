@@ -366,6 +366,38 @@ def _weekly_checkin_chart_data(anchor: date) -> list[dict]:
 _THAI_LEADING_VOWELS = "เแโใไ"
 
 
+# Consecutive leaves (counted back from the date on screen) that earn a
+# warning on the check-in card.
+LEAVE_STREAK_WARN = 3
+
+
+def _annotate_leave_stats(enrollments, as_of: date) -> None:
+    """Set .leave_total and .leave_streak on each enrollment for the check-in
+    cards: leaves taken so far on this enrollment (both kinds of ลา), and how
+    many of the most recent records up to `as_of` are leaves in an unbroken
+    run. One query for the whole page rather than two per card."""
+    by_enr: dict[int, list[str]] = {}
+    ids = [e.id for e in enrollments]
+    if ids:
+        for eid, status in (
+            Attendance.objects
+            .filter(enrollment_id__in=ids, attendance_date__lte=as_of)
+            .order_by("enrollment_id", "-attendance_date", "-checked_at")
+            .values_list("enrollment_id", "status")
+        ):
+            by_enr.setdefault(eid, []).append(status)
+    for e in enrollments:
+        statuses = by_enr.get(e.id, [])
+        e.leave_total = sum(1 for st in statuses if st in LEAVE_STATUSES)
+        streak = 0
+        for st in statuses:
+            if st not in LEAVE_STATUSES:
+                break
+            streak += 1
+        e.leave_streak = streak
+        e.leave_warn = streak >= LEAVE_STREAK_WARN
+
+
 def _thai_name_sort_key(name: str | None) -> str:
     """Sort key that files Thai names the way a person reads them.
 
@@ -529,6 +561,7 @@ def dashboard(request: HttpRequest) -> HttpResponse:
             _thai_name_sort_key(e.student.full_name),
         ),
     )
+    _annotate_leave_stats(roster, selected_date)
 
     context = {
         "selected_date": selected_date,

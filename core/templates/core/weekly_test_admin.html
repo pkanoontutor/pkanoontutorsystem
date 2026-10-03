@@ -26,6 +26,18 @@
 
   .class-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.class-card{border:1px solid #e2e8f0;border-radius:20px;overflow:hidden;background:#fff}.class-head{padding:13px 14px;background:linear-gradient(135deg,#f8fafc,#eef2ff);border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;gap:10px;align-items:flex-start}.class-name{font-weight:1000;font-size:16px}.class-meta{font-size:12px;color:#64748b;margin-top:4px;font-weight:800}.chips{display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end}.chip{border-radius:999px;padding:4px 8px;font-size:11px;font-weight:1000;background:#f1f5f9;color:#334155}.chip.present{background:#dcfce7;color:#166534}.chip.excused{background:#e5e7eb;color:#475569}.chip.noshow{background:#fee2e2;color:#991b1b}
   .score-table{width:100%;border-collapse:collapse}.score-table td{border-bottom:1px solid #f1f5f9;padding:10px;vertical-align:middle}.score-table tr:last-child td{border-bottom:none}.score-table tr.att-excused td,.score-table tr.att-no-show td,.score-table tr.att-not-checked td{background:#fafafa}.student-name{font-weight:1000}.student-full{font-size:12px;color:#64748b;margin-top:2px;font-weight:700}.status-mini{font-size:11px;font-weight:1000;border-radius:999px;padding:4px 9px;display:inline-flex;margin-top:6px;border:1px solid #e2e8f0;background:#f8fafc;color:#64748b}.status-mini.att-present{background:#dcfce7;color:#166534;border-color:#86efac}.status-mini.att-excused{background:#e5e7eb;color:#475569}.status-mini.att-no-show{background:#fee2e2;color:#991b1b;border-color:#fecaca}.status-mini.att-not-checked{background:#f8fafc;color:#94a3b8}
+  .att-edit-wrap{display:inline-flex;align-items:center;gap:5px;flex-wrap:wrap;margin-top:6px}
+  .att-edit-wrap .status-mini{margin-top:0}
+  .att-edit-btn{border:1px solid #cbd5e1;background:#fff;color:#475569;border-radius:999px;padding:3px 9px;font-size:11px;font-weight:900;cursor:pointer;font-family:inherit}
+  .att-edit-btn:hover{border-color:#2563eb;color:#1d4ed8}
+  .att-edit-menu{display:inline-flex;gap:4px;flex-wrap:wrap}
+  .att-edit-menu[hidden]{display:none}
+  .att-edit-menu button{border:1px solid #e2e8f0;border-radius:999px;padding:4px 10px;font-size:11.5px;font-weight:1000;cursor:pointer;font-family:inherit;background:#fff}
+  .att-edit-menu .m-present{background:#dcfce7;color:#166534;border-color:#86efac}
+  .att-edit-menu .m-excused{background:#fef3c7;color:#92400e;border-color:#fde68a}
+  .att-edit-menu .m-half{background:#ffedd5;color:#c2410c;border-color:#fdba74}
+  .att-edit-menu .m-noshow{background:#fee2e2;color:#991b1b;border-color:#fecaca}
+  .att-edit-menu .m-clear{background:#f8fafc;color:#64748b}
   .pill-row{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}.result-pill{cursor:pointer}.result-pill input{display:none}.pill-label{position:relative;display:inline-flex;align-items:center;justify-content:center;border-radius:999px;padding:8px 11px;font-weight:1000;font-size:12px;border:2px solid transparent;background:#fff;color:#334155;transition:.1s;min-width:58px}.result-pill input:checked+.pill-label{border:3px solid #0f172a!important;box-shadow:0 0 0 4px rgba(37,99,235,.24),0 7px 16px rgba(15,23,42,.22);transform:scale(1.05)}.result-pill input:checked+.pill-label:before{content:"✓";font-weight:1000;margin-right:5px}.result-pill input:disabled+.pill-label{opacity:.38;cursor:not-allowed;background:#f8fafc!important;color:#94a3b8!important;border-color:#e2e8f0!important;box-shadow:none;transform:none}.clear-pill{opacity:.78;background:#f8fafc!important;color:#475569!important;border-color:#cbd5e1!important}
   .score-full{background:#5f9b48!important;color:#fff!important}.score-great{background:#9add78!important;color:#12310f!important}.score-good{background:#c8efb2!important;color:#173b12!important}.score-medium{background:#ffe083!important;color:#4b3100!important}.score-fail{background:#e3a0a0!important;color:#5f1111!important}.score-empty{background:#f1f5f9!important;color:#64748b!important}.score-excused{background:#e5e7eb!important;color:#475569!important}.score-noshow{background:#fee2e2!important;color:#991b1b!important}.score-notchecked{background:#f8fafc!important;color:#94a3b8!important}
   .class-save{padding:12px 14px;background:#f8fafc;text-align:right;border-top:1px solid #e2e8f0}
@@ -208,7 +220,18 @@
                 <td>
                   <div class="student-name">{{ row.student.nickname|default:row.student.full_name }}</div>
                   <div class="student-full">{{ row.student.full_name }}</div>
-                  <span class="status-mini {{ row.attendance_class }}">{{ row.attendance_label }}</span>
+                  <span class="att-edit-wrap">
+                    <span class="status-mini {{ row.attendance_class }}">{{ row.attendance_label }}</span>
+                    <button type="button" class="att-edit-btn" title="แก้ไขการเช็คชื่อของวันนี้"
+                            data-enrollment="{{ row.enrollment.id }}" data-date="{{ row.attendance_date|date:'Y-m-d' }}">✎ แก้</button>
+                    <span class="att-edit-menu" hidden>
+                      <button type="button" data-status="present" class="m-present">มา</button>
+                      <button type="button" data-status="excused" class="m-excused">ลา</button>
+                      <button type="button" data-status="excused_half" class="m-half">ลา½</button>
+                      <button type="button" data-status="no_show" class="m-noshow">ขาด</button>
+                      <button type="button" data-status="clear" class="m-clear">ล้าง</button>
+                    </span>
+                  </span>
                 </td>
                 <td style="width:60%;">
                   <div class="pill-row">
@@ -432,6 +455,54 @@
       busy(btn, false);
       alert(err && err.message ? err.message : 'สร้างรูปไม่สำเร็จ ลองใช้ปุ่มดาวน์โหลด PNG แทนครับ');
     });
+  });
+})();
+
+// ---- fix a student's check-in for this week without leaving the page ----
+(function(){
+  var URL = "{% url 'core:weekly_test_set_attendance' %}";
+  function csrf(){
+    var el = document.querySelector('[name=csrfmiddlewaretoken]');
+    if(el) return el.value;
+    var m = document.cookie.match(/csrftoken=([^;]+)/); return m ? m[1] : "";
+  }
+  var CLS = {present:"att-present", excused:"att-excused", excused_half:"att-excused",
+             no_show:"att-no-show", not_checked:"att-not-checked"};
+  document.addEventListener("click", function(e){
+    var btn = e.target.closest(".att-edit-btn");
+    if(btn){
+      var menu = btn.parentElement.querySelector(".att-edit-menu");
+      document.querySelectorAll(".att-edit-menu").forEach(function(m){ if(m!==menu) m.hidden = true; });
+      menu.hidden = !menu.hidden;
+      return;
+    }
+    var pick = e.target.closest(".att-edit-menu button");
+    if(!pick) return;
+    var wrap = pick.closest(".att-edit-wrap");
+    var edit = wrap.querySelector(".att-edit-btn");
+    var status = pick.getAttribute("data-status");
+    if(status === "clear" && !confirm("ล้างการเช็คชื่อของวันนี้? (จะคืนครั้งเรียนที่ถูกหักไป)")) return;
+    pick.disabled = true;
+    fetch(URL, {
+      method: "POST",
+      headers: {"Content-Type": "application/json", "X-CSRFToken": csrf()},
+      body: JSON.stringify({enrollment_id: edit.dataset.enrollment, date: edit.dataset.date, status: status}),
+      credentials: "same-origin"
+    }).then(function(r){ return r.json(); }).then(function(d){
+      if(!d.ok){ alert(d.error || "บันทึกไม่สำเร็จ"); return; }
+      var tr = wrap.closest("tr");
+      var mini = wrap.querySelector(".status-mini");
+      var cls = CLS[d.status] || "att-not-checked";
+      tr.className = cls;
+      mini.className = "status-mini " + cls;
+      mini.textContent = d.label;
+      // scores open up only for a student who was actually there
+      tr.querySelectorAll('input[type="radio"]').forEach(function(r){ r.disabled = !d.can_score; });
+      wrap.querySelector(".att-edit-menu").hidden = true;
+      edit.textContent = "✓ แก้แล้ว";
+      setTimeout(function(){ edit.textContent = "✎ แก้"; }, 1800);
+    }).catch(function(){ alert("บันทึกไม่สำเร็จ ลองใหม่อีกครั้ง"); })
+      .finally(function(){ pick.disabled = false; });
   });
 })();
 </script>

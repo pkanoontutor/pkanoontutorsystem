@@ -44,6 +44,8 @@
   .ar-row.excused .ar-tag{background:#dbeafe;color:#1d4ed8;}
   .ar-row.adjust{background:#fefce8;border-color:#fde047;} .ar-row.adjust .ar-dot{background:#eab308;font-size:11px;}
   .ar-row.adjust .ar-tag{background:#fef08a;color:#854d0e;}
+  .ar-row.payment{background:#fffbeb;border-color:#fde68a;} .ar-row.payment .ar-dot{background:#fef3c7;font-size:13px;}
+  .ar-row.payment .ar-date{color:#9a3412;} .ar-row.payment .ar-tag{background:#fed7aa;color:#9a3412;}
   .ar-row.open{background:#fff;border:1.5px dashed #cbd5e1;}
   .ar-row.open .ar-dot{background:#fff;border:2.5px solid #94a3b8;color:#64748b;}
   .ar-row.open .ar-date{color:#64748b;}
@@ -90,7 +92,7 @@
 
     <div class="ar-meta">
       <span>
-        {% if att.rounds_count > 1 %}รอบที่ {{ att.round_number }} · {% endif %}คอร์ส {{ att.total_sessions|sessions }} ครั้ง
+        {% if att.is_window %}{{ att.window_count|sessions }} ครั้งล่าสุด{% else %}{% if att.rounds_count > 1 %}รอบที่ {{ att.round_number }} · {% endif %}คอร์ส {{ att.total_sessions|sessions }} ครั้ง{% endif %}
         {% if att.is_installment %} · แบ่งชำระ {{ att.groups|length }} ส่วน{% endif %}
       </span>
       {% if att.window_start %}<small>เริ่ม {{ att.window_start|date:"d/m/Y" }}</small>{% endif %}
@@ -100,7 +102,10 @@
       <div class="ar-group {{ g.tone }}{% if not g.paid %} unpaid{% endif %}">
         <div class="ar-head">
           <div>
-            {% if g.is_bonus %}
+            {% if g.is_window %}
+              <div class="t">เข้าเรียน {{ att.window_count|sessions }} ครั้งล่าสุด</div>
+              <div class="s">รวมทุกรอบที่ชำระมา เรียงตามวันที่</div>
+            {% elif g.is_bonus %}
               <div class="t">ครั้งเรียนที่ได้รับเพิ่ม</div>
               <div class="s">จากการปรับจำนวนครั้ง</div>
             {% elif att.is_installment %}
@@ -125,6 +130,10 @@
               <div class="ar-row excused"><div class="ar-dot">📩</div>
                 <div><div class="ar-date">{{ r.date_label }}</div><div class="ar-sub">แจ้งลา · ไม่หักครั้งเรียน</div></div>
                 <div class="ar-tag">ลา</div></div>
+            {% elif r.kind == "payment" %}
+              <div class="ar-row payment"><div class="ar-dot">💰</div>
+                <div><div class="ar-date">{{ r.date_label }}</div><div class="ar-sub">ชำระค่าคอร์ส · ใบเสร็จ {{ r.receipt_no }} · {{ r.sessions }} ครั้ง</div></div>
+                <div class="ar-tag">฿{{ r.amount|floatformat:0|intcomma }}</div></div>
             {% elif r.kind == "adjust" %}
               <div class="ar-row adjust"><div class="ar-dot">{{ r.label }}</div>
                 <div><div class="ar-date">{{ r.date_label }}</div><div class="ar-sub">{{ r.reason|truncatechars:60 }}</div></div>

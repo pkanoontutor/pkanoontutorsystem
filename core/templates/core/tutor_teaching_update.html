@@ -104,6 +104,7 @@
   .muted{color:#64748b;font-size:12px;line-height:1.45;}
   .mini{font-size:11px;color:#64748b;font-weight:800;margin-top:4px;}
   .error-box{background:#fef2f2;border:1px solid #fecaca;color:#991b1b;border-radius:16px;padding:12px;font-size:13px;font-weight:1000;line-height:1.55;}
+  .status-missing .sheet-status-toggle{outline:3px solid rgba(239,68,68,.45);border-radius:14px;}
   .field-error input{border-color:#ef4444!important;box-shadow:0 0 0 3px rgba(239,68,68,.12)!important;}
   .flash-saved{animation:flashSaved 1s ease;}
   @keyframes flashSaved{0%{box-shadow:0 0 0 0 rgba(34,197,94,.55);}45%{box-shadow:0 0 0 8px rgba(34,197,94,.18);}100%{box-shadow:none;}}
@@ -168,6 +169,9 @@
     </div>
   </details>
 
+  {% if error_code == "missing_sheet_status" %}
+    <div class="error-box">กรุณาเลือกสถานะชีท “ชีทเหลือปกติ” หรือ “ใกล้จบชีท” ก่อนบันทึกทุกครั้งครับ</div>
+  {% endif %}
   {% if error_code == "missing_progress" %}
     <div class="error-box">กรุณากรอกทั้ง “สอนถึงหน้า” และ “สอนถึงข้อ” ก่อนบันทึก ถ้าไม่ต้องการใส่ตัวเลขให้กรอกเครื่องหมาย “-” ได้ครับ ยกเว้นกรณีติ๊ก “สัปดาห์นี้ไม่มีสอน”</div>
   {% endif %}
@@ -282,15 +286,15 @@
                       </label>
                     </div>
 
-                    <div class="field status-field">
-                      <label>สถานะชีท</label>
+                    <div class="field status-field" data-status-field>
+                      <label>สถานะชีท <span style="color:#dc2626">* เลือกทุกครั้ง</span></label>
                       <div class="sheet-status-toggle">
                         <label>
-                          <input type="radio" name="sheet_status" value="normal" {% if not curr or not curr.sheet_near_end %}checked{% endif %}>
+                          <input type="radio" name="sheet_status" value="normal" data-sheet-status>
                           <span class="normal">ชีทเหลือปกติ</span>
                         </label>
                         <label>
-                          <input type="radio" name="sheet_status" value="near_end" {% if curr and curr.sheet_near_end %}checked{% endif %}>
+                          <input type="radio" name="sheet_status" value="near_end" data-sheet-status>
                           <span class="near">ใกล้จบชีท</span>
                         </label>
                       </div>
@@ -378,6 +382,15 @@
         const checkedNoTeaching = noTeaching && noTeaching.checked;
 
         if (!checkedNoTeaching) {
+          const statusField = form.querySelector("[data-status-field]");
+          const pickedStatus = form.querySelector("input[name='sheet_status']:checked");
+          if (statusField) statusField.classList.toggle("status-missing", !pickedStatus);
+          if (!pickedStatus) {
+            e.preventDefault();
+            alert("กรุณาเลือกสถานะชีท: ชีทเหลือปกติ หรือ ใกล้จบชีท ก่อนบันทึก");
+            if (statusField) statusField.scrollIntoView({behavior:"smooth", block:"center"});
+            return;
+          }
           const missingPage = !pageInput.value.trim();
           const missingQuestion = !questionInput.value.trim();
           pageField.classList.toggle("field-error", missingPage);

@@ -44,6 +44,7 @@ from .models import (
     SheetClassMapping,
     SheetPrintOrder,
     SheetAllocation,
+    SheetReservation,
     AdmissionInquiry,
     FinanceSetting,
     ExpenseCategory,
@@ -8102,6 +8103,7 @@ def _upcoming_weekend_admissions() -> list[dict]:
     inquiries = (
         AdmissionInquiry.objects
         .filter(is_completed=False, first_lesson_date__in=weekend_dates)
+        .select_related("target_class")
         .order_by("first_lesson_date", "preferred_time_slot", "nickname")
     )
     for inq in inquiries:
@@ -8116,8 +8118,225 @@ def _upcoming_weekend_admissions() -> list[dict]:
             "date_label": _thai_schedule_date(inq.first_lesson_date),
             "attended_first_lesson": inq.attended_first_lesson,
             "paid_on_signup": inq.paid_on_signup,
+            "target_class_id": inq.target_class_id,
+            "sheets": _admission_sheet_panel(inq),
         })
     return rows
+
+
+def _sheet_by_text(text: str | None) -> Sheet | None:
+    code = _sheet_code_from_text(text)
+    if not code:
+        return None
+    return Sheet.objects.filter(code__iexact=code).select_related("subject").first()
+
+
+def _sheet_stock(sheet: Sheet | None) -> int:
+    inv = _inventory_for_sheet(sheet) if sheet else None
+    return int(inv.quantity or 0) if inv else 0
+
+
+def _class_current_sheets(tutoring_class: TutoringClass) -> list[dict]:
+    """What each subject of a class is studying right now, for preparing a
+    new student's sheets: the latest tutor update per subject (teaching
+    schedule), falling back to the subject template's default sheet, plus any
+    manual SheetClassMapping / ClassSubject.current_sheet not already covered.
+    Each row carries the live shelf count from Sheet Inventory."""
+    rows: list[dict] = []
+    seen: set[int] = set()
+
+    templates = (
+        TeachingClassSubjectTemplate.objects
+        .select_related("default_sheet", "default_sheet__subject")
+        .filter(tutoring_class=tutoring_class, is_active=True)
+        .order_by("display_order", "id")
+    )
+    for t in templates:
+        latest = (
+            TeachingProgressUpdate.objects
+            .filter(assignment__subject_template=t, no_teaching=False)
+            .exclude(sheet_name="")
+            .order_by("-teaching_date", "-updated_at")
+            .first()
+        )
+        label = (latest.sheet_name if latest else "") or t.default_sheet_name or ""
+        sheet = _sheet_by_text(latest.sheet_name) if latest else None
+        if sheet is None:
+            sheet = t.default_sheet or _sheet_by_text(t.default_sheet_name)
+        if sheet is None and not label:
+            continue
+        if sheet is not None:
+            if sheet.id in seen:
+                continue
+            seen.add(sheet.id)
+        rows.append({
+            "subject": t.subject_name,
+            "sheet": sheet,
+            "label": label or sheet.code,
+            "near_end": bool(latest and latest.sheet_near_end),
+            "stock": _sheet_stock(sheet),
+        })
+
+    extra = [m.sheet for m in SheetClassMapping.objects.select_related("sheet", "sheet__subject")
+             .filter(tutoring_class=tutoring_class, is_active=True)]
+    extra += [cs.current_sheet for cs in ClassSubject.objects.select_related("current_sheet", "current_sheet__subject")
+              .filter(tutoring_class=tutoring_class, is_active=True, current_sheet__isnull=False)]
+    for sheet in extra:
+        if sheet.id in seen:
+            continue
+        seen.add(sheet.id)
+        rows.append({
+            "subject": sheet.subject.name if sheet.subject_id else "",
+            "sheet": sheet,
+            "label": sheet.code,
+            "near_end": False,
+            "stock": _sheet_stock(sheet),
+        })
+    return rows
+
+
+def _admission_sheet_panel(inquiry: AdmissionInquiry) -> dict:
+    """Sheet needs for one upcoming student plus where each one stands
+    (ยังไม่สำรอง / รอแจก / แจกแล้ว). Reservations for sheets that are no
+    longer in the class list (class changed after handing out) still show."""
+    live = {
+        r.sheet_id: r for r in
+        inquiry.sheet_reservations.select_related("sheet", "sheet__subject")
+        .exclude(status=SheetReservation.Status.RELEASED).order_by("created_at")
+    }
+    needs = _class_current_sheets(inquiry.target_class) if inquiry.target_class_id else []
+    shown: set[int] = set()
+    for n in needs:
+        sheet = n["sheet"]
+        res = live.get(sheet.id) if sheet else None
+        n["reservation"] = res
+        n["status"] = res.status if res else ("none" if sheet else "unknown")
+        if sheet:
+            shown.add(sheet.id)
+    for sheet_id, res in live.items():
+        if sheet_id in shown:
+            continue
+        needs.append({
+            "subject": res.sheet.subject.name if res.sheet.subject_id else "",
+            "sheet": res.sheet, "label": res.sheet.code, "near_end": False,
+            "stock": _sheet_stock(res.sheet),
+            "reservation": res, "status": res.status, "orphan": True,
+        })
+    return {
+        "needs": needs,
+        "pending_count": sum(1 for n in needs if n["status"] == "none"),
+        "reserved_count": sum(1 for n in needs if n["status"] == SheetReservation.Status.RESERVED),
+        "handed_count": sum(1 for n in needs if n["status"] == SheetReservation.Status.HANDED_OUT),
+    }
+
+
+def _reserve_sheet_for_inquiry(inquiry, sheet, user) -> tuple[bool, str]:
+    if inquiry.sheet_reservations.filter(sheet=sheet).exclude(status=SheetReservation.Status.RELEASED).exists():
+        return True, ""
+    ok, msg, _inv, movement = _apply_sheet_inventory_movement(
+        sheet=sheet, movement_type=SheetInventoryMovement.MovementType.DEDUCT, quantity=1,
+        note=f"สำรองชีท (รอแจก) — {inquiry.nickname} #{inquiry.id}", user=user,
+    )
+    if not ok:
+        return False, f"{sheet.code}: {msg}"
+    SheetReservation.objects.create(
+        admission_inquiry=inquiry, sheet=sheet, tutoring_class=inquiry.target_class,
+        movement=movement, status=SheetReservation.Status.RESERVED,
+    )
+    return True, ""
+
+
+def _hand_out_sheet_for_inquiry(inquiry, sheet, user) -> tuple[bool, str]:
+    res = (inquiry.sheet_reservations.filter(sheet=sheet)
+           .exclude(status=SheetReservation.Status.RELEASED).first())
+    if res and res.status == SheetReservation.Status.HANDED_OUT:
+        return True, ""
+    if res is None:
+        # Never reserved: cut it from stock now.
+        ok, msg, _inv, movement = _apply_sheet_inventory_movement(
+            sheet=sheet, movement_type=SheetInventoryMovement.MovementType.DEDUCT, quantity=1,
+            note=f"แจกชีท — {inquiry.nickname} #{inquiry.id}", user=user,
+        )
+        if not ok:
+            return False, f"{sheet.code}: {msg}"
+        res = SheetReservation(admission_inquiry=inquiry, sheet=sheet,
+                               tutoring_class=inquiry.target_class, movement=movement)
+    allocation = SheetAllocation.objects.create(
+        sheet=sheet, quantity=1,
+        recipient_type=SheetAllocation.RecipientType.ADMISSION,
+        admission_inquiry=inquiry,
+        manual_nickname=inquiry.nickname or "",
+        tutoring_class=res.tutoring_class or inquiry.target_class,
+        movement=res.movement,
+        note="แจกจากหน้า admin tool (ทดลอง/เริ่มเรียน)",
+        created_by=user if getattr(user, "is_authenticated", False) else None,
+    )
+    res.allocation = allocation
+    res.status = SheetReservation.Status.HANDED_OUT
+    res.save()
+    return True, ""
+
+
+def _release_sheet_reservations(inquiry, user, sheet=None) -> None:
+    """Put reserved-but-not-handed-out sheets back on the shelf."""
+    qs = inquiry.sheet_reservations.select_related("sheet").filter(status=SheetReservation.Status.RESERVED)
+    if sheet is not None:
+        qs = qs.filter(sheet=sheet)
+    for res in qs:
+        _apply_sheet_inventory_movement(
+            sheet=res.sheet, movement_type=SheetInventoryMovement.MovementType.ADD, quantity=res.quantity,
+            note=f"คืนชีทที่สำรองไว้ — {inquiry.nickname} #{inquiry.id}", user=user,
+        )
+        res.status = SheetReservation.Status.RELEASED
+        res.save(update_fields=["status", "updated_at"])
+
+
+def _near_end_sheet_flags() -> list[dict]:
+    """Subjects whose most recent tutor update says "ใกล้จบชีท" -- once the
+    tutor saves a later update as ปกติ (e.g. moved to the next book) the
+    flag drops off on its own."""
+    since = timezone.localdate() - timedelta(days=60)
+    latest: dict[int, TeachingProgressUpdate] = {}
+    for u in (
+        TeachingProgressUpdate.objects
+        .select_related("assignment__tutoring_class", "assignment__subject_template", "assignment__tutor")
+        .filter(teaching_date__gte=since, no_teaching=False, assignment__tutoring_class__is_active=True)
+        .order_by("-teaching_date", "-updated_at")
+    ):
+        latest.setdefault(u.assignment.subject_template_id, u)
+    rows = []
+    for u in latest.values():
+        if not u.sheet_near_end:
+            continue
+        sheet = _sheet_by_text(u.sheet_name)
+        progress = " · ".join(x for x in [
+            f"หน้า {u.page_to}" if u.page_to else "",
+            f"ข้อ {u.question_to}" if u.question_to else "",
+        ] if x)
+        rows.append({
+            "class_name": u.assignment.tutoring_class.name,
+            "subject": u.assignment.subject_template.subject_name,
+            "sheet_name": u.sheet_name or "-",
+            "progress": progress,
+            "tutor": u.updated_by_name or (u.assignment.tutor.name if u.assignment.tutor_id else ""),
+            "date": u.teaching_date,
+            "stock": _sheet_stock(sheet) if sheet else None,
+        })
+    rows.sort(key=lambda r: r["date"], reverse=True)
+    return rows
+
+
+def _active_classes_for_assign() -> list[TutoringClass]:
+    return list(TutoringClass.objects.filter(is_active=True).order_by("time_slot", "name"))
+
+
+def _render_admission_sheet_panel(request, inquiry) -> str:
+    from django.template.loader import render_to_string
+    return render_to_string("core/_admission_sheet_panel.html", {
+        "a": {"id": inquiry.id, "target_class_id": inquiry.target_class_id,
+              "sheets": _admission_sheet_panel(inquiry)},
+        "assign_classes": _active_classes_for_assign(),
+    }, request=request)
 
 
 def _low_stock_sheets(threshold: int = 3) -> list[dict]:
@@ -8168,6 +8387,8 @@ def pkanoon_admin_tool(request: HttpRequest) -> HttpResponse:
         "can_edit": can_edit,
         "upcoming_admissions": _upcoming_weekend_admissions(),
         "low_stock_sheets": _low_stock_sheets(),
+        "near_end_sheets": _near_end_sheet_flags(),
+        "assign_classes": _active_classes_for_assign(),
         "binding_type_choices": SheetPrintOrder.BindingType.choices,
         "spine_color_choices": _print_color_choices(),
         "default_print_due_date": timezone.localdate() + timedelta(days=3),
@@ -8236,6 +8457,7 @@ def admin_tool_admission_action(request: HttpRequest) -> JsonResponse:
         return JsonResponse({"ok": True, "result": "enrolled"})
 
     if action == "trial_not_enrolled":
+        _release_sheet_reservations(inquiry, request.user)
         # นักเรียนทดลองแล้วไม่สมัคร
         inquiry.trial_attended = AdmissionInquiry.TrialAttended.YES
         inquiry.trial_result = AdmissionInquiry.TrialResult.NOT_ENROLLED
@@ -8249,6 +8471,7 @@ def admin_tool_admission_action(request: HttpRequest) -> JsonResponse:
         return JsonResponse({"ok": True, "result": "not_enrolled"})
 
     if action == "cancel_appointment":
+        _release_sheet_reservations(inquiry, request.user)
         # ยกเลิกนัดหมายทดลอง (ไม่ได้มาเรียน)
         inquiry.trial_attended = AdmissionInquiry.TrialAttended.NO
         inquiry.trial_result = AdmissionInquiry.TrialResult.PENDING
@@ -8259,13 +8482,83 @@ def admin_tool_admission_action(request: HttpRequest) -> JsonResponse:
         ])
         return JsonResponse({"ok": True, "result": "cancelled"})
 
+    if action == "done":
+        # ดำเนินการเสร็จแล้ว: everything for this student is sorted.
+        inquiry.is_completed = True
+        inquiry.completed_at = timezone.now()
+        inquiry.save(update_fields=["is_completed", "completed_at"])
+        return JsonResponse({"ok": True})
+
     if action == "cancel":
+        _release_sheet_reservations(inquiry, request.user)
         inquiry.is_completed = True
         inquiry.completed_at = timezone.now()
         inquiry.save(update_fields=["is_completed", "completed_at"])
         return JsonResponse({"ok": True})
 
     return JsonResponse({"ok": False, "error": "ไม่รู้จักคำสั่งนี้"}, status=400)
+
+
+@require_POST
+def admin_tool_admission_sheet(request: HttpRequest) -> JsonResponse:
+    """Per-student sheet panel on the admin tool: assign the class, then
+    สำรองชีท (deduct now, status รอแจก) / แจกชีทแล้ว (final) / คืนคลัง,
+    for one sheet (sheet_id) or every outstanding sheet of the student."""
+    denied = _admin_tool_staff_denied(request)
+    if denied:
+        return denied
+    payload = _admin_tool_card_payload(request)
+    action = (payload.get("do") or "").strip()
+    inquiry = AdmissionInquiry.objects.select_related("target_class").filter(id=payload.get("admission_id")).first()
+    if not inquiry:
+        return JsonResponse({"ok": False, "error": "ไม่พบรายการนี้"}, status=404)
+
+    errors: list[str] = []
+    if action == "assign_class":
+        raw = str(payload.get("class_id") or "").strip()
+        new_class = TutoringClass.objects.filter(id=raw).first() if raw.isdigit() else None
+        if raw and not new_class:
+            return JsonResponse({"ok": False, "error": "ไม่พบ Class นี้"}, status=404)
+        if (new_class.id if new_class else None) != inquiry.target_class_id:
+            # Sheets reserved for the old class go back on the shelf;
+            # anything already handed out stays recorded.
+            _release_sheet_reservations(inquiry, request.user)
+            inquiry.target_class = new_class
+            inquiry.save(update_fields=["target_class"])
+    elif action in ("reserve", "hand_out", "release"):
+        sheet_id = payload.get("sheet_id")
+        if sheet_id:
+            sheet = Sheet.objects.filter(id=sheet_id).first()
+            if not sheet:
+                return JsonResponse({"ok": False, "error": "ไม่พบชีทนี้"}, status=404)
+            sheets = [sheet]
+        elif action == "release":
+            sheets = [None]
+        else:
+            panel = _admission_sheet_panel(inquiry)
+            wanted = {"reserve": ("none",), "hand_out": ("none", SheetReservation.Status.RESERVED)}[action]
+            sheets = [n["sheet"] for n in panel["needs"] if n["sheet"] and n["status"] in wanted]
+            if not sheets:
+                return JsonResponse({"ok": False, "error": "ยังไม่มีชีทที่ต้องดำเนินการ — เลือก Class ก่อน หรือชีทถูกจัดการครบแล้ว"}, status=400)
+        for sheet in sheets:
+            if action == "reserve":
+                ok, msg = _reserve_sheet_for_inquiry(inquiry, sheet, request.user)
+            elif action == "hand_out":
+                ok, msg = _hand_out_sheet_for_inquiry(inquiry, sheet, request.user)
+            else:
+                _release_sheet_reservations(inquiry, request.user, sheet=sheet)
+                ok, msg = True, ""
+            if not ok:
+                errors.append(msg)
+    else:
+        return JsonResponse({"ok": False, "error": "ไม่รู้จักคำสั่งนี้"}, status=400)
+
+    inquiry.refresh_from_db()
+    return JsonResponse({
+        "ok": True,
+        "warning": " / ".join(errors),
+        "html": _render_admission_sheet_panel(request, inquiry),
+    })
 
 
 @require_POST
@@ -9828,7 +10121,11 @@ def tutor_teaching_update(request: HttpRequest) -> HttpResponse:
             elif not sheet_name:
                 sheet_name = assignment.subject_template.default_sheet_name or ""
 
-        sheet_near_end = (request.POST.get("sheet_status") or "normal") == "near_end"
+        sheet_status = (request.POST.get("sheet_status") or "").strip()
+        if not no_teaching and sheet_status not in ("normal", "near_end"):
+            qs += "&error=missing_sheet_status"
+            return redirect(f"/tutor-teaching-update/?{qs}#assignment-{assignment.id}")
+        sheet_near_end = sheet_status == "near_end"
         if no_teaching:
             sheet_near_end = False
 

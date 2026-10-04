@@ -1,0 +1,44 @@
+<div class="as-panel" data-sheet-panel data-admission-id="{{ a.id }}">
+  <label class="as-class">
+    <span>🏫 Class ที่จะเข้าเรียน</span>
+    <select data-assign-class data-admission-id="{{ a.id }}">
+      <option value="">— เลือก Class —</option>
+      {% for c in assign_classes %}
+        <option value="{{ c.id }}" {% if c.id == a.target_class_id %}selected{% endif %}>{{ c.name }} · {{ c.get_time_slot_display }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  {% if a.target_class_id or a.sheets.needs %}
+    {% if a.sheets.needs %}
+      <div class="as-list">
+        {% for n in a.sheets.needs %}
+          <div class="as-item st-{{ n.status }}">
+            <div class="as-info">
+              <div class="as-subj">{{ n.subject|default:"-" }}{% if n.near_end %} <span class="as-near">ใกล้จบชีท</span>{% endif %}{% if n.orphan %} <span class="as-near">นอก Class ปัจจุบัน</span>{% endif %}</div>
+              <div class="as-sheet">{% if n.sheet %}<b>{{ n.sheet.code }}</b> {{ n.sheet.title }}{% else %}{{ n.label }} <span class="as-warn">(ไม่พบรหัสในคลังชีท)</span>{% endif %}</div>
+            </div>
+            {% if n.sheet %}
+              <div class="as-stock {% if n.stock <= 0 %}zero{% elif n.stock < 3 %}low{% endif %}" title="คงเหลือในคลัง">เหลือ {{ n.stock }}</div>
+              <div class="as-act">
+                {% if n.status == "none" %}
+                  <button type="button" class="rt-mini-btn" data-sheet-do="reserve" data-sheet-id="{{ n.sheet.id }}">📌 สำรอง</button>
+                  <button type="button" class="rt-mini-btn handout" data-sheet-do="hand_out" data-sheet-id="{{ n.sheet.id }}">📤 แจกแล้ว</button>
+                {% elif n.status == "reserved" %}
+                  <span class="as-badge wait">รอแจก</span>
+                  <button type="button" class="rt-mini-btn handout" data-sheet-do="hand_out" data-sheet-id="{{ n.sheet.id }}">📤 แจกแล้ว</button>
+                  <button type="button" class="rt-mini-btn" data-sheet-do="release" data-sheet-id="{{ n.sheet.id }}" title="คืนชีทเข้าคลัง">↩︎ คืน</button>
+                {% else %}
+                  <span class="as-badge done">✓ แจกแล้ว</span>
+                {% endif %}
+              </div>
+            {% endif %}
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="as-empty">Class นี้ยังไม่มีข้อมูลชีทที่กำลังเรียน (ตั้งค่าในอัปเดตการสอนติวเตอร์/คลังชีท)</div>
+    {% endif %}
+  {% else %}
+    <div class="as-empty">เลือก Class เพื่อดูว่าต้องเตรียมชีทอะไรบ้าง</div>
+  {% endif %}
+</div>

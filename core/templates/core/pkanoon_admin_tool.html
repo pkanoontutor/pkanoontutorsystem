@@ -285,6 +285,44 @@
   .rt-mini-btn.receipt{background:var(--accent);border-color:var(--accent);color:#fff;}
   .rt-mini-btn.receipt:hover{background:var(--accent-strong);border-color:var(--accent-strong);color:#fff;}
 
+  /* ⋯ menu for the less-used admission buttons */
+  .rt-more{position:relative;}
+  .rt-more-btn{font-size:15px;line-height:1;padding:3px 10px;}
+  .rt-more-menu{position:absolute;left:0;top:calc(100% + 4px);z-index:30;min-width:180px;background:var(--panel);
+    border:1px solid var(--line-strong);border-radius:11px;box-shadow:var(--shadow);padding:5px;display:grid;gap:2px;}
+  .rt-more-menu[hidden]{display:none;}
+  .rt-more-menu button,.rt-more-menu a{all:unset;cursor:pointer;font-size:12.5px;font-weight:700;color:var(--ink);
+    padding:7px 10px;border-radius:8px;}
+  .rt-more-menu button:hover,.rt-more-menu a:hover{background:var(--accent-soft);}
+  .rt-more-menu button:disabled{opacity:.45;cursor:default;}
+  /* Per-student sheet panel */
+  .rt-details:has(.rt-more-menu:not([hidden])){overflow:visible;}
+  .as-panel{width:100%;display:grid;gap:7px;margin-top:4px;}
+  .as-class{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:11.5px;font-weight:700;color:var(--ink-soft);}
+  .as-class select{flex:1;min-width:170px;font-family:inherit;font-size:12px;padding:5px 8px;border-radius:8px;
+    border:1px solid var(--line-strong);background:var(--panel);color:var(--ink);}
+  .as-list{display:grid;gap:5px;}
+  .as-item{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--panel);border:1px solid var(--line);
+    border-radius:9px;padding:6px 8px;}
+  .as-item.st-reserved{border-color:#fbbf24;background:#fffbeb;}
+  .as-item.st-handed_out{border-color:#86efac;background:#f0fdf4;}
+  .as-info{flex:1;min-width:140px;}
+  .as-subj{font-size:10.5px;font-weight:800;color:var(--ink-faint);}
+  .as-sheet{font-size:12px;color:var(--ink);}
+  .as-warn{font-size:10.5px;color:#c0483a;}
+  .as-near{font-size:10px;font-weight:800;color:#b45309;background:#fef3c7;border-radius:999px;padding:1px 6px;}
+  .as-stock{font-size:11px;font-weight:800;color:#15803d;background:#dcfce7;border-radius:999px;padding:2px 8px;white-space:nowrap;}
+  .as-stock.low{color:#b45309;background:#fef3c7;}
+  .as-stock.zero{color:#b42318;background:#fee2e2;}
+  .as-act{display:flex;gap:4px;align-items:center;flex-wrap:wrap;}
+  .as-badge{font-size:11px;font-weight:800;border-radius:999px;padding:2px 8px;}
+  .as-badge.wait{background:#f59e0b;color:#fff;}
+  .as-badge.done{background:#16a34a;color:#fff;}
+  .rt-mini-btn.handout{background:var(--accent);border-color:var(--accent);color:#fff;}
+  .as-empty{font-size:11.5px;color:var(--ink-faint);border:1px dashed var(--line);border-radius:9px;padding:7px;text-align:center;}
+  .rt-row.near{border-color:#fcd34d;background:#fffbeb;}
+  .rt-qty-soft{flex:none;font-size:11.5px;font-weight:800;color:#b45309;}
+
   /* Low-stock print / missing-link */
   .rt-mini-btn.print[data-has-link="0"]{opacity:.6;}
   .rt-link-fill{width:100%;display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:8px;
@@ -447,7 +485,7 @@
     </div>
   </details>
 
-  <details class="rt-details" open>
+  <details class="rt-details">
     <summary class="rt-summary">
       <span class="rt-summary-title">📡 ภาพรวมเรียลไทม์</span>
       <span class="rt-summary-hint">นักเรียนที่จะมาเสาร์-อาทิตย์นี้ · ชีทใกล้หมด — กดเพื่อซ่อน/แสดง</span>
@@ -468,17 +506,23 @@
                   <div class="rt-row-name">{{ a.nickname }} <span class="rt-tag">{{ a.request_type_label }}</span>{% if a.attended_first_lesson %}<span class="rt-tag attended-tag">มาแล้ว · รอใบเสร็จ</span>{% endif %}{% if a.paid_on_signup %}<span class="rt-tag paid-tag">สมัครและจ่ายแล้ว</span>{% endif %}</div>
                   <div class="rt-row-meta">{{ a.full_name }} · {{ a.grade_label }} · {{ a.date_label }} · {{ a.time_slot_label }}</div>
                 </div>
+                {% include "core/_admission_sheet_panel.html" %}
                 <div class="rt-row-actions">
-                  <button class="rt-mini-btn arrive" type="button" data-mark-attended data-admission-id="{{ a.id }}" title="มาแล้ว">✅ มาแล้ว</button>
-                  <button class="rt-mini-btn paidbtn" type="button" data-paid-signup data-admission-id="{{ a.id }}"
-                          title="สมัครและจ่ายเงินแล้ว (รายการยังไม่ถูกลบ)" {% if a.paid_on_signup %}disabled{% endif %}>💳 สมัครและจ่ายแล้ว</button>
-                  <a class="rt-mini-btn receipt" href="/course-payments/new/?admission_id={{ a.id }}" title="สร้างใบเสร็จ">🧾 สร้างใบเสร็จ</a>
-                  <button class="rt-mini-btn" style="background:#dcfce7;border-color:#86efac;color:#15803d;font-weight:700;" type="button"
-                    data-trial-action="trial_enrolled" data-admission-id="{{ a.id }}">✅ ทดลองแล้วสมัคร</button>
-                  <button class="rt-mini-btn" style="background:#fff7ed;border-color:#fdba74;color:#c2410c;font-weight:700;" type="button"
-                    data-trial-action="trial_not_enrolled" data-admission-id="{{ a.id }}">❌ ทดลองแล้วไม่สมัคร</button>
+                  <button class="rt-mini-btn" type="button" data-sheet-do="reserve" data-admission-id="{{ a.id }}" title="สำรองชีททุกเล่มที่ต้องใช้ (ตัดจากคลัง สถานะรอแจก)">📌 สำรองชีท</button>
+                  <button class="rt-mini-btn receipt" type="button" data-sheet-do="hand_out" data-admission-id="{{ a.id }}" title="แจกชีททุกเล่มแล้ว (ตัด stock)">📤 แจกชีทแล้ว</button>
+                  <button class="rt-mini-btn arrive" type="button" data-trial-action="done" data-admission-id="{{ a.id }}">✔️ ดำเนินการเสร็จแล้ว</button>
                   <button class="rt-mini-btn cancel" type="button"
                     data-trial-action="cancel_appointment" data-admission-id="{{ a.id }}" title="ยกเลิกนัด">🚫 ยกเลิกนัดหมาย</button>
+                  <div class="rt-more">
+                    <button class="rt-mini-btn rt-more-btn" type="button" data-more-toggle aria-label="ตัวเลือกเพิ่มเติม">⋯</button>
+                    <div class="rt-more-menu" hidden>
+                      <button type="button" data-mark-attended data-admission-id="{{ a.id }}">✅ มาแล้ว</button>
+                      <a href="/course-payments/new/?admission_id={{ a.id }}">🧾 สร้างใบเสร็จ</a>
+                      <button type="button" data-paid-signup data-admission-id="{{ a.id }}" {% if a.paid_on_signup %}disabled{% endif %}>💳 สมัครและจ่ายแล้ว</button>
+                      <button type="button" data-trial-action="trial_enrolled" data-admission-id="{{ a.id }}">✅ ทดลองแล้วสมัคร</button>
+                      <button type="button" data-trial-action="trial_not_enrolled" data-admission-id="{{ a.id }}">❌ ทดลองแล้วไม่สมัคร</button>
+                    </div>
+                  </div>
                 </div>
               </div>
             {% empty %}
@@ -488,6 +532,20 @@
         </div>
 
         <div>
+          <div class="rt-block-title">📘 ติวเตอร์แจ้งใกล้จบชีท <span class="n">{{ near_end_sheets|length }}</span></div>
+          <div class="rt-list" style="margin-bottom:18px;">
+            {% for n in near_end_sheets %}
+              <div class="rt-row near">
+                <div class="rt-row-main">
+                  <div class="rt-row-name">{{ n.sheet_name }} <span class="rt-tag">{{ n.subject }}</span></div>
+                  <div class="rt-row-meta">{{ n.class_name }}{% if n.progress %} · {{ n.progress }}{% endif %} · {{ n.date|date:"d/m/Y" }}{% if n.tutor %} · {{ n.tutor }}{% endif %}</div>
+                </div>
+                {% if n.stock is not None %}<div class="rt-qty-soft" title="คงเหลือในคลัง">เหลือ {{ n.stock }}</div>{% endif %}
+              </div>
+            {% empty %}
+              <div class="rt-empty-mini">ยังไม่มีวิชาที่ติวเตอร์แจ้งใกล้จบชีท</div>
+            {% endfor %}
+          </div>
           <div class="rt-block-title">📄 ชีทใกล้หมด (เหลือน้อยกว่า 3 เล่ม) <span class="n" id="rtLowStockCount">{{ low_stock_sheets|length }}</span></div>
           <div class="rt-list" id="rtLowStockList">
             {% for s in low_stock_sheets %}
@@ -633,6 +691,7 @@
     reset: "{% url 'core:admin_tool_card_reset' %}",
     dismissLowStock: "{% url 'core:admin_tool_dismiss_low_stock_sheet' %}",
     admissionAction: "{% url 'core:admin_tool_admission_action' %}",
+    admissionSheet: "{% url 'core:admin_tool_admission_sheet' %}",
     updateSheetLink: "{% url 'core:admin_tool_update_sheet_link' %}",
     createPrintOrder: "{% url 'core:admin_tool_create_print_order' %}",
     moneyAdd: "{% url 'core:admin_tool_money_add' %}",
@@ -1122,7 +1181,47 @@
   // ---------- Real-time overview: upcoming-admission actions ----------
   var admissionList=$("rtAdmissionList"), admissionCount=$("rtAdmissionCount");
   if(admissionList){
+    function sheetCall(row, body){
+      body.admission_id=row.getAttribute("data-admission-id");
+      return api(window.PK_URLS.admissionSheet, body).then(function(j){
+        var panel=row.querySelector("[data-sheet-panel]");
+        if(panel && j.html){ panel.insertAdjacentHTML("afterend", j.html); panel.remove(); }
+        if(j.warning) alert("บางเล่มทำรายการไม่ได้: "+j.warning);
+      });
+    }
+    admissionList.addEventListener("change",function(e){
+      var sel=e.target.closest("[data-assign-class]");
+      if(!sel) return;
+      sel.disabled=true;
+      sheetCall(sel.closest(".rt-row"),{"do":"assign_class",class_id:sel.value});
+    });
+    document.addEventListener("click",function(e){
+      if(e.target.closest(".rt-more")) return;
+      document.querySelectorAll(".rt-more-menu").forEach(function(m){ m.hidden=true; });
+    });
     admissionList.addEventListener("click",function(e){
+      var moreBtn=e.target.closest("[data-more-toggle]");
+      if(moreBtn){
+        var menu=moreBtn.nextElementSibling, wasHidden=menu.hidden;
+        document.querySelectorAll(".rt-more-menu").forEach(function(m){ m.hidden=true; });
+        menu.hidden=!wasHidden;
+        return;
+      }
+      if(e.target.closest(".rt-more-menu")){
+        var m0=e.target.closest(".rt-more-menu");
+        setTimeout(function(){ m0.hidden=true; },0);
+      }
+      var sheetBtn=e.target.closest("[data-sheet-do]");
+      if(sheetBtn){
+        var srow=sheetBtn.closest(".rt-row"), sdo=sheetBtn.getAttribute("data-sheet-do");
+        var body={"do":sdo};
+        var sid=sheetBtn.getAttribute("data-sheet-id");
+        if(sid) body.sheet_id=sid;
+        else if(!confirm(sdo==="reserve" ? "สำรองชีททุกเล่มที่ยังไม่ได้สำรอง? (ตัดจากคลัง สถานะรอแจก)" : "บันทึกว่าแจกชีททุกเล่มแล้ว? (ตัด stock ทันที)")) return;
+        sheetBtn.disabled=true;
+        sheetCall(srow, body).finally(function(){ sheetBtn.disabled=false; });
+        return;
+      }
       var arriveBtn=e.target.closest("[data-mark-attended]");
       if(arriveBtn){
         var row=arriveBtn.closest(".rt-row");
@@ -1181,11 +1280,13 @@
         var action=trialBtn.getAttribute("data-trial-action");
         var row3=trialBtn.closest(".rt-row");
         var id3=trialBtn.getAttribute("data-admission-id");
-        var confirmMsg = action==="trial_enrolled"
+        var confirmMsg = action==="done"
+          ? (row3.querySelector(".as-item.st-reserved") ? "ยังมีชีทสถานะรอแจกอยู่ — ยืนยันว่าดำเนินการเสร็จแล้ว?" : "ดำเนินการเสร็จแล้ว ปิดรายการนี้?")
+          : action==="trial_enrolled"
           ? "บันทึก: ทดลองแล้วสมัครเรียน ใช่ไหม?"
           : action==="trial_not_enrolled"
           ? "บันทึก: ทดลองแล้วไม่สมัครเรียน ใช่ไหม?"
-          : "บันทึก: ยกเลิกนัดหมายทดลองเรียน ใช่ไหม?";
+          : "บันทึก: ยกเลิกนัดหมายทดลองเรียน ใช่ไหม? (ชีทที่สำรองไว้จะคืนเข้าคลัง)";
         if(!confirm(confirmMsg)) return;
         trialBtn.disabled=true;
         api(window.PK_URLS.admissionAction,{admission_id:id3,"do":action}).then(function(){

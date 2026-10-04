@@ -3405,3 +3405,45 @@ class SessionAdjustment(models.Model):
     @property
     def is_increase(self) -> bool:
         return self.delta >= 0
+
+
+class SheetReservation(models.Model):
+    """A sheet set aside for an incoming trial / new student before their
+    first lesson. Reserving deducts it from stock right away (so the shelf
+    count stays honest) and parks it as "รอแจก"; handing it out finalizes
+    the deduction as a SheetAllocation; releasing puts it back on the shelf."""
+
+    class Status(models.TextChoices):
+        RESERVED = "reserved", "รอแจก"
+        HANDED_OUT = "handed_out", "แจกแล้ว"
+        RELEASED = "released", "คืนคลังแล้ว"
+
+    admission_inquiry = models.ForeignKey(
+        AdmissionInquiry, verbose_name="รายการสมัคร/ทดลองเรียน",
+        on_delete=models.CASCADE, related_name="sheet_reservations",
+    )
+    sheet = models.ForeignKey(Sheet, verbose_name="ชีท", on_delete=models.PROTECT, related_name="reservations")
+    tutoring_class = models.ForeignKey(
+        TutoringClass, verbose_name="Class", on_delete=models.SET_NULL,
+        null=True, blank=True, related_name="sheet_reservations",
+    )
+    quantity = models.PositiveIntegerField("จำนวน", default=1)
+    status = models.CharField("สถานะ", max_length=20, choices=Status.choices, default=Status.RESERVED)
+    movement = models.ForeignKey(
+        SheetInventoryMovement, verbose_name="Movement ที่ตัด stock",
+        on_delete=models.SET_NULL, null=True, blank=True, related_name="+",
+    )
+    allocation = models.ForeignKey(
+        SheetAllocation, verbose_name="Sheet Allocation",
+        on_delete=models.SET_NULL, null=True, blank=True, related_name="+",
+    )
+    created_at = models.DateTimeField("วันที่สร้าง", default=timezone.now)
+    updated_at = models.DateTimeField("อัปเดตล่าสุด", auto_now=True)
+
+    class Meta:
+        verbose_name = "Sheet Reservation"
+        verbose_name_plural = "Sheet Reservations"
+        ordering = ("-created_at",)
+
+    def __str__(self) -> str:
+        return f"{self.admission_inquiry_id} | {self.sheet.code} | {self.get_status_display()}"

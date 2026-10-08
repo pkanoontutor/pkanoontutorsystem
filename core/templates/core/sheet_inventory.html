@@ -462,7 +462,7 @@
         </div>
         <button type="button" class="print-modal-close" id="createSheetClose" aria-label="Close">×</button>
       </div>
-      <form method="post" class="print-modal-body">
+      <form method="post" class="print-modal-body" enctype="multipart/form-data" id="createSheetForm">
         {% csrf_token %}
         <input type="hidden" name="action" value="create_sheet">
         <div class="print-grid2">
@@ -470,13 +470,26 @@
           <div class="print-field"><label>ชื่อชีท</label><input name="title" placeholder="ชื่อชีท" required></div>
         </div>
         <div class="print-grid2">
-          <div class="print-field"><label>ระดับชั้น</label><select name="grade_level"><option value="">ระดับชั้น</option>{% for value,label in sheet_grade_choices %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</select></div>
+          <div class="print-field"><label>ระดับชั้น</label><select name="grade_level" id="csGrade"><option value="">ระดับชั้น</option>{% for value,label in sheet_grade_choices %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</select></div>
           <div class="print-field"><label>จำนวนหน้า</label><input type="number" min="0" name="total_pages" placeholder="เช่น 180"></div>
         </div>
         <div class="print-grid2">
-          <div class="print-field"><label>เลือกวิชา</label><select name="subject_id"><option value="">เลือกวิชา</option>{% for s in subjects %}<option value="{{ s.id }}">{{ s.name }}</option>{% endfor %}</select></div>
+          <div class="print-field"><label>เลือกวิชา</label><select name="subject_id" id="csSubject"><option value="">เลือกวิชา</option>{% for s in subjects %}<option value="{{ s.id }}">{{ s.name }}</option>{% endfor %}</select></div>
           <div class="print-field"><label>หรือสร้างวิชาใหม่</label><input name="new_subject" placeholder="ชื่อวิชาใหม่"></div>
         </div>
+        <div class="print-field">
+          <label>📚 ทำมาจากหนังสือเล่ม (คลังหนังสือ)</label>
+          <select name="source_book_id" id="csBook">
+            <option value="">— ไม่ระบุ —</option>
+            {% for b in books %}<option value="{{ b.id }}" data-grade="{{ b.grade_level }}" data-subject="{{ b.subject_id|default:'' }}">{{ b.code }} · {{ b.title }}{% if b.publisher %} ({{ b.publisher }}){% endif %}</option>{% endfor %}
+          </select>
+          <span id="csBookHint" style="font-size:11px;font-weight:800;color:#64748b;">แสดงเฉพาะหนังสือของระดับชั้นและวิชาที่เลือก</span>
+        </div>
+        <div class="print-grid2">
+          <div class="print-field"><label>📕 ปก (PDF)</label><input type="file" name="doc_cover" accept="application/pdf,.pdf"></div>
+          <div class="print-field"><label>📄 เนื้อหา (PDF)</label><input type="file" name="doc_content" accept="application/pdf,.pdf" multiple></div>
+        </div>
+        <div class="print-field"><label>✅ เฉลย (PDF)</label><input type="file" name="doc_answer" accept="application/pdf,.pdf" multiple></div>
         <div class="print-field"><label>ลิงก์ไฟล์ (OneDrive)</label><input type="url" name="onedrive_url" placeholder="สำหรับส่งร้านปรินท์"></div>
         <div class="print-grid2">
           <div class="print-field"><label>ยอดเริ่มต้น</label><input type="number" min="0" name="initial_qty" placeholder="0"></div>
@@ -484,7 +497,8 @@
         </div>
         <div class="print-actions" style="margin:0 -14px -14px;">
           <button type="button" class="btnx soft" id="createSheetCancel">ยกเลิก</button>
-          <button class="btnx primary" type="submit">สร้างชีท</button>
+          <button class="btnx soft" type="submit" name="print_after" value="0">สร้างชีท</button>
+          <button class="btnx primary" type="submit" name="print_after" value="1">สร้าง + สั่งปรินท์ 🖨️</button>
         </div>
       </form>
     </div>
@@ -893,15 +907,58 @@ document.addEventListener('DOMContentLoaded', function(){
 
   // After creating a sheet the page reloads in place, so surface the result
   // as a toast and drop the query string to avoid a stale message on refresh.
+  // Create form: book picker narrowed to the chosen grade + subject
+  (function(){
+    const BANDS = {{ book_bands_json|safe }};
+    const g = document.getElementById('csGrade'), sub = document.getElementById('csSubject'), bk = document.getElementById('csBook');
+    const form = document.getElementById('createSheetForm');
+    if(!g || !sub || !bk) return;
+    function filterBooks(){
+      const grade = g.value, subject = sub.value;
+      Array.from(bk.options).forEach(function(o){
+        if(!o.value){ o.hidden = false; return; }
+        const bg = o.dataset.grade || '', bs = o.dataset.subject || '';
+        const gradeOk = !grade || !bg || bg === grade || (BANDS[bg] || []).indexOf(grade) !== -1;
+        const subjOk = !subject || !bs || bs === subject;
+        o.hidden = !(gradeOk && subjOk);
+        o.disabled = o.hidden;
+      });
+      if(bk.selectedOptions[0] && bk.selectedOptions[0].hidden) bk.value = '';
+    }
+    g.addEventListener('change', filterBooks);
+    sub.addEventListener('change', filterBooks);
+    filterBooks();
+    if(form) form.addEventListener('submit', function(){
+      form.querySelectorAll('button[type=submit]').forEach(function(b){ b.disabled = true; });
+      const n = form.querySelectorAll('input[type=file]');
+      let has = false; n.forEach(function(i){ if(i.files.length) has = true; });
+      if(has) toast('⏳ กำลังสร้างชีทและอัปโหลดไฟล์ — อย่าปิดหน้านี้', false);
+    });
+    // submit buttons get disabled above, so carry the clicked value in a hidden field
+    if(form) form.querySelectorAll('button[name=print_after]').forEach(function(b){
+      b.addEventListener('click', function(){
+        let h = form.querySelector('input[type=hidden][name=print_after]');
+        if(!h){ h = document.createElement('input'); h.type = 'hidden'; h.name = 'print_after'; form.appendChild(h); }
+        h.value = b.value;
+      });
+    });
+  })();
+
   {% if sheet_saved %}
     toast(
-      {% if sheet_saved == 'created' %}'✅ บันทึกแล้ว — สร้างชีท {{ sheet_saved_code|escapejs }} เรียบร้อย'
+      {% if sheet_saved == 'created' %}'✅ บันทึกแล้ว — สร้างชีท {{ sheet_saved_code|escapejs }} เรียบร้อย{% if sheet_saved_uploaded %} (อัปโหลด {{ sheet_saved_uploaded }} ไฟล์){% endif %}'
       {% else %}'⚠ มีชีทรหัส {{ sheet_saved_code|escapejs }} อยู่แล้ว (อัปเดตลิงก์ให้แล้ว)'{% endif %},
       {% if sheet_saved == 'created' %}false{% else %}true{% endif %}
     );
     if(window.history.replaceState){
       window.history.replaceState({}, '', window.location.pathname + window.location.hash);
     }
+    {% if print_sheet_id %}
+      setTimeout(function(){
+        const pb = document.querySelector('[data-print-open][data-sheet-id="{{ print_sheet_id }}"]');
+        if(pb) pb.click();
+      }, 300);
+    {% endif %}
   {% endif %}
 
   // --- Quantity popup (button 1: ➕➖) ---

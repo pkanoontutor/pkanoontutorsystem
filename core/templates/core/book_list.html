@@ -52,6 +52,23 @@
   .radio-card{border:1px solid #e2e8f0;background:#f8fafc;border-radius:13px;padding:9px 12px;font-weight:900;font-size:12.5px;display:flex;gap:7px;align-items:center;cursor:pointer}
   .radio-card:has(input:checked){background:#f5f3ff;border-color:#c4b5fd;color:#6d28d9}
   .radio-card input{width:auto}
+  /* Bookshelf: one shelf per grade, a labelled row per subject */
+  .shelf{margin-top:16px;border-radius:20px;background:linear-gradient(180deg,#fdf8f0,#f6ead6);
+    border:1px solid #e7d3b1;padding:14px 14px 4px;box-shadow:inset 0 1px 0 #fff;}
+  .shelf-head{display:flex;align-items:center;gap:8px;margin-bottom:6px;}
+  .shelf-grade{font-size:18px;font-weight:1000;color:#5b3a1a;background:#fff;border:1px solid #e7d3b1;
+    border-radius:12px;padding:4px 14px;box-shadow:0 2px 0 #d6b98d;}
+  .shelf-count{font-size:11.5px;font-weight:900;color:#8a6a45;}
+  .shelf-row{margin-bottom:12px;}
+  .shelf-subject{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:1000;color:#7c2d12;
+    background:#fed7aa;border:1px solid #fdba74;border-radius:999px;padding:3px 12px;margin:6px 0 8px;}
+  .shelf-books{display:flex;gap:12px;overflow-x:auto;padding:4px 4px 0;align-items:flex-end;
+    border-bottom:12px solid #b98552;border-radius:0 0 6px 6px;box-shadow:0 8px 10px -6px rgba(91,58,26,.45);}
+  .shelf-books .card{flex:0 0 150px;margin-bottom:0;border-radius:12px 12px 4px 4px;}
+  .shelf-books .card .cover{aspect-ratio:3/4.1;}
+  .chip.pub{background:#ede9fe;color:#5b21b6;border-color:#ddd6fe}
+  .code-hint{font-size:10.5px;font-weight:800;color:#64748b;}
+  .file-now{font-size:11px;font-weight:800;color:#16a34a;}
   .empty{text-align:center;padding:30px 16px;color:#64748b;font-weight:850;font-size:13px;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:16px;margin-top:12px}
   .err{background:#fee2e2;color:#991b1b;border:1px solid #fecaca;border-radius:14px;padding:10px 12px;font-weight:900;font-size:12.5px;margin-top:10px}
   @media(max-width:640px){.row{grid-template-columns:1fr}.hero .btn{width:100%}}
@@ -63,7 +80,7 @@
   <section class="hero">
     <div>
       <div class="title">📚 คลังหนังสือ</div>
-      <div class="sub">เก็บโปรไฟล์หนังสือต้นทางที่ใช้ทำชีท — ชื่อ รหัส วิชา ระดับชั้น ลิงก์ไฟล์ และรูปปก</div>
+      <div class="sub">ชั้นหนังสือต้นทางที่ใช้ทำชีท แยกตามระดับชั้นและวิชา — อัปโหลด PDF หนังสือ/เฉลยได้ ปกดึงจากหน้าแรกอัตโนมัติ</div>
     </div>
     <div class="actions">
       <a class="btn soft" href="{% url 'core:sheet_inventory_dashboard' %}">← Sheet Inventory</a>
@@ -73,6 +90,7 @@
 
   {% if error == 'duplicate' %}<div class="err">รหัสหนังสือนี้มีอยู่แล้ว กรุณาใช้รหัสอื่น</div>{% endif %}
   {% if error == 'required' %}<div class="err">ต้องกรอกรหัสหนังสือและชื่อหนังสือ</div>{% endif %}
+  {% if error == 'pdf' %}<div class="err">ไฟล์หนังสือ/เฉลยต้องเป็น PDF เท่านั้น</div>{% endif %}
   {% if error == 'cover' %}<div class="err">ไฟล์ปกต้องเป็นรูปภาพ (JPG หรือ PNG) เท่านั้น</div>{% endif %}
 
   <section class="panel">
@@ -91,8 +109,14 @@
     </form>
 
     {% if books %}
-      <div class="grid">
-        {% for b in books %}
+      {% for shelf in shelves %}
+        <div class="shelf">
+          <div class="shelf-head"><span class="shelf-grade">{{ shelf.label }}</span><span class="shelf-count">{{ shelf.count }} เล่ม</span></div>
+          {% for subj in shelf.subjects %}
+            <div class="shelf-row">
+              <div class="shelf-subject">📗 {{ subj.name }} · {{ subj.books|length }}</div>
+              <div class="shelf-books">
+                {% for b in subj.books %}
           <div class="card" id="book-{{ b.id }}">
             <div class="cover">
               {% if b.cover_image %}
@@ -105,7 +129,7 @@
               <div class="bk-code">{{ b.code }}</div>
               <div class="bk-title">{{ b.title }}</div>
               <div class="bk-meta">
-                {{ b.subject.name|default:"ไม่ระบุวิชา" }} · {{ b.grade_label }}
+                {{ b.subject.name|default:"ไม่ระบุวิชา" }} · {{ b.grade_label }}{% if b.page_count %} · {{ b.page_count }} หน้า{% endif %}
               </div>
               <div class="chips">
                 {% if b.answer_location == 'separate' %}
@@ -113,13 +137,16 @@
                 {% else %}
                   <span class="chip inc">รวมเฉลย</span>
                 {% endif %}
+                {% if b.publisher %}<span class="chip pub">{{ b.publisher }}</span>{% endif %}
                 {% if b.sheet_count %}<span class="chip">ใช้ทำชีท {{ b.sheet_count }}</span>{% endif %}
                 {% if not b.is_active %}<span class="chip off">ปิดใช้งาน</span>{% endif %}
               </div>
             </div>
             <div class="card-actions">
-              {% if b.file_url %}<a class="mini" href="{{ b.file_url }}" target="_blank" rel="noopener">📄 ไฟล์</a>{% endif %}
-              {% if b.answer_location == 'separate' and b.answer_url %}
+              {% if b.pdf_file %}<a class="mini" href="{{ b.pdf_file.url }}" target="_blank" rel="noopener">📄 PDF</a>
+              {% elif b.file_url %}<a class="mini" href="{{ b.file_url }}" target="_blank" rel="noopener">📄 ไฟล์</a>{% endif %}
+              {% if b.answer_pdf %}<a class="mini" href="{{ b.answer_pdf.url }}" target="_blank" rel="noopener">✅ เฉลย</a>
+              {% elif b.answer_location == 'separate' and b.answer_url %}
                 <a class="mini" href="{{ b.answer_url }}" target="_blank" rel="noopener">✅ เฉลย</a>
               {% endif %}
               <button class="mini" type="button"
@@ -129,6 +156,9 @@
                       data-title="{{ b.title }}"
                       data-subject="{{ b.subject_id|default:'' }}"
                       data-grade="{{ b.grade_level }}"
+                      data-publisher="{{ b.publisher }}"
+                      data-has-pdf="{{ b.pdf_file|yesno:'1,0' }}"
+                      data-has-answer="{{ b.answer_pdf|yesno:'1,0' }}"
                       data-file-url="{{ b.file_url }}"
                       data-answer-location="{{ b.answer_location }}"
                       data-answer-url="{{ b.answer_url }}"
@@ -136,8 +166,12 @@
                       data-active="{{ b.is_active|yesno:'1,0' }}">✏️ แก้ไข</button>
             </div>
           </div>
-        {% endfor %}
-      </div>
+                {% endfor %}
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      {% endfor %}
     {% else %}
       <div class="empty">ยังไม่มีหนังสือในคลัง — กด “+ เพิ่มหนังสือ” เพื่อเริ่มบันทึกเล่มแรก</div>
     {% endif %}
@@ -151,8 +185,7 @@
       {% csrf_token %}
       <input type="hidden" name="book_id" id="bookId" value="">
       <div class="row">
-        <div class="field"><label>รหัสหนังสือ *</label><input type="text" name="code" id="bkCode" required placeholder="เช่น BK-M-001"></div>
-        <div class="field"><label>ชื่อหนังสือ *</label><input type="text" name="title" id="bkTitle" required placeholder="เช่น คณิตศาสตร์ ป.6 เล่ม 1"></div>
+        <div class="field full"><label>ชื่อหนังสือ *</label><input type="text" name="title" id="bkTitle" required placeholder="เช่น คณิตศาสตร์ ป.6 เล่ม 1"></div>
         <div class="field">
           <label>วิชา</label>
           <select name="subject_id" id="bkSubject">
@@ -167,7 +200,18 @@
             {% for value, label in grade_choices %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
           </select>
         </div>
-        <div class="field full"><label>ลิงก์ไฟล์หนังสือ</label><input type="url" name="file_url" id="bkFileUrl" placeholder="https://..."></div>
+        <div class="field">
+          <label>รหัสหนังสือ (รันอัตโนมัติ แก้ได้)</label>
+          <input type="text" name="code" id="bkCode" placeholder="เช่น ค-ป6-01">
+          <span class="code-hint">รูปแบบ วิชา-ระดับชั้น-ลำดับ เช่น ค-ป6-01, ว-มต-01</span>
+        </div>
+        <div class="field"><label>สำนักพิมพ์</label><input type="text" name="publisher" id="bkPublisher" placeholder="เช่น แม็ค, ไฮเอ็ด"></div>
+        <div class="field full">
+          <label>ไฟล์หนังสือ (PDF) — หน้าแรกจะใช้เป็นปก</label>
+          <input type="file" name="pdf_file" accept="application/pdf,.pdf">
+          <span class="file-now" id="bkPdfNow" hidden>✓ มีไฟล์แล้ว — เลือกใหม่เพื่อแทนที่</span>
+        </div>
+        <div class="field full"><label>ลิงก์ไฟล์หนังสือ (ถ้าไม่อัปโหลด)</label><input type="url" name="file_url" id="bkFileUrl" placeholder="https://..."></div>
 
         <div class="field full">
           <label>เฉลย</label>
@@ -180,11 +224,14 @@
           </div>
         </div>
         <div class="field full hidden" id="answerUrlField" style="display:none">
-          <label>ลิงก์ไฟล์เฉลย</label>
+          <label>ไฟล์เฉลย (PDF)</label>
+          <input type="file" name="answer_pdf" accept="application/pdf,.pdf">
+          <span class="file-now" id="bkAnswerNow" hidden>✓ มีไฟล์เฉลยแล้ว — เลือกใหม่เพื่อแทนที่</span>
+          <label style="margin-top:6px">หรือลิงก์ไฟล์เฉลย</label>
           <input type="url" name="answer_url" id="bkAnswerUrl" placeholder="https://...">
         </div>
 
-        <div class="field full"><label>รูปปก (JPG / PNG)</label><input type="file" name="cover_image" accept="image/png,image/jpeg"></div>
+        <div class="field full"><label>รูปปก (ไม่ต้องใส่ถ้าอัปโหลด PDF — ใช้หน้าแรกให้)</label><input type="file" name="cover_image" accept="image/png,image/jpeg"></div>
         <div class="field full"><label>หมายเหตุ</label><textarea name="note" id="bkNote" rows="2"></textarea></div>
         <div class="field full">
           <label class="radio-card" style="width:max-content">
@@ -209,6 +256,24 @@
 <script>
 (function(){
   const bg = document.getElementById('bookModalBg');
+  const EXISTING = {{ existing_codes_json|safe }};
+  const SUBJ_INITIAL = {{ subject_initials_json|safe }};
+  const GRADE_TOKEN = {{ grade_tokens_json|safe }};
+  const codeInput = document.getElementById('bkCode');
+  let codeTouched = false, editing = false;
+  codeInput.addEventListener('input', () => { codeTouched = true; });
+  function suggestCode(){
+    if(editing || codeTouched) return;
+    const subj = document.getElementById('bkSubject').value;
+    const grade = document.getElementById('bkGrade').value;
+    if(!subj && !grade){ codeInput.value = ''; return; }
+    const prefix = (SUBJ_INITIAL[subj] || 'X') + '-' + (GRADE_TOKEN[grade] || 'ทั่วไป') + '-';
+    let used = 0;
+    EXISTING.forEach(c => { if(c.startsWith(prefix)){ const n = parseInt(c.slice(prefix.length), 10); if(String(n).length && !isNaN(n)) used = Math.max(used, n); } });
+    codeInput.value = prefix + String(used + 1).padStart(2, '0');
+  }
+  document.getElementById('bkSubject').addEventListener('change', suggestCode);
+  document.getElementById('bkGrade').addEventListener('change', suggestCode);
 
   window.openBookModal = function(){
     document.getElementById('bookModalTitle').textContent = 'เพิ่มหนังสือ';
@@ -216,6 +281,9 @@
     document.getElementById('bookId').value = '';
     document.getElementById('bkActive').checked = true;
     document.getElementById('bkDeleteBtn').style.display = 'none';
+    document.getElementById('bkPdfNow').hidden = true;
+    document.getElementById('bkAnswerNow').hidden = true;
+    editing = false; codeTouched = false;
     toggleAnswerUrl();
     bg.classList.add('show');
   };
@@ -243,6 +311,10 @@
     document.getElementById('bkFileUrl').value = d.fileUrl || '';
     document.getElementById('bkAnswerUrl').value = d.answerUrl || '';
     document.getElementById('bkNote').value = d.note || '';
+    document.getElementById('bkPublisher').value = d.publisher || '';
+    document.getElementById('bkPdfNow').hidden = d.hasPdf !== '1';
+    document.getElementById('bkAnswerNow').hidden = d.hasAnswer !== '1';
+    editing = true;
     document.getElementById('bkActive').checked = d.active === '1';
     const radio = document.querySelector(`input[name="answer_location"][value="${d.answerLocation}"]`);
     if(radio) radio.checked = true;

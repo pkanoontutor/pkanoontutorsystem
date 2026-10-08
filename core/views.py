@@ -15,6 +15,7 @@ from django import forms
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
 from django.db.models import Count, Max, Q, Sum
+from django.core.files.base import ContentFile
 from django.http import JsonResponse, HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -1310,6 +1311,7 @@ def sheet_inventory_dashboard(request: HttpRequest) -> HttpResponse:
             initial_qty = int(request.POST.get("initial_qty") or 0)
             minimum_stock = int(request.POST.get("minimum_stock") or 0)
             onedrive_url = (request.POST.get("onedrive_url") or "").strip()
+            source_book = Book.objects.filter(id=_id_or_none(request.POST.get("source_book_id"))).first()
 
             if code and title:
                 if subject_id:
@@ -1327,10 +1329,28 @@ def sheet_inventory_dashboard(request: HttpRequest) -> HttpResponse:
                         "grade_level": grade_level,
                         "total_pages": total_pages,
                         "total_questions": total_questions,
+                        "source_book": source_book,
                         "is_active": True,
                     }
                 )
+                uploaded = 0
                 if created:
+                    # ปก / เนื้อหา / เฉลย attached straight from the create form.
+                    for kind in (SheetDocument.Kind.COVER, SheetDocument.Kind.CONTENT, SheetDocument.Kind.ANSWER):
+                        for upload in request.FILES.getlist(f"doc_{kind}")[: (1 if kind == SheetDocument.Kind.COVER else 10)]:
+                            if not (upload.name or "").lower().endswith(".pdf") and (upload.content_type or "") != "application/pdf":
+                                continue
+                            try:
+                                attach_document(
+                                    sheet, kind, upload, upload.name or f"{kind}.pdf",
+                                    source_book=source_book,
+                                    uploaded_by=request.user if request.user.is_authenticated else None,
+                                )
+                                uploaded += 1
+                            except Exception:
+                                logger.exception("create_sheet upload failed: sheet=%s kind=%s", sheet.pk, kind)
+                    if uploaded:
+                        sync_sheet_total_pages(sheet)
                     inv, _ = SheetInventory.objects.get_or_create(sheet=sheet, defaults={"quantity": 0})
                     inv.minimum_stock = max(minimum_stock, 0)
                     if onedrive_url:
@@ -1351,7 +1371,10 @@ def sheet_inventory_dashboard(request: HttpRequest) -> HttpResponse:
 
                 # Stay on this page so several sheets can be added in a row.
                 status = "created" if created else "exists"
-                return redirect(f"{request.path}?sheet_saved={status}&sheet_code={quote(sheet.code)}")
+                url = f"{request.path}?sheet_saved={status}&sheet_code={quote(sheet.code)}&uploaded={uploaded}"
+                if created and request.POST.get("print_after") == "1":
+                    url += f"&print_sheet={sheet.id}"
+                return redirect(url)
 
         elif action.startswith("update_sheet_link:"):
             # Pencil-toggle link editor on each sheet card -- single field,
@@ -1814,6 +1837,9 @@ def sheet_inventory_dashboard(request: HttpRequest) -> HttpResponse:
     return render(request, "core/sheet_inventory.html", _sheet_inventory_context(q=q, request=request, extra={
         "sheet_saved": (request.GET.get("sheet_saved") or "").strip(),
         "sheet_saved_code": (request.GET.get("sheet_code") or "").strip(),
+        "sheet_saved_uploaded": _id_or_none(request.GET.get("uploaded")) or 0,
+        "print_sheet_id": _id_or_none(request.GET.get("print_sheet")) or "",
+        "book_bands_json": json.dumps(BOOK_GRADE_BANDS),
     }))
 
 
@@ -2857,6 +2883,82 @@ def _run_bulk_pdf_import(upload, user) -> dict:
     }
 
 
+# Book codes follow ค-ป6-01: subject initial - grade - running number.
+_BOOK_SUBJECT_INITIALS = [
+    ("คณิต", "ค"), ("math", "ค"), ("วิทย", "ว"), ("sci", "ว"), ("อังกฤษ", "อ"), ("eng", "อ"),
+    ("ไทย", "ท"), ("thai", "ท"), ("สังคม", "ส"), ("social", "ส"), ("ฟิสิกส", "ฟ"), ("เคมี", "ค"),
+    ("ชีว", "ช"), ("จีน", "จ"),
+]
+_BOOK_GRADE_TOKENS = {
+    "p4": "ป4", "p5": "ป5", "p6": "ป6", "m1": "ม1", "m2": "ม2", "m3": "ม3",
+    "m4": "ม4", "m5": "ม5", "m6": "ม6",
+    "upper_primary": "ปป", "lower_secondary": "มต", "upper_secondary": "มป",
+}
+# Which sheet grades a book of a given level can serve (ป.5 sheet <- ประถมปลาย book).
+BOOK_GRADE_BANDS = {
+    "upper_primary": ["p4", "p5", "p6"],
+    "lower_secondary": ["m1", "m2", "m3"],
+    "upper_secondary": ["m4", "m5", "m6"],
+}
+
+
+def _book_subject_initial(subject_name: str) -> str:
+    name = (subject_name or "").strip()
+    low = name.lower()
+    for key, initial in _BOOK_SUBJECT_INITIALS:
+        if key in low:
+            return initial
+    for ch in name:
+        # skip leading Thai vowels (เ แ โ ใ ไ) and anything non-letter
+        if "\u0e01" <= ch <= "\u0e2e" or ch.isalpha():
+            return ch.upper()
+    return "X"
+
+
+def _book_code_prefix(subject_name: str, grade_level: str) -> str:
+    return f"{_book_subject_initial(subject_name)}-{_BOOK_GRADE_TOKENS.get(grade_level, 'ทั่วไป')}-"
+
+
+def _next_book_code(subject_name: str, grade_level: str) -> str:
+    prefix = _book_code_prefix(subject_name, grade_level)
+    used = 0
+    for code in Book.objects.filter(code__startswith=prefix).values_list("code", flat=True):
+        tail = code[len(prefix):]
+        if tail.isdigit():
+            used = max(used, int(tail))
+    return f"{prefix}{used + 1:02d}"
+
+
+def _book_grade_label(value: str) -> str:
+    return dict(Book.GradeLevel.choices).get(value or "", "ไม่ระบุระดับชั้น")
+
+
+def _is_pdf_upload(upload) -> bool:
+    return (upload.name or "").lower().endswith(".pdf") or (upload.content_type or "") == "application/pdf"
+
+
+def _save_book_pdf(book: Book, upload, field: str) -> str | None:
+    """Store an uploaded PDF on the book. For the book file itself, page 1
+    becomes the cover and the page count is recorded. Returns an error code."""
+    if not _is_pdf_upload(upload):
+        return "pdf"
+    is_book = field == "pdf_file"
+    pages, png = render_pdf(upload, thumbnail=is_book)
+    current = getattr(book, field)
+    if current:
+        current.delete(save=False)
+    suffix = "book" if is_book else "answer"
+    getattr(book, field).save(f"{book.code}-{suffix}.pdf", upload, save=False)
+    if is_book:
+        book.page_count = pages or 0
+        if png:
+            if book.cover_image:
+                book.cover_image.delete(save=False)
+            book.cover_image.save(f"{book.code}.png", ContentFile(png), save=False)
+    book.save()
+    return None
+
+
 @login_required
 def book_list(request: HttpRequest) -> HttpResponse:
     """คลังหนังสือ -- profiles of the source books sheets are built from."""
@@ -2866,15 +2968,26 @@ def book_list(request: HttpRequest) -> HttpResponse:
         if action == "delete":
             book = Book.objects.filter(id=_id_or_none(request.POST.get("book_id"))).first()
             if book:
-                if book.cover_image:
-                    book.cover_image.delete(save=False)
+                for f in (book.cover_image, book.pdf_file, book.answer_pdf):
+                    if f:
+                        f.delete(save=False)
                 book.delete()
             return redirect("core:book_list")
 
         code = (request.POST.get("code") or "").strip()
         title = (request.POST.get("title") or "").strip()
+        subject = Subject.objects.filter(id=_id_or_none(request.POST.get("subject_id"))).first()
+        grade = (request.POST.get("grade_level") or "").strip()
+        if grade not in dict(Book.GradeLevel.choices):
+            grade = ""
+        if not code and title:
+            code = _next_book_code(subject.name if subject else "", grade)
         if not code or not title:
             return redirect(f"{reverse('core:book_list')}?error=required")
+        for field in ("pdf_file", "answer_pdf"):
+            upload = request.FILES.get(field)
+            if upload and not _is_pdf_upload(upload):
+                return redirect(f"{reverse('core:book_list')}?error=pdf")
 
         book = Book.objects.filter(id=_id_or_none(request.POST.get("book_id"))).first()
         if book is None:
@@ -2891,9 +3004,9 @@ def book_list(request: HttpRequest) -> HttpResponse:
             answer_location = Book.AnswerLocation.INCLUDED
 
         book.title = title
-        book.subject = Subject.objects.filter(id=_id_or_none(request.POST.get("subject_id"))).first()
-        grade = (request.POST.get("grade_level") or "").strip()
-        book.grade_level = grade if grade in dict(Sheet.GradeLevel.choices) else ""
+        book.subject = subject
+        book.grade_level = grade
+        book.publisher = (request.POST.get("publisher") or "").strip()[:255]
         book.file_url = (request.POST.get("file_url") or "").strip()[:2000]
         book.answer_location = answer_location
         # A book that bundles its answers has no separate answer link to keep.
@@ -2904,6 +3017,11 @@ def book_list(request: HttpRequest) -> HttpResponse:
         book.note = (request.POST.get("note") or "").strip()
         book.is_active = request.POST.get("is_active") == "on"
         book.save()
+
+        for field in ("pdf_file", "answer_pdf"):
+            upload = request.FILES.get(field)
+            if upload and _save_book_pdf(book, upload, field):
+                return redirect(f"{reverse('core:book_list')}?error=pdf")
 
         cover = request.FILES.get("cover_image")
         if cover:
@@ -2927,15 +3045,33 @@ def book_list(request: HttpRequest) -> HttpResponse:
     if grade:
         books_qs = books_qs.filter(grade_level=grade)
 
-    books = list(books_qs)
+    books = list(books_qs.annotate(n_sheets=Count("sheets")))
+    grade_order = {v: i for i, (v, _l) in enumerate(Book.GradeLevel.choices)}
+    books.sort(key=lambda b: (grade_order.get(b.grade_level, 99),
+                              (b.subject.name if b.subject_id else "ฮ"), b.code))
+    # Shelves: one per grade, one row per subject on it.
+    shelves: list[dict] = []
     for b in books:
-        b.grade_label = _sheet_grade_label(b.grade_level)
-        b.sheet_count = b.sheets.count()
+        b.grade_label = _book_grade_label(b.grade_level)
+        b.sheet_count = b.n_sheets
+        if not shelves or shelves[-1]["grade"] != b.grade_level:
+            shelves.append({"grade": b.grade_level, "label": b.grade_label, "subjects": [], "count": 0})
+        shelf = shelves[-1]
+        subj = b.subject.name if b.subject_id else "ไม่ระบุวิชา"
+        if not shelf["subjects"] or shelf["subjects"][-1]["name"] != subj:
+            shelf["subjects"].append({"name": subj, "books": []})
+        shelf["subjects"][-1]["books"].append(b)
+        shelf["count"] += 1
 
+    subjects = Subject.objects.filter(is_active=True).order_by("name")
     return render(request, "core/book_list.html", {
         "books": books,
-        "subjects": Subject.objects.filter(is_active=True).order_by("name"),
-        "grade_choices": Sheet.GradeLevel.choices,
+        "shelves": shelves,
+        "subjects": subjects,
+        "existing_codes_json": json.dumps(list(Book.objects.values_list("code", flat=True)), ensure_ascii=False),
+        "subject_initials_json": json.dumps({s.id: _book_subject_initial(s.name) for s in subjects}, ensure_ascii=False),
+        "grade_tokens_json": json.dumps(_BOOK_GRADE_TOKENS, ensure_ascii=False),
+        "grade_choices": Book.GradeLevel.choices,
         "answer_choices": Book.AnswerLocation.choices,
         "q": q,
         "grade": grade,

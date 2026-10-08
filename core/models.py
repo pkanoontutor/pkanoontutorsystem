@@ -264,10 +264,24 @@ class Sheet(models.Model):
 class Book(models.Model):
     """A source book the school builds its sheets from.
 
-    Only the cover image is uploaded here; the book file itself lives
-    elsewhere and is referenced by link, since scanned books are far too
-    large to keep on the app's disk.
+    The book PDF (and a separate answer-key PDF, for books whose answers
+    come as another volume) can be uploaded; page 1 of the book PDF becomes
+    the cover. A link to the file elsewhere is still accepted as well.
     """
+
+    class GradeLevel(models.TextChoices):
+        P4 = "p4", "ป.4"
+        P5 = "p5", "ป.5"
+        P6 = "p6", "ป.6"
+        M1 = "m1", "ม.1"
+        M2 = "m2", "ม.2"
+        M3 = "m3", "ม.3"
+        M4 = "m4", "ม.4"
+        M5 = "m5", "ม.5"
+        M6 = "m6", "ม.6"
+        UPPER_PRIMARY = "upper_primary", "ประถมปลาย"
+        LOWER_SECONDARY = "lower_secondary", "มัธยมต้น"
+        UPPER_SECONDARY = "upper_secondary", "มัธยมปลาย"
 
     class AnswerLocation(models.TextChoices):
         INCLUDED = "included", "รวมเฉลยในเล่ม"
@@ -286,10 +300,14 @@ class Book(models.Model):
     grade_level = models.CharField(
         "ระดับชั้น",
         max_length=20,
-        choices=Sheet.GradeLevel.choices,
+        choices=GradeLevel.choices,
         blank=True,
         default="",
     )
+    publisher = models.CharField("สำนักพิมพ์", max_length=255, blank=True)
+    pdf_file = models.FileField("ไฟล์หนังสือ (PDF)", upload_to="book_files/", blank=True, null=True)
+    answer_pdf = models.FileField("ไฟล์เฉลย (PDF)", upload_to="book_files/", blank=True, null=True)
+    page_count = models.PositiveIntegerField("จำนวนหน้า", default=0)
     file_url = models.URLField("ลิงก์ไฟล์หนังสือ", max_length=2000, blank=True)
     answer_location = models.CharField(
         "เฉลย",

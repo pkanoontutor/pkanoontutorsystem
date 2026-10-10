@@ -4429,7 +4429,25 @@ def tutor_sheet_read(request: HttpRequest, class_id: int, sheet_id: int) -> Http
 
     progress = TutorSheetProgress.objects.filter(tutoring_class=cls, sheet=sheet).first()
 
+    # ประวัติการสอนย้อนหลัง: past tutor updates for this class on this sheet.
+    history = []
+    for u in (
+        TeachingProgressUpdate.objects
+        .select_related("assignment__subject_template", "assignment__tutor")
+        .filter(assignment__tutoring_class=cls, no_teaching=False, sheet_name__icontains=sheet.code)
+        .order_by("-teaching_date", "-updated_at")[:20]
+    ):
+        history.append({
+            "date": u.teaching_date,
+            "subject": u.assignment.subject_template.subject_name,
+            "page": u.page_to or "-",
+            "question": u.question_to or "-",
+            "tutor": u.updated_by_name or (u.assignment.tutor.name if u.assignment.tutor_id else "-"),
+            "near_end": u.sheet_near_end,
+        })
+
     return render(request, "core/tutor_sheet_read.html", {
+        "history": history,
         "tutor": tutor,
         "cls": cls,
         "sheet": sheet,

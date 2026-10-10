@@ -51,6 +51,18 @@
   .page-block.page-error{display:flex;align-items:center;justify-content:center;min-height:160px;cursor:pointer;}
   .page-block.page-error::after{content:'⚠️ แสดงหน้านี้ไม่ได้ กดเพื่อลองใหม่';font-size:12.5px;font-weight:900;color:#b91c1c;}
   .stage-empty{padding:40px 16px;text-align:center;font-weight:850;color:#64748b}
+  /* Drawing tools were removed (didn't work reliably); zoom stays. */
+  .mk-tools, #undoBtn, #redoBtn, #mkStatus{display:none!important;}
+  .markup-canvas{display:none!important;}
+  .hist-btn{display:inline-flex;align-items:center;gap:6px;}
+  .hist-list{display:grid;gap:7px;max-height:60vh;overflow:auto;margin-top:8px;}
+  .hist-row{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;border:1px solid #e2e8f0;
+    border-radius:12px;padding:9px 11px;background:#f8fafc;}
+  .hist-row:first-child{background:#ecfeff;border-color:#a5f3fc;}
+  .hist-date{font-size:12px;font-weight:1000;color:#0f766e;white-space:nowrap;}
+  .hist-pq{font-size:14px;font-weight:1000;color:#0f172a;}
+  .hist-meta{font-size:11px;font-weight:800;color:#64748b;}
+  .hist-near{font-size:10.5px;font-weight:900;color:#b45309;background:#fef3c7;border-radius:999px;padding:2px 7px;white-space:nowrap;}
   .pager{display:flex;justify-content:center;align-items:center;gap:11px;flex-wrap:wrap}
 
   /* Markup toolbar: highlighter + pen, each with its own colors and a
@@ -122,6 +134,7 @@
       <div class="s">{{ cls.name }} · {{ sheet.subject.name }} · ผู้สอน {{ tutor.name }}</div>
     </div>
     <div class="acts">
+      <button class="btn soft hist-btn" type="button" id="historyBtn">🕒 ประวัติการสอนย้อนหลัง</button>
       <button class="btn amber" type="button" id="endClassBtn">✅ จบคาบ บันทึกสถานะการสอนเข้าระบบ</button>
       <a class="btn soft" href="{% url 'core:tutor_sheet_shelf' cls.id %}">← ชั้นวางชีท</a>
     </div>
@@ -135,6 +148,39 @@
 
   <div id="readerRoot"></div>
 </div>
+
+<div class="modal-bg" id="historyModalBg">
+  <div class="modal">
+    <h3>🕒 ประวัติการสอนย้อนหลัง</h3>
+    <div class="sub">{{ sheet.code }} · {{ cls.name }} — ล่าสุดอยู่บนสุด</div>
+    {% if history %}
+      <div class="hist-list">
+        {% for h in history %}
+          <div class="hist-row">
+            <div class="hist-date">{{ h.date|date:"d/m/Y" }}</div>
+            <div>
+              <div class="hist-pq">หน้า {{ h.page }} · ข้อ {{ h.question }}</div>
+              <div class="hist-meta">{{ h.subject }} · {{ h.tutor }}</div>
+            </div>
+            {% if h.near_end %}<span class="hist-near">ใกล้จบชีท</span>{% else %}<span></span>{% endif %}
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="sub" style="margin-top:10px">ยังไม่มีประวัติการสอนของชีทเล่มนี้ในคลาสนี้</div>
+    {% endif %}
+    <div class="modal-actions"><button class="btn soft" type="button" id="historyClose">ปิด</button></div>
+  </div>
+</div>
+<script>
+(function(){
+  var bg=document.getElementById('historyModalBg');
+  function show(on){ bg.classList.toggle('show', on); bg.style.display = on ? 'flex' : ''; }
+  document.getElementById('historyBtn').addEventListener('click', function(){ show(true); });
+  document.getElementById('historyClose').addEventListener('click', function(){ show(false); });
+  bg.addEventListener('click', function(e){ if(e.target===bg) show(false); });
+})();
+</script>
 
 <div class="modal-bg" id="endModalBg">
   <div class="modal">

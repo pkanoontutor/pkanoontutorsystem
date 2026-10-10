@@ -31,6 +31,7 @@ urlpatterns = [
     # Class video replay (ดูคลิปย้อนหลัง)
     path("class-videos/", views.class_video_admin, name="class_video_admin"),
     path("class-videos/edit/", views.class_video_edit, name="class_video_edit"),
+    path("class-videos/watch-report/", views.class_video_watch_report, name="class_video_watch_report"),
     path("video-replay/", views.class_video_login, name="class_video_login"),
     path("video-replay/home/", views.class_video_home, name="class_video_home"),
     path("video-replay/class/<int:class_id>/", views.class_video_calendar, name="class_video_calendar"),

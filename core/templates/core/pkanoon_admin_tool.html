@@ -384,9 +384,11 @@
     <summary class="mn-summary">
       <span class="mn-summary-title">💰 บันทึกรายรับ-รายจ่ายด่วน</span>
       <span class="mn-chips">
-        <span class="mn-chip in">รับ {{ money_income_total|floatformat:0|intcomma }}</span>
+        <span class="mn-chip in" title="จากใบเสร็จ + รายรับอื่น">รับเงินสด {{ money_income_total|floatformat:0|intcomma }}</span>
+        <span class="mn-chip in" title="จากการเช็คชื่อ + รายรับอื่น">รับรู้รายได้ {{ money_recognized_total|floatformat:0|intcomma }}</span>
         <span class="mn-chip out">จ่าย {{ money_expense_total|floatformat:0|intcomma }}</span>
-        <span class="mn-chip net">คงเหลือ {{ money_net|floatformat:0|intcomma }}</span>
+        <span class="mn-chip net">กระแสเงินสด {{ money_cash_flow|floatformat:0|intcomma }}</span>
+        <span class="mn-chip net">กำไรสุทธิ {{ money_net_profit|floatformat:0|intcomma }}</span>
         <span class="mn-summary-hint">{{ money_month_label }} — กดเพื่อเปิด/ปิด</span>
       </span>
     </summary>
@@ -441,9 +443,14 @@
 
       <div class="mn-sum">
         <div class="mn-box in">
-          <div class="k">รายรับเดือนนี้</div>
+          <div class="k">รับเงินสด (ใบเสร็จ)</div>
           <div class="v">{{ money_income_total|floatformat:0|intcomma }}</div>
           <div class="sub">ค่าคอร์ส {{ money_course_revenue|floatformat:0|intcomma }} · อื่น ๆ {{ money_other_income|floatformat:0|intcomma }}</div>
+        </div>
+        <div class="mn-box in">
+          <div class="k">รับรู้รายได้ (เช็คชื่อ)</div>
+          <div class="v">{{ money_recognized_total|floatformat:0|intcomma }}</div>
+          <div class="sub">ค่าเรียนที่เข้าเรียนจริง {{ money_recognized_course|floatformat:0|intcomma }} · อื่น ๆ {{ money_other_income|floatformat:0|intcomma }}</div>
         </div>
         <div class="mn-box out">
           <div class="k">รายจ่ายเดือนนี้</div>
@@ -451,9 +458,14 @@
           <div class="sub">ทั่วไป {{ money_general_expense|floatformat:0|intcomma }} · ค่าติวเตอร์ {{ money_tutor_payroll|floatformat:0|intcomma }}</div>
         </div>
         <div class="mn-box net">
-          <div class="k">คงเหลือ</div>
-          <div class="v">{{ money_net|floatformat:0|intcomma }}</div>
-          <div class="sub">{{ money_month_label }}</div>
+          <div class="k">กระแสเงินสด</div>
+          <div class="v">{{ money_cash_flow|floatformat:0|intcomma }}</div>
+          <div class="sub">รับเงินสด − รายจ่าย · {{ money_month_label }}</div>
+        </div>
+        <div class="mn-box net">
+          <div class="k">กำไรสุทธิ</div>
+          <div class="v">{{ money_net_profit|floatformat:0|intcomma }}</div>
+          <div class="sub">รับรู้รายได้ − รายจ่าย · {{ money_month_label }}</div>
         </div>
         <div class="mn-box">
           <div class="k">ดูรายงานเต็ม</div>

@@ -2,7 +2,43 @@
 {% block title %}สรุปผลการสอบ {{ test_round.title }}{% endblock %}
 
 {% block head %}
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 <style>
+  /* select-people column + image builder */
+  .pick-col{width:34px;text-align:center!important;}
+  .pick-col input{width:17px;height:17px;accent-color:#2563eb;cursor:pointer;}
+  tr.picked td{background:#eff6ff;}
+  .img-bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px;background:#fff7ed;border:1px solid #fed7aa;border-radius:16px;padding:10px 12px;}
+  .img-bar b{font-size:13px;color:#9a3412;}
+  .img-btn{border:0;border-radius:12px;padding:9px 13px;font-weight:1000;cursor:pointer;background:#ea580c;color:#fff;font-family:inherit;}
+  .im-bg{position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:9999;display:none;align-items:flex-start;justify-content:center;padding:18px;overflow-y:auto;}
+  .im-bg.show{display:flex;}
+  .im-modal{width:100%;max-width:980px;background:#fff;border-radius:20px;padding:18px;box-shadow:0 24px 60px rgba(15,23,42,.35);margin:auto;}
+  .im-head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px;}
+  .im-title{font-size:18px;font-weight:1000;color:#0f172a;}
+  .im-group{border:1px solid #e2e8f0;border-radius:14px;padding:10px;margin-bottom:10px;}
+  .im-group-t{font-size:11px;font-weight:1000;color:#334155;text-transform:uppercase;letter-spacing:.04em;margin-bottom:7px;}
+  .im-opts{display:flex;gap:6px;flex-wrap:wrap;}
+  .im-opts input[type=text]{border:1px solid #cbd5e1;border-radius:10px;padding:7px 10px;font-weight:800;font-family:inherit;min-width:260px;flex:1;}
+  .im-actions{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0;}
+  .im-preview{border:1px dashed #cbd5e1;border-radius:14px;padding:10px;background:#f8fafc;overflow:auto;text-align:center;min-height:60px;}
+  .im-preview img{max-width:100%;height:auto;box-shadow:0 6px 16px rgba(15,23,42,.15);border-radius:8px;}
+  .im-msg{font-size:12px;font-weight:900;color:#166534;}
+  /* the card that gets rendered into the image (off-screen, html2canvas-safe) */
+  #scoreImageStage{position:fixed;left:-10000px;top:0;}
+  .sc-card{background:#ffffff;padding:26px 26px 20px;font-family:inherit;width:max-content;min-width:520px;color:#0f172a;}
+  .sc-card-h{background:#1d4ed8;color:#fff;border-radius:16px;padding:14px 18px;margin-bottom:14px;}
+  .sc-card-h .t{font-size:22px;font-weight:900;}
+  .sc-card-h .s{font-size:13px;font-weight:700;color:#dbeafe;margin-top:3px;}
+  .sc-card table{min-width:0;width:auto;border-collapse:collapse;}
+  .sc-card th{position:static;background:#eff6ff;color:#1e3a8a;font-size:13px;font-weight:900;padding:9px 12px;border:1px solid #bfdbfe;text-transform:none;letter-spacing:0;text-align:center;}
+  .sc-card td{font-size:14px;font-weight:700;color:#0f172a;padding:9px 12px;border:1px solid #dbeafe;text-align:center;white-space:nowrap;}
+  .sc-card td.l{text-align:left;}
+  .sc-card tr:nth-child(even) td{background:#f8fafc;}
+  .sc-card .sub{display:block;font-size:11.5px;font-weight:700;color:#475569;}
+  .sc-card .rk{color:#b45309;font-weight:900;}
+  .sc-card .sum-t{margin-top:14px;}
+  .sc-card .foot{margin-top:12px;font-size:11px;font-weight:700;color:#94a3b8;text-align:right;}
   .wrap2{max-width:1320px;margin:0 auto;display:grid;gap:14px;}
   .hero{background:linear-gradient(135deg,#0f172a,#2563eb,#7c3aed);color:#fff;border-radius:24px;padding:22px;box-shadow:0 12px 26px rgba(15,23,42,.20);}
   .title{font-size:26px;font-weight:1000;letter-spacing:-.03em;}
@@ -134,10 +170,17 @@
       </div>
     </div>
 
+    <div class="img-bar">
+      <b>📸 ออกเป็นรูป</b>
+      <span class="muted" id="pickCount">ติ๊กเลือกคนในตาราง (ไม่เลือก = ทุกคน)</span>
+      <button type="button" class="mini-btn" id="pickClear">ล้างที่เลือก</button>
+      <button type="button" class="img-btn" id="openImageBuilder">🖼️ สร้างรูปสำหรับ Copy</button>
+    </div>
     <div class="table-wrap">
       <table>
         <thead>
           <tr>
+            <th class="pick-col" title="เลือกคนที่จะออกเป็นรูป"><input type="checkbox" id="pickAll"></th>
             <th data-col="rank" data-sort-col="rank" class="sortable-th">อันดับรวม</th>
             <th data-col="nickname" data-sort-col="nickname" class="sortable-th">ชื่อเล่น</th>
             <th data-col="fullname" data-sort-col="fullname" class="sortable-th">ชื่อจริง นามสกุล</th>
@@ -153,6 +196,7 @@
         <tbody id="scoreSummaryBody">
           {% for row in score_rows %}
             <tr class="{% if forloop.first %}top-row{% endif %}" data-original-index="{{ forloop.counter0 }}">
+              <td class="pick-col"><input type="checkbox" data-pick></td>
               <td data-col="rank" data-sort-value="{{ row.total_rank|default:999999 }}"><span class="rank-pill">#{{ row.total_rank }}</span></td>
               <td data-col="nickname" data-sort-value="{{ row.participant.nickname|default:'' }}">{{ row.participant.nickname|default:"-" }}</td>
               <td data-col="fullname" data-sort-value="{{ row.participant.full_name|default:'' }}">{{ row.participant.full_name|default:"-" }}</td>
@@ -169,7 +213,7 @@
               <td data-col="note" data-sort-value="{{ row.participant.note|default:'' }}">{{ row.participant.note|default:"-" }}</td>
             </tr>
           {% empty %}
-            <tr><td colspan="8">ยังไม่มีผู้เข้าสอบในรอบนี้</td></tr>
+            <tr><td colspan="9">ยังไม่มีผู้เข้าสอบในรอบนี้</td></tr>
           {% endfor %}
         </tbody>
       </table>
@@ -390,6 +434,190 @@
 
     sortScoreRows("total_pct", "desc");
   })();
+</script>
+
+<div class="im-bg" id="imageBuilderBg">
+  <div class="im-modal">
+    <div class="im-head">
+      <div class="im-title">🖼️ สร้างรูปผลสอบ</div>
+      <button type="button" class="mini-btn" data-im-close>✕ ปิด</button>
+    </div>
+    <div class="im-group">
+      <div class="im-group-t">หัวรูป</div>
+      <div class="im-opts">
+        <input type="text" id="imTitle" value="ผลสอบ {{ test_round.title }}">
+        <input type="text" id="imSubtitle" value="{% if test_round.exam_date %}วันที่สอบ {{ test_round.exam_date|date:'d/m/Y' }}{% endif %}" placeholder="บรรทัดรอง (ไม่ใส่ก็ได้)">
+      </div>
+    </div>
+    <div class="im-group">
+      <div class="im-group-t">ข้อมูลนักเรียน</div>
+      <div class="im-opts">
+        <label class="col-toggle"><input type="checkbox" data-im="rank" checked> อันดับรวม</label>
+        <label class="col-toggle"><input type="checkbox" data-im="nickname" checked> ชื่อเล่น</label>
+        <label class="col-toggle"><input type="checkbox" data-im="fullname"> ชื่อจริง</label>
+        <label class="col-toggle"><input type="checkbox" data-im="school"> โรงเรียน</label>
+        <label class="col-toggle"><input type="checkbox" data-im="note"> หมายเหตุ</label>
+      </div>
+    </div>
+    <div class="im-group">
+      <div class="im-group-t">วิชา</div>
+      <div class="im-opts">
+        {% for s in subjects %}
+          <label class="col-toggle"><input type="checkbox" data-im-subject="{{ forloop.counter }}" data-name="{{ s.name }}" data-full="{{ s.full_score|floatformat:0 }}" checked> {{ s.name }}</label>
+        {% endfor %}
+      </div>
+      <div class="im-group-t" style="margin-top:9px">ในแต่ละวิชาให้แสดง</div>
+      <div class="im-opts">
+        <label class="col-toggle"><input type="checkbox" data-im="subj_score" checked> คะแนน</label>
+        <label class="col-toggle"><input type="checkbox" data-im="subj_pct" checked> %</label>
+        <label class="col-toggle"><input type="checkbox" data-im="subj_rank"> อันดับวิชา</label>
+      </div>
+    </div>
+    <div class="im-group">
+      <div class="im-group-t">รวม</div>
+      <div class="im-opts">
+        <label class="col-toggle"><input type="checkbox" data-im="total_score" checked> คะแนนรวม</label>
+        <label class="col-toggle"><input type="checkbox" data-im="total_pct" checked> % รวม</label>
+        <label class="col-toggle"><input type="checkbox" data-im="full_row"> แถวคะแนนเต็มบนหัวตาราง</label>
+        <label class="col-toggle"><input type="checkbox" data-im="summary"> ตารางคะแนนเฉลี่ยทั้งรอบ</label>
+        <label class="col-toggle"><input type="checkbox" data-im="count"> จำนวนผู้เข้าสอบ</label>
+      </div>
+    </div>
+    <div class="im-actions">
+      <button type="button" class="img-btn" id="imBuild">🖼️ สร้างรูป</button>
+      <button type="button" class="btnx dark" id="imCopy" disabled>📋 Copy รูป</button>
+      <button type="button" class="btnx soft" id="imDownload" disabled>⬇️ บันทึกรูป</button>
+      <span class="im-msg" id="imMsg"></span>
+    </div>
+    <div class="im-preview" id="imPreview"><span class="muted">เลือกข้อมูลแล้วกด “สร้างรูป”</span></div>
+  </div>
+</div>
+<div id="scoreImageStage"></div>
+
+<script>
+(function(){
+  const body = document.getElementById("scoreSummaryBody");
+  const pickAll = document.getElementById("pickAll");
+  const pickCount = document.getElementById("pickCount");
+  const PARTICIPANTS = {{ participant_count }};
+  const SUMMARY = {
+    full: [{% for item in subject_summary_rows %}"{{ item.full_score|floatformat:0 }}",{% endfor %}],
+    avg: [{% for item in subject_summary_rows %}"{{ item.avg_score|floatformat:1 }}",{% endfor %}],
+    pct: [{% for item in subject_summary_rows %}"{{ item.avg_pct|floatformat:1 }}",{% endfor %}],
+    totalFull: "{{ total_full_score|floatformat:0 }}", totalAvg: "{{ total_avg_score|floatformat:1 }}", totalPct: "{{ total_avg_pct|floatformat:1 }}"
+  };
+  const allPicks = () => Array.from(body.querySelectorAll("[data-pick]"));
+  function refreshPicks(){
+    const picks = allPicks(), n = picks.filter(p => p.checked).length;
+    picks.forEach(p => p.closest("tr").classList.toggle("picked", p.checked));
+    pickCount.textContent = n ? ("เลือกแล้ว " + n + " คน") : "ติ๊กเลือกคนในตาราง (ไม่เลือก = ทุกคน)";
+    if(pickAll){ pickAll.checked = n && n === picks.length; pickAll.indeterminate = n > 0 && n < picks.length; }
+  }
+  body.addEventListener("change", e => { if(e.target.matches("[data-pick]")) refreshPicks(); });
+  body.addEventListener("click", e => {
+    // click anywhere on a row (not a link/input) toggles it
+    if(e.target.closest("input,a,button")) return;
+    const cb = e.target.closest("tr") && e.target.closest("tr").querySelector("[data-pick]");
+    if(cb){ cb.checked = !cb.checked; refreshPicks(); }
+  });
+  if(pickAll) pickAll.addEventListener("change", () => { allPicks().forEach(p => p.checked = pickAll.checked); refreshPicks(); });
+  document.getElementById("pickClear").addEventListener("click", () => { allPicks().forEach(p => p.checked = false); refreshPicks(); });
+
+  const bg = document.getElementById("imageBuilderBg");
+  document.getElementById("openImageBuilder").addEventListener("click", () => bg.classList.add("show"));
+  bg.addEventListener("click", e => { if(e.target === bg || e.target.closest("[data-im-close]")) bg.classList.remove("show"); });
+
+  const opt = k => { const el = document.querySelector('[data-im="' + k + '"]'); return el && el.checked; };
+  const esc = v => String(v == null ? "" : v).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+  const cellText = (row, col) => { const c = row.querySelector('[data-col="' + col + '"]'); return c ? c.textContent.trim() : ""; };
+
+  function rowsForImage(){
+    const rows = Array.from(body.querySelectorAll("tr")).filter(r => r.querySelector("[data-pick]"));
+    const picked = rows.filter(r => r.querySelector("[data-pick]").checked);
+    return picked.length ? picked : rows;   // keeps the table's current sort order
+  }
+
+  function buildCard(){
+    const subjects = Array.from(document.querySelectorAll("[data-im-subject]")).filter(c => c.checked)
+      .map(c => ({i: c.dataset.imSubject, name: c.dataset.name, full: c.dataset.full}));
+    const parts = ["subj_score","subj_pct","subj_rank"].filter(opt);
+    const cols = [];
+    if(opt("rank")) cols.push({h:"อันดับ", f: r => '<span class="rk">' + esc(cellText(r,"rank")) + '</span>'});
+    if(opt("nickname")) cols.push({h:"ชื่อเล่น", l:1, f: r => esc(cellText(r,"nickname"))});
+    if(opt("fullname")) cols.push({h:"ชื่อ-นามสกุล", l:1, f: r => esc(cellText(r,"fullname"))});
+    if(opt("school")) cols.push({h:"โรงเรียน", l:1, f: r => esc(cellText(r,"school"))});
+    if(parts.length) subjects.forEach(s => cols.push({
+      h: esc(s.name) + (opt("full_row") ? '<span class="sub">เต็ม ' + esc(s.full) + '</span>' : ""),
+      f: r => {
+        const c = r.querySelector('[data-col="subject-' + s.i + '"]');
+        if(!c) return "-";
+        const sc = c.querySelector(".score-pill"), pc = c.querySelector(".pct-pill"), rk = c.querySelector(".rank-pill");
+        const bits = [];
+        if(parts.includes("subj_score") && sc) bits.push(esc(sc.textContent.trim()));
+        if(parts.includes("subj_pct") && pc) bits.push(parts.includes("subj_score") ? '<span class="sub">' + esc(pc.textContent.trim()) + '</span>' : esc(pc.textContent.trim()));
+        if(parts.includes("subj_rank") && rk) bits.push('<span class="sub rk">อันดับ ' + esc(rk.textContent.trim().replace("#","")) + '</span>');
+        return bits.join(" ");
+      }}));
+    if(opt("total_score")) cols.push({h:"คะแนนรวม" + (opt("full_row") ? '<span class="sub">เต็ม ' + esc(SUMMARY.totalFull) + '</span>' : ""), f: r => esc(cellText(r,"total_score"))});
+    if(opt("total_pct")) cols.push({h:"% รวม", f: r => esc(cellText(r,"total_pct"))});
+    if(opt("note")) cols.push({h:"หมายเหตุ", l:1, f: r => esc(cellText(r,"note"))});
+
+    const rows = rowsForImage();
+    let html = '<div class="sc-card"><div class="sc-card-h"><div class="t">' + esc(document.getElementById("imTitle").value) + '</div>';
+    const subT = document.getElementById("imSubtitle").value.trim();
+    const meta = [subT, opt("count") ? ("ผู้เข้าสอบ " + PARTICIPANTS + " คน") : ""].filter(Boolean).join(" · ");
+    if(meta) html += '<div class="s">' + esc(meta) + '</div>';
+    html += '</div>';
+    if(cols.length){
+      html += '<table><thead><tr>' + cols.map(c => '<th>' + c.h + '</th>').join("") + '</tr></thead><tbody>';
+      rows.forEach(r => { html += '<tr>' + cols.map(c => '<td' + (c.l ? ' class="l"' : '') + '>' + (c.f(r) || "-") + '</td>').join("") + '</tr>'; });
+      html += '</tbody></table>';
+    }
+    if(opt("summary") && subjects.length){
+      html += '<table class="sum-t"><thead><tr><th>ทั้งรอบ</th>' + subjects.map(s => '<th>' + esc(s.name) + '</th>').join("") + '<th>รวม</th></tr></thead><tbody>';
+      html += '<tr><td class="l">คะแนนเต็ม</td>' + subjects.map(s => '<td>' + esc(SUMMARY.full[s.i-1]) + '</td>').join("") + '<td>' + esc(SUMMARY.totalFull) + '</td></tr>';
+      html += '<tr><td class="l">คะแนนเฉลี่ย</td>' + subjects.map(s => '<td>' + esc(SUMMARY.avg[s.i-1]) + '</td>').join("") + '<td>' + esc(SUMMARY.totalAvg) + '</td></tr>';
+      html += '<tr><td class="l">% เฉลี่ย</td>' + subjects.map(s => '<td>' + esc(SUMMARY.pct[s.i-1]) + '%</td>').join("") + '<td>' + esc(SUMMARY.totalPct) + '%</td></tr>';
+      html += '</tbody></table>';
+    }
+    html += '<div class="foot">พี่ขนุนติวเตอร์</div></div>';
+    return html;
+  }
+
+  let lastBlob = null;
+  const msg = document.getElementById("imMsg");
+  document.getElementById("imBuild").addEventListener("click", async () => {
+    const stage = document.getElementById("scoreImageStage");
+    stage.innerHTML = buildCard();
+    msg.textContent = "กำลังสร้างรูป...";
+    const canvas = await html2canvas(stage.firstElementChild, {scale: 2, backgroundColor: "#ffffff", useCORS: true});
+    canvas.toBlob(blob => {
+      lastBlob = blob;
+      const prev = document.getElementById("imPreview");
+      prev.innerHTML = "";
+      const img = new Image(); img.src = URL.createObjectURL(blob); prev.appendChild(img);
+      document.getElementById("imCopy").disabled = false;
+      document.getElementById("imDownload").disabled = false;
+      msg.textContent = "✓ สร้างรูปแล้ว (" + rowsForImage().length + " คน) — กด Copy หรือกดค้างที่รูปเพื่อบันทึกบนมือถือ";
+    }, "image/png");
+  });
+  document.getElementById("imCopy").addEventListener("click", async () => {
+    if(!lastBlob) return;
+    try {
+      await navigator.clipboard.write([new ClipboardItem({"image/png": lastBlob})]);
+      msg.textContent = "📋 Copy แล้ว — ไปวางในแชทได้เลย";
+    } catch(e) {
+      msg.textContent = "เบราว์เซอร์นี้ copy รูปไม่ได้ — กดค้างที่รูปแล้วเลือกคัดลอก/บันทึก";
+    }
+  });
+  document.getElementById("imDownload").addEventListener("click", () => {
+    if(!lastBlob) return;
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(lastBlob);
+    a.download = "ผลสอบ-{{ test_round.id }}.png";
+    a.click();
+  });
+})();
 </script>
 
 {% endblock %}

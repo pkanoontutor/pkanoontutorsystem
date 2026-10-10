@@ -6534,6 +6534,67 @@ def course_renewal_notice_create(request: HttpRequest, enrollment_id: int) -> Ht
     return redirect("core:course_renewal_notice_detail", pk=notice.pk)
 
 
+def _installment_notice_defaults(notice: "CourseRenewalNotice") -> dict:
+    """Default breakdown for an installment notice (e.g. 3 งวด, billing งวด 2).
+
+    Taken from the formal installment plan on the receipt when there is one;
+    otherwise the remaining balance is split evenly over the installments
+    still to come (odd baht on the last). Due dates follow the same rule as
+    receipts (_nth_session_date): an installment falls due on the last class
+    the earlier installments pay for -- so this one is due when the current
+    balance of sessions runs out, and the next one after this installment's
+    sessions are used too."""
+    enrollment = notice.enrollment
+    n = int(notice.installment_no or 2)
+    out = {"count": max(int(notice.installment_count or 0), n), "amount": None,
+           "sessions": int(notice.installment_sessions or 0), "next_sessions": 0,
+           "due_date": None, "next_due_date": None}
+
+    pkg = (CoursePackage.objects.filter(enrollment=enrollment, installment_count__gt=1)
+           .order_by("-created_at").first()) if enrollment else None
+    if pkg:
+        insts = {i.installment_no: i for i in pkg.installments.all()}
+        out["count"] = max(pkg.installment_count, n)
+        if n in insts:
+            out["amount"] = Decimal(insts[n].amount)
+            out["sessions"] = out["sessions"] or int(insts[n].sessions or 0)
+            out["due_date"] = insts[n].due_date
+        if n + 1 in insts:
+            out["next_sessions"] = int(insts[n + 1].sessions or 0)
+            out["next_due_date"] = insts[n + 1].due_date
+
+    if out["count"] < 2:
+        out["count"] = n
+    remaining = max(Decimal(str(notice.installment_full_amount or 0)) - Decimal(str(notice.installment_paid_amount or 0))
+                    - Decimal(str(notice.referral_credit_used or 0)), Decimal("0"))
+    if out["amount"] is None:
+        left = max(out["count"] - n + 1, 1)
+        out["amount"] = _split_amount(remaining, left)[0] if left > 1 else remaining
+
+    cls = enrollment.tutoring_class if enrollment else None
+    today = timezone.localdate()
+    remaining_sessions = Decimal(str(enrollment.remaining_sessions or 0)) if enrollment else Decimal("0")
+    if out["due_date"] is None and cls:
+        out["due_date"] = _nth_session_date(cls, remaining_sessions, today) if remaining_sessions > 0 else today
+    if out["next_due_date"] is None and cls and out["count"] > n:
+        out["next_due_date"] = _nth_session_date(cls, remaining_sessions + out["sessions"], today)
+    return out
+
+
+def _apply_installment_defaults(notice, force: bool = False) -> None:
+    d = _installment_notice_defaults(notice)
+    if force or not notice.installment_count:
+        notice.installment_count = d["count"]
+    if force or not notice.installment_due_amount:
+        notice.installment_due_amount = d["amount"]
+    if force or not notice.installment_sessions:
+        notice.installment_sessions = d["sessions"]
+    if force or not notice.installment_due_date:
+        notice.installment_due_date = d["due_date"]
+    if force or not notice.next_installment_due_date:
+        notice.next_installment_due_date = d["next_due_date"]
+
+
 @login_required
 def course_installment_notice_create(request: HttpRequest, enrollment_id: int) -> HttpResponse:
     enrollment = get_object_or_404(
@@ -6568,6 +6629,8 @@ def course_installment_notice_create(request: HttpRequest, enrollment_id: int) -
         installment_paid_amount=amounts["paid"],
         created_by=request.user if request.user.is_authenticated else None,
     )
+    _apply_installment_defaults(notice, force=True)
+    notice.save()
 
     return redirect("core:course_renewal_notice_detail", pk=notice.pk)
 
@@ -6634,6 +6697,17 @@ def course_renewal_notice_detail(request: HttpRequest, pk: int) -> HttpResponse:
             notice.installment_sessions = max(int(request.POST.get("installment_sessions") or 0), 0)
         except Exception:
             notice.installment_sessions = notice.installment_sessions or 0
+
+        if notice.notice_type == CourseRenewalNotice.NoticeType.INSTALLMENT:
+            try:
+                notice.installment_count = max(int(request.POST.get("installment_count") or 0), 0)
+            except (TypeError, ValueError):
+                pass
+            notice.installment_due_amount = _decimal_from_post(request.POST.get("installment_due_amount"), Decimal("0"))
+            notice.installment_due_date = _parse_optional_date(request.POST.get("installment_due_date"))
+            notice.next_installment_due_date = _parse_optional_date(request.POST.get("next_installment_due_date"))
+            # "คำนวณใหม่" (or blank fields) fills in from the plan / due-date rule.
+            _apply_installment_defaults(notice, force=request.POST.get("recalc_installment") == "1")
 
         notice.note_wording = (request.POST.get("note_wording") or "").strip() or notice.note_wording
 

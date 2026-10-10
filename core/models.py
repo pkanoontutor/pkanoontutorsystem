@@ -1046,6 +1046,13 @@ class CourseRenewalNotice(models.Model):
         default=0,
         help_text="กรอกเองสำหรับใบแจ้งชำระงวดที่ 2/3/4",
     )
+    # Multi-installment breakdown (e.g. 3 งวด, billing งวด 2): how much of
+    # the remaining balance is due now, and what is still owed after it.
+    installment_count = models.PositiveSmallIntegerField("จำนวนงวดทั้งหมด", default=0)
+    installment_due_amount = models.DecimalField("ยอดที่ต้องชำระงวดนี้", max_digits=10, decimal_places=2, default=0)
+    installment_due_date = models.DateField("กำหนดชำระงวดนี้", null=True, blank=True)
+    next_installment_amount = models.DecimalField("ยอดงวดถัดไป (คงเหลือหลังงวดนี้)", max_digits=10, decimal_places=2, default=0)
+    next_installment_due_date = models.DateField("กำหนดชำระงวดถัดไป", null=True, blank=True)
 
     note_wording = models.TextField(
         "ข้อความท้ายใบแจ้ง",
@@ -1105,6 +1112,15 @@ class CourseRenewalNotice(models.Model):
             )
             if not self.installment_no:
                 self.installment_no = 2
+            if self.installment_count and self.installment_count > self.installment_no:
+                due = min(Decimal(str(self.installment_due_amount or 0)), self.installment_remaining_amount)
+                self.installment_due_amount = due
+                self.next_installment_amount = self.installment_remaining_amount - due
+            else:
+                # Last installment: everything left is due now.
+                self.installment_due_amount = self.installment_remaining_amount
+                self.next_installment_amount = Decimal("0")
+                self.next_installment_due_date = None
         else:
             self.installment_no = None
             self.installment_sessions = 0

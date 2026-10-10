@@ -183,6 +183,15 @@
           </div>
         </div>
 
+        <div class="pkg-edit" style="background:#fffbeb;border-color:#fcd34d;">
+          <div class="pkg-title">⭐ ดาวส่งการบ้าน</div>
+          <div class="hint">
+            ใช้ได้ <b>{{ stars.available }}</b> ดวง · สะสมทั้งหมด <b>{{ stars.total }}</b> ดวง
+            {% if stars.recent %}· ล่าสุด {{ stars.recent.0.date_label }}{% endif %}
+            <br>(อนาคตจะใช้เป็นส่วนลดต่อคอร์สได้)
+          </div>
+        </div>
+
         <div class="pkg-edit" style="background:#fdf4ff;border-color:#f0abfc;">
           <div class="pkg-title">🎁 เครดิตชวนเพื่อน (นักเรียนคนนี้เป็นผู้ชวน)</div>
           <div class="hint">

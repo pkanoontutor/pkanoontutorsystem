@@ -92,6 +92,7 @@ urlpatterns = [
 
     # Book library (คลังหนังสือ)
     path("books/", views.book_list, name="book_list"),
+    path("homework-stars/", views.homework_stars, name="homework_stars"),
 
     # ระบบชีทสำหรับติวเตอร์ (PDF reader)
     path("tutor-sheets/", views.tutor_sheet_login, name="tutor_sheet_login"),

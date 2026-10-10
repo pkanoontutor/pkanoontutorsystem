@@ -154,6 +154,23 @@
 
       <details class="panel">
         <summary>
+          <span class="section-title">⭐ ดาวส่งการบ้าน {{ stars.total }} ดวง</span>
+          <span class="chev">▸</span>
+        </summary>
+        <div class="body">
+          {% if stars.total %}
+            <div style="font-size:13px;font-weight:800;color:#92400e;margin-bottom:8px;">ใช้ได้ {{ stars.available }} ดวง · สะสมทั้งหมด {{ stars.total }} ดวง</div>
+            {% for r in stars.recent %}
+              <div style="font-size:12.5px;font-weight:700;color:#334155;padding:3px 0;">⭐ {{ r.date_label }}{% if r.class_name %} · {{ r.class_name }}{% endif %}</div>
+            {% endfor %}
+          {% else %}
+            <div class="empty">ยังไม่มีดาวส่งการบ้าน</div>
+          {% endif %}
+        </div>
+      </details>
+
+      <details class="panel">
+        <summary>
           <span class="section-title">💰 ประวัติการชำระเงิน</span>
           <span class="chev">▸</span>
         </summary>

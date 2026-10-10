@@ -1,0 +1,224 @@
+{% extends "core/base.html" %}
+{% block title %}สะสมดาวส่งการบ้าน{% endblock %}
+
+{% block head %}
+<style>
+  .hs-wrap{max-width:1180px;margin:0 auto;display:grid;gap:12px;padding-bottom:110px;}
+  .hs-hero{background:linear-gradient(135deg,#f59e0b,#f97316);color:#fff;border-radius:22px;padding:18px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center;box-shadow:0 10px 22px rgba(249,115,22,.25);}
+  .hs-title{font-size:25px;font-weight:1000;}
+  .hs-sub{font-size:12.5px;font-weight:700;color:#fff7ed;margin-top:3px;}
+  .hs-panel{background:#fff;border-radius:18px;padding:14px;box-shadow:0 4px 12px rgba(15,23,42,.07);}
+  .hs-label{font-size:11px;font-weight:1000;color:#334155;text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;}
+  .hs-row{display:grid;grid-template-columns:minmax(220px,320px) 1fr;gap:12px;}
+  select,input[type=text]{width:100%;box-sizing:border-box;border:1px solid #e2e8f0;border-radius:12px;padding:10px 12px;font-family:inherit;font-size:14px;font-weight:800;}
+  .hs-search{position:relative;}
+  .hs-results{position:absolute;left:0;right:0;top:calc(100% + 4px);background:#fff;border:1px solid #e2e8f0;border-radius:12px;box-shadow:0 12px 26px rgba(15,23,42,.16);z-index:20;max-height:300px;overflow:auto;}
+  .hs-results button{all:unset;display:flex;justify-content:space-between;gap:8px;width:100%;box-sizing:border-box;padding:9px 12px;cursor:pointer;font-size:13.5px;font-weight:800;}
+  .hs-results button:hover{background:#fff7ed;}
+  .hs-results small{color:#64748b;font-weight:700;}
+  .chips{display:flex;gap:6px;flex-wrap:wrap;}
+  .chip{border:1px solid #e2e8f0;background:#f8fafc;border-radius:999px;padding:7px 12px;font-size:12.5px;font-weight:900;cursor:pointer;font-family:inherit;color:#334155;}
+  .chip.on{background:#f97316;border-color:#f97316;color:#fff;}
+  .chip small{font-weight:700;opacity:.8;}
+  .cls-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;}
+  .cls-card{background:#fff;border:1px solid #fed7aa;border-radius:16px;padding:12px;}
+  .cls-head{display:flex;justify-content:space-between;gap:8px;align-items:baseline;margin-bottom:8px;}
+  .cls-name{font-size:15px;font-weight:1000;color:#0f172a;}
+  .cls-meta{font-size:11px;font-weight:800;color:#9a3412;}
+  .cls-all{font-size:11px;font-weight:900;color:#ea580c;background:none;border:0;cursor:pointer;font-family:inherit;}
+  .stu-list{display:grid;gap:6px;}
+  .stu{display:flex;justify-content:space-between;align-items:center;gap:8px;border:1.5px solid #e2e8f0;background:#fff;border-radius:12px;padding:9px 11px;cursor:pointer;font-family:inherit;text-align:left;width:100%;}
+  .stu .n{font-size:14px;font-weight:900;color:#0f172a;}
+  .stu .f{font-size:11px;font-weight:700;color:#64748b;}
+  .stu .r{display:flex;gap:5px;align-items:center;flex:none;}
+  .stu .cnt{font-size:11.5px;font-weight:900;color:#b45309;}
+  .att{font-size:10.5px;font-weight:900;border-radius:999px;padding:2px 7px;}
+  .att.present{background:#dcfce7;color:#166534;} .att.leave{background:#fef3c7;color:#92400e;} .att.no_show{background:#fee2e2;color:#991b1b;}
+  .stu.sel{border-color:#f97316;background:#fff7ed;box-shadow:0 0 0 3px rgba(249,115,22,.15);}
+  .stu.sel .n::before{content:"✓ ";color:#f97316;}
+  .stu.done{opacity:.55;cursor:default;background:#fefce8;}
+  .tray{position:fixed;left:0;right:0;bottom:0;z-index:50;background:#0f172a;color:#fff;padding:12px 16px;display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap;box-shadow:0 -8px 20px rgba(15,23,42,.25);}
+  .tray .names{font-size:12.5px;font-weight:700;color:#cbd5e1;max-width:620px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .tray b{font-size:15px;}
+  .save-btn{border:0;border-radius:14px;padding:11px 20px;font-size:15px;font-weight:1000;background:#f59e0b;color:#0f172a;cursor:pointer;font-family:inherit;}
+  .save-btn:disabled{opacity:.45;cursor:default;}
+  .clear-btn{border:1px solid #475569;background:transparent;color:#e2e8f0;border-radius:12px;padding:9px 12px;font-weight:800;cursor:pointer;font-family:inherit;}
+  .recent{display:grid;gap:5px;max-height:320px;overflow:auto;}
+  .recent-row{display:flex;justify-content:space-between;gap:8px;align-items:center;font-size:12.5px;font-weight:700;color:#334155;border-bottom:1px dashed #e2e8f0;padding:5px 0;}
+  .del{border:1px solid #fecaca;background:#fff;color:#b91c1c;border-radius:8px;font-size:11px;font-weight:900;padding:3px 8px;cursor:pointer;font-family:inherit;}
+  .toast{position:fixed;left:50%;top:18px;transform:translateX(-50%);background:#166534;color:#fff;border-radius:12px;padding:10px 16px;font-weight:900;z-index:99;display:none;max-width:90vw;}
+  .empty{font-size:13px;font-weight:800;color:#94a3b8;text-align:center;padding:18px;border:1.5px dashed #e2e8f0;border-radius:14px;}
+  @media(max-width:720px){.hs-row{grid-template-columns:1fr;}}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="hs-wrap">
+  <section class="hs-hero">
+    <div>
+      <div class="hs-title">⭐ สะสมดาวส่งการบ้าน</div>
+      <div class="hs-sub">เลือกเด็กที่ส่งการบ้าน แล้วกดบันทึก — 1 ครั้ง = 1 ดาว ต่อรอบเรียน (เฉพาะคนที่เลือกเท่านั้น)</div>
+    </div>
+    <a class="chip" style="background:#fff" href="{% url 'core:pkanoon_admin_tool' %}">← Admin Tool</a>
+  </section>
+
+  <section class="hs-panel hs-row">
+    <div>
+      <div class="hs-label">รอบวันที่เรียน</div>
+      <select id="weekendSel">
+        {% for w in weekends %}<option value="{{ w.value }}" {% if w.value == weekend %}selected{% endif %}>{{ w.label }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="hs-search">
+      <div class="hs-label">เสิร์ชชื่อเด็ก</div>
+      <input type="text" id="searchBox" placeholder="พิมพ์ชื่อเล่น / ชื่อจริง แล้วกดเลือก" autocomplete="off">
+      <div class="hs-results" id="searchResults" hidden></div>
+    </div>
+  </section>
+
+  <section class="hs-panel">
+    <div class="hs-label">หรือเลือกคลาส (เลือกได้หลายคลาสพร้อมกัน)</div>
+    <div class="chips" id="classChips"></div>
+  </section>
+
+  <section class="cls-grid" id="classCards"></section>
+
+  <section class="hs-panel">
+    <div class="hs-label">บันทึกล่าสุด</div>
+    {% if recent %}
+      <div class="recent">
+        {% for r in recent %}
+          <div class="recent-row" data-star="{{ r.id }}">
+            <span>⭐ {{ r.student.nickname|default:r.student.full_name }} · {{ r.tutoring_class.name|default:"-" }} · เรียน {{ r.lesson_date|date:"d/m/Y" }}</span>
+            <button class="del" type="button" data-del="{{ r.id }}">ลบ</button>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="empty">ยังไม่มีการบันทึกดาว</div>
+    {% endif %}
+  </section>
+</div>
+
+<div class="tray">
+  <b id="trayCount">ยังไม่ได้เลือก</b>
+  <span class="names" id="trayNames"></span>
+  <button class="clear-btn" type="button" id="clearBtn">ล้าง</button>
+  <button class="save-btn" type="button" id="saveBtn" disabled>⭐ บันทึกดาว</button>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  const CLASSES = {{ classes_json|safe }};
+  const STUDENTS = {{ students_json|safe }};
+  const WEEKEND = "{{ weekend }}";
+  const CSRF = "{{ csrf_token }}";
+  const LS_KEY = "pk_hs_classes";
+  const byId = {}; STUDENTS.forEach(s => byId[s.id] = s);
+  const selected = new Set();
+  let openClasses = [];
+  try { openClasses = JSON.parse(localStorage.getItem(LS_KEY) || "[]").filter(id => CLASSES.some(c => c.id === id)); } catch(e) {}
+
+  const esc = v => String(v == null ? "" : v).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+  const ATT = {present:["มา","present"], excused:["ลา","leave"], excused_half:["ลา½","leave"], no_show:["ขาด","no_show"]};
+
+  document.getElementById("weekendSel").addEventListener("change", e => {
+    location.href = location.pathname + "?weekend=" + e.target.value;
+  });
+
+  function stuButton(s){
+    const att = ATT[s.att] ? '<span class="att ' + ATT[s.att][1] + '">' + ATT[s.att][0] + '</span>' : '';
+    return '<button type="button" class="stu' + (s.done ? ' done' : '') + (selected.has(s.id) ? ' sel' : '') + '" data-enr="' + s.id + '"' + (s.done ? ' disabled title="ได้ดาวของรอบนี้แล้ว"' : '') + '>' +
+      '<span><span class="n">' + esc(s.nickname || s.full_name) + '</span><br><span class="f">' + esc(s.full_name) + '</span></span>' +
+      '<span class="r">' + att + (s.done ? '<span class="cnt">⭐ ได้แล้ว</span>' : '') + '<span class="cnt">⭐' + s.stars + '</span></span></button>';
+  }
+
+  function renderChips(){
+    document.getElementById("classChips").innerHTML = CLASSES.map(c =>
+      '<button type="button" class="chip' + (openClasses.includes(c.id) ? ' on' : '') + '" data-cls="' + c.id + '">' + esc(c.name) + ' <small>' + esc(c.slot) + '</small></button>'
+    ).join("") || '<span class="empty">ไม่มีคลาสที่เปิดอยู่</span>';
+  }
+  function renderCards(){
+    const box = document.getElementById("classCards");
+    box.innerHTML = openClasses.map(id => {
+      const c = CLASSES.find(x => x.id === id); if(!c) return "";
+      const list = STUDENTS.filter(s => s.class_id === id);
+      return '<div class="cls-card"><div class="cls-head"><div><div class="cls-name">' + esc(c.name) + '</div>' +
+        '<div class="cls-meta">เรียน ' + esc(c.lesson_label) + ' · ' + list.length + ' คน</div></div>' +
+        '<button type="button" class="cls-all" data-all="' + id + '">เลือกทั้งห้อง</button></div>' +
+        '<div class="stu-list">' + (list.map(stuButton).join("") || '<div class="empty">ไม่มีนักเรียน</div>') + '</div></div>';
+    }).join("");
+  }
+  function renderTray(){
+    const names = [...selected].map(id => byId[id] && (byId[id].nickname || byId[id].full_name));
+    document.getElementById("trayCount").textContent = selected.size ? ("เลือกแล้ว " + selected.size + " คน") : "ยังไม่ได้เลือก";
+    document.getElementById("trayNames").textContent = names.join(", ");
+    document.getElementById("saveBtn").disabled = !selected.size;
+  }
+  function toggle(id){
+    const s = byId[id]; if(!s || s.done) return;
+    selected.has(id) ? selected.delete(id) : selected.add(id);
+    renderCards(); renderTray();
+  }
+
+  document.getElementById("classChips").addEventListener("click", e => {
+    const b = e.target.closest("[data-cls]"); if(!b) return;
+    const id = +b.dataset.cls;
+    openClasses = openClasses.includes(id) ? openClasses.filter(x => x !== id) : openClasses.concat(id);
+    try { localStorage.setItem(LS_KEY, JSON.stringify(openClasses)); } catch(e) {}
+    renderChips(); renderCards();
+  });
+  document.getElementById("classCards").addEventListener("click", e => {
+    const all = e.target.closest("[data-all]");
+    if(all){
+      const list = STUDENTS.filter(s => s.class_id === +all.dataset.all && !s.done);
+      const every = list.every(s => selected.has(s.id));
+      list.forEach(s => every ? selected.delete(s.id) : selected.add(s.id));
+      renderCards(); renderTray(); return;
+    }
+    const b = e.target.closest("[data-enr]"); if(b) toggle(+b.dataset.enr);
+  });
+
+  const box = document.getElementById("searchBox"), res = document.getElementById("searchResults");
+  box.addEventListener("input", () => {
+    const q = box.value.trim().toLowerCase();
+    if(!q){ res.hidden = true; return; }
+    const hits = STUDENTS.filter(s => (s.nickname + " " + s.full_name).toLowerCase().includes(q)).slice(0, 15);
+    res.innerHTML = hits.map(s => '<button type="button" data-pick="' + s.id + '"' + (s.done ? ' disabled' : '') + '><span>' + (selected.has(s.id) ? "✓ " : "") + esc(s.nickname || s.full_name) + ' <small>' + esc(s.full_name) + '</small></span><small>' + esc(s.class_name) + (s.done ? " · ได้ดาวแล้ว" : "") + '</small></button>').join("") || '<div class="empty">ไม่พบชื่อนี้</div>';
+    res.hidden = false;
+  });
+  res.addEventListener("click", e => {
+    const b = e.target.closest("[data-pick]"); if(!b || b.disabled) return;
+    const id = +b.dataset.pick; if(!selected.has(id)) toggle(id);
+    box.value = ""; res.hidden = true; box.focus();
+  });
+  document.addEventListener("click", e => { if(!e.target.closest(".hs-search")) res.hidden = true; });
+
+  document.getElementById("clearBtn").addEventListener("click", () => { selected.clear(); renderCards(); renderTray(); });
+
+  function post(body){
+    return fetch(location.pathname, {method:"POST", headers:{"Content-Type":"application/json","X-CSRFToken":CSRF}, body:JSON.stringify(body)})
+      .then(r => r.json().then(j => { if(!r.ok || j.ok === false) throw new Error(j.error || ("HTTP " + r.status)); return j; }));
+  }
+  function toast(msg){ const t = document.getElementById("toast"); t.textContent = msg; t.style.display = "block"; setTimeout(() => t.style.display = "none", 3200); }
+
+  document.getElementById("saveBtn").addEventListener("click", () => {
+    const btn = document.getElementById("saveBtn"); btn.disabled = true;
+    post({weekend: WEEKEND, enrollment_ids: [...selected]}).then(j => {
+      selected.forEach(id => { byId[id].done = true; });
+      selected.clear(); renderCards(); renderTray();
+      toast("⭐ บันทึกแล้ว " + j.added.length + " คน" + (j.skipped.length ? (" · ได้ดาวรอบนี้อยู่แล้ว " + j.skipped.length + " คน") : ""));
+      setTimeout(() => location.reload(), 1600);
+    }).catch(e => { alert("บันทึกไม่สำเร็จ: " + e.message); btn.disabled = false; });
+  });
+
+  document.querySelectorAll("[data-del]").forEach(b => b.addEventListener("click", () => {
+    if(!confirm("ลบดาวรายการนี้?")) return;
+    post({do:"delete", star_id: b.dataset.del}).then(() => location.reload());
+  }));
+
+  renderChips(); renderCards(); renderTray();
+})();
+</script>
+{% endblock %}

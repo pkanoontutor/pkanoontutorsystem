@@ -46,6 +46,7 @@ from .models import (
     SheetPrintOrder,
     SheetAllocation,
     SheetReservation,
+    HomeworkStar,
     AdmissionInquiry,
     FinanceSetting,
     ExpenseCategory,
@@ -4257,6 +4258,7 @@ def remaining_attendance_search(request: HttpRequest) -> HttpResponse:
         "expected_completion_label": expected_completion_label,
         "attendance_rows": attendance_rows,
         "payment_rows": payment_rows,
+        "stars": _homework_star_summary(student),
     })
 
 
@@ -6671,6 +6673,7 @@ def course_renewal_notice_detail(request: HttpRequest, pk: int) -> HttpResponse:
             else _attendance_round_view(notice.enrollment, _parse_round_index(request.GET.get("round")))
         ),
         "current_round_used": _attendance_round_view(notice.enrollment).get("used", 0) if notice.enrollment else 0,
+        "stars": _homework_star_summary(notice.student),
     })
 
 
@@ -13191,4 +13194,128 @@ def weekly_test_set_attendance(request: HttpRequest) -> JsonResponse:
         # scores can only be entered for a student who was actually there
         "can_score": status == "present",
         "remaining": _sessions_num(enrollment.remaining_sessions),
+    })
+
+
+# =========================================================
+# ⭐ สะสมดาวส่งการบ้าน
+# =========================================================
+def _homework_star_summary(student) -> dict:
+    """Stars for the remaining-attendance page and the renewal notice."""
+    if not student:
+        return {"total": 0, "available": 0, "recent": []}
+    qs = HomeworkStar.objects.filter(student=student).select_related("tutoring_class")
+    recent = [
+        {"date": s.lesson_date, "date_label": _thai_schedule_date(s.lesson_date),
+         "class_name": s.tutoring_class.name if s.tutoring_class_id else ""}
+        for s in qs.order_by("-lesson_date")[:10]
+    ]
+    return {
+        "total": qs.count(),
+        "available": qs.filter(redeemed_at__isnull=True).count(),
+        "recent": recent,
+    }
+
+
+def _homework_star_weekends(today: date, count: int = 10) -> list[dict]:
+    """รอบวันที่เรียน: recent weekends (Saturday dates), newest first. A
+    class's own lesson day inside the weekend follows check-in's rule
+    (_class_weekday: Sat or Sun)."""
+    sat = today - timedelta(days=(today.weekday() - 5) % 7)
+    out = []
+    for i in range(count):
+        d = sat - timedelta(weeks=i)
+        sun = d + timedelta(days=1)
+        out.append({"value": d.isoformat(), "label": f"{_thai_schedule_date(d)} – {_thai_schedule_date(sun)}"})
+    return out
+
+
+def _lesson_date_in_weekend(tutoring_class, weekend_sat: date) -> date:
+    return weekend_sat + timedelta(days=_class_weekday(tutoring_class) - 5)
+
+
+@login_required
+def homework_stars(request: HttpRequest) -> HttpResponse:
+    if not request.user.is_staff:
+        return HttpResponse(status=403)
+    today = timezone.localdate()
+    weekends = _homework_star_weekends(today)
+
+    if request.method == "POST":
+        payload = _admin_tool_card_payload(request)
+        if payload.get("do") == "delete":
+            HomeworkStar.objects.filter(id=_id_or_none(payload.get("star_id"))).delete()
+            return JsonResponse({"ok": True})
+        weekend = _parse_date(payload.get("weekend")) if payload.get("weekend") else None
+        if not weekend or weekend.weekday() != 5:
+            return JsonResponse({"ok": False, "error": "กรุณาเลือกรอบวันที่เรียน"}, status=400)
+        ids = [i for i in (_id_or_none(x) for x in (payload.get("enrollment_ids") or [])) if i]
+        if not ids:
+            return JsonResponse({"ok": False, "error": "ยังไม่ได้เลือกนักเรียน"}, status=400)
+        added, skipped = [], []
+        for e in Enrollment.objects.select_related("student", "tutoring_class").filter(id__in=ids):
+            lesson = _lesson_date_in_weekend(e.tutoring_class, weekend)
+            star, created = HomeworkStar.objects.get_or_create(
+                enrollment=e, lesson_date=lesson,
+                defaults={"student": e.student, "tutoring_class": e.tutoring_class,
+                          "created_by": request.user},
+            )
+            (added if created else skipped).append(e.student.nickname or e.student.full_name)
+        return JsonResponse({"ok": True, "added": added, "skipped": skipped})
+
+    weekend = _parse_date(request.GET.get("weekend")) if request.GET.get("weekend") else None
+    if not weekend or weekend.weekday() != 5:
+        weekend = date.fromisoformat(weekends[0]["value"])
+
+    enrollments = list(_active_enrollments_for_payment())
+    totals = dict(
+        HomeworkStar.objects.values("student_id").annotate(n=Count("id")).values_list("student_id", "n")
+    )
+    lesson_dates = {
+        cls_id: _lesson_date_in_weekend(cls, weekend)
+        for cls_id, cls in {e.tutoring_class_id: e.tutoring_class for e in enrollments}.items()
+    }
+    starred = set(
+        HomeworkStar.objects.filter(lesson_date__in=set(lesson_dates.values()))
+        .values_list("enrollment_id", "lesson_date")
+    )
+    present = set(
+        Attendance.objects.filter(attendance_date__in=set(lesson_dates.values()))
+        .values_list("enrollment_id", "status")
+    )
+    att_status = {eid: st for eid, st in present}
+
+    classes: dict[int, dict] = {}
+    students_json = []
+    for e in enrollments:
+        ld = lesson_dates[e.tutoring_class_id]
+        row = {
+            "id": e.id,
+            "nickname": e.student.nickname or "",
+            "full_name": e.student.full_name or "",
+            "class_id": e.tutoring_class_id,
+            "class_name": e.tutoring_class.name,
+            "stars": totals.get(e.student_id, 0),
+            "done": (e.id, ld) in starred,
+            "att": att_status.get(e.id, ""),
+        }
+        students_json.append(row)
+        c = classes.setdefault(e.tutoring_class_id, {
+            "id": e.tutoring_class_id, "name": e.tutoring_class.name,
+            "slot": e.tutoring_class.get_time_slot_display(), "time_slot": e.tutoring_class.time_slot,
+            "lesson_label": _thai_schedule_date(ld),
+        })
+    slot_rank = {s: i for i, s in enumerate(TIME_SLOT_ORDER)}
+    class_list = sorted(classes.values(), key=lambda c: (slot_rank.get(c["time_slot"], 99), c["name"]))
+
+    recent = (
+        HomeworkStar.objects.select_related("student", "tutoring_class")
+        .order_by("-created_at")[:30]
+    )
+    return render(request, "core/homework_stars.html", {
+        "weekends": weekends,
+        "weekend": weekend.isoformat(),
+        "classes_json": json.dumps(class_list, ensure_ascii=False),
+        "students_json": json.dumps(students_json, ensure_ascii=False),
+        "recent": recent,
     })

@@ -3465,3 +3465,35 @@ class SheetReservation(models.Model):
 
     def __str__(self) -> str:
         return f"{self.admission_inquiry_id} | {self.sheet.code} | {self.get_status_display()}"
+
+
+class HomeworkStar(models.Model):
+    """One star for handing in homework for one lesson. lesson_date is the
+    class's own day in the chosen weekend (same rule as check-in), and a
+    student earns at most one star per enrollment per lesson. redeemed_at is
+    reserved for using stars as a renewal discount later."""
+
+    student = models.ForeignKey(Student, verbose_name="นักเรียน", on_delete=models.CASCADE, related_name="homework_stars")
+    enrollment = models.ForeignKey(
+        Enrollment, verbose_name="Enrollment", on_delete=models.SET_NULL,
+        null=True, blank=True, related_name="homework_stars",
+    )
+    tutoring_class = models.ForeignKey(
+        TutoringClass, verbose_name="Class", on_delete=models.SET_NULL,
+        null=True, blank=True, related_name="homework_stars",
+    )
+    lesson_date = models.DateField("วันที่เรียน")
+    redeemed_at = models.DateTimeField("ใช้เป็นส่วนลดแล้วเมื่อ", null=True, blank=True)
+    created_by = models.ForeignKey("auth.User", on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+    created_at = models.DateTimeField("วันที่บันทึก", default=timezone.now)
+
+    class Meta:
+        verbose_name = "Homework Star"
+        verbose_name_plural = "Homework Stars"
+        ordering = ("-lesson_date", "-created_at")
+        constraints = [
+            models.UniqueConstraint(fields=["enrollment", "lesson_date"], name="uniq_homework_star_per_lesson"),
+        ]
+
+    def __str__(self) -> str:
+        return f"⭐ {self.student_id} {self.lesson_date}"

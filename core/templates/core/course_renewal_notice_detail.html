@@ -179,7 +179,22 @@
               <label>จำนวนครั้งที่ให้เรียนจากงวดนี้</label>
               <input type="number" min="0" step="1" name="installment_sessions" value="{{ notice.installment_sessions }}">
             </div>
-            <div class="hint">ยอดคงเหลือจะคำนวณจากยอดเต็ม - ยอดที่ชำระแล้ว หลังจากกดบันทึก</div>
+            <div class="grid">
+              <div class="field"><label>แบ่งจ่ายทั้งหมด (งวด)</label>
+                <select name="installment_count">
+                  {% for c in "234" %}<option value="{{ c }}" {% if notice.installment_count|stringformat:"s" == c %}selected{% endif %}>{{ c }} งวด</option>{% endfor %}
+                </select>
+              </div>
+              <div class="field"><label>ยอดที่เรียกเก็บงวดนี้</label><input name="installment_due_amount" value="{{ notice.installment_due_amount|floatformat:0 }}"></div>
+            </div>
+            <div class="grid">
+              <div class="field"><label>กำหนดชำระงวดนี้</label><input type="date" name="installment_due_date" value="{{ notice.installment_due_date|date:'Y-m-d' }}"></div>
+              <div class="field"><label>กำหนดชำระงวดถัดไป</label><input type="date" name="next_installment_due_date" value="{{ notice.next_installment_due_date|date:'Y-m-d' }}"></div>
+            </div>
+            <label class="hint" style="display:flex;gap:6px;align-items:center;cursor:pointer;">
+              <input type="checkbox" name="recalc_installment" value="1"> คำนวณยอดงวดนี้และวันกำหนดชำระใหม่ตามแผนแบ่งชำระ / จำนวนครั้งที่เหลือ
+            </label>
+            <div class="hint">ยอดคงเหลือ = ยอดเต็ม − ชำระแล้ว · งวดถัดไปขาดอีก = ยอดคงเหลือ − ยอดงวดนี้ (คำนวณให้ตอนกดบันทึก) · เว้นวันที่ว่างไว้ ระบบจะคำนวณให้</div>
           </div>
         </div>
 
@@ -260,8 +275,17 @@
             {% if notice.referral_credit_used > 0 %}
               <div class="money-row"><span class="k">🎁 เครดิตชวนเพื่อน</span><span class="v" style="color:#dc2626;">-{{ notice.referral_credit_used|floatformat:0|intcomma }} บาท</span></div>
             {% endif %}
-            <div class="money-row remaining"><span class="k">ยอดคงเหลือต้องชำระ</span><span class="v">{{ notice.installment_remaining_amount|floatformat:0|intcomma }} บาท</span></div>
-            <div class="money-row"><span class="k">จำนวนครั้งที่ได้รับจากงวดนี้</span><span class="v">{{ notice.installment_sessions }} ครั้ง</span></div>
+            {% if notice.installment_count > notice.installment_no %}
+              <div class="money-row"><span class="k">ยอดคงเหลือทั้งหมด</span><span class="v">{{ notice.installment_remaining_amount|floatformat:0|intcomma }} บาท</span></div>
+              <div class="money-row remaining"><span class="k">ยอดชำระงวดที่ {{ notice.installment_no }} / {{ notice.installment_count }}</span><span class="v">{{ notice.installment_due_amount|floatformat:0|intcomma }} บาท</span></div>
+              {% if notice.installment_due_date %}<div class="money-row"><span class="k">กำหนดชำระงวดนี้</span><span class="v">{{ notice.installment_due_date|date:"d/m/Y" }}</span></div>{% endif %}
+              <div class="money-row"><span class="k">จำนวนครั้งที่ได้รับจากงวดนี้</span><span class="v">{{ notice.installment_sessions }} ครั้ง</span></div>
+              <div class="money-row" style="background:#fff7ed;border-radius:12px;padding:8px 10px;border-bottom:0;"><span class="k" style="color:#c2410c;">งวดที่ {{ notice.installment_no|add:1 }} ขาดอีก{% if notice.next_installment_due_date %} · กำหนดชำระ {{ notice.next_installment_due_date|date:"d/m/Y" }}{% endif %}</span><span class="v" style="color:#c2410c;">{{ notice.next_installment_amount|floatformat:0|intcomma }} บาท</span></div>
+            {% else %}
+              <div class="money-row remaining"><span class="k">ยอดคงเหลือต้องชำระ{% if notice.installment_count %} (งวดสุดท้าย){% endif %}</span><span class="v">{{ notice.installment_remaining_amount|floatformat:0|intcomma }} บาท</span></div>
+              {% if notice.installment_due_date %}<div class="money-row"><span class="k">กำหนดชำระ</span><span class="v">{{ notice.installment_due_date|date:"d/m/Y" }}</span></div>{% endif %}
+              <div class="money-row"><span class="k">จำนวนครั้งที่ได้รับจากงวดนี้</span><span class="v">{{ notice.installment_sessions }} ครั้ง</span></div>
+            {% endif %}
           </div>
         {% else %}
           <div class="packages">

@@ -13071,6 +13071,11 @@ def _money_widget_context() -> dict:
 
     income_total = Decimal(course_revenue) + Decimal(other_income)
     expense_total = Decimal(general_expense) + Decimal(tutor_payroll)
+    # รับรู้รายได้: sessions actually consumed this month (attendance), valued
+    # at each student's own rate -- same logic as the revenue analysis page.
+    from .analytics import recognized_revenue_rows
+    recognized_course = sum((r["revenue"] for r in recognized_revenue_rows(month_start, today)), Decimal("0"))
+    recognized_total = Decimal(recognized_course) + Decimal(other_income)
 
     recent = []
     for e in OtherIncome.objects.select_related("category")[:6]:
@@ -13099,6 +13104,10 @@ def _money_widget_context() -> dict:
         "money_tutor_payroll": Decimal(tutor_payroll),
         "money_expense_total": expense_total,
         "money_net": income_total - expense_total,
+        "money_recognized_course": Decimal(recognized_course),
+        "money_recognized_total": recognized_total,
+        "money_cash_flow": income_total - expense_total,
+        "money_net_profit": recognized_total - expense_total,
         "money_recent": recent[:8],
         "money_payment_methods": SchoolExpense.PaymentMethod.choices,
     }

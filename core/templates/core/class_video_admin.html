@@ -49,6 +49,7 @@
         <input type="date" name="date" id="dateInput" value="{{ today|date:'Y-m-d' }}" required>
       </div>
       <button class="btn rose" type="submit">＋ สร้าง / แก้ไขคลิปของวันนี้</button>
+      <a class="btn" href="{% url 'core:class_video_watch_report' %}">👀 ประวัติการเข้าชม</a>
     </form>
     <div class="quick">
       <span style="font-size:12px;font-weight:800;color:#64748b;align-self:center;">วันเรียนล่าสุด:</span>
@@ -61,7 +62,7 @@
   <div class="cardx" style="padding:0;overflow:hidden;">
     <table>
       <thead>
-        <tr><th>วันที่</th><th>คลาส</th><th>คลิป</th><th>สถานะ</th><th>ตารางสอน</th><th></th></tr>
+        <tr><th>วันที่</th><th>คลาส</th><th>คลิป</th><th>สถานะ</th><th>ตารางสอน</th><th>ผู้ชม</th><th></th></tr>
       </thead>
       <tbody>
         {% for r in rows %}
@@ -80,13 +81,14 @@
               {% if r.off_schedule %}<span class="pill p-warn">แก้เอง {{ r.off_schedule }} ช่อง</span>
               {% else %}<span style="color:#94a3b8;font-size:12px;font-weight:700;">ตรงตาราง</span>{% endif %}
             </td>
+            <td><a href="{% url 'core:class_video_watch_report' %}?session_id={{ r.session.id }}&from={{ r.session.lesson_date|date:'Y-m-d' }}&to={{ r.session.lesson_date|date:'Y-m-d' }}" style="font-weight:900;color:#2563eb;text-decoration:none;white-space:nowrap;">👀 {{ r.viewers }} คน</a></td>
             <td style="text-align:right;">
               <a class="btn" style="padding:6px 12px;font-size:12px;"
                  href="{% url 'core:class_video_edit' %}?class_id={{ r.session.tutoring_class_id }}&date={{ r.session.lesson_date|date:'Y-m-d' }}">แก้ไข</a>
             </td>
           </tr>
         {% empty %}
-          <tr><td colspan="6" style="text-align:center;padding:26px;color:#94a3b8;font-weight:700;">ยังไม่มีคลิป — เลือกคลาสและวันที่ด้านบนเพื่อเริ่ม</td></tr>
+          <tr><td colspan="7" style="text-align:center;padding:26px;color:#94a3b8;font-weight:700;">ยังไม่มีคลิป — เลือกคลาสและวันที่ด้านบนเพื่อเริ่ม</td></tr>
         {% endfor %}
       </tbody>
     </table>

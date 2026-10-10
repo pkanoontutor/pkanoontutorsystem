@@ -1,0 +1,95 @@
+{% extends "core/base.html" %}
+{% block title %}ประวัติการเข้าชมคลิป{% endblock %}
+{% block head %}
+<style>
+  .wrap{max-width:1080px;margin:0 auto;display:grid;gap:14px;}
+  .cardx{background:#fff;border-radius:16px;padding:16px;box-shadow:0 4px 12px rgba(15,23,42,.07);}
+  .h1{font-size:22px;font-weight:900;color:#0f172a;margin:0;}
+  .sub{font-size:12.5px;font-weight:700;color:#64748b;margin-top:3px;}
+  .filters{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-top:12px;}
+  .f{display:flex;flex-direction:column;gap:4px;}
+  .f label{font-size:11px;font-weight:900;color:#334155;}
+  .f input,.f select{border:1px solid #cbd5e1;border-radius:10px;padding:8px 10px;font-family:inherit;font-size:13px;font-weight:700;}
+  .btn{border:0;border-radius:10px;padding:9px 15px;font-size:13px;font-weight:800;background:#0f172a;color:#fff;cursor:pointer;font-family:inherit;text-decoration:none;display:inline-flex;align-items:center;gap:6px;}
+  .btn.soft{background:#f1f5f9;color:#0f172a;}
+  .tabs{display:flex;gap:6px;flex-wrap:wrap;}
+  .tab{border:1px solid #e2e8f0;border-radius:999px;padding:6px 13px;font-size:12.5px;font-weight:900;color:#334155;text-decoration:none;background:#f8fafc;}
+  .tab.on{background:#2563eb;border-color:#2563eb;color:#fff;}
+  table{width:100%;border-collapse:collapse;}
+  th,td{padding:10px 12px;border-bottom:1px solid #eef2f7;text-align:left;font-size:13px;}
+  th{background:#f8fafc;font-size:11px;font-weight:900;color:#475569;}
+  td{font-weight:700;color:#334155;}
+  .name{font-weight:900;color:#0f172a;}
+  .muted{font-size:11.5px;color:#94a3b8;font-weight:700;}
+  .pill{display:inline-block;border-radius:999px;padding:2px 9px;font-size:11.5px;font-weight:900;}
+  .p-yes{background:#dcfce7;color:#166534;} .p-no{background:#fee2e2;color:#991b1b;}
+  details summary{cursor:pointer;color:#2563eb;font-weight:900;font-size:12px;list-style:none;}
+  details summary::-webkit-details-marker{display:none;}
+  .det{margin-top:6px;display:grid;gap:3px;}
+  .det div{font-size:12px;font-weight:700;color:#475569;}
+</style>
+{% endblock %}
+{% block content %}
+<div class="wrap">
+  <div class="cardx">
+    <h1 class="h1">👀 ประวัติการเข้าชมคลิปย้อนหลัง</h1>
+    <div class="sub">
+      {% if session %}เฉพาะคลิป {{ session.tutoring_class.name }} วันที่ {{ session.lesson_date|date:"d/m/Y" }} ·{% endif %}
+      คลิปวันที่เรียน {{ date_from|date:"d/m/Y" }} – {{ date_to|date:"d/m/Y" }}
+    </div>
+    <form method="get" class="filters">
+      {% if session %}<input type="hidden" name="session_id" value="{{ session.id }}">{% endif %}
+      <div class="f"><label>คลาส</label>
+        <select name="class_id" {% if session %}disabled{% endif %}>
+          <option value="">ทุกคลาส</option>
+          {% for c in classes %}<option value="{{ c.id }}" {% if c.id == class_id %}selected{% endif %}>{{ c.name }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="f"><label>คลิปวันที่เรียน ตั้งแต่</label><input type="date" name="from" value="{{ date_from|date:'Y-m-d' }}"></div>
+      <div class="f"><label>ถึง</label><input type="date" name="to" value="{{ date_to|date:'Y-m-d' }}"></div>
+      <div class="f"><label>ชื่อนักเรียน</label><input type="text" name="q" value="{{ q }}" placeholder="ชื่อเล่น / ชื่อจริง"></div>
+      <input type="hidden" name="show" value="{{ show }}">
+      <button class="btn" type="submit">ค้นหา</button>
+      <a class="btn soft" href="{% url 'core:class_video_watch_report' %}">ล้าง</a>
+    </form>
+  </div>
+
+  <div class="tabs">
+    <a class="tab {% if show == 'all' %}on{% endif %}" href="?{{ request.GET.urlencode }}&show=all">ทั้งหมด {{ watched_n|add:never_n }}</a>
+    <a class="tab {% if show == 'watched' %}on{% endif %}" href="?{{ request.GET.urlencode }}&show=watched">✅ เคยดู {{ watched_n }}</a>
+    <a class="tab {% if show == 'never' %}on{% endif %}" href="?{{ request.GET.urlencode }}&show=never">❌ ยังไม่เคยดู {{ never_n }}</a>
+  </div>
+
+  <div class="cardx" style="padding:0;overflow:auto;">
+    <table>
+      <thead><tr><th>นักเรียน</th><th>คลาส</th><th>สถานะ</th><th>คลิปที่ดู</th><th>เปิดดูรวม</th><th>ดูล่าสุด</th><th>รายละเอียด</th></tr></thead>
+      <tbody>
+        {% for r in rows %}
+          <tr>
+            <td><div class="name">{{ r.student.nickname|default:r.student.full_name }}</div><div class="muted">{{ r.student.full_name }}</div></td>
+            <td>{{ r.class_names|default:"-" }}</td>
+            <td>{% if r.clips %}<span class="pill p-yes">เคยดู</span>{% else %}<span class="pill p-no">ยังไม่เคยดู</span>{% endif %}</td>
+            <td>{% if r.clips %}{{ r.clips }} คลิป · {{ r.sessions }} วัน{% else %}-{% endif %}</td>
+            <td>{% if r.opens %}{{ r.opens }} ครั้ง{% else %}-{% endif %}</td>
+            <td style="white-space:nowrap;">{% if r.last %}{{ r.last|date:"d/m/Y H:i" }}{% else %}-{% endif %}</td>
+            <td>
+              {% if r.detail %}
+                <details><summary>ดู {{ r.detail|length }} รายการ ▸</summary>
+                  <div class="det">
+                    {% for d in r.detail %}
+                      <div>🎬 {{ d.lesson_date|date:"d/m/Y" }} · คาบ {{ d.slot }}{% if d.subject %} {{ d.subject }}{% endif %} — เปิด {{ d.count }} ครั้ง · ล่าสุด {{ d.last|date:"d/m H:i" }}</div>
+                    {% endfor %}
+                  </div>
+                </details>
+              {% endif %}
+            </td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="7" style="text-align:center;padding:26px;color:#94a3b8;">ไม่พบข้อมูลตามเงื่อนไขนี้</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div style="text-align:center;"><a href="{% url 'core:class_video_admin' %}" style="font-size:13px;font-weight:800;color:#64748b;text-decoration:none;">← กลับหน้าจัดการคลิป</a></div>
+</div>
+{% endblock %}

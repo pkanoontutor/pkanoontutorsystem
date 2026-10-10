@@ -12530,10 +12530,17 @@ def class_video_admin(request: HttpRequest) -> HttpResponse:
         .prefetch_related("clips")
         .order_by("-lesson_date", "tutoring_class__name")[:120]
     )
+    from .models import ClassVideoWatch
+    viewers = dict(
+        ClassVideoWatch.objects.filter(clip__session__in=[s.id for s in sessions])
+        .values("clip__session_id").annotate(n=Count("student_id", distinct=True))
+        .values_list("clip__session_id", "n")
+    )
     rows = []
     for s in sessions:
         clips = list(s.clips.all())
         rows.append({
+            "viewers": viewers.get(s.id, 0),
             "session": s,
             "filled": sum(1 for c in clips if c.has_video),
             "total": CLASS_VIDEO_SLOTS,
@@ -12548,6 +12555,109 @@ def class_video_admin(request: HttpRequest) -> HttpResponse:
         "classes": TutoringClass.objects.filter(is_active=True).order_by("time_slot", "name"),
         "recent_dates": recent_weekend,
         "today": today,
+    })
+
+
+@login_required
+def class_video_watch_report(request: HttpRequest) -> HttpResponse:
+    """ประวัติการเข้าชมคลิปย้อนหลัง: who has watched (and who hasn't),
+    per student, filterable by class / session / name / date range."""
+    from .models import ClassVideoSession, ClassVideoWatch
+
+    today = timezone.localdate()
+    date_from = _parse_date(request.GET.get("from")) if request.GET.get("from") else today - timedelta(days=60)
+    date_to = _parse_date(request.GET.get("to")) if request.GET.get("to") else today
+    class_id = _id_or_none(request.GET.get("class_id"))
+    session_id = _id_or_none(request.GET.get("session_id"))
+    q = (request.GET.get("q") or "").strip()
+    show = request.GET.get("show") or "all"   # all | watched | never
+
+    session = ClassVideoSession.objects.select_related("tutoring_class").filter(id=session_id).first() if session_id else None
+    if session:
+        class_id = session.tutoring_class_id
+
+    watches = (
+        ClassVideoWatch.objects
+        .select_related("student", "clip__session__tutoring_class")
+        .filter(clip__session__lesson_date__range=(date_from, date_to))
+        .order_by("-last_watched_at")
+    )
+    if session:
+        watches = watches.filter(clip__session=session)
+    elif class_id:
+        watches = watches.filter(clip__session__tutoring_class_id=class_id)
+
+    by_student: dict[int, dict] = {}
+    for w in watches:
+        st = w.student
+        row = by_student.setdefault(st.id, {
+            "student": st, "clips": 0, "opens": 0, "last": None, "sessions": set(), "detail": [],
+        })
+        row["clips"] += 1
+        row["opens"] += int(w.watch_count or 0)
+        row["sessions"].add(w.clip.session_id)
+        if row["last"] is None or w.last_watched_at > row["last"]:
+            row["last"] = w.last_watched_at
+        clip = w.clip
+        row["detail"].append({
+            "lesson_date": clip.session.lesson_date,
+            "class_name": clip.session.tutoring_class.name,
+            "slot": clip.slot_index,
+            "subject": clip.subject_label or clip.schedule_subject or "",
+            "count": w.watch_count,
+            "first": w.first_watched_at,
+            "last": w.last_watched_at,
+        })
+
+    # Students expected to watch: active enrollments in the chosen class
+    # (or every active class), so "never watched" can be listed too.
+    enr = Enrollment.objects.select_related("student", "tutoring_class").filter(
+        is_active=True, student__is_active=True, tutoring_class__is_active=True)
+    if class_id:
+        enr = enr.filter(tutoring_class_id=class_id)
+    class_names: dict[int, list[str]] = {}
+    students = {}
+    for e in enr:
+        students[e.student_id] = e.student
+        class_names.setdefault(e.student_id, []).append(e.tutoring_class.name)
+    for sid, row in by_student.items():
+        students.setdefault(sid, row["student"])
+
+    rows = []
+    for sid, st in students.items():
+        row = by_student.get(sid)
+        rows.append({
+            "student": st,
+            "class_names": ", ".join(class_names.get(sid, [])),
+            "clips": row["clips"] if row else 0,
+            "opens": row["opens"] if row else 0,
+            "sessions": len(row["sessions"]) if row else 0,
+            "last": row["last"] if row else None,
+            "detail": sorted(row["detail"], key=lambda d: (d["lesson_date"], d["slot"]), reverse=True) if row else [],
+        })
+    if q:
+        ql = q.lower()
+        rows = [r for r in rows if ql in f"{r['student'].nickname} {r['student'].full_name}".lower()]
+    watched_n = sum(1 for r in rows if r["clips"])
+    never_n = len(rows) - watched_n
+    if show == "watched":
+        rows = [r for r in rows if r["clips"]]
+    elif show == "never":
+        rows = [r for r in rows if not r["clips"]]
+    rows.sort(key=lambda r: (r["last"] is None, -(r["last"].timestamp() if r["last"] else 0),
+                             r["student"].nickname or r["student"].full_name))
+
+    return render(request, "core/class_video_watch_report.html", {
+        "rows": rows,
+        "watched_n": watched_n,
+        "never_n": never_n,
+        "classes": TutoringClass.objects.filter(is_active=True).order_by("time_slot", "name"),
+        "class_id": class_id,
+        "session": session,
+        "q": q,
+        "show": show,
+        "date_from": date_from,
+        "date_to": date_to,
     })
 
 

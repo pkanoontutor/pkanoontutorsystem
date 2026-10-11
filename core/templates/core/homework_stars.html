@@ -18,6 +18,8 @@
   .hs-results small{color:#64748b;font-weight:700;}
   .chips{display:flex;gap:6px;flex-wrap:wrap;}
   .chip{border:1px solid #e2e8f0;background:#f8fafc;border-radius:999px;padding:7px 12px;font-size:12.5px;font-weight:900;cursor:pointer;font-family:inherit;color:#334155;}
+  .chip.grade{border-color:#fdba74;background:#fff7ed;color:#9a3412;font-size:13.5px;padding:8px 15px;}
+  .chip.grade.part{border-style:dashed;}
   .chip.on{background:#f97316;border-color:#f97316;color:#fff;}
   .chip small{font-weight:700;opacity:.8;}
   .cls-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;}
@@ -77,6 +79,8 @@
   </section>
 
   <section class="hs-panel">
+    <div class="hs-label">เลือกทั้งระดับชั้น</div>
+    <div class="chips" id="gradeChips" style="margin-bottom:12px;"></div>
     <div class="hs-label">หรือเลือกคลาส (เลือกได้หลายคลาสพร้อมกัน)</div>
     <div class="chips" id="classChips"></div>
   </section>
@@ -134,7 +138,29 @@
       '<span class="r">' + att + (s.done ? '<span class="cnt">⭐ ได้แล้ว</span>' : '') + '<span class="cnt">⭐' + s.stars + '</span></span></button>';
   }
 
+  // Grade read from the class name ("ป.5 ห้อง A" -> "ป.5").
+  const gradeOf = c => { const m = String(c.name).match(/([ปม])\.?\s*(\d)/); return m ? (m[1] + "." + m[2]) : ""; };
+  const GRADES = [...new Set(CLASSES.map(gradeOf).filter(Boolean))].sort((a, b) =>
+    (a[0] === b[0] ? a.slice(2) - b.slice(2) : (a[0] === "ป" ? -1 : 1)));
+  function renderGrades(){
+    document.getElementById("gradeChips").innerHTML = GRADES.map(g => {
+      const ids = CLASSES.filter(c => gradeOf(c) === g).map(c => c.id);
+      const open = ids.filter(id => openClasses.includes(id)).length;
+      const cls = open === ids.length ? " on" : (open ? " part" : "");
+      return '<button type="button" class="chip grade' + cls + '" data-grade="' + g + '">' + g + ' <small>' + ids.length + ' คลาส</small></button>';
+    }).join("") || '<span class="hs-sub" style="color:#94a3b8">ไม่พบระดับชั้นจากชื่อคลาส</span>';
+  }
+  document.getElementById("gradeChips").addEventListener("click", e => {
+    const b = e.target.closest("[data-grade]"); if(!b) return;
+    const ids = CLASSES.filter(c => gradeOf(c) === b.dataset.grade).map(c => c.id);
+    const allOpen = ids.every(id => openClasses.includes(id));
+    openClasses = allOpen ? openClasses.filter(id => !ids.includes(id)) : [...new Set(openClasses.concat(ids))];
+    try { localStorage.setItem(LS_KEY, JSON.stringify(openClasses)); } catch(e) {}
+    renderChips(); renderCards();
+  });
+
   function renderChips(){
+    renderGrades();
     document.getElementById("classChips").innerHTML = CLASSES.map(c =>
       '<button type="button" class="chip' + (openClasses.includes(c.id) ? ' on' : '') + '" data-cls="' + c.id + '">' + esc(c.name) + ' <small>' + esc(c.slot) + '</small></button>'
     ).join("") || '<span class="empty">ไม่มีคลาสที่เปิดอยู่</span>';

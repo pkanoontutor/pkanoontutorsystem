@@ -8,6 +8,7 @@
       {% endfor %}
     </select>
   </label>
+  <a class="rt-mini-btn" style="justify-self:start;" href="{% url 'core:admission_sheet_checklist' a.id %}" target="_blank" rel="noopener">🧾 Checklist เตรียมชีท (รูป)</a>
   {% if a.target_class_id or a.sheets.needs %}
     {% if a.sheets.needs %}
       <div class="as-list">

@@ -13512,3 +13512,30 @@ def homework_stars(request: HttpRequest) -> HttpResponse:
         "students_json": json.dumps(students_json, ensure_ascii=False),
         "recent": recent,
     })
+
+
+@login_required
+def admission_sheet_checklist(request: HttpRequest, pk: int) -> HttpResponse:
+    """Copyable checklist image of the sheets to prepare for one incoming
+    student: code, title and shelf location; sheets can be added/removed
+    on the page before the image is made."""
+    inquiry = get_object_or_404(AdmissionInquiry.objects.select_related("target_class"), pk=pk)
+
+    def row(sheet, subject=""):
+        inv = _inventory_for_sheet(sheet)
+        return {
+            "id": sheet.id, "code": sheet.code, "title": sheet.title,
+            "subject": subject or (sheet.subject.name if sheet.subject_id else ""),
+            "location": (inv.storage_location if inv else "") or "",
+            "stock": int(inv.quantity or 0) if inv else 0,
+        }
+
+    initial = [row(n["sheet"], n["subject"]) for n in _admission_sheet_panel(inquiry)["needs"] if n["sheet"]]
+    all_sheets = [row(s) for s in Sheet.objects.select_related("subject", "inventory").filter(is_active=True)
+                  .order_by("grade_level", "subject__name", "code")]
+    return render(request, "core/admission_sheet_checklist.html", {
+        "inquiry": inquiry,
+        "lesson_label": _thai_schedule_date(inquiry.first_lesson_date) if inquiry.first_lesson_date else "",
+        "initial_json": json.dumps(initial, ensure_ascii=False),
+        "all_json": json.dumps(all_sheets, ensure_ascii=False),
+    })

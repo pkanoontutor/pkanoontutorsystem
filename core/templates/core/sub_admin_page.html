@@ -1,0 +1,50 @@
+{% extends "core/base.html" %}
+{% block title %}{{ tool.name }}{% endblock %}
+{% block head %}
+<style>
+  .sp-wrap{max-width:1000px;margin:0 auto;display:grid;gap:14px;}
+  .sp-hero{background:linear-gradient(120deg,#0ea5e9,#6366f1);color:#fff;border-radius:22px;padding:20px 22px;}
+  .sp-hero h1{margin:0;font-size:24px;font-weight:1000;}
+  .sp-hero p{margin:5px 0 0;font-size:13.5px;font-weight:700;color:#e0e7ff;}
+  .owner{background:#fffbeb;border:1px solid #fde68a;color:#92400e;border-radius:12px;padding:9px 12px;font-size:13px;font-weight:800;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;}
+  .owner a{color:#92400e;}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px;}
+  .tile{display:flex;gap:12px;align-items:flex-start;text-decoration:none;color:#0f172a;background:#fff;border-radius:18px;padding:16px;box-shadow:0 4px 14px rgba(15,23,42,.07);border:1px solid #eef2f7;transition:.15s;}
+  .tile:hover{transform:translateY(-2px);box-shadow:0 10px 22px rgba(15,23,42,.12);}
+  .ic{width:46px;height:46px;border-radius:14px;display:grid;place-items:center;font-size:22px;flex:none;border:1px solid;}
+  .nm{font-size:15px;font-weight:1000;line-height:1.3;}
+  .ds{font-size:12px;font-weight:700;color:#64748b;margin-top:3px;line-height:1.45;}
+  .c-clay{background:#f3e4dd;color:#b15c42;border-color:#e7cec3;}
+  .c-sage{background:#e5ece1;color:#5c7355;border-color:#d3e0cc;}
+  .c-sky{background:#e2eaf1;color:#4a6b8a;border-color:#cfddea;}
+  .c-sand{background:#f1ead6;color:#8a7333;border-color:#e6dbbe;}
+  .c-rose{background:#f2e1e7;color:#9a5c6e;border-color:#e8ccd6;}
+  .c-lilac{background:#eae4f1;color:#6b5c8a;border-color:#dcd2ea;}
+  .c-stone{background:#eae7e0;color:#6b665c;border-color:#ddd8cd;}
+  .c-teal{background:#dfece9;color:#3f6e68;border-color:#cde2dd;}
+  .empty{text-align:center;color:#94a3b8;font-weight:800;padding:30px;background:#fff;border-radius:16px;}
+</style>
+{% endblock %}
+{% block content %}
+<div class="sp-wrap">
+  {% if is_owner_preview %}
+    <div class="owner"><span>👁️ คุณกำลังดูหน้าของ “{{ tool.name }}” ในฐานะเจ้าของ</span><a href="{% url 'core:sub_admin_manage' %}#tool-{{ tool.id }}">✏️ แก้ไขปุ่มของหน้านี้</a></div>
+  {% endif %}
+  <div class="sp-hero">
+    <h1>🧰 {{ tool.name }}</h1>
+    <p>{{ tool.note|default:"เมนูสำหรับการทำงานของคุณ" }}</p>
+  </div>
+  {% if cards %}
+    <div class="grid">
+      {% for c in cards %}
+        <a class="tile" href="{{ c.url }}">
+          <span class="ic {{ c.color }}">{{ c.icon }}</span>
+          <span><span class="nm">{{ c.name }}</span><span class="ds">{{ c.desc }}</span></span>
+        </a>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="empty">ยังไม่มีเมนูสำหรับหน้านี้</div>
+  {% endif %}
+</div>
+{% endblock %}

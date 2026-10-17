@@ -1,0 +1,66 @@
+{% extends "core/base.html" %}
+{% block title %}จัดการ Sub Admin Tool{% endblock %}
+{% block head %}
+<style>
+  .sa-wrap{max-width:1000px;margin:0 auto;display:grid;gap:12px;}
+  .sa-hero{background:linear-gradient(120deg,#0f172a,#334155);color:#fff;border-radius:20px;padding:18px 20px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center;}
+  .sa-hero h1{margin:0;font-size:22px;font-weight:1000;}
+  .sa-hero p{margin:4px 0 0;font-size:12.5px;font-weight:700;color:#cbd5e1;}
+  .btn{border:0;border-radius:12px;padding:9px 14px;font-weight:1000;cursor:pointer;font-family:inherit;font-size:13.5px;background:#4f46e5;color:#fff;text-decoration:none;display:inline-flex;align-items:center;gap:6px;}
+  .btn.soft{background:#f1f5f9;color:#0f172a;} .btn.red{background:#fff;color:#b91c1c;border:1px solid #fecaca;} .btn.light{background:#fff;color:#0f172a;}
+  .card{background:#fff;border-radius:16px;padding:14px;box-shadow:0 4px 12px rgba(15,23,42,.07);}
+  .card summary{list-style:none;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;}
+  .card summary::-webkit-details-marker{display:none;}
+  .card h2{margin:0;font-size:17px;font-weight:1000;}
+  .meta{font-size:12px;font-weight:700;color:#64748b;}
+  .pill{font-size:11px;font-weight:900;border-radius:999px;padding:2px 9px;}
+  .pill.on{background:#dcfce7;color:#166534;} .pill.off{background:#fee2e2;color:#991b1b;}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px;}
+  label.f{font-size:11px;font-weight:1000;color:#475569;display:block;margin-bottom:4px;}
+  input[type=text],select{width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:10px;padding:9px 11px;font-family:inherit;font-weight:700;font-size:14px;background:#fff;}
+  .cards-pick{margin-top:12px;}
+  .cards-head{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px;}
+  .sec-t{font-size:12px;font-weight:1000;color:#334155;margin:10px 0 6px;}
+  .cgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:6px;}
+  .cgrid label{display:flex;gap:8px;align-items:flex-start;border:1.5px solid #e2e8f0;border-radius:12px;padding:8px 10px;cursor:pointer;font-size:13px;font-weight:800;color:#0f172a;}
+  .cgrid label:has(input:checked){border-color:#6366f1;background:#eef2ff;}
+  .cgrid input{margin-top:3px;accent-color:#4f46e5;}
+  .cgrid small{display:block;font-size:11px;color:#94a3b8;font-weight:700;}
+  .link-row{display:flex;gap:6px;align-items:center;margin-top:10px;flex-wrap:wrap;}
+  .link-row input{flex:1;min-width:220px;font-size:12.5px;color:#334155;background:#f8fafc;}
+  .actions{display:flex;gap:8px;justify-content:flex-end;margin-top:12px;flex-wrap:wrap;}
+  .msg{border-radius:12px;padding:9px 12px;font-weight:900;font-size:13px;background:#f0fdf4;color:#166534;}
+  .msg.err{background:#fef2f2;color:#991b1b;}
+  .hint{font-size:12px;font-weight:700;color:#64748b;line-height:1.5;}
+  @media(max-width:640px){.grid2{grid-template-columns:1fr;}}
+</style>
+{% endblock %}
+{% block content %}
+<div class="sa-wrap">
+  <div class="sa-hero">
+    <div><h1>👥 จัดการ Sub Admin Tool</h1><p>สร้างหน้าแอดมินแยกรายคน แล้วเลือกปุ่มจาก Admin Tool หลักให้แต่ละคน — แอดมินแก้เมนูเองไม่ได้</p></div>
+    <a class="btn light" href="{% url 'core:pkanoon_admin_tool' %}">← Admin Tool</a>
+  </div>
+  {% if saved == "deleted" %}<div class="msg">ลบแล้ว</div>{% elif saved %}<div class="msg">✅ บันทึกแล้ว</div>{% endif %}
+  {% if error %}<div class="msg err">กรุณาตั้งชื่อหน้า</div>{% endif %}
+
+  <div class="card hint">
+    แอดมินต้อง login ด้วยบัญชีของตัวเอง (สร้างบัญชีได้ที่ Django Admin) → เลือกบัญชีนั้นในหน้าด้านล่าง → แอดมินคนนั้นเข้า Admin Tool หลักไม่ได้อีก ระบบจะพาไปหน้าของตัวเองแทน และแก้เมนูไม่ได้
+  </div>
+
+  {% for t in tools %}
+    {% include "core/_sub_admin_form.html" with t=t %}
+  {% endfor %}
+  {% include "core/_sub_admin_form.html" with t=None %}
+</div>
+<script>
+  document.querySelectorAll("[data-all]").forEach(b => b.addEventListener("click", () => {
+    const box = b.closest("form"), on = b.dataset.all === "1";
+    box.querySelectorAll("input[name=card_ids]").forEach(i => i.checked = on);
+  }));
+  document.querySelectorAll("[data-copy]").forEach(b => b.addEventListener("click", () => {
+    const inp = b.previousElementSibling; inp.select();
+    (navigator.clipboard ? navigator.clipboard.writeText(inp.value) : Promise.reject()).then(() => b.textContent = "✓ คัดลอกแล้ว").catch(() => document.execCommand("copy"));
+  }));
+</script>
+{% endblock %}

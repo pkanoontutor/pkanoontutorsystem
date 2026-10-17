@@ -216,7 +216,6 @@
                 <input type="checkbox" class="chk js-special350" name="special350_{{ r.tutor.id }}" value="yes"
                        {% if r.special_rate_350 %}checked{% endif %}
                        title="{% if r.taught_grades %}สอน {{ r.taught_grades }}{% endif %}">
-                {% if r.matches_350 %}<div style="font-size:9px;font-weight:700;color:#c2410c;margin-top:2px;">{{ r.taught_grades }}</div>{% endif %}
               </td>
               <td class="num">
                 <input type="number" step="0.01" min="0" class="js-rate-input" name="rate_override_{{ r.tutor.id }}"
@@ -319,7 +318,7 @@
     // updates the moment the 325 box is ticked, before anything is submitted.
     function rateFor(hours, special, flat350){
       if(hours <= 0) return 0;
-      if(flat350) return 350;          // ป.5 rooms, whatever the hours
+      if(flat350) return 350;          // ticked by hand: flat 350, whatever the hours
       if(hours <= 1) return 550;
       if(hours < 4) return 350;
       return special ? 325 : 300;

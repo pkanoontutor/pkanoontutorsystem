@@ -13649,6 +13649,7 @@ def _memo_row(m) -> dict:
         "due_label": _thai_schedule_date(m.due_date) if m.due_date else "",
         "overdue": bool(m.due_date and not m.is_done and m.due_date < today),
         "due_today": bool(m.due_date and not m.is_done and m.due_date == today),
+        "due_soon": bool(m.due_date and not m.is_done and today <= m.due_date <= today + timedelta(days=2)),
         "done": m.is_done, "done_at": m.done_at,
         "admission_id": m.admission_inquiry_id,
         "admission_label": (f"{inq.nickname} · {_thai_schedule_date(inq.first_lesson_date)}" if inq else ""),
@@ -13676,9 +13677,23 @@ def _pending_memos(limit: int = 12) -> list[dict]:
     return [_memo_row(m) for m in qs[:limit]]
 
 
+MEMO_DUE_SOON_DAYS = 3   # due today .. +2 days counts as "ใกล้ถึงกำหนด"
+
+
+def _memo_due_counts() -> dict:
+    today = timezone.localdate()
+    soon_end = today + timedelta(days=MEMO_DUE_SOON_DAYS - 1)
+    open_qs = MemoTask.objects.filter(is_done=False)
+    overdue = open_qs.filter(due_date__lt=today).count()
+    soon = open_qs.filter(due_date__gte=today, due_date__lte=soon_end).count()
+    total = open_qs.count()
+    return {"overdue": overdue, "soon": soon, "later": total - overdue - soon, "total": total}
+
+
 def _memo_panel_context() -> dict:
     return {
         "memos": _pending_memos(),
+        "memo_counts": _memo_due_counts(),
         "memo_open_count": MemoTask.objects.filter(is_done=False).count(),
         "memo_owner_names": _memo_owner_names(),
         "memo_admission_choices": _memo_admission_choices(),
@@ -13729,6 +13744,7 @@ def memo_api(request: HttpRequest) -> JsonResponse:
     return JsonResponse({
         "ok": True,
         "memo": _memo_row(memo) if memo else None,
+        "counts": _memo_due_counts(),
         "panel_html": render_to_string("core/_memo_panel.html", _memo_panel_context(), request=request),
     })
 

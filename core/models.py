@@ -3539,3 +3539,34 @@ class MemoTask(models.Model):
 
     def __str__(self) -> str:
         return self.text[:60]
+
+
+class SnackShopEntry(models.Model):
+    """ร้านขนม (side business) cash book, kept apart from the school's
+    finance figures: one income type and two expense types."""
+
+    class Kind(models.TextChoices):
+        CASH_IN = "cash_in", "รับเงินสด"
+        PURCHASE = "purchase", "ซื้อสินค้า"
+        COIN_EXCHANGE = "coin_exchange", "นำเงินไปแลกเหรียญ"
+
+    INCOME_KINDS = ("cash_in",)
+
+    entry_date = models.DateField("วันที่", default=timezone.localdate)
+    kind = models.CharField("ประเภท", max_length=20, choices=Kind.choices)
+    amount = models.DecimalField("จำนวนเงิน", max_digits=12, decimal_places=2)
+    note = models.CharField("รายละเอียด", max_length=255, blank=True)
+    created_by = models.ForeignKey("auth.User", on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+    created_at = models.DateTimeField("บันทึกเมื่อ", default=timezone.now)
+
+    class Meta:
+        verbose_name = "Snack Shop Entry"
+        verbose_name_plural = "Snack Shop Entries"
+        ordering = ("-entry_date", "-created_at")
+
+    @property
+    def is_income(self) -> bool:
+        return self.kind in self.INCOME_KINDS
+
+    def __str__(self) -> str:
+        return f"{self.entry_date} {self.get_kind_display()} {self.amount}"

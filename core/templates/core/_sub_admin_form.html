@@ -1,0 +1,55 @@
+<details class="card" id="{% if t %}tool-{{ t.id }}{% else %}tool-new{% endif %}" {% if not t or saved == t.id|stringformat:"s" %}open{% endif %}>
+  <summary>
+    {% if t %}
+      <div><h2>{{ t.name }} <span class="pill {% if t.is_active %}on{% else %}off{% endif %}">{% if t.is_active %}ใช้งาน{% else %}ปิด{% endif %}</span></h2>
+        <div class="meta">👤 {% if t.user %}{{ t.user.get_full_name|default:t.user.username }}{% else %}ยังไม่ผูกบัญชี{% endif %} · {{ t.card_ids|length }} ปุ่ม</div></div>
+      <span class="btn soft">แก้ไข ▾</span>
+    {% else %}
+      <h2>＋ สร้าง Sub Admin Tool ใหม่</h2>
+    {% endif %}
+  </summary>
+  <form method="post">
+    {% csrf_token %}
+    {% if t %}<input type="hidden" name="tool_id" value="{{ t.id }}">{% endif %}
+    <div class="grid2">
+      <div><label class="f">ชื่อหน้า / ชื่อแอดมิน *</label><input type="text" name="name" value="{{ t.name|default:'' }}" placeholder="เช่น แอดมินฝ้าย" required></div>
+      <div><label class="f">บัญชีผู้ใช้ของแอดมิน</label>
+        <select name="user_id">
+          <option value="">— ยังไม่ผูก —</option>
+          {% for u in users %}<option value="{{ u.id }}" {% if t and t.user_id == u.id %}selected{% endif %}>{{ u.label }}{% if u.taken_by and not t or u.taken_by and t and t.user_id != u.id %} · ใช้กับ "{{ u.taken_by }}" แล้ว{% endif %}</option>{% endfor %}
+        </select>
+      </div>
+      <div><label class="f">ข้อความต้อนรับ (ไม่บังคับ)</label><input type="text" name="note" value="{{ t.note|default:'' }}" placeholder="เช่น งานประจำวันของคุณ"></div>
+      <div style="display:flex;align-items:flex-end;"><label style="display:flex;gap:6px;align-items:center;font-weight:800;font-size:13px;"><input type="checkbox" name="is_active" {% if not t or t.is_active %}checked{% endif %}> เปิดใช้งาน</label></div>
+    </div>
+    <div class="cards-pick">
+      <div class="cards-head">
+        <label class="f" style="margin:0;">เลือกปุ่มที่ให้แอดมินคนนี้ใช้</label>
+        <span><button type="button" class="btn soft" data-all="1">เลือกทั้งหมด</button> <button type="button" class="btn soft" data-all="0">ล้าง</button></span>
+      </div>
+      <div class="sec-t">🛠️ Operation</div>
+      <div class="cgrid">
+        {% for c in cards %}{% if c.section == "operation" %}
+          <label><input type="checkbox" name="card_ids" value="{{ c.id }}" {% if t and c.id in t.card_ids %}checked{% endif %}><span>{{ c.icon }} {{ c.name }}<small>{{ c.url }}</small></span></label>
+        {% endif %}{% endfor %}
+      </div>
+      <div class="sec-t">🔐 Private / Management</div>
+      <div class="cgrid">
+        {% for c in cards %}{% if c.section != "operation" %}
+          <label><input type="checkbox" name="card_ids" value="{{ c.id }}" {% if t and c.id in t.card_ids %}checked{% endif %}><span>{{ c.icon }} {{ c.name }}<small>{{ c.url }}</small></span></label>
+        {% endif %}{% endfor %}
+      </div>
+    </div>
+    {% if t %}
+      <div class="link-row">
+        <input type="text" readonly value="{{ t.link }}">
+        <button type="button" class="btn soft" data-copy>📋 คัดลอกลิงก์</button>
+        <a class="btn soft" href="{% url 'core:sub_admin_page' t.slug %}" target="_blank" rel="noopener">👁️ ดูหน้านี้</a>
+      </div>
+    {% endif %}
+    <div class="actions">
+      {% if t %}<button class="btn red" type="submit" name="action" value="delete" formnovalidate onclick="return confirm('ลบหน้า {{ t.name|escapejs }}?')">ลบ</button>{% endif %}
+      <button class="btn" type="submit">💾 บันทึก</button>
+    </div>
+  </form>
+</details>

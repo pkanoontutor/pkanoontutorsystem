@@ -52,6 +52,7 @@ from .models import (
     OnlineSchedule,
     OnlineScheduleRow,
     OnlineScheduleTestTutor,
+    SubAdminTool,
     AdmissionInquiry,
     FinanceSetting,
     ExpenseCategory,
@@ -8620,6 +8621,9 @@ def _active_enrollment_summaries_by_student() -> dict:
 def pkanoon_admin_tool(request: HttpRequest) -> HttpResponse:
     """Private landing page for sensitive school tools."""
     from .models import AdminToolCard
+    sub = _sub_admin_tool_for(request.user)
+    if sub:
+        return redirect("core:sub_admin_page", slug=sub.slug)
     _seed_admin_tool_cards()
     cards = [c.as_dict() for c in AdminToolCard.objects.all()]
     can_edit = bool(request.user.is_authenticated and request.user.is_staff)
@@ -8634,6 +8638,7 @@ def pkanoon_admin_tool(request: HttpRequest) -> HttpResponse:
         "binding_type_choices": SheetPrintOrder.BindingType.choices,
         "spine_color_choices": _print_color_choices(),
         "default_print_due_date": timezone.localdate() + timedelta(days=3),
+        "is_owner": bool(request.user.is_authenticated and request.user.is_superuser),
         "students_json": json.dumps(_allocation_students_json(), ensure_ascii=False),
         "student_enrollments_json": json.dumps(_active_enrollment_summaries_by_student(), ensure_ascii=False),
         **_money_widget_context(),
@@ -8939,10 +8944,26 @@ def _admin_tool_staff_denied(request: HttpRequest) -> JsonResponse | None:
     )
 
 
+def _sub_admin_tool_for(user):
+    """The sub admin tool assigned to a (non-superuser) account, if any."""
+    if not user or not user.is_authenticated or user.is_superuser:
+        return None
+    return SubAdminTool.objects.filter(user=user, is_active=True).first()
+
+
+def _admin_tool_menu_denied(request: HttpRequest) -> JsonResponse | None:
+    denied = _admin_tool_staff_denied(request)
+    if denied:
+        return denied
+    if _sub_admin_tool_for(request.user):
+        return JsonResponse({"ok": False, "error": "บัญชีนี้แก้ไขเมนูไม่ได้"}, status=403)
+    return None
+
+
 @require_POST
 def admin_tool_card_save(request: HttpRequest) -> JsonResponse:
     """Create or update a single card. Returns the saved card as JSON."""
-    denied = _admin_tool_staff_denied(request)
+    denied = _admin_tool_menu_denied(request)
     if denied:
         return denied
     from .models import AdminToolCard
@@ -8984,7 +9005,7 @@ def admin_tool_card_save(request: HttpRequest) -> JsonResponse:
 
 @require_POST
 def admin_tool_card_delete(request: HttpRequest) -> JsonResponse:
-    denied = _admin_tool_staff_denied(request)
+    denied = _admin_tool_menu_denied(request)
     if denied:
         return denied
     from .models import AdminToolCard
@@ -9000,7 +9021,7 @@ def admin_tool_card_reorder(request: HttpRequest) -> JsonResponse:
 
     Body: {"items": [{"id": 1, "section": "private"}, ...]} in desired order.
     """
-    denied = _admin_tool_staff_denied(request)
+    denied = _admin_tool_menu_denied(request)
     if denied:
         return denied
     from .models import AdminToolCard
@@ -9026,7 +9047,7 @@ def admin_tool_card_reorder(request: HttpRequest) -> JsonResponse:
 @require_POST
 def admin_tool_card_reset(request: HttpRequest) -> JsonResponse:
     """Wipe all cards and re-seed defaults."""
-    denied = _admin_tool_staff_denied(request)
+    denied = _admin_tool_menu_denied(request)
     if denied:
         return denied
     from .models import AdminToolCard
@@ -14198,3 +14219,75 @@ def online_schedule_copy_from(request: HttpRequest, pk: int) -> HttpResponse:
             s.time_text, s.hours_per_session = src.time_text, src.hours_per_session
             s.save(update_fields=["time_text", "hours_per_session"])
     return redirect(f"{reverse('core:online_schedule_edit', args=[s.id])}?copied=1")
+
+
+
+# =========================================================
+# 👥 Sub admin tools
+# =========================================================
+def _new_sub_admin_slug() -> str:
+    import secrets
+    while True:
+        slug = secrets.token_hex(4)
+        if not SubAdminTool.objects.filter(slug=slug).exists():
+            return slug
+
+
+@login_required
+def sub_admin_manage(request: HttpRequest) -> HttpResponse:
+    """Owner-only (superuser) page to create sub admin tools and pick their cards."""
+    from django.contrib.auth.models import User
+    from .models import AdminToolCard
+    if not request.user.is_superuser:
+        return HttpResponse("เฉพาะเจ้าของระบบเท่านั้น", status=403)
+
+    if request.method == "POST":
+        action = request.POST.get("action") or "save"
+        tool = SubAdminTool.objects.filter(id=_id_or_none(request.POST.get("tool_id"))).first()
+        if action == "delete" and tool:
+            tool.delete()
+            return redirect(f"{reverse('core:sub_admin_manage')}?saved=deleted")
+        name = (request.POST.get("name") or "").strip()[:120]
+        if not name:
+            return redirect(f"{reverse('core:sub_admin_manage')}?error=name")
+        if tool is None:
+            tool = SubAdminTool(slug=_new_sub_admin_slug())
+        tool.name = name
+        tool.note = (request.POST.get("note") or "").strip()[:255]
+        tool.is_active = request.POST.get("is_active") == "on"
+        user = User.objects.filter(id=_id_or_none(request.POST.get("user_id"))).first()
+        tool.user = user if (user and not user.is_superuser) else None
+        tool.save()
+        tool.cards.set(AdminToolCard.objects.filter(id__in=[_id_or_none(x) for x in request.POST.getlist("card_ids")]))
+        return redirect(f"{reverse('core:sub_admin_manage')}?saved={tool.id}#tool-{tool.id}")
+
+    cards = list(AdminToolCard.objects.all())
+    tools = list(SubAdminTool.objects.select_related("user").prefetch_related("cards"))
+    for t in tools:
+        t.card_ids = {c.id for c in t.cards.all()}
+        t.link = request.build_absolute_uri(reverse("core:sub_admin_page", args=[t.slug]))
+    taken = {t.user_id: t.name for t in tools if t.user_id}
+    users = [{"id": u.id, "label": (u.get_full_name() or u.username) + (f" ({u.username})" if u.get_full_name() else ""),
+              "taken_by": taken.get(u.id, "")}
+             for u in User.objects.filter(is_active=True, is_superuser=False).order_by("username")]
+    return render(request, "core/sub_admin_manage.html", {
+        "tools": tools,
+        "cards": cards,
+        "users": users,
+        "saved": request.GET.get("saved") or "",
+        "error": request.GET.get("error") or "",
+    })
+
+
+@login_required
+def sub_admin_page(request: HttpRequest, slug: str) -> HttpResponse:
+    """The admin's own page: only the cards the owner picked, no editing."""
+    tool = get_object_or_404(SubAdminTool.objects.prefetch_related("cards"), slug=slug)
+    if not (request.user.is_superuser or (tool.is_active and tool.user_id == request.user.id)):
+        return HttpResponse("ไม่มีสิทธิ์เข้าหน้านี้", status=403)
+    cards = sorted(tool.cards.all(), key=lambda c: (c.section != "operation", c.order, c.id))
+    return render(request, "core/sub_admin_page.html", {
+        "tool": tool,
+        "cards": cards,
+        "is_owner_preview": request.user.is_superuser,
+    })

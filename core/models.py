@@ -3617,3 +3617,29 @@ class OnlineScheduleTestTutor(models.Model):
 
     class Meta:
         ordering = ("work_date", "id")
+
+
+
+class SubAdminTool(models.Model):
+    """A cut-down admin tool page for one admin: the owner picks which main
+    admin-tool cards appear. The admin can only open it, never edit it."""
+
+    name = models.CharField("ชื่อหน้า / ชื่อแอดมิน", max_length=120)
+    slug = models.SlugField("ลิงก์", max_length=40, unique=True)
+    user = models.ForeignKey(
+        "auth.User", verbose_name="บัญชีผู้ใช้ของแอดมิน", on_delete=models.SET_NULL,
+        null=True, blank=True, related_name="sub_admin_tools",
+    )
+    cards = models.ManyToManyField("AdminToolCard", verbose_name="เมนูที่ให้ใช้", blank=True, related_name="sub_admin_tools")
+    note = models.CharField("ข้อความต้อนรับ", max_length=255, blank=True)
+    is_active = models.BooleanField("ใช้งาน", default=True)
+    created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Sub Admin Tool"
+        verbose_name_plural = "Sub Admin Tools"
+        ordering = ("name",)
+
+    def __str__(self) -> str:
+        return self.name

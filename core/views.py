@@ -8638,7 +8638,7 @@ def pkanoon_admin_tool(request: HttpRequest) -> HttpResponse:
         "binding_type_choices": SheetPrintOrder.BindingType.choices,
         "spine_color_choices": _print_color_choices(),
         "default_print_due_date": timezone.localdate() + timedelta(days=3),
-        "is_owner": bool(request.user.is_authenticated and request.user.is_superuser),
+        "is_owner": _is_tool_owner(request.user),
         "students_json": json.dumps(_allocation_students_json(), ensure_ascii=False),
         "student_enrollments_json": json.dumps(_active_enrollment_summaries_by_student(), ensure_ascii=False),
         **_money_widget_context(),
@@ -8949,6 +8949,16 @@ def _sub_admin_tool_for(user):
     if not user or not user.is_authenticated or user.is_superuser:
         return None
     return SubAdminTool.objects.filter(user=user, is_active=True).first()
+
+
+def _is_tool_owner(user) -> bool:
+    """Who may manage sub admin tools: superusers, and staff accounts that
+    are not themselves a sub-admin."""
+    if not user or not user.is_authenticated:
+        return False
+    if user.is_superuser:
+        return True
+    return bool(user.is_staff and not SubAdminTool.objects.filter(user=user).exists())
 
 
 def _admin_tool_menu_denied(request: HttpRequest) -> JsonResponse | None:
@@ -14228,7 +14238,7 @@ def sub_admin_manage(request: HttpRequest) -> HttpResponse:
     """Owner-only (superuser) page to create sub admin tools and pick their cards."""
     from django.contrib.auth.models import User
     from .models import AdminToolCard
-    if not request.user.is_superuser:
+    if not _is_tool_owner(request.user):
         return HttpResponse("เฉพาะเจ้าของระบบเท่านั้น", status=403)
 
     if request.method == "POST":
@@ -14246,7 +14256,7 @@ def sub_admin_manage(request: HttpRequest) -> HttpResponse:
         tool.note = (request.POST.get("note") or "").strip()[:255]
         tool.is_active = request.POST.get("is_active") == "on"
         user = User.objects.filter(id=_id_or_none(request.POST.get("user_id"))).first()
-        tool.user = user if (user and not user.is_superuser) else None
+        tool.user = user if (user and not user.is_superuser and user.id != request.user.id) else None
         tool.save()
         tool.cards.set(AdminToolCard.objects.filter(id__in=[_id_or_none(x) for x in request.POST.getlist("card_ids")]))
         return redirect(f"{reverse('core:sub_admin_manage')}?saved={tool.id}#tool-{tool.id}")
@@ -14259,7 +14269,7 @@ def sub_admin_manage(request: HttpRequest) -> HttpResponse:
     taken = {t.user_id: t.name for t in tools if t.user_id}
     users = [{"id": u.id, "label": (u.get_full_name() or u.username) + (f" ({u.username})" if u.get_full_name() else ""),
               "taken_by": taken.get(u.id, "")}
-             for u in User.objects.filter(is_active=True, is_superuser=False).order_by("username")]
+             for u in User.objects.filter(is_active=True, is_superuser=False).exclude(id=request.user.id).order_by("username")]
     return render(request, "core/sub_admin_manage.html", {
         "tools": tools,
         "cards": cards,
@@ -14273,11 +14283,11 @@ def sub_admin_manage(request: HttpRequest) -> HttpResponse:
 def sub_admin_page(request: HttpRequest, slug: str) -> HttpResponse:
     """The admin's own page: only the cards the owner picked, no editing."""
     tool = get_object_or_404(SubAdminTool.objects.prefetch_related("cards"), slug=slug)
-    if not (request.user.is_superuser or (tool.is_active and tool.user_id == request.user.id)):
+    if not (_is_tool_owner(request.user) or (tool.is_active and tool.user_id == request.user.id)):
         return HttpResponse("ไม่มีสิทธิ์เข้าหน้านี้", status=403)
     cards = sorted(tool.cards.all(), key=lambda c: (c.section != "operation", c.order, c.id))
     return render(request, "core/sub_admin_page.html", {
         "tool": tool,
         "cards": cards,
-        "is_owner_preview": request.user.is_superuser,
+        "is_owner_preview": _is_tool_owner(request.user),
     })

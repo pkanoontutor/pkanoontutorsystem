@@ -100,7 +100,8 @@ urlpatterns = [
     path("online-schedule/", views.online_schedule_list, name="online_schedule_list"),
     path("online-schedule/<int:pk>/edit/", views.online_schedule_edit, name="online_schedule_edit"),
     path("online-schedule/<int:pk>/", views.online_schedule_view, name="online_schedule_view"),
-    path("online-schedule/<int:pk>/send-payroll/", views.online_schedule_send_payroll, name="online_schedule_send_payroll"),
+    path("online-schedule/<int:pk>/data/", views.online_schedule_data, name="online_schedule_data"),
+    path("online-schedule/<int:pk>/copy-from/", views.online_schedule_copy_from, name="online_schedule_copy_from"),
     path("memos/api/", views.memo_api, name="memo_api"),
     path("memos/board/", views.memo_board, name="memo_board"),
     path("memos/board/toggle/", views.memo_board_toggle, name="memo_board_toggle"),
@@ -215,6 +216,7 @@ urlpatterns = [
     path("teaching-schedule/rooms/", views.teaching_schedule_rooms, name="teaching_schedule_rooms"),
     path("teaching-schedule/tutors/", views.teaching_schedule_tutor_profiles, name="teaching_schedule_tutor_profiles"),
     path("teaching-schedule/image/<int:pk>/send-payroll/", views.teaching_schedule_send_payroll, name="teaching_schedule_send_payroll"),
+    path("teaching-schedule/image/<int:pk>/send-online-payroll/", views.teaching_schedule_send_online_payroll, name="teaching_schedule_send_online_payroll"),
 
     # Generate course notice
     path("generate/course-notice/", views.generate_course_notice, name="generate_course_notice"),

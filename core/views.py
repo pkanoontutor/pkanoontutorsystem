@@ -11449,6 +11449,21 @@ def teaching_schedule_editor(request: HttpRequest) -> HttpResponse:
     if request.method == "POST":
         action = (request.POST.get("action") or "").strip()
 
+        if action == "copy_from":
+            src = DailySchedule.objects.filter(id=_id_or_none(request.POST.get("source_id"))).exclude(id=schedule.id).first()
+            if src:
+                with transaction.atomic():
+                    schedule.cells.all().delete()
+                    for pc in src.cells.all():
+                        DailyScheduleCell.objects.create(
+                            schedule=schedule, room_id=pc.room_id, time_index=pc.time_index,
+                            tutoring_class_id=pc.tutoring_class_id,
+                            subject_template_id=pc.subject_template_id,
+                            tutor_id=pc.tutor_id,
+                            grade_label=pc.grade_label, subject_label=pc.subject_label,
+                        )
+            return redirect(f"/teaching-schedule/edit/?date={d.isoformat()}&copied=1")
+
         if action == "carry_forward":
             prev = _previous_same_weekday_schedule(d)
             if prev:
@@ -11516,6 +11531,10 @@ def teaching_schedule_editor(request: HttpRequest) -> HttpResponse:
         })
 
     has_previous = _previous_same_weekday_schedule(d) is not None
+    older = list(DailySchedule.objects.exclude(id=schedule.id).filter(date__lt=d).order_by("-date")[:40])
+    copy_choices = [{"id": o.id, "label": _thai_schedule_date(o.date), "same_day": o.date.weekday() == d.weekday(),
+                     "count": o.cells.count()} for o in older]
+    copy_choices.sort(key=lambda c: not c["same_day"])   # same weekday first, each group newest first
 
     rooms_payload = []
     for r in rooms:
@@ -11543,6 +11562,8 @@ def teaching_schedule_editor(request: HttpRequest) -> HttpResponse:
         "editor_rows": editor_rows,
         "tutors": tutors,
         "has_previous": has_previous,
+        "copy_choices": copy_choices,
+        "copied": request.GET.get("copied") == "1",
         "class_data_json": json.dumps(class_data, ensure_ascii=False),
         "tutors_json": json.dumps(
             [{"id": t.id, "name": t.name, "color": color_map.get(t.id, t.color)} for t in tutors],
@@ -11631,6 +11652,11 @@ def teaching_schedule_image(request: HttpRequest, pk: int) -> HttpResponse:
         payroll_sent = int(request.GET.get("payroll_sent") or 0)
     except ValueError:
         payroll_sent = 0
+    online_week = None
+    if request.GET.get("online"):
+        online_week = OnlineSchedule.objects.filter(id=_id_or_none(request.GET.get("online"))).first()
+    online_week = online_week or _online_week_before(schedule.date)
+    online_rows = _online_payroll_by_tutor(online_week) if online_week else []
 
     return render(request, "core/teaching_schedule_image.html", {
         "schedule": schedule,
@@ -11644,6 +11670,13 @@ def teaching_schedule_image(request: HttpRequest, pk: int) -> HttpResponse:
         "footer_note": footer_note,
         "payroll_rows": payroll_rows,
         "payroll_sent": payroll_sent,
+        "embed": request.GET.get("embed") == "1",
+        "online_week": online_week,
+        "online_week_label": _online_range_label(online_week) if online_week else "",
+        "online_rows": online_rows,
+        "online_total": sum((r["amount"] for r in online_rows), Decimal("0")),
+        "online_choices": [{"id": o.id, "label": _online_range_label(o)} for o in OnlineSchedule.objects.order_by("-start_date")[:20]],
+        "online_sent": request.GET.get("online_sent") or "",
     })
 
 
@@ -14043,61 +14076,125 @@ def online_schedule_edit(request: HttpRequest, pk: int) -> HttpResponse:
         "tutors": tutors,
         "grades": ONLINE_GRADE_CHOICES,
         "sheet_codes": list(Sheet.objects.filter(is_active=True).order_by("code").values_list("code", flat=True)),
+        "sheet_options": list(Sheet.objects.filter(is_active=True).select_related("subject").order_by("grade_level", "code")),
+        "subject_options": sorted(set(Subject.objects.filter(is_active=True).values_list("name", flat=True))
+                                  | {"คณิตศาสตร์", "วิทยาศาสตร์", "ภาษาอังกฤษ", "ภาษาไทย", "สังคมศึกษา"}
+                                  | set(OnlineScheduleRow.objects.values_list("subject", flat=True).distinct()[:100])),
+        "other_weeks": [{"id": o.id, "label": _online_range_label(o), "rows": o.rows.count()}
+                        for o in OnlineSchedule.objects.exclude(id=s.id).order_by("-start_date")[:40]],
         "saved": request.GET.get("saved") == "1",
+        "copied": request.GET.get("copied") == "1",
     })
 
 
 def online_schedule_view(request: HttpRequest, pk: int) -> HttpResponse:
     s = get_object_or_404(OnlineSchedule, pk=pk)
     is_staff = bool(request.user.is_authenticated and request.user.is_staff)
-    payroll = _online_payroll_rows(s) if is_staff else []
     return render(request, "core/online_schedule_view.html", {
         "s": s,
         "range_label": _online_range_label(s),
         "sections": _online_sections(s),
-        "payroll_rows": payroll,
-        "payroll_total": sum((r["amount"] for r in payroll), Decimal("0")),
-        "rate": ONLINE_HOURLY_RATE,
         "can_edit": is_staff,
-        "payroll_sent": request.GET.get("payroll_sent") or "",
     })
+
+
+def _online_payroll_by_tutor(s) -> list[dict]:
+    """The week's online pay rolled up per tutor (paid on the weekend that
+    follows the online week)."""
+    per: dict[int, dict] = {}
+    for r in _online_payroll_rows(s):
+        t = per.setdefault(r["tutor"].id, {"tutor": r["tutor"], "teach": Decimal("0"), "test": Decimal("0"),
+                                           "hours": Decimal("0"), "amount": Decimal("0"), "subjects": []})
+        t["teach"] += r["teach"]
+        t["test"] += r["test"]
+        t["hours"] += r["hours"]
+        t["amount"] += r["amount"]
+        t["subjects"] += ["%s %s" % (r["date_label"].rsplit(" ", 1)[0], x) for x in r["subjects"]]
+    return sorted(per.values(), key=lambda x: x["tutor"].name)
+
+
+def _online_week_before(d: date):
+    """The online week whose lessons end in the 7 days before this weekend
+    day (Mon-Fri 12-16 -> paid on Sat/Sun 17-18)."""
+    return (OnlineSchedule.objects.filter(end_date__lt=d, end_date__gte=d - timedelta(days=8))
+            .order_by("-end_date").first())
 
 
 @require_POST
 @login_required
-def online_schedule_send_payroll(request: HttpRequest, pk: int) -> HttpResponse:
-    """Write approved (tutor, day) online hours into TutorPayrollEntry:
-    online_teaching_hours at the flat online rate, no travel fee. Only the
-    online part of an existing day entry is replaced, so onsite pay on the
-    same day is untouched; re-sending is idempotent."""
-    from .models import Tutor, TutorPayrollEntry
-    s = get_object_or_404(OnlineSchedule, pk=pk)
-    approved = set(request.POST.getlist("keys"))
+def teaching_schedule_send_online_payroll(request: HttpRequest, pk: int) -> HttpResponse:
+    """From the weekend schedule page: pay the previous online week. The pay
+    is dated on this weekend day; only the online part of that day's entry
+    is replaced (onsite pay untouched), so re-sending is idempotent."""
+    from .models import DailySchedule, Tutor, TutorPayrollEntry
+    schedule = get_object_or_404(DailySchedule, pk=pk)
+    online = get_object_or_404(OnlineSchedule, pk=_id_or_none(request.POST.get("online_id")))
+    approved = set(request.POST.getlist("tutor_ids"))
     sent = 0
     with transaction.atomic():
-        for row in _online_payroll_rows(s):
-            if row["key"] not in approved:
-                continue
+        for row in _online_payroll_by_tutor(online):
             tt = row["tutor"]
+            if str(tt.id) not in approved:
+                continue
             payroll_tutor = tt.payroll_tutor
             if payroll_tutor is None:
                 payroll_tutor, _ = Tutor.objects.get_or_create(name=tt.name.strip(), defaults={"is_active": True})
                 tt.payroll_tutor = payroll_tutor
                 tt.save(update_fields=["payroll_tutor"])
-            entry, _ = TutorPayrollEntry.objects.get_or_create(work_date=row["date"], tutor=payroll_tutor)
+            entry, _ = TutorPayrollEntry.objects.get_or_create(work_date=schedule.date, tutor=payroll_tutor)
             entry.online_teaching_hours = row["hours"]
             entry.online_hourly_rate_override = ONLINE_HOURLY_RATE
-            parts = ["ออนไลน์: " + ", ".join(row["subjects"])] if row["subjects"] else []
+            line = "ออนไลน์สัปดาห์ %s: %d คาบ" % (_online_range_label(online), len(row["subjects"]))
             if row["test"]:
-                parts.append("เฉลยเทส +%s ชม." % row["test"].normalize())
-            line = " · ".join(parts)
-            if line and line not in (entry.note or ""):
+                line += " · เฉลยเทส +%s ชม." % row["test"].normalize()
+            if line not in (entry.note or ""):
                 entry.note = (entry.note + "\n" + line).strip() if entry.note else line
             if not entry.teaching_hours:
                 entry.travel_fee_override = Decimal("0")   # online only: no travel
             entry.save()
             sent += 1
         if sent:
-            s.payroll_sent_at = timezone.now()
-            s.save(update_fields=["payroll_sent_at"])
-    return redirect(f"{reverse('core:online_schedule_view', args=[s.id])}?payroll_sent={sent}")
+            online.payroll_sent_at = timezone.now()
+            online.save(update_fields=["payroll_sent_at"])
+    return redirect(f"/teaching-schedule/image/{schedule.id}/?online_sent={sent}")
+
+
+# --- copy a previous week (preview first) ---------------------------------
+def _online_rows_payload(s) -> dict:
+    return {
+        "id": s.id, "range_label": _online_range_label(s), "time_text": s.time_text,
+        "sections": [{"grade": sec["grade"], "rows": [{
+            "day": x["day"], "date_label": x["date_label"], "subject": x["row"].subject,
+            "tutor": x["row"].tutor.name if x["row"].tutor_id else "", "sheet": x["row"].sheet_code,
+        } for x in sec["rows"]]} for sec in _online_sections(s)],
+        "tests": [{"tutor": t.tutor.name, "date_label": _thai_date_short_be(t.work_date), "hours": str(t.hours.normalize())}
+                  for t in s.test_tutors.select_related("tutor")],
+    }
+
+
+@login_required
+def online_schedule_data(request: HttpRequest, pk: int) -> JsonResponse:
+    return JsonResponse(_online_rows_payload(get_object_or_404(OnlineSchedule, pk=pk)))
+
+
+@require_POST
+@login_required
+def online_schedule_copy_from(request: HttpRequest, pk: int) -> HttpResponse:
+    """Replace this week's lessons (and test-answer tutors) with another
+    week's, keeping each lesson on the same weekday offset from the start."""
+    s = get_object_or_404(OnlineSchedule, pk=pk)
+    src = get_object_or_404(OnlineSchedule, pk=_id_or_none(request.POST.get("source_id")))
+    if src.id != s.id:
+        shift = s.start_date - src.start_date
+        with transaction.atomic():
+            s.rows.all().delete()
+            for r in src.rows.all():
+                OnlineScheduleRow.objects.create(schedule=s, grade_label=r.grade_label, lesson_date=r.lesson_date + shift,
+                                                 subject=r.subject, tutor_id=r.tutor_id, sheet_code=r.sheet_code, order=r.order)
+            s.test_tutors.all().delete()
+            for t in src.test_tutors.all():
+                OnlineScheduleTestTutor.objects.create(schedule=s, tutor_id=t.tutor_id, work_date=t.work_date + shift,
+                                                       hours=t.hours, note=t.note)
+            s.time_text, s.hours_per_session = src.time_text, src.hours_per_session
+            s.save(update_fields=["time_text", "hours_per_session"])
+    return redirect(f"{reverse('core:online_schedule_edit', args=[s.id])}?copied=1")

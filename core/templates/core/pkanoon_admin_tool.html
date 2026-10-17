@@ -285,6 +285,24 @@
   .rt-mini-btn.receipt{background:var(--accent);border-color:var(--accent);color:#fff;}
   .rt-mini-btn.receipt:hover{background:var(--accent-strong);border-color:var(--accent-strong);color:#fff;}
 
+  /* Memo / checklist panel */
+  .memo-panel{background:#fffdf5;border:1px solid #fde68a;border-radius:14px;padding:12px;}
+  .memo-add{display:grid;grid-template-columns:minmax(180px,2fr) minmax(110px,1fr) 140px minmax(150px,1.3fr) auto;gap:6px;margin-bottom:8px;}
+  .memo-add input,.memo-add select{font-family:inherit;font-size:12.5px;padding:7px 9px;border-radius:9px;border:1px solid var(--line-strong);background:var(--panel);color:var(--ink);min-width:0;}
+  .memo-list{display:grid;gap:6px;}
+  .memo-item{display:flex;align-items:flex-start;gap:9px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 10px;}
+  .memo-item input[type=checkbox]{width:18px;height:18px;margin-top:2px;accent-color:#16a34a;flex:none;cursor:pointer;}
+  .memo-main{flex:1;min-width:0;}
+  .memo-text{font-size:13px;font-weight:700;color:var(--ink);word-break:break-word;}
+  .memo-meta{display:flex;gap:8px;flex-wrap:wrap;margin-top:3px;font-size:11px;font-weight:700;color:var(--ink-soft);}
+  .memo-item.overdue{border-color:#fca5a5;background:#fef2f2;} .memo-item.overdue .memo-due{color:#b91c1c;}
+  .memo-item.today{border-color:#fcd34d;background:#fffbeb;} .memo-item.today .memo-due{color:#b45309;}
+  .memo-item.done-anim{opacity:.4;text-decoration:line-through;}
+  .card-memos{width:100%;display:grid;gap:4px;}
+  .card-memos:empty{display:none;}
+  .card-memo{font-size:11.5px;font-weight:700;color:#92400e;background:#fffbeb;border:1px dashed #fcd34d;border-radius:8px;padding:4px 8px;}
+  .card-memo.overdue{color:#b91c1c;border-color:#fca5a5;background:#fef2f2;}
+  @media(max-width:760px){.memo-add{grid-template-columns:1fr 1fr;}.memo-add input[name=text]{grid-column:1/-1;}}
   /* ⋯ menu for the less-used admission buttons */
   .rt-more{position:relative;}
   .rt-more-btn{font-size:15px;line-height:1;padding:3px 10px;}
@@ -500,9 +518,10 @@
   <details class="rt-details">
     <summary class="rt-summary">
       <span class="rt-summary-title">📡 ภาพรวมเรียลไทม์</span>
-      <span class="rt-summary-hint">นักเรียนที่จะมาเสาร์-อาทิตย์นี้ · ชีทใกล้หมด — กดเพื่อซ่อน/แสดง</span>
+      <span class="rt-summary-hint">{% if memo_open_count %}📝 งานค้าง {{ memo_open_count }} · {% endif %}นักเรียนที่จะมาเสาร์-อาทิตย์นี้ · ชีทใกล้หมด — กดเพื่อซ่อน/แสดง</span>
     </summary>
     <div class="rt-body">
+      {% include "core/_memo_panel.html" %}
       <div class="rt-cols">
         <div>
           <div class="rt-block-title" style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
@@ -519,6 +538,9 @@
                   <div class="rt-row-meta">{{ a.full_name }} · {{ a.grade_label }} · {{ a.date_label }} · {{ a.time_slot_label }}</div>
                 </div>
                 {% include "core/_admission_sheet_panel.html" %}
+                <div class="card-memos" data-card-memos>
+                  {% for m in a.memos %}<div class="card-memo{% if m.overdue %} overdue{% endif %}">📝 {{ m.text }}{% if m.owner %} · 👤 {{ m.owner }}{% endif %}{% if m.due %} · 📅 {{ m.due_label }}{% endif %}</div>{% endfor %}
+                </div>
                 <div class="rt-row-actions">
                   <button class="rt-mini-btn" type="button" data-sheet-do="reserve" data-admission-id="{{ a.id }}" title="สำรองชีททุกเล่มที่ต้องใช้ (ตัดจากคลัง สถานะรอแจก)">📌 สำรองชีท</button>
                   <button class="rt-mini-btn receipt" type="button" data-sheet-do="hand_out" data-admission-id="{{ a.id }}" title="แจกชีททุกเล่มแล้ว (ตัด stock)">📤 แจกชีทแล้ว</button>
@@ -528,6 +550,7 @@
                   <div class="rt-more">
                     <button class="rt-mini-btn rt-more-btn" type="button" data-more-toggle aria-label="ตัวเลือกเพิ่มเติม">⋯</button>
                     <div class="rt-more-menu" hidden>
+                      <button type="button" data-card-memo data-admission-id="{{ a.id }}" data-nickname="{{ a.nickname }}">📝 เพิ่มโน้ต / งานที่ต้องทำ</button>
                       <button type="button" data-mark-attended data-admission-id="{{ a.id }}">✅ มาแล้ว</button>
                       <a href="/course-payments/new/?admission_id={{ a.id }}">🧾 สร้างใบเสร็จ</a>
                       <button type="button" data-paid-signup data-admission-id="{{ a.id }}" {% if a.paid_on_signup %}disabled{% endif %}>💳 สมัครและจ่ายแล้ว</button>
@@ -704,6 +727,7 @@
     dismissLowStock: "{% url 'core:admin_tool_dismiss_low_stock_sheet' %}",
     admissionAction: "{% url 'core:admin_tool_admission_action' %}",
     admissionSheet: "{% url 'core:admin_tool_admission_sheet' %}",
+    memoApi: "{% url 'core:memo_api' %}",
     updateSheetLink: "{% url 'core:admin_tool_update_sheet_link' %}",
     createPrintOrder: "{% url 'core:admin_tool_create_print_order' %}",
     moneyAdd: "{% url 'core:admin_tool_money_add' %}",
@@ -1189,6 +1213,39 @@
         .catch(function(){ btn.disabled = false; });
     });
   })();
+
+  // ---------- Memo / checklist ----------
+  function memoCall(body){
+    return api(window.PK_URLS.memoApi, body).then(function(j){
+      var panel=document.getElementById("memoPanel");
+      if(panel && j.panel_html){ panel.insertAdjacentHTML("afterend", j.panel_html); panel.remove(); }
+      return j;
+    });
+  }
+  document.addEventListener("submit", function(e){
+    var f=e.target.closest("[data-memo-add]"); if(!f) return;
+    e.preventDefault();
+    var body={"do":"add"}; new FormData(f).forEach(function(v,k){ body[k]=v; });
+    memoCall(body);
+  });
+  document.addEventListener("click", function(e){
+    var t=e.target.closest("[data-memo-toggle]");
+    if(t){ var item=t.closest(".memo-item"); if(item) item.classList.add("done-anim");
+      setTimeout(function(){ memoCall({"do":"toggle", id:t.getAttribute("data-memo-toggle")}); }, 250); return; }
+    var d=e.target.closest("[data-memo-delete]");
+    if(d){ if(!confirm("ลบรายการนี้?")) return; memoCall({"do":"delete", id:d.getAttribute("data-memo-delete")}); return; }
+    var c=e.target.closest("[data-card-memo]");
+    if(c){
+      var text=prompt("โน้ต / งานที่ต้องทำสำหรับ "+(c.getAttribute("data-nickname")||"")+" เช่น อย่าลืมแจกชีท");
+      if(!text||!text.trim()) return;
+      var owner=prompt("ผู้รับผิดชอบ (เว้นว่างได้)")||"";
+      memoCall({"do":"add", text:text.trim(), owner:owner.trim(), admission_id:c.getAttribute("data-admission-id"), due_from_admission:1}).then(function(j){
+        var row=c.closest(".rt-row"), box=row&&row.querySelector("[data-card-memos]");
+        if(box&&j.memo){ var div=document.createElement("div"); div.className="card-memo";
+          div.textContent="📝 "+j.memo.text+(j.memo.owner?(" · 👤 "+j.memo.owner):"")+(j.memo.due_label?(" · 📅 "+j.memo.due_label):""); box.appendChild(div); }
+      });
+    }
+  });
 
   // ---------- Real-time overview: upcoming-admission actions ----------
   var admissionList=$("rtAdmissionList"), admissionCount=$("rtAdmissionCount");

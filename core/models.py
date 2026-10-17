@@ -3513,3 +3513,29 @@ class HomeworkStar(models.Model):
 
     def __str__(self) -> str:
         return f"⭐ {self.student_id} {self.lesson_date}"
+
+
+class MemoTask(models.Model):
+    """A to-do note for the owner, an admin or a tutor: free-typed owner,
+    optional due date, and an optional link to an incoming student on the
+    admin tool's real-time overview (e.g. "อย่าลืมแจกชีทให้น้อง…")."""
+
+    text = models.CharField("รายการ", max_length=500)
+    owner_name = models.CharField("ผู้รับผิดชอบ", max_length=120, blank=True)
+    due_date = models.DateField("กำหนดเสร็จ", null=True, blank=True)
+    is_done = models.BooleanField("เสร็จแล้ว", default=False)
+    done_at = models.DateTimeField("เสร็จเมื่อ", null=True, blank=True)
+    admission_inquiry = models.ForeignKey(
+        AdmissionInquiry, verbose_name="เชื่อมกับนักเรียนที่จะมาเรียน", on_delete=models.SET_NULL,
+        null=True, blank=True, related_name="memo_tasks",
+    )
+    created_by = models.ForeignKey("auth.User", on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+    created_at = models.DateTimeField("สร้างเมื่อ", default=timezone.now)
+
+    class Meta:
+        verbose_name = "Memo Task"
+        verbose_name_plural = "Memo Tasks"
+        ordering = ("is_done", "due_date", "-created_at")
+
+    def __str__(self) -> str:
+        return self.text[:60]

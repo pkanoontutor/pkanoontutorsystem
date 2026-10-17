@@ -14,7 +14,7 @@ from urllib.parse import quote
 from django import forms
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
-from django.db.models import Count, Max, Q, Sum
+from django.db.models import Count, F, Max, Q, Sum
 from django.core.files.base import ContentFile
 from django.http import JsonResponse, HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -47,6 +47,7 @@ from .models import (
     SheetAllocation,
     SheetReservation,
     HomeworkStar,
+    MemoTask,
     AdmissionInquiry,
     FinanceSetting,
     ExpenseCategory,
@@ -8286,6 +8287,7 @@ _ADMIN_TOOL_DEFAULTS = [
     ("private", "c-sand",  "⭐", "Test ย่อยรายสัปดาห์", "บันทึกผล Test ย่อยจาก Dashboard แยกตามสัปดาห์ ห้อง และระดับชั้น พร้อมหน้าสรุปสำหรับแคปส่งผู้ปกครอง", "/weekly-tests/"),
     ("operation", "c-sky",   "🏠", "Dashboard เช็คชื่อ", "กลับหน้า Dashboard หลักสำหรับเช็คชื่อ", "/dashboard/"),
     ("operation", "c-lilac", "📋", "เช็คชื่อรวม", "ตาราง Attendance รายห้องและรายคอร์ส", "/attendance-details/"),
+    ("operation", "c-sand",  "📝", "Memo / Checklist", "จดงานที่ต้องทำ กำหนดวัน และผู้รับผิดชอบ (ตัวเอง / แอดมิน / ติวเตอร์) เชื่อมกับนักเรียนในภาพรวมเรียลไทม์ได้", "/memos/"),
     ("operation", "c-sky",   "🗓️", "ตารางสอนติวเตอร์", "ตารางสอนสำหรับติวเตอร์เปิดดูเอง (ไม่ต้อง login) เลือกชื่อ/วิชาเพื่อไฮไลต์ และ Save / Share เป็นรูป", "/tutor-schedule/"),
 ]
 
@@ -8352,6 +8354,7 @@ def _upcoming_weekend_admissions() -> list[dict]:
             "paid_on_signup": inq.paid_on_signup,
             "target_class_id": inq.target_class_id,
             "sheets": _admission_sheet_panel(inq),
+            "memos": [_memo_row(m) for m in inq.memo_tasks.filter(is_done=False).order_by("due_date", "created_at")],
         })
     return rows
 
@@ -8620,6 +8623,7 @@ def pkanoon_admin_tool(request: HttpRequest) -> HttpResponse:
         "upcoming_admissions": _upcoming_weekend_admissions(),
         "low_stock_sheets": _low_stock_sheets(),
         "near_end_sheets": _near_end_sheet_flags(),
+        **_memo_panel_context(),
         "assign_classes": _active_classes_for_assign(),
         "binding_type_choices": SheetPrintOrder.BindingType.choices,
         "spine_color_choices": _print_color_choices(),
@@ -13629,4 +13633,128 @@ def tutor_schedule_view(request: HttpRequest) -> HttpResponse:
         "subjects": subjects,
         "countdowns": countdowns,
         "footer_note": footer_note,
+    })
+
+
+# =========================================================
+# 📝 Memo / Checklist
+# =========================================================
+def _memo_row(m) -> dict:
+    today = timezone.localdate()
+    inq = m.admission_inquiry
+    return {
+        "id": m.id, "text": m.text, "owner": m.owner_name, "due": m.due_date,
+        "due_label": _thai_schedule_date(m.due_date) if m.due_date else "",
+        "overdue": bool(m.due_date and not m.is_done and m.due_date < today),
+        "due_today": bool(m.due_date and not m.is_done and m.due_date == today),
+        "done": m.is_done, "done_at": m.done_at,
+        "admission_id": m.admission_inquiry_id,
+        "admission_label": (f"{inq.nickname} · {_thai_schedule_date(inq.first_lesson_date)}" if inq else ""),
+    }
+
+
+def _memo_owner_names() -> list[str]:
+    names = set(TeachingTutor.objects.filter(is_active=True).values_list("name", flat=True))
+    names |= set(MemoTask.objects.exclude(owner_name="").values_list("owner_name", flat=True).distinct()[:200])
+    return sorted(n for n in names if n)
+
+
+def _memo_admission_choices() -> list[dict]:
+    today = timezone.localdate()
+    return [
+        {"id": i.id, "label": f"{i.nickname} · {i.get_request_type_display()} · {_thai_schedule_date(i.first_lesson_date)}"}
+        for i in AdmissionInquiry.objects.filter(is_completed=False, first_lesson_date__gte=today - timedelta(days=7))
+        .order_by("first_lesson_date", "nickname")[:80]
+    ]
+
+
+def _pending_memos(limit: int = 12) -> list[dict]:
+    qs = (MemoTask.objects.select_related("admission_inquiry").filter(is_done=False)
+          .order_by(F("due_date").asc(nulls_last=True), "-created_at"))
+    return [_memo_row(m) for m in qs[:limit]]
+
+
+def _memo_panel_context() -> dict:
+    return {
+        "memos": _pending_memos(),
+        "memo_open_count": MemoTask.objects.filter(is_done=False).count(),
+        "memo_owner_names": _memo_owner_names(),
+        "memo_admission_choices": _memo_admission_choices(),
+    }
+
+
+@require_POST
+def memo_api(request: HttpRequest) -> JsonResponse:
+    """add / toggle / delete / update a memo (JSON). Returns the refreshed
+    admin-tool memo panel HTML so the page can swap it in place."""
+    denied = _admin_tool_staff_denied(request)
+    if denied:
+        return denied
+    from django.template.loader import render_to_string
+    p = _admin_tool_card_payload(request)
+    action = (p.get("do") or "").strip()
+    memo = MemoTask.objects.filter(id=_id_or_none(p.get("id"))).first() if p.get("id") else None
+
+    if action == "add":
+        text = (p.get("text") or "").strip()[:500]
+        if not text:
+            return JsonResponse({"ok": False, "error": "กรุณาพิมพ์รายการ"}, status=400)
+        inq = AdmissionInquiry.objects.filter(id=_id_or_none(p.get("admission_id"))).first() if p.get("admission_id") else None
+        due = _parse_optional_date(p.get("due_date"))
+        memo = MemoTask.objects.create(
+            text=text, owner_name=(p.get("owner") or "").strip()[:120],
+            due_date=due if due else (inq.first_lesson_date if inq and p.get("due_from_admission") else None),
+            admission_inquiry=inq, created_by=request.user if request.user.is_authenticated else None,
+        )
+    elif action in ("toggle", "delete", "update"):
+        if not memo:
+            return JsonResponse({"ok": False, "error": "ไม่พบรายการนี้"}, status=404)
+        if action == "toggle":
+            memo.is_done = not memo.is_done
+            memo.done_at = timezone.now() if memo.is_done else None
+            memo.save(update_fields=["is_done", "done_at"])
+        elif action == "delete":
+            memo.delete()
+            memo = None
+        else:
+            memo.text = (p.get("text") or memo.text).strip()[:500]
+            memo.owner_name = (p.get("owner") if p.get("owner") is not None else memo.owner_name).strip()[:120]
+            memo.due_date = _parse_optional_date(p.get("due_date"))
+            memo.save()
+    else:
+        return JsonResponse({"ok": False, "error": "ไม่รู้จักคำสั่งนี้"}, status=400)
+
+    return JsonResponse({
+        "ok": True,
+        "memo": _memo_row(memo) if memo else None,
+        "panel_html": render_to_string("core/_memo_panel.html", _memo_panel_context(), request=request),
+    })
+
+
+@login_required
+def memo_page(request: HttpRequest) -> HttpResponse:
+    if not request.user.is_staff:
+        return HttpResponse(status=403)
+    status = request.GET.get("status") or "open"
+    owner = (request.GET.get("owner") or "").strip()
+    qs = MemoTask.objects.select_related("admission_inquiry")
+    if status == "open":
+        qs = qs.filter(is_done=False).order_by(F("due_date").asc(nulls_last=True), "-created_at")
+    elif status == "done":
+        qs = qs.filter(is_done=True).order_by("-done_at")
+    else:
+        qs = qs.order_by("is_done", F("due_date").asc(nulls_last=True), "-created_at")
+    if owner:
+        qs = qs.filter(owner_name=owner)
+    return render(request, "core/memo_page.html", {
+        "rows": [_memo_row(m) for m in qs[:300]],
+        "status": status,
+        "owner": owner,
+        "counts": {
+            "open": MemoTask.objects.filter(is_done=False).count(),
+            "done": MemoTask.objects.filter(is_done=True).count(),
+        },
+        "owner_names": _memo_owner_names(),
+        "admission_choices": _memo_admission_choices(),
+        "today": timezone.localdate(),
     })

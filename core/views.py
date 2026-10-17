@@ -13569,10 +13569,11 @@ def admission_sheet_checklist(request: HttpRequest, pk: int) -> HttpResponse:
 
 
 def tutor_schedule_view(request: HttpRequest) -> HttpResponse:
-    """ตารางสอนสำหรับติวเตอร์ -- public (no login), read-only view of the
-    teaching schedule built in /teaching-schedule/. Pick a tutor or a
+    """ตารางสอนสำหรับติวเตอร์ -- public (no login), read-only copy of the
+    /teaching-schedule/ image (same template look), with an option to show
+    sheet + latest progress like the tutor version. Pick a tutor or a
     subject to grey out everything else; save/share as an image."""
-    from .models import DailySchedule, ScheduleRoom, TeachingTutor
+    from .models import DailySchedule, ScheduleRoom, TeachingTutor, ScheduleExamCountdown
     today = timezone.localdate()
     schedules = list(DailySchedule.objects.order_by("-date")[:30])
     schedule = None
@@ -13582,12 +13583,19 @@ def tutor_schedule_view(request: HttpRequest) -> HttpResponse:
     if schedule is None:
         upcoming = [s for s in schedules if s.date >= today]
         schedule = (min(upcoming, key=lambda s: s.date) if upcoming else (schedules[0] if schedules else None))
+    show_sheet = request.GET.get("sheet") == "1"
 
-    grid, tutors, subjects = [], [], []
+    grid, tutors, subjects, countdowns, footer_note = [], [], [], [], ""
     rooms = list(ScheduleRoom.objects.filter(is_active=True))
     if schedule:
         color_map = _schedule_tutor_color_map(list(TeachingTutor.objects.all()))
         grid, _ = _annotate_schedule_grid(schedule, color_map=color_map)
+        if show_sheet:
+            progress = _schedule_progress_map(schedule)
+            for row in grid:
+                for rc in row["rooms"]:
+                    c = rc.get("cell")
+                    rc["progress"] = progress.get(c.subject_template_id) if (c and c.subject_template_id) else None
         tset, sset = {}, set()
         for row in grid:
             for rc in row["rooms"]:
@@ -13599,12 +13607,24 @@ def tutor_schedule_view(request: HttpRequest) -> HttpResponse:
         tutors = sorted(({"id": k, "name": v[0], "color": v[1]} for k, v in tset.items()), key=lambda t: t["name"])
         subjects = sorted(sset)
 
+        qs = ScheduleExamCountdown.objects.filter(is_active=True)
+        qs = qs.filter(show_on_saturday=True) if schedule.date.weekday() == 5 else qs.filter(show_on_sunday=True)
+        countdowns = [{
+            "grade_label": e.grade_label, "days": (e.exam_date - schedule.date).days,
+            "exam_date_th": _thai_date_short_be(e.exam_date), "note": e.note,
+        } for e in qs]
+        footer_note = countdowns[0]["note"] if (countdowns and countdowns[0]["note"]) else ""
+
     return render(request, "core/tutor_schedule_view.html", {
         "schedule": schedule,
         "thai_date": _thai_schedule_date(schedule.date) if schedule else "",
+        "is_sunday": bool(schedule and schedule.date.weekday() == 6),
+        "show_sheet": show_sheet,
         "schedule_dates": [{"value": s.date.isoformat(), "label": _thai_schedule_date(s.date)} for s in sorted(schedules, key=lambda s: s.date, reverse=True)],
         "rooms": rooms,
         "grid": grid,
         "tutors": tutors,
         "subjects": subjects,
+        "countdowns": countdowns,
+        "footer_note": footer_note,
     })

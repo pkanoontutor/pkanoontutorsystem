@@ -8286,6 +8286,7 @@ _ADMIN_TOOL_DEFAULTS = [
     ("private", "c-sand",  "⭐", "Test ย่อยรายสัปดาห์", "บันทึกผล Test ย่อยจาก Dashboard แยกตามสัปดาห์ ห้อง และระดับชั้น พร้อมหน้าสรุปสำหรับแคปส่งผู้ปกครอง", "/weekly-tests/"),
     ("operation", "c-sky",   "🏠", "Dashboard เช็คชื่อ", "กลับหน้า Dashboard หลักสำหรับเช็คชื่อ", "/dashboard/"),
     ("operation", "c-lilac", "📋", "เช็คชื่อรวม", "ตาราง Attendance รายห้องและรายคอร์ส", "/attendance-details/"),
+    ("operation", "c-sky",   "🗓️", "ตารางสอนติวเตอร์", "ตารางสอนสำหรับติวเตอร์เปิดดูเอง (ไม่ต้อง login) เลือกชื่อ/วิชาเพื่อไฮไลต์ และ Save / Share เป็นรูป", "/tutor-schedule/"),
 ]
 
 _ADMIN_TOOL_COLORS = {"c-sky", "c-teal", "c-sage", "c-clay", "c-sand", "c-rose", "c-lilac", "c-stone"}

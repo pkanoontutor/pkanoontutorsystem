@@ -3570,3 +3570,50 @@ class SnackShopEntry(models.Model):
 
     def __str__(self) -> str:
         return f"{self.entry_date} {self.get_kind_display()} {self.amount}"
+
+
+class OnlineSchedule(models.Model):
+    """ปฏิทินตารางเรียน Online for one week (usually Mon-Fri evenings)."""
+
+    start_date = models.DateField("วันที่เริ่ม")
+    end_date = models.DateField("วันที่สิ้นสุด")
+    time_text = models.CharField("เวลาเรียน", max_length=60, default="19.00-20.00น.")
+    hours_per_session = models.DecimalField("ชั่วโมงต่อคาบ", max_digits=4, decimal_places=2, default=1)
+    note = models.CharField("หมายเหตุใต้ตาราง", max_length=255, blank=True)
+    payroll_sent_at = models.DateTimeField("ส่งค่าติวเตอร์ล่าสุด", null=True, blank=True)
+    created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Online Schedule"
+        verbose_name_plural = "Online Schedules"
+        ordering = ("-start_date",)
+
+    def __str__(self) -> str:
+        return f"ตารางออนไลน์ {self.start_date} - {self.end_date}"
+
+
+class OnlineScheduleRow(models.Model):
+    schedule = models.ForeignKey(OnlineSchedule, on_delete=models.CASCADE, related_name="rows")
+    grade_label = models.CharField("ระดับชั้น", max_length=40)
+    lesson_date = models.DateField("วันที่เรียน")
+    subject = models.CharField("วิชา", max_length=120)
+    tutor = models.ForeignKey("TeachingTutor", on_delete=models.SET_NULL, null=True, blank=True, related_name="online_rows")
+    sheet_code = models.CharField("รหัสชีท", max_length=80, blank=True)
+    order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ("order", "lesson_date", "id")
+
+
+class OnlineScheduleTestTutor(models.Model):
+    """ติวเตอร์เฉลยเทส: paid extra hours, never shown on the timetable."""
+
+    schedule = models.ForeignKey(OnlineSchedule, on_delete=models.CASCADE, related_name="test_tutors")
+    tutor = models.ForeignKey("TeachingTutor", on_delete=models.CASCADE, related_name="online_test_duties")
+    work_date = models.DateField("วันที่เฉลยเทส")
+    hours = models.DecimalField("ชั่วโมงที่ได้", max_digits=4, decimal_places=2, default=2)
+    note = models.CharField("หมายเหตุ", max_length=255, blank=True)
+
+    class Meta:
+        ordering = ("work_date", "id")

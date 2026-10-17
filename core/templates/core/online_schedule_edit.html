@@ -1,0 +1,140 @@
+{% extends "core/base.html" %}
+{% block title %}แก้ไขตารางเรียน Online{% endblock %}
+{% block head %}
+<style>
+  .oe-wrap{max-width:1080px;margin:0 auto;display:grid;gap:12px;padding-bottom:30px;}
+  .oe-hero{background:linear-gradient(120deg,#6366f1,#8b5cf6 60%,#ec4899);color:#fff;border-radius:20px;padding:16px 20px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center;}
+  .oe-hero h1{margin:0;font-size:21px;font-weight:1000;}
+  .oe-panel{background:#fff;border-radius:16px;padding:14px;box-shadow:0 4px 12px rgba(15,23,42,.07);}
+  .oe-title{font-size:15px;font-weight:1000;color:#0f172a;margin:0 0 4px;}
+  .oe-hint{font-size:12px;font-weight:700;color:#64748b;margin-bottom:10px;}
+  .grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;}
+  label.f{font-size:11px;font-weight:1000;color:#475569;display:block;margin-bottom:4px;}
+  input,select{width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:10px;padding:8px 10px;font-family:inherit;font-weight:700;font-size:13.5px;background:#fff;}
+  table{width:100%;border-collapse:separate;border-spacing:0 6px;}
+  th{font-size:11px;font-weight:1000;color:#64748b;text-align:left;padding:0 4px;}
+  td{padding:0 4px;vertical-align:middle;}
+  .rm{border:1px solid #fecaca;background:#fff;color:#b91c1c;border-radius:9px;width:32px;height:34px;font-weight:1000;cursor:pointer;}
+  .btn{border:0;border-radius:12px;padding:10px 16px;font-weight:1000;cursor:pointer;font-family:inherit;font-size:14px;background:#6366f1;color:#fff;text-decoration:none;display:inline-flex;align-items:center;gap:6px;}
+  .btn.soft{background:#eef2ff;color:#4338ca;} .btn.add{background:#f1f5f9;color:#334155;} .btn.green{background:#16a34a;} .btn.red{background:#fff;color:#b91c1c;border:1px solid #fecaca;}
+  .actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;}
+  .saved{background:#f0fdf4;color:#166534;border-radius:12px;padding:9px 12px;font-weight:900;font-size:13px;}
+  .test-box{background:#fffbeb;border:1px solid #fde68a;}
+  @media(max-width:760px){.grid4{grid-template-columns:1fr 1fr;} table,thead,tbody,tr,td{display:block;} thead{display:none;} tr{border:1px solid #e2e8f0;border-radius:12px;padding:8px;margin-bottom:8px;display:grid;grid-template-columns:1fr 1fr;gap:6px;} td{padding:0;}}
+</style>
+{% endblock %}
+{% block content %}
+<form class="oe-wrap" method="post" id="oeForm">
+  {% csrf_token %}
+  <div class="oe-hero">
+    <h1>✏️ ตารางเรียน Online · {{ s.start_date|date:"d/m/Y" }} – {{ s.end_date|date:"d/m/Y" }}</h1>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;">
+      <a class="btn soft" href="{% url 'core:online_schedule_list' %}">📅 ตารางทั้งหมด</a>
+      <a class="btn soft" href="{% url 'core:online_schedule_view' s.id %}">🖼️ ดูตาราง</a>
+    </div>
+  </div>
+  {% if saved %}<div class="saved">✅ บันทึกแล้ว</div>{% endif %}
+
+  <div class="oe-panel">
+    <div class="oe-title">ข้อมูลสัปดาห์</div>
+    <div class="grid4">
+      <div><label class="f">วันที่เริ่ม</label><input type="date" name="start_date" value="{{ s.start_date|date:'Y-m-d' }}"></div>
+      <div><label class="f">วันที่สิ้นสุด</label><input type="date" name="end_date" value="{{ s.end_date|date:'Y-m-d' }}"></div>
+      <div><label class="f">เวลาเรียน (แสดงบนหัวตาราง)</label><input type="text" name="time_text" value="{{ s.time_text }}" placeholder="19.00-20.00น."></div>
+      <div><label class="f">ชั่วโมงต่อคาบ (ใช้คิดค่าติวเตอร์)</label><input type="number" step="0.25" min="0.25" name="hours_per_session" value="{{ s.hours_per_session|floatformat:'-2' }}"></div>
+    </div>
+    <div style="margin-top:8px;"><label class="f">หมายเหตุใต้ตาราง (ไม่บังคับ)</label><input type="text" name="note" value="{{ s.note }}" placeholder="เช่น ลิงก์ Zoom ส่งในกลุ่ม Line ก่อนเรียน 10 นาที"></div>
+  </div>
+
+  <div class="oe-panel">
+    <div class="oe-title">📚 คาบเรียน</div>
+    <div class="oe-hint">ตารางจะจัดกลุ่มตามระดับชั้นและเรียงตามวันให้อัตโนมัติ · ถ้าเปลี่ยนวันที่เริ่ม/สิ้นสุด ให้กดบันทึกก่อนเพื่ออัปเดตตัวเลือกวัน</div>
+    <table>
+      <thead><tr><th style="width:90px">ระดับชั้น</th><th style="width:170px">วัน</th><th>วิชา</th><th style="width:170px">ติวเตอร์</th><th style="width:170px">รหัสชีท</th><th style="width:40px"></th></tr></thead>
+      <tbody id="rowBody">
+        {% for r in rows %}
+          <tr>
+            <td><select name="row_grade">{% for g in grades %}<option {% if g == r.grade_label %}selected{% endif %}>{{ g }}</option>{% endfor %}{% if r.grade_label not in grades %}<option selected>{{ r.grade_label }}</option>{% endif %}</select></td>
+            <td><select name="row_date">{% for d in dates %}<option value="{{ d.value }}" {% if d.value == r.lesson_date|date:'Y-m-d' %}selected{% endif %}>{{ d.label }}</option>{% endfor %}</select></td>
+            <td><input type="text" name="row_subject" value="{{ r.subject }}" list="subjectList" placeholder="วิชา"></td>
+            <td><select name="row_tutor"><option value="">— ติวเตอร์ —</option>{% for t in tutors %}<option value="{{ t.id }}" {% if t.id == r.tutor_id %}selected{% endif %}>{{ t.name }}</option>{% endfor %}</select></td>
+            <td><input type="text" name="row_sheet" value="{{ r.sheet_code }}" list="sheetList" placeholder="เช่น ONP501"></td>
+            <td><button type="button" class="rm" data-rm title="ลบแถว">✕</button></td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <button type="button" class="btn add" id="addRow">＋ เพิ่มคาบ</button>
+  </div>
+
+  <div class="oe-panel test-box">
+    <div class="oe-title">📝 ติวเตอร์เฉลยเทส</div>
+    <div class="oe-hint">ไม่แสดงในตารางเรียน · ได้ค่าสอนเพิ่ม (ค่าเริ่มต้น 2 ชม. × 300) ในวันที่เลือก</div>
+    <table>
+      <thead><tr><th>ติวเตอร์</th><th style="width:190px">วันที่</th><th style="width:110px">ชั่วโมง</th><th>หมายเหตุ</th><th style="width:40px"></th></tr></thead>
+      <tbody id="testBody">
+        {% for t in test_tutors %}
+          <tr>
+            <td><select name="test_tutor"><option value="">— ติวเตอร์ —</option>{% for x in tutors %}<option value="{{ x.id }}" {% if x.id == t.tutor_id %}selected{% endif %}>{{ x.name }}</option>{% endfor %}</select></td>
+            <td><input type="date" name="test_date" value="{{ t.work_date|date:'Y-m-d' }}"></td>
+            <td><input type="number" step="0.5" min="0" name="test_hours" value="{{ t.hours|floatformat:'-2' }}"></td>
+            <td><input type="text" name="test_note" value="{{ t.note }}" placeholder="เช่น เฉลยเทส ป.6"></td>
+            <td><button type="button" class="rm" data-rm title="ลบ">✕</button></td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <button type="button" class="btn add" id="addTest">＋ เพิ่มติวเตอร์เฉลยเทส</button>
+  </div>
+
+  <div class="actions">
+    <button class="btn red" type="submit" name="action" value="delete_schedule" formnovalidate onclick="return confirm('ลบตารางสัปดาห์นี้ทั้งหมด?')">ลบตารางนี้</button>
+    <button class="btn" type="submit">💾 บันทึก</button>
+    <button class="btn green" type="submit" name="then" value="view">💾 บันทึกและดูตาราง</button>
+  </div>
+
+  <datalist id="sheetList">{% for c in sheet_codes %}<option value="{{ c }}">{% endfor %}</datalist>
+  <datalist id="subjectList"><option value="คณิตศาสตร์"><option value="วิทยาศาสตร์"><option value="ภาษาอังกฤษ"><option value="ภาษาไทย"><option value="สังคมศึกษา"></datalist>
+</form>
+
+<template id="rowTpl">
+  <tr>
+    <td><select name="row_grade">{% for g in grades %}<option>{{ g }}</option>{% endfor %}</select></td>
+    <td><select name="row_date">{% for d in dates %}<option value="{{ d.value }}">{{ d.label }}</option>{% endfor %}</select></td>
+    <td><input type="text" name="row_subject" list="subjectList" placeholder="วิชา"></td>
+    <td><select name="row_tutor"><option value="">— ติวเตอร์ —</option>{% for t in tutors %}<option value="{{ t.id }}">{{ t.name }}</option>{% endfor %}</select></td>
+    <td><input type="text" name="row_sheet" list="sheetList" placeholder="เช่น ONP501"></td>
+    <td><button type="button" class="rm" data-rm title="ลบแถว">✕</button></td>
+  </tr>
+</template>
+<template id="testTpl">
+  <tr>
+    <td><select name="test_tutor"><option value="">— ติวเตอร์ —</option>{% for x in tutors %}<option value="{{ x.id }}">{{ x.name }}</option>{% endfor %}</select></td>
+    <td><input type="date" name="test_date" value="{{ s.end_date|date:'Y-m-d' }}"></td>
+    <td><input type="number" step="0.5" min="0" name="test_hours" value="2"></td>
+    <td><input type="text" name="test_note" placeholder="เช่น เฉลยเทส ป.6"></td>
+    <td><button type="button" class="rm" data-rm title="ลบ">✕</button></td>
+  </tr>
+</template>
+<script>
+(function(){
+  const rowBody = document.getElementById("rowBody"), testBody = document.getElementById("testBody");
+  function addFrom(tplId, body){
+    const tr = document.getElementById(tplId).content.firstElementChild.cloneNode(true);
+    const last = body.lastElementChild;
+    if(last && tplId === "rowTpl"){
+      // copy grade from the row above and move to the next day
+      tr.querySelector('[name=row_grade]').value = last.querySelector('[name=row_grade]').value;
+      const ds = tr.querySelector('[name=row_date]'), prev = last.querySelector('[name=row_date]');
+      ds.selectedIndex = Math.min(prev.selectedIndex + 1, ds.options.length - 1);
+    }
+    body.appendChild(tr);
+    const first = tr.querySelector("input[type=text]"); if(first) first.focus();
+  }
+  document.getElementById("addRow").addEventListener("click", () => addFrom("rowTpl", rowBody));
+  document.getElementById("addTest").addEventListener("click", () => addFrom("testTpl", testBody));
+  document.addEventListener("click", e => { const b = e.target.closest("[data-rm]"); if(b) b.closest("tr").remove(); });
+  if(!rowBody.children.length) addFrom("rowTpl", rowBody);
+})();
+</script>
+{% endblock %}

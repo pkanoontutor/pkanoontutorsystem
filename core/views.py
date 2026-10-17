@@ -49,6 +49,9 @@ from .models import (
     HomeworkStar,
     MemoTask,
     SnackShopEntry,
+    OnlineSchedule,
+    OnlineScheduleRow,
+    OnlineScheduleTestTutor,
     AdmissionInquiry,
     FinanceSetting,
     ExpenseCategory,
@@ -8279,6 +8282,7 @@ _ADMIN_TOOL_DEFAULTS = [
     ("private", "c-teal",  "📖", "ระบบชีทสำหรับติวเตอร์", "ติวเตอร์เข้าด้วย PIN เปิดชีท PDF ทีละหน้า สลับเนื้อหา/เฉลย และกดจบคาบเพื่อบันทึกหน้า/ข้อเข้าระบบอัปเดตชีท", "/tutor-sheets/"),
     ("private", "c-lilac", "📚", "คลังหนังสือ", "บันทึกโปรไฟล์หนังสือต้นทางที่ใช้ทำชีท ชื่อ/รหัส/วิชา/ระดับชั้น ลิงก์ไฟล์ และรูปปก", "/books/"),
     ("private", "c-stone", "🔎", "Remaining Attendance", "เสิร์ชชื่อเด็ก ดูครั้งเรียนคงเหลือ คาดว่าจะครบคอร์สวันไหน ประวัติมา/ลา/ขาดล่าสุด และประวัติการชำระเงินต่อคอร์ส", "/remaining-attendance/"),
+    ("private", "c-lilac", "💻", "ตารางเรียน Online", "สร้างปฏิทินตารางเรียนออนไลน์รายสัปดาห์เป็นรูป แล้วส่งค่าติวเตอร์ (ชม.ละ 300 + ติวเตอร์เฉลยเทส +2 ชม.) เข้าระบบรายรับรายจ่าย", "/online-schedule/"),
     ("private", "c-rose",  "🍬", "รายรับรายจ่ายร้านขนม", "บันทึกรับเงินสด · ซื้อสินค้า · นำเงินไปแลกเหรียญ ของร้านขนม แยกจากบัญชีโรงเรียน", "/snack-shop/"),
     ("private", "c-sage",  "💰", "รายรับรายจ่าย", "บันทึกค่าใช้จ่าย ค่าติวเตอร์ และ Export Excel", "/school-finance/"),
     ("private", "c-clay",  "📊", "วิเคราะห์รายได้-ต้นทุน-กำไร", "ดูกำไรรายห้อง ปรับสมมติฐานค่าสอน/รายได้ต่อคนได้เอง ปันส่วน fixed cost หาจุดคุ้มทุน และจำลอง what-if", "/revenue-analysis/"),
@@ -13882,3 +13886,218 @@ def memo_board_toggle(request: HttpRequest) -> JsonResponse:
         memo.save(update_fields=["is_done", "done_at"])
     return JsonResponse({"ok": True, "done": memo.is_done,
                          "done_at": memo.done_at.strftime("%d/%m/%Y %H:%M") if memo.done_at else ""})
+
+
+# =========================================================
+# 💻 ตารางเรียน Online
+# =========================================================
+ONLINE_GRADE_CHOICES = ["ป.4", "ป.5", "ป.6", "ม.1", "ม.2", "ม.3", "ม.4", "ม.5", "ม.6"]
+ONLINE_DAY_COLORS = ["#fde68a", "#f5b8ec", "#bbf7a0", "#fbc98a", "#b4cafc", "#d8c4fb", "#fca5a5"]  # Mon..Sun
+ONLINE_HOURLY_RATE = Decimal("300")
+
+
+def _online_range_label(s) -> str:
+    a, b = s.start_date, s.end_date
+    if a.month == b.month and a.year == b.year:
+        return f"{a.day} - {b.day} {_THAI_MONTHS_ABBR[b.month]} {(b.year + 543) % 100:02d}"
+    return f"{_thai_date_short_be(a)} - {_thai_date_short_be(b)}"
+
+
+def _online_dates(s) -> list[date]:
+    out, d = [], s.start_date
+    while d <= s.end_date and len(out) < 14:
+        out.append(d)
+        d += timedelta(days=1)
+    return out
+
+
+def _online_sections(s) -> list[dict]:
+    """Rows grouped by grade (grade order = first appearance), each sorted by date."""
+    sections: dict[str, list] = {}
+    for r in s.rows.select_related("tutor").order_by("order", "lesson_date", "id"):
+        sections.setdefault(r.grade_label, []).append(r)
+    out = []
+    for grade, rows in sections.items():
+        rows.sort(key=lambda r: (r.lesson_date, r.order, r.id))
+        out.append({"grade": grade, "rows": [{
+            "row": r,
+            "day": _THAI_DAYS[r.lesson_date.weekday()],
+            "day_color": ONLINE_DAY_COLORS[r.lesson_date.weekday()],
+            "date_label": _thai_date_short_be(r.lesson_date),
+        } for r in rows]})
+    return out
+
+
+def _online_payroll_rows(s) -> list[dict]:
+    """Per tutor per day: online hours = lessons x hours_per_session, plus
+    ติวเตอร์เฉลยเทส hours on their chosen date. Flat 300/hr, no travel."""
+    per: dict[tuple, dict] = {}
+    hrs = Decimal(str(s.hours_per_session or 1))
+
+    def slot(tutor, day):
+        return per.setdefault((tutor.id, day), {"tutor": tutor, "date": day, "teach": Decimal("0"),
+                                                "test": Decimal("0"), "subjects": []})
+
+    for r in s.rows.select_related("tutor"):
+        if not r.tutor_id:
+            continue
+        d = slot(r.tutor, r.lesson_date)
+        d["teach"] += hrs
+        d["subjects"].append(f"{r.grade_label} {r.subject}")
+    for t in s.test_tutors.select_related("tutor"):
+        slot(t.tutor, t.work_date)["test"] += Decimal(str(t.hours or 0))
+    rows = []
+    for d in sorted(per.values(), key=lambda x: (x["date"], x["tutor"].name)):
+        hours = d["teach"] + d["test"]
+        rows.append({**d, "hours": hours, "amount": hours * ONLINE_HOURLY_RATE,
+                     "date_label": _thai_date_short_be(d["date"]),
+                     "key": "%s_%s" % (d["tutor"].id, d["date"].isoformat())})
+    return rows
+
+
+@login_required
+def online_schedule_list(request: HttpRequest) -> HttpResponse:
+    if request.method == "POST":
+        start = _parse_date(request.POST.get("start_date"))
+        end = _parse_optional_date(request.POST.get("end_date")) or start + timedelta(days=4)
+        if end < start:
+            end = start
+        s = OnlineSchedule.objects.create(start_date=start, end_date=end)
+        prev = OnlineSchedule.objects.exclude(id=s.id).order_by("-start_date").first()
+        if prev:
+            s.time_text, s.hours_per_session = prev.time_text, prev.hours_per_session
+            s.save(update_fields=["time_text", "hours_per_session"])
+        return redirect("core:online_schedule_edit", pk=s.id)
+    today = timezone.localdate()
+    next_monday = today + timedelta(days=(7 - today.weekday()) % 7 or 7)
+    schedules = list(OnlineSchedule.objects.all()[:60])
+    for s in schedules:
+        s.range_label = _online_range_label(s)
+        s.row_count = s.rows.count()
+    return render(request, "core/online_schedule_list.html", {
+        "schedules": schedules, "default_start": next_monday, "default_end": next_monday + timedelta(days=4),
+    })
+
+
+@login_required
+def online_schedule_edit(request: HttpRequest, pk: int) -> HttpResponse:
+    s = get_object_or_404(OnlineSchedule, pk=pk)
+    tutors = list(TeachingTutor.objects.filter(is_active=True).order_by("name"))
+    if request.method == "POST":
+        if request.POST.get("action") == "delete_schedule":
+            s.delete()
+            return redirect("core:online_schedule_list")
+        s.start_date = _parse_date(request.POST.get("start_date"))
+        s.end_date = max(_parse_optional_date(request.POST.get("end_date")) or s.start_date, s.start_date)
+        s.time_text = (request.POST.get("time_text") or "").strip()[:60]
+        s.hours_per_session = _decimal_from_post(request.POST.get("hours_per_session"), Decimal("1")) or Decimal("1")
+        s.note = (request.POST.get("note") or "").strip()[:255]
+        s.save()
+        tutor_ids = set(TeachingTutor.objects.values_list("id", flat=True))
+
+        def at(lst, i):
+            return lst[i] if i < len(lst) else ""
+
+        with transaction.atomic():
+            s.rows.all().delete()
+            grades = request.POST.getlist("row_grade")
+            dates = request.POST.getlist("row_date")
+            subjects = request.POST.getlist("row_subject")
+            row_tutors = request.POST.getlist("row_tutor")
+            sheets = request.POST.getlist("row_sheet")
+            for i, subject in enumerate(subjects):
+                subject = (subject or "").strip()
+                d = _parse_optional_date(at(dates, i))
+                if not subject or not d:
+                    continue
+                tid = _id_or_none(at(row_tutors, i))
+                OnlineScheduleRow.objects.create(
+                    schedule=s, grade_label=at(grades, i).strip()[:40] or "-",
+                    lesson_date=d, subject=subject[:120], tutor_id=tid if tid in tutor_ids else None,
+                    sheet_code=at(sheets, i).strip()[:80], order=i,
+                )
+            s.test_tutors.all().delete()
+            t_tutors = request.POST.getlist("test_tutor")
+            t_dates = request.POST.getlist("test_date")
+            t_hours = request.POST.getlist("test_hours")
+            t_notes = request.POST.getlist("test_note")
+            for i, tid in enumerate(t_tutors):
+                tid = _id_or_none(tid)
+                if not tid or tid not in tutor_ids:
+                    continue
+                OnlineScheduleTestTutor.objects.create(
+                    schedule=s, tutor_id=tid,
+                    work_date=_parse_optional_date(at(t_dates, i)) or s.end_date,
+                    hours=_decimal_from_post(at(t_hours, i), Decimal("2")) or Decimal("2"),
+                    note=at(t_notes, i).strip()[:255],
+                )
+        if request.POST.get("then") == "view":
+            return redirect("core:online_schedule_view", pk=s.id)
+        return redirect(f"{reverse('core:online_schedule_edit', args=[s.id])}?saved=1")
+
+    return render(request, "core/online_schedule_edit.html", {
+        "s": s,
+        "dates": [{"value": d.isoformat(), "label": f"{_THAI_DAYS[d.weekday()]} {_thai_date_short_be(d)}"} for d in _online_dates(s)],
+        "rows": list(s.rows.select_related("tutor").order_by("order", "id")),
+        "test_tutors": list(s.test_tutors.select_related("tutor")),
+        "tutors": tutors,
+        "grades": ONLINE_GRADE_CHOICES,
+        "sheet_codes": list(Sheet.objects.filter(is_active=True).order_by("code").values_list("code", flat=True)),
+        "saved": request.GET.get("saved") == "1",
+    })
+
+
+def online_schedule_view(request: HttpRequest, pk: int) -> HttpResponse:
+    s = get_object_or_404(OnlineSchedule, pk=pk)
+    is_staff = bool(request.user.is_authenticated and request.user.is_staff)
+    payroll = _online_payroll_rows(s) if is_staff else []
+    return render(request, "core/online_schedule_view.html", {
+        "s": s,
+        "range_label": _online_range_label(s),
+        "sections": _online_sections(s),
+        "payroll_rows": payroll,
+        "payroll_total": sum((r["amount"] for r in payroll), Decimal("0")),
+        "rate": ONLINE_HOURLY_RATE,
+        "can_edit": is_staff,
+        "payroll_sent": request.GET.get("payroll_sent") or "",
+    })
+
+
+@require_POST
+@login_required
+def online_schedule_send_payroll(request: HttpRequest, pk: int) -> HttpResponse:
+    """Write approved (tutor, day) online hours into TutorPayrollEntry:
+    online_teaching_hours at the flat online rate, no travel fee. Only the
+    online part of an existing day entry is replaced, so onsite pay on the
+    same day is untouched; re-sending is idempotent."""
+    from .models import Tutor, TutorPayrollEntry
+    s = get_object_or_404(OnlineSchedule, pk=pk)
+    approved = set(request.POST.getlist("keys"))
+    sent = 0
+    with transaction.atomic():
+        for row in _online_payroll_rows(s):
+            if row["key"] not in approved:
+                continue
+            tt = row["tutor"]
+            payroll_tutor = tt.payroll_tutor
+            if payroll_tutor is None:
+                payroll_tutor, _ = Tutor.objects.get_or_create(name=tt.name.strip(), defaults={"is_active": True})
+                tt.payroll_tutor = payroll_tutor
+                tt.save(update_fields=["payroll_tutor"])
+            entry, _ = TutorPayrollEntry.objects.get_or_create(work_date=row["date"], tutor=payroll_tutor)
+            entry.online_teaching_hours = row["hours"]
+            entry.online_hourly_rate_override = ONLINE_HOURLY_RATE
+            parts = ["ออนไลน์: " + ", ".join(row["subjects"])] if row["subjects"] else []
+            if row["test"]:
+                parts.append("เฉลยเทส +%s ชม." % row["test"].normalize())
+            line = " · ".join(parts)
+            if line and line not in (entry.note or ""):
+                entry.note = (entry.note + "\n" + line).strip() if entry.note else line
+            if not entry.teaching_hours:
+                entry.travel_fee_override = Decimal("0")   # online only: no travel
+            entry.save()
+            sent += 1
+        if sent:
+            s.payroll_sent_at = timezone.now()
+            s.save(update_fields=["payroll_sent_at"])
+    return redirect(f"{reverse('core:online_schedule_view', args=[s.id])}?payroll_sent={sent}")

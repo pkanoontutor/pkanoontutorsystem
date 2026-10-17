@@ -104,6 +104,8 @@
   .muted{color:#64748b;font-size:12px;line-height:1.45;}
   .mini{font-size:11px;color:#64748b;font-weight:800;margin-top:4px;}
   .error-box{background:#fef2f2;border:1px solid #fecaca;color:#991b1b;border-radius:16px;padding:12px;font-size:13px;font-weight:1000;line-height:1.55;}
+  .inactive-toggle{display:flex;align-items:center;gap:6px;margin-top:6px;font-size:12px;font-weight:800;color:#64748b;cursor:pointer;}
+  .inactive-toggle input{width:16px;height:16px;padding:0;}
   .sheet-src{display:flex;gap:6px;margin-bottom:6px;flex-wrap:wrap;}
   .sheet-src label{cursor:pointer;}
   .sheet-src input{display:none;}
@@ -370,7 +372,17 @@
                         {% for s in sheet_choices %}
                           <option value="{{ s.code }} {{ s.title }}" data-code="{{ s.code }}" data-grade="{{ s.grade_level }}">{{ s.get_grade_level_display|default:"ไม่ระบุ" }} · {{ s.code }} · {{ s.title }}</option>
                         {% endfor %}
+                        {% if inactive_sheet_choices %}
+                          <optgroup label="🗄️ ชีทเก่า (inactive)" data-inactive-group>
+                            {% for s in inactive_sheet_choices %}
+                              <option value="{{ s.code }} {{ s.title }}" data-code="{{ s.code }}" data-grade="{{ s.grade_level }}" data-inactive>🗄️ {{ s.get_grade_level_display|default:"ไม่ระบุ" }} · {{ s.code }} · {{ s.title }}</option>
+                            {% endfor %}
+                          </optgroup>
+                        {% endif %}
                       </select>
+                      {% if inactive_sheet_choices %}
+                        <label class="inactive-toggle" data-inactive-wrap hidden><input type="checkbox" data-show-inactive> แสดงชีทเก่า (inactive) ด้วย — กรณีเอาชีทเก่ามาสอน</label>
+                      {% endif %}
                       <input type="text" data-sheet-text placeholder="พิมพ์ชื่อชีทเสริม / เอกสาร" hidden>
                     </div>
                     <div class="field" data-page-field>
@@ -519,15 +531,29 @@
       const text = field.querySelector("[data-sheet-text]");
       const radios = field.querySelectorAll("[data-src]");
       const grade = select.dataset.grade || "";
-      Array.from(select.options).forEach(opt => {
-        if(!opt.value) return;
-        const g = opt.dataset.grade || "";
-        opt.hidden = !!(grade && g && g !== grade);
+      const showInactive = field.querySelector("[data-show-inactive]");
+      const inactiveWrap = field.querySelector("[data-inactive-wrap]");
+      const inactiveGroup = select.querySelector("[data-inactive-group]");
+      function filterOptions(){
+        const withOld = !!(showInactive && showInactive.checked);
+        if(inactiveGroup) inactiveGroup.hidden = !withOld;
+        Array.from(select.options).forEach(opt => {
+          if(!opt.value) return;
+          const g = opt.dataset.grade || "";
+          const old = opt.hasAttribute("data-inactive");
+          opt.hidden = !!(grade && g && g !== grade) || (old && !withOld);
+          opt.disabled = old && !withOld;
+        });
+      }
+      if(showInactive) showInactive.addEventListener("change", () => {
+        filterOptions();
+        if(select.selectedOptions[0] && select.selectedOptions[0].disabled){ select.value = ""; sync(); }
       });
       function setMode(mode){
         radios.forEach(r => r.checked = r.value === mode);
         select.hidden = mode !== "system";
         text.hidden = mode !== "extra";
+        if(inactiveWrap) inactiveWrap.hidden = mode !== "system";
         sync();
       }
       function sync(){
@@ -537,6 +563,9 @@
       const saved = (hidden.value || "").trim();
       const firstToken = saved.split(/\s+/)[0].toUpperCase();
       const match = Array.from(select.options).find(o => o.dataset.code && o.dataset.code.toUpperCase() === firstToken);
+      // A saved inactive sheet reopens with the old-sheet list switched on.
+      if(match && match.hasAttribute("data-inactive") && showInactive) showInactive.checked = true;
+      filterOptions();
       if(match){ select.value = match.value; setMode("system"); }
       else if(saved){ text.value = saved; setMode("extra"); }
       else { setMode("system"); }

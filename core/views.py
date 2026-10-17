@@ -10472,6 +10472,7 @@ def tutor_teaching_update(request: HttpRequest) -> HttpResponse:
     unassigned_count = sum(1 for a in all_week_assignments if not a.tutor_id and getattr(a, "is_teaching", True))
 
     sheet_choices = Sheet.objects.select_related("subject").filter(is_active=True).order_by("grade_level", "subject__name", "code")
+    inactive_sheet_choices = Sheet.objects.select_related("subject").filter(is_active=False).order_by("grade_level", "subject__name", "code")
     grouped_slots = _teaching_slot_groups_from_assignments(all_assignments, previous_updates, current_updates)
     # Tutors with work this week first, then A-Z; idle tutors last.
     tutor_summary_rows.sort(key=lambda r: (r["is_empty"], r["tutor"].name))
@@ -10492,6 +10493,7 @@ def tutor_teaching_update(request: HttpRequest) -> HttpResponse:
         "grouped_slots": grouped_slots,
         "error_code": (request.GET.get("error") or "").strip(),
         "sheet_choices": sheet_choices,
+        "inactive_sheet_choices": inactive_sheet_choices,
         "sheet_progress_sections": _sheet_progress_sections(week_start),
     })
 

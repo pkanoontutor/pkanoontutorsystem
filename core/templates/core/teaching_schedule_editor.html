@@ -56,9 +56,8 @@
 
     <div class="sch-bar" style="margin-bottom:10px;">
       <button class="sbtn green" type="submit">💾 บันทึก + ดูรูป</button>
-      {% if has_previous %}
-      <button class="sbtn amber" type="submit" name="action" value="carry_forward"
-        onclick="return confirm('คัดลอกตารางจาก{{ day_label }}สัปดาห์ก่อนมาทับตารางวันนี้?');">↩ คัดลอกจาก{{ day_label }}สัปดาห์ก่อน</button>
+      {% if copy_choices %}
+      <button class="sbtn amber" type="button" onclick="openCopy()">📋 ดึงข้อมูลจากสัปดาห์ก่อน…</button>
       {% endif %}
       <span class="legend">เลือกวิชา + ติวเตอร์ในแต่ละช่อง (เลือกติวเตอร์แล้วช่องจะเปลี่ยนเป็นสีประจำตัวทันที) — คลาสตั้งจากหน้า "ผูกคลาสห้อง"</span>
     </div>
@@ -92,6 +91,55 @@
     </table>
   </form>
 </div>
+
+{% if copied %}<div class="copy-toast" id="copyToast">✅ คัดลอกตารางมาวางแล้ว — ตรวจแล้วกดบันทึก</div>{% endif %}
+<div class="copy-bg" id="copyBg">
+  <form class="copy-modal" method="post" action="/teaching-schedule/edit/?date={{ date|date:'Y-m-d' }}">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="copy_from">
+    <input type="hidden" name="date" value="{{ date|date:'Y-m-d' }}">
+    <div class="copy-head">
+      <strong>📋 ดึงข้อมูลตารางจากสัปดาห์ก่อน</strong>
+      <button type="button" class="sbtn soft" onclick="closeCopy()">✕</button>
+    </div>
+    <div class="copy-pick">
+      <label class="legend">เลือกตาราง:</label>
+      <select name="source_id" id="copySource">
+        {% for c in copy_choices %}<option value="{{ c.id }}">{% if c.same_day %}⭐ {% endif %}{{ c.label }} ({{ c.count }} ช่อง)</option>{% endfor %}
+      </select>
+      <span class="legend">⭐ = {{ day_label }}เหมือนกัน (คลาสตรงกัน)</span>
+    </div>
+    <iframe id="copyPreview" class="copy-frame" title="preview"></iframe>
+    <div class="copy-actions">
+      <button type="button" class="sbtn soft" onclick="closeCopy()">ยกเลิก</button>
+      <button type="submit" class="sbtn amber" onclick="return confirm('คัดลอกตารางที่เลือกมาวางทับตาราง{{ thai_date }}?');">คัดลอกและวางทับตารางนี้</button>
+    </div>
+  </form>
+</div>
+<style>
+  .copy-bg{position:fixed;inset:0;background:rgba(15,23,42,.55);display:none;align-items:center;justify-content:center;z-index:80;padding:14px;}
+  .copy-bg.show{display:flex;}
+  .copy-modal{width:100%;max-width:1100px;background:#fff;border-radius:18px;padding:16px;display:grid;gap:10px;max-height:94vh;}
+  .copy-head{display:flex;justify-content:space-between;align-items:center;font-size:17px;}
+  .copy-pick{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+  .copy-pick select{font-family:inherit;padding:8px 10px;border-radius:10px;border:1px solid #cbd5e1;font-size:14px;}
+  .copy-frame{width:100%;height:62vh;border:1px solid #e2e8f0;border-radius:12px;background:#e6f4fb;}
+  .copy-actions{display:flex;gap:8px;justify-content:flex-end;}
+  .copy-toast{position:fixed;left:50%;top:14px;transform:translateX(-50%);background:#166534;color:#fff;border-radius:12px;padding:10px 16px;font-weight:700;z-index:90;}
+</style>
+<script>
+  function loadCopyPreview(){
+    var sel=document.getElementById("copySource");
+    if(sel && sel.value) document.getElementById("copyPreview").src="/teaching-schedule/image/"+sel.value+"/?embed=1";
+  }
+  function openCopy(){ document.getElementById("copyBg").classList.add("show"); loadCopyPreview(); }
+  function closeCopy(){ document.getElementById("copyBg").classList.remove("show"); }
+  (function(){
+    var sel=document.getElementById("copySource"); if(sel) sel.addEventListener("change", loadCopyPreview);
+    var bg=document.getElementById("copyBg"); if(bg) bg.addEventListener("click", function(e){ if(e.target===bg) closeCopy(); });
+    var t=document.getElementById("copyToast"); if(t) setTimeout(function(){ t.remove(); }, 3500);
+  })();
+</script>
 
 <script>
   window.SCH_CLASSES = {{ class_data_json|safe }};

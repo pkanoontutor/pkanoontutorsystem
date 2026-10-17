@@ -38,7 +38,7 @@
   .brand{margin-top:12px;text-align:center;font-size:15px;font-weight:600;color:#f97316;}
   .empty{padding:30px;text-align:center;color:#94a3b8;font-size:18px;}
 
-  /* payroll modal */
+  /* modal */
   .pay-bg{position:fixed;inset:0;background:rgba(15,23,42,.5);display:none;align-items:center;justify-content:center;z-index:60;padding:14px;}
   .pay-bg.show{display:flex;}
   .pay{width:100%;max-width:760px;background:#fff;border-radius:20px;padding:20px;max-height:90vh;overflow:auto;}
@@ -61,12 +61,10 @@
     {% if can_edit %}
       <a class="btn soft" href="{% url 'core:online_schedule_edit' s.id %}">✏️ แก้ไขตาราง</a>
       <a class="btn soft" href="{% url 'core:online_schedule_list' %}">📅 ทั้งหมด</a>
-      {% if payroll_rows %}<button class="btn amber" type="button" onclick="openPay()">💸 ส่งค่าติวเตอร์</button>{% endif %}
     {% endif %}
     <button class="btn green" type="button" onclick="copyImage()">Copy / Share Image</button>
     <button class="btn" type="button" onclick="downloadImage()">Save Image</button>
   </div>
-  {% if payroll_sent %}<div class="ok">✅ ส่งค่าติวเตอร์เข้าระบบรายรับรายจ่ายแล้ว {{ payroll_sent }} รายการ</div>{% endif %}
 
   <div class="scroll">
   <div class="card" id="card">
@@ -99,41 +97,9 @@
   </div>
 </div>
 
-{% if payroll_rows %}
-<div class="pay-bg" id="payBg">
-  <form class="pay" method="post" action="{% url 'core:online_schedule_send_payroll' s.id %}">
-    {% csrf_token %}
-    <h3>💸 ส่งค่าติวเตอร์ (ออนไลน์)</h3>
-    <p>ชม.ละ {{ rate|floatformat:0 }} บาท · ไม่มีค่าเดินทาง · รวมชั่วโมงติวเตอร์เฉลยเทส · ส่งซ้ำได้ (ทับยอดออนไลน์ของวันนั้น ไม่กระทบค่าสอน onsite){% if s.payroll_sent_at %} · ส่งล่าสุด {{ s.payroll_sent_at|date:"d/m/Y H:i" }}{% endif %}</p>
-    <table>
-      <thead><tr><th><input type="checkbox" checked onclick="document.querySelectorAll('.pk').forEach(x=>x.checked=this.checked)"></th><th>วันที่</th><th>ติวเตอร์</th><th>รายละเอียด</th><th class="n">ชม.</th><th class="n">ยอด</th></tr></thead>
-      <tbody>
-        {% for p in payroll_rows %}
-          <tr>
-            <td><input type="checkbox" class="pk" name="keys" value="{{ p.key }}" checked></td>
-            <td>{{ p.date_label }}</td>
-            <td>{{ p.tutor.name }}</td>
-            <td>{{ p.subjects|join:", " }}{% if p.test %}<span class="tag">เฉลยเทส +{{ p.test|floatformat:"-2" }} ชม.</span>{% endif %}</td>
-            <td class="n">{{ p.hours|floatformat:"-2" }}</td>
-            <td class="n">{{ p.amount|floatformat:0|intcomma }}</td>
-          </tr>
-        {% endfor %}
-        <tr><td colspan="5" class="n"><b>รวม</b></td><td class="n"><b>{{ payroll_total|floatformat:0|intcomma }}</b></td></tr>
-      </tbody>
-    </table>
-    <div class="pay-actions">
-      <button class="btn soft" type="button" onclick="closePay()">ยกเลิก</button>
-      <button class="btn green" type="submit">ส่งเข้าระบบรายรับรายจ่าย</button>
-    </div>
-  </form>
-</div>
-{% endif %}
 <div class="preview" id="imagePreview"><img id="previewImage" alt=""><p id="previewHint"></p></div>
 
 <script>
-function openPay(){ document.getElementById('payBg').classList.add('show'); }
-function closePay(){ document.getElementById('payBg').classList.remove('show'); }
-(function(){ const bg=document.getElementById('payBg'); if(bg) bg.addEventListener('click', e => { if(e.target===bg) closePay(); }); })();
 
 /* Same image helpers as the receipt / renewal notice pages. */
 function isIOSDevice(){

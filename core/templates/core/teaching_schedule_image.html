@@ -95,16 +95,21 @@
 </head>
 <body>
   <div class="wrap">
+    {% if not embed %}
     <div class="toolbar">
       <a class="btn soft" href="/teaching-schedule/edit/?date={{ schedule.date|date:'Y-m-d' }}">← แก้ไขตาราง</a>
       <a class="btn soft" href="/teaching-schedule/">📅 ทั้งหมด</a>
       <a class="btn soft {% if version == 'parent' %}on{% endif %}" href="/teaching-schedule/image/{{ schedule.id }}/">👨‍👩‍👧 ผู้ปกครอง</a>
       <a class="btn soft {% if version == 'tutor' %}on{% endif %}" href="/teaching-schedule/image/{{ schedule.id }}/?v=tutor">👩‍🏫 ติวเตอร์</a>
       {% if payroll_rows %}<button class="btn amber" type="button" onclick="openPay()">💸 ส่งค่าติวเตอร์</button>{% endif %}
+      <button class="btn" type="button" onclick="openOnlinePay()" style="background:#7c3aed;">💻 ส่งค่าติวเตอร์ตารางออนไลน์</button>
       <button class="btn green" type="button" onclick="copyImage()">Copy Image</button>
       <button class="btn" type="button" onclick="downloadImage()">Download PNG</button>
     </div>
 
+    {% if online_sent %}
+      <div class="ok-banner">✅ ส่งค่าติวเตอร์ออนไลน์เข้าระบบแล้ว {{ online_sent }} คน (ลงวันที่ {{ schedule.date|date:"d/m/Y" }})</div>
+    {% endif %}
     {% if payroll_sent %}
       <div class="ok-banner">✅ ส่งข้อมูลเข้าระบบค่าติวเตอร์แล้ว {{ payroll_sent }} คน (ดูได้ที่หน้ารายรับรายจ่าย)</div>
     {% endif %}
@@ -112,6 +117,7 @@
       <div class="warn-banner">⚠ มีติวเตอร์ถูกจัดสอนชนกันในช่วงเวลาเดียวกัน (ช่องที่ขอบแดง) — โปรดตรวจสอบก่อนส่ง</div>
     {% endif %}
 
+    {% endif %}
     <div class="sched {% if version == 'tutor' %}tutor-mode{% endif %}" id="schedCard">
       <div class="head">
         <img class="logo" src="{% static 'core/logo2.png' %}" alt="พี่ขนุนติวเตอร์">
@@ -257,7 +263,54 @@
   </div>
   {% endif %}
 
+  <div class="pay-bg" id="onlinePayBg">
+    <form class="pay-modal" method="post" action="/teaching-schedule/image/{{ schedule.id }}/send-online-payroll/">
+      {% csrf_token %}
+      <h3>💻 ส่งค่าติวเตอร์ตารางออนไลน์</h3>
+      <p class="sub">ค่าสอนออนไลน์ของสัปดาห์ก่อนหน้า จ่ายรวมในวีคนี้ (ลงวันที่ {{ schedule.date|date:"d/m/Y" }}) · ชม.ละ 300 · ไม่มีค่าเดินทาง · ส่งซ้ำได้ (ทับเฉพาะยอดออนไลน์)</p>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px;">
+        <span style="font-size:13px;font-weight:600;">สัปดาห์ออนไลน์:</span>
+        <select onchange="location.href='?{% if version == 'tutor' %}v=tutor&{% endif %}online='+this.value+'#online'" style="font-family:inherit;padding:7px 10px;border-radius:10px;border:1px solid #cbd5e1;">
+          {% if not online_week %}<option value="">— ไม่พบตารางออนไลน์ของสัปดาห์ก่อน —</option>{% endif %}
+          {% for o in online_choices %}<option value="{{ o.id }}" {% if online_week and o.id == online_week.id %}selected{% endif %}>{{ o.label }}</option>{% endfor %}
+        </select>
+        {% if online_week and online_week.payroll_sent_at %}<span class="exist-tag">ส่งแล้ว {{ online_week.payroll_sent_at|date:"d/m/Y H:i" }}</span>{% endif %}
+      </div>
+      {% if online_week %}
+        <input type="hidden" name="online_id" value="{{ online_week.id }}">
+        <table class="pay">
+          <thead><tr><th><input type="checkbox" class="chk" checked onclick="document.querySelectorAll('.onrow').forEach(function(x){x.checked=this.checked;}, this)"></th><th>ติวเตอร์</th><th>คาบที่สอน</th><th class="num">ชม.</th><th class="num">ยอด</th></tr></thead>
+          <tbody>
+            {% for r in online_rows %}
+              <tr>
+                <td><input type="checkbox" class="chk onrow" name="tutor_ids" value="{{ r.tutor.id }}" checked></td>
+                <td>{{ r.tutor.name }}</td>
+                <td style="font-size:12.5px;">{{ r.subjects|join:", "|default:"-" }}{% if r.test %} <span class="exist-tag">เฉลยเทส +{{ r.test|floatformat:"-2" }} ชม.</span>{% endif %}</td>
+                <td class="num">{{ r.hours|floatformat:"-2" }}</td>
+                <td class="num">{{ r.amount|floatformat:0|intcomma }}</td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="5" style="text-align:center;color:#94a3b8;">สัปดาห์นี้ยังไม่มีคาบที่ระบุติวเตอร์</td></tr>
+            {% endfor %}
+            {% if online_rows %}<tr><td colspan="4" class="num"><b>รวม</b></td><td class="num"><b>{{ online_total|floatformat:0|intcomma }}</b></td></tr>{% endif %}
+          </tbody>
+        </table>
+      {% endif %}
+      <div class="pay-actions">
+        <button class="btn soft" type="button" onclick="closeOnlinePay()">ยกเลิก</button>
+        {% if online_rows %}<button class="btn green" type="submit">ส่งเข้าระบบรายรับรายจ่าย</button>{% endif %}
+      </div>
+    </form>
+  </div>
+
   <script>
+    function openOnlinePay(){document.getElementById("onlinePayBg").classList.add("show");}
+    function closeOnlinePay(){document.getElementById("onlinePayBg").classList.remove("show");}
+    (function(){
+      var ob=document.getElementById("onlinePayBg");
+      if(ob) ob.addEventListener("click",function(e){ if(e.target===ob) closeOnlinePay(); });
+      if(location.hash==="#online") openOnlinePay();
+    })();
     function openPay(){document.getElementById("payBg").classList.add("show");}
     function closePay(){document.getElementById("payBg").classList.remove("show");}
     function toggleAll(cb){document.querySelectorAll(".payrow").forEach(function(x){x.checked=cb.checked;});}

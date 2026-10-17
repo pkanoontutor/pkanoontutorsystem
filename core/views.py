@@ -11277,10 +11277,6 @@ def _thai_date_short_be(d: date) -> str:
     return f"{d.day} {_THAI_MONTHS_ABBR[d.month]} {(d.year + 543) % 100:02d}"
 
 
-# Rooms on the flat 350/hr tutor rate. The payroll popup pre-ticks the box
-# for these and staff can untick it before sending.
-RATE_350_GRADES = {"ป.5"}
-
 
 def _grade_from_class_name(name: str) -> str:
     """Extract a grade label like 'ม.1' / 'ป.6' from a class name."""
@@ -11880,15 +11876,10 @@ def _schedule_tutor_day_summary(schedule) -> list:
         else:
             special = bool(getattr(payroll_tutor, "default_special_rate_325", False))
 
-        # ป.5 rooms pay a flat 350, so the box starts ticked whenever the tutor
-        # taught one that day. A saved entry wins, so unticking it and sending
-        # sticks when the popup is reopened.
+        # The flat-350 box is never pre-ticked any more (no grade gets it by
+        # default); staff tick it by hand, and a saved entry is remembered.
         taught_grades = sorted(grades_by_tutor.get(tutor, set()))
-        matches_350 = any(g in RATE_350_GRADES for g in taught_grades)
-        if entry is not None:
-            special_350 = bool(entry.special_rate_350)
-        else:
-            special_350 = matches_350
+        special_350 = bool(entry.special_rate_350) if entry is not None else False
 
         default_rate = TutorPayrollEntry.calculate_hourly_rate(Decimal(taught), special, special_350)
         default_travel_fee = TutorPayrollEntry.calculate_travel_fee(Decimal(taught))
@@ -11918,7 +11909,6 @@ def _schedule_tutor_day_summary(schedule) -> list:
             "travel_fee_override": travel_override,
             "special_rate_325": special,
             "special_rate_350": special_350,
-            "matches_350": matches_350,
             "taught_grades": ", ".join(taught_grades),
             "teaching_fee": rate * taught,
             "has_existing": bool(entry),

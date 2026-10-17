@@ -1,0 +1,114 @@
+{% extends "core/base.html" %}
+{% load humanize %}
+{% block title %}รายรับรายจ่ายร้านขนม{% endblock %}
+{% block head %}
+<style>
+  .sn-wrap{max-width:860px;margin:0 auto;display:grid;gap:12px;}
+  .sn-hero{background:linear-gradient(120deg,#ec4899,#f97316);color:#fff;border-radius:20px;padding:18px 20px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center;}
+  .sn-hero h1{margin:0;font-size:23px;font-weight:1000;}
+  .sn-hero p{margin:3px 0 0;font-size:12.5px;font-weight:700;color:#fff1f2;}
+  .sn-panel{background:#fff;border-radius:16px;padding:14px;box-shadow:0 4px 12px rgba(15,23,42,.07);}
+  .kind-pick{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px;}
+  .kind-pick input{display:none;}
+  .kind-pick span{display:block;text-align:center;border:2px solid #e2e8f0;border-radius:14px;padding:12px 6px;font-weight:1000;font-size:14px;cursor:pointer;background:#f8fafc;color:#334155;}
+  .kind-pick input:checked + span.in{background:#dcfce7;border-color:#22c55e;color:#166534;}
+  .kind-pick input:checked + span.out{background:#fee2e2;border-color:#f87171;color:#991b1b;}
+  .kind-pick input:checked + span.coin{background:#fef3c7;border-color:#f59e0b;color:#92400e;}
+  .sn-form{display:grid;grid-template-columns:150px 1fr 1fr;gap:8px;align-items:end;}
+  .sn-form label{font-size:11px;font-weight:1000;color:#475569;display:block;margin-bottom:4px;}
+  .sn-form input{width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:12px;padding:10px 12px;font-family:inherit;font-size:15px;font-weight:800;}
+  .sn-form input[name=amount]{font-size:20px;}
+  .sn-save{grid-column:1/-1;border:0;border-radius:14px;padding:13px;font-size:16px;font-weight:1000;background:#ec4899;color:#fff;cursor:pointer;font-family:inherit;}
+  .month-bar{display:flex;align-items:center;gap:8px;justify-content:center;flex-wrap:wrap;}
+  .month-bar a{text-decoration:none;font-weight:1000;color:#334155;background:#f1f5f9;border-radius:10px;padding:7px 12px;}
+  .month-bar b{font-size:17px;}
+  .sum{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px;}
+  .box{border-radius:14px;padding:11px;text-align:center;border:1px solid #e2e8f0;}
+  .box .k{font-size:11.5px;font-weight:1000;color:#64748b;}
+  .box .v{font-size:20px;font-weight:1000;margin-top:3px;}
+  .box.in{background:#f0fdf4;border-color:#bbf7d0;} .box.in .v{color:#15803d;}
+  .box.out{background:#fef2f2;border-color:#fecaca;} .box.out .v{color:#b91c1c;}
+  .box.coin{background:#fffbeb;border-color:#fde68a;} .box.coin .v{color:#b45309;}
+  .box.net{background:#eef2ff;border-color:#c7d2fe;} .box.net .v{color:#4338ca;}
+  .balance{margin-top:8px;text-align:center;font-size:12.5px;font-weight:800;color:#64748b;}
+  .day{border-top:1px dashed #e2e8f0;padding-top:8px;margin-top:8px;}
+  .day-h{display:flex;justify-content:space-between;font-size:13px;font-weight:1000;color:#0f172a;margin-bottom:5px;}
+  .day-h small{font-weight:800;color:#64748b;}
+  .ent{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 4px;}
+  .ent .t{font-size:13px;font-weight:800;color:#334155;}
+  .ent .t small{display:block;font-size:11.5px;color:#94a3b8;font-weight:700;}
+  .ent .a{font-size:15px;font-weight:1000;white-space:nowrap;}
+  .ent .a.in{color:#15803d;} .ent .a.out{color:#b91c1c;}
+  .ent form{margin:0;}
+  .del{border:0;background:none;color:#cbd5e1;cursor:pointer;font-size:14px;}
+  .del:hover{color:#dc2626;}
+  .msg{border-radius:12px;padding:9px 12px;font-weight:900;font-size:13px;}
+  .msg.ok{background:#f0fdf4;color:#166534;} .msg.err{background:#fef2f2;color:#991b1b;}
+  .empty{text-align:center;color:#94a3b8;font-weight:800;padding:20px;}
+  @media(max-width:620px){.sn-form{grid-template-columns:1fr 1fr;}.sn-form .note{grid-column:1/-1;}.sum{grid-template-columns:1fr 1fr;}}
+</style>
+{% endblock %}
+{% block content %}
+<div class="sn-wrap">
+  <div class="sn-hero">
+    <div><h1>🍬 รายรับรายจ่ายร้านขนม</h1><p>แยกจากบัญชีโรงเรียน · เงินคงเหลือสะสมทั้งหมด {{ balance_all|floatformat:0|intcomma }} บาท</p></div>
+    <a class="month-bar" style="text-decoration:none" href="{% url 'core:pkanoon_admin_tool' %}"><span style="background:#fff;color:#be185d;border-radius:10px;padding:7px 12px;font-weight:1000;">← Admin Tool</span></a>
+  </div>
+
+  {% if saved == "deleted" %}<div class="msg ok">ลบรายการแล้ว</div>
+  {% elif saved %}<div class="msg ok">✅ บันทึกแล้ว</div>{% endif %}
+  {% if error %}<div class="msg err">กรุณาเลือกประเภท และกรอกจำนวนเงินมากกว่า 0</div>{% endif %}
+
+  <form class="sn-panel" method="post">
+    {% csrf_token %}
+    <input type="hidden" name="month" value="{{ month_value }}">
+    <div class="kind-pick">
+      <label><input type="radio" name="kind" value="cash_in" checked><span class="in">💵 รับเงินสด</span></label>
+      <label><input type="radio" name="kind" value="purchase"><span class="out">🛒 ซื้อสินค้า</span></label>
+      <label><input type="radio" name="kind" value="coin_exchange"><span class="coin">🪙 นำเงินไปแลกเหรียญ</span></label>
+    </div>
+    <div class="sn-form">
+      <div><label>วันที่</label><input type="date" name="entry_date" value="{{ today|date:'Y-m-d' }}"></div>
+      <div><label>จำนวนเงิน (บาท)</label><input type="number" name="amount" step="0.01" min="0" inputmode="decimal" placeholder="0" required></div>
+      <div class="note"><label>รายละเอียด (ไม่บังคับ)</label><input type="text" name="note" maxlength="255" placeholder="เช่น ขายช่วงเช้า / ขนมปัง 2 ลัง"></div>
+      <button class="sn-save" type="submit">บันทึก</button>
+    </div>
+  </form>
+
+  <div class="sn-panel">
+    <div class="month-bar">
+      <a href="?month={{ prev_month }}">‹</a>
+      <b>{{ month_label }}</b>
+      <a href="?month={{ next_month }}">›</a>
+      {% if not is_current_month %}<a href="?">เดือนนี้</a>{% endif %}
+    </div>
+    <div class="sum">
+      <div class="box in"><div class="k">รับเงินสด</div><div class="v">{{ total_in|floatformat:0|intcomma }}</div></div>
+      <div class="box out"><div class="k">ซื้อสินค้า</div><div class="v">{{ total_purchase|floatformat:0|intcomma }}</div></div>
+      <div class="box coin"><div class="k">แลกเหรียญ</div><div class="v">{{ total_coin|floatformat:0|intcomma }}</div></div>
+      <div class="box net"><div class="k">คงเหลือเดือนนี้</div><div class="v">{{ net|floatformat:0|intcomma }}</div></div>
+    </div>
+    <div class="balance">รายจ่ายรวม {{ total_out|floatformat:0|intcomma }} บาท (ซื้อสินค้า + แลกเหรียญ)</div>
+
+    {% for d in days %}
+      <div class="day">
+        <div class="day-h"><span>{{ d.label }}</span><small>รับ {{ d.in|floatformat:0|intcomma }} · จ่าย {{ d.out|floatformat:0|intcomma }}</small></div>
+        {% for e in d.entries %}
+          <div class="ent">
+            <div class="t">{% if e.kind == "cash_in" %}💵{% elif e.kind == "purchase" %}🛒{% else %}🪙{% endif %} {{ e.get_kind_display }}{% if e.note %}<small>{{ e.note }}</small>{% endif %}</div>
+            <div style="display:flex;align-items:center;gap:6px;">
+              <span class="a {% if e.is_income %}in{% else %}out{% endif %}">{% if e.is_income %}+{% else %}−{% endif %}{{ e.amount|floatformat:"-2"|intcomma }}</span>
+              <form method="post" onsubmit="return confirm('ลบรายการนี้?')">
+                {% csrf_token %}<input type="hidden" name="action" value="delete"><input type="hidden" name="entry_id" value="{{ e.id }}"><input type="hidden" name="month" value="{{ month_value }}">
+                <button class="del" type="submit" title="ลบ">✕</button>
+              </form>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% empty %}
+      <div class="empty">ยังไม่มีรายการในเดือนนี้</div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

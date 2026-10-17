@@ -48,6 +48,7 @@ from .models import (
     SheetReservation,
     HomeworkStar,
     MemoTask,
+    SnackShopEntry,
     AdmissionInquiry,
     FinanceSetting,
     ExpenseCategory,
@@ -8278,6 +8279,7 @@ _ADMIN_TOOL_DEFAULTS = [
     ("private", "c-teal",  "📖", "ระบบชีทสำหรับติวเตอร์", "ติวเตอร์เข้าด้วย PIN เปิดชีท PDF ทีละหน้า สลับเนื้อหา/เฉลย และกดจบคาบเพื่อบันทึกหน้า/ข้อเข้าระบบอัปเดตชีท", "/tutor-sheets/"),
     ("private", "c-lilac", "📚", "คลังหนังสือ", "บันทึกโปรไฟล์หนังสือต้นทางที่ใช้ทำชีท ชื่อ/รหัส/วิชา/ระดับชั้น ลิงก์ไฟล์ และรูปปก", "/books/"),
     ("private", "c-stone", "🔎", "Remaining Attendance", "เสิร์ชชื่อเด็ก ดูครั้งเรียนคงเหลือ คาดว่าจะครบคอร์สวันไหน ประวัติมา/ลา/ขาดล่าสุด และประวัติการชำระเงินต่อคอร์ส", "/remaining-attendance/"),
+    ("private", "c-rose",  "🍬", "รายรับรายจ่ายร้านขนม", "บันทึกรับเงินสด · ซื้อสินค้า · นำเงินไปแลกเหรียญ ของร้านขนม แยกจากบัญชีโรงเรียน", "/snack-shop/"),
     ("private", "c-sage",  "💰", "รายรับรายจ่าย", "บันทึกค่าใช้จ่าย ค่าติวเตอร์ และ Export Excel", "/school-finance/"),
     ("private", "c-clay",  "📊", "วิเคราะห์รายได้-ต้นทุน-กำไร", "ดูกำไรรายห้อง ปรับสมมติฐานค่าสอน/รายได้ต่อคนได้เอง ปันส่วน fixed cost หาจุดคุ้มทุน และจำลอง what-if", "/revenue-analysis/"),
     ("private", "c-rose",  "📌", "รายงานสมัคร/ทดลองเรียน", "ติดตามใบสมัคร จองทดลองเรียน และสถานะภายใน", "/admission-report/"),
@@ -13757,4 +13759,76 @@ def memo_page(request: HttpRequest) -> HttpResponse:
         "owner_names": _memo_owner_names(),
         "admission_choices": _memo_admission_choices(),
         "today": timezone.localdate(),
+    })
+
+
+# =========================================================
+# 🍬 ร้านขนม -- side-business cash book
+# =========================================================
+@login_required
+def snack_shop(request: HttpRequest) -> HttpResponse:
+    if not request.user.is_staff:
+        return HttpResponse(status=403)
+    Kind = SnackShopEntry.Kind
+
+    if request.method == "POST":
+        action = request.POST.get("action") or "add"
+        month_qs = request.POST.get("month") or ""
+        if action == "delete":
+            SnackShopEntry.objects.filter(id=_id_or_none(request.POST.get("entry_id"))).delete()
+            return redirect(f"{reverse('core:snack_shop')}?month={month_qs}&saved=deleted")
+        kind = request.POST.get("kind") or ""
+        amount = _decimal_from_post(request.POST.get("amount"), Decimal("0"))
+        if kind not in dict(Kind.choices) or amount <= 0:
+            return redirect(f"{reverse('core:snack_shop')}?month={month_qs}&error=1")
+        entry_date = _parse_optional_date(request.POST.get("entry_date")) or timezone.localdate()
+        SnackShopEntry.objects.create(
+            entry_date=entry_date, kind=kind, amount=amount,
+            note=(request.POST.get("note") or "").strip()[:255],
+            created_by=request.user,
+        )
+        return redirect(f"{reverse('core:snack_shop')}?month={entry_date.strftime('%Y-%m')}&saved={kind}")
+
+    today = timezone.localdate()
+    try:
+        y, m = (int(x) for x in (request.GET.get("month") or "").split("-"))
+        month_start = date(y, m, 1)
+    except (ValueError, TypeError):
+        month_start = today.replace(day=1)
+    next_month = (month_start + timedelta(days=32)).replace(day=1)
+    prev_month = (month_start - timedelta(days=1)).replace(day=1)
+
+    entries = list(SnackShopEntry.objects.filter(entry_date__gte=month_start, entry_date__lt=next_month))
+    totals = {k: sum((e.amount for e in entries if e.kind == k), Decimal("0")) for k, _ in Kind.choices}
+    expense = totals[Kind.PURCHASE] + totals[Kind.COIN_EXCHANGE]
+    all_time = dict(SnackShopEntry.objects.values("kind").annotate(t=Sum("amount")).values_list("kind", "t"))
+    balance_all = Decimal(all_time.get(Kind.CASH_IN) or 0) - Decimal(all_time.get(Kind.PURCHASE) or 0) - Decimal(all_time.get(Kind.COIN_EXCHANGE) or 0)
+
+    days: dict[date, dict] = {}
+    for e in entries:
+        d = days.setdefault(e.entry_date, {"date": e.entry_date, "label": _thai_schedule_date(e.entry_date),
+                                           "entries": [], "in": Decimal("0"), "out": Decimal("0")})
+        d["entries"].append(e)
+        if e.is_income:
+            d["in"] += e.amount
+        else:
+            d["out"] += e.amount
+
+    return render(request, "core/snack_shop.html", {
+        "kinds": Kind.choices,
+        "today": today,
+        "month_value": month_start.strftime("%Y-%m"),
+        "month_label": f"{_THAI_MONTHS[month_start.month]} {month_start.year + 543}",
+        "prev_month": prev_month.strftime("%Y-%m"),
+        "next_month": next_month.strftime("%Y-%m"),
+        "is_current_month": month_start == today.replace(day=1),
+        "total_in": totals[Kind.CASH_IN],
+        "total_purchase": totals[Kind.PURCHASE],
+        "total_coin": totals[Kind.COIN_EXCHANGE],
+        "total_out": expense,
+        "net": totals[Kind.CASH_IN] - expense,
+        "balance_all": balance_all,
+        "days": sorted(days.values(), key=lambda d: d["date"], reverse=True),
+        "saved": request.GET.get("saved") or "",
+        "error": request.GET.get("error") or "",
     })

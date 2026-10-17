@@ -63,13 +63,13 @@
     </div>
     <div class="list">
       {% for m in rows %}
-        <div class="item{% if m.done %} done{% elif m.overdue %} overdue{% elif m.due_today %} today{% endif %}">
+        <div class="item{% if m.done %} done{% elif m.overdue %} overdue{% elif m.due_soon %} today{% endif %}">
           <input type="checkbox" data-toggle="{{ m.id }}" {% if m.done %}checked{% endif %}>
           <div class="main">
             <div class="txt">{{ m.text }}</div>
             <div class="meta">
               {% if m.owner %}<span>👤 {{ m.owner }}</span>{% endif %}
-              {% if m.due %}<span class="due">📅 {{ m.due_label }}{% if m.overdue %} · เลยกำหนด{% elif m.due_today %} · วันนี้{% endif %}</span>{% endif %}
+              {% if m.due %}<span class="due">📅 {{ m.due_label }}{% if m.overdue %} · เลยกำหนด{% elif m.due_today %} · วันนี้{% elif m.due_soon %} · ใกล้ถึงกำหนด{% endif %}</span>{% endif %}
               {% if m.admission_label %}<span>🧒 {{ m.admission_label }}</span>{% endif %}
               {% if m.done and m.done_at %}<span>✓ เสร็จ {{ m.done_at|date:"d/m/Y H:i" }}</span>{% endif %}
             </div>

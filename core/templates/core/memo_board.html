@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Checklist งานที่ต้องทำ</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box;}
+  body{margin:0;background:#f4f7fb;font-family:'IBM Plex Sans Thai',system-ui,sans-serif;color:#0f172a;}
+  .wrap{max-width:720px;margin:0 auto;padding:16px;display:grid;gap:12px;}
+  .hero{background:linear-gradient(120deg,#f59e0b,#f97316);color:#fff;border-radius:20px;padding:18px 20px;}
+  .hero h1{margin:0;font-size:22px;}
+  .hero p{margin:4px 0 0;font-size:13px;font-weight:600;color:#fff7ed;}
+  .owners{display:flex;gap:6px;flex-wrap:wrap;}
+  .chip{border:1.5px solid #e2e8f0;background:#fff;border-radius:999px;padding:7px 13px;font-size:13px;font-weight:700;color:#334155;text-decoration:none;}
+  .chip.on{background:#f97316;border-color:#f97316;color:#fff;}
+  .list{display:grid;gap:8px;}
+  .item{display:flex;gap:10px;align-items:center;background:#fff;border:1.5px solid #e2e8f0;border-radius:14px;padding:12px 14px;transition:background .2s, opacity .2s;}
+  .item .main{flex:1;min-width:0;}
+  .item .txt{font-size:15px;font-weight:700;word-break:break-word;}
+  .item .meta{display:flex;gap:9px;flex-wrap:wrap;margin-top:4px;font-size:12px;font-weight:600;color:#64748b;}
+  .item.overdue{border-color:#fca5a5;background:#fef2f2;} .item.overdue .due{color:#b91c1c;}
+  .item.soon{border-color:#fcd34d;background:#fffbeb;} .item.soon .due{color:#b45309;}
+  .item.done{background:#f1f5f9;border-color:#e2e8f0;opacity:.75;}
+  .item.done .txt{text-decoration:line-through;color:#94a3b8;}
+  .item.done .meta{color:#94a3b8;}
+  .act{flex:none;border:0;border-radius:12px;padding:10px 14px;font-weight:700;font-size:13.5px;cursor:pointer;font-family:inherit;white-space:nowrap;}
+  .act.do{background:#16a34a;color:#fff;}
+  .act.undo{background:#fff;color:#475569;border:1px solid #cbd5e1;}
+  .divider{font-size:12px;font-weight:700;color:#94a3b8;text-align:center;margin:6px 0 0;}
+  .empty{text-align:center;color:#94a3b8;font-weight:700;padding:24px;background:#fff;border-radius:14px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hero">
+    <h1>📝 Checklist งานที่ต้องทำ</h1>
+    <p>ทำเสร็จแล้วกด “✓ เสร็จแล้ว” · กดผิดดึงกลับได้ · ค้างอยู่ <span id="openCount">{{ open_count }}</span> รายการ</p>
+  </div>
+
+  {% if owners %}
+  <div class="owners">
+    <a class="chip {% if not owner %}on{% endif %}" href="?">ทุกคน</a>
+    {% for n in owners %}<a class="chip {% if n == owner %}on{% endif %}" href="?owner={{ n|urlencode }}">👤 {{ n }}</a>{% endfor %}
+  </div>
+  {% endif %}
+
+  <div class="list" id="list">
+    {% for m in rows %}
+      <div class="item{% if m.done %} done{% elif m.overdue %} overdue{% elif m.due_soon %} soon{% endif %}" data-id="{{ m.id }}"
+           data-cls="{% if m.overdue %}overdue{% elif m.due_soon %}soon{% endif %}">
+        <div class="main">
+          <div class="txt">{{ m.text }}</div>
+          <div class="meta">
+            {% if m.owner %}<span>👤 {{ m.owner }}</span>{% endif %}
+            {% if m.due %}<span class="due">📅 {{ m.due_label }}{% if not m.done %}{% if m.overdue %} · เลยกำหนด{% elif m.due_today %} · วันนี้{% elif m.due_soon %} · ใกล้ถึงกำหนด{% endif %}{% endif %}</span>{% endif %}
+            {% if m.admission_label %}<span>🧒 {{ m.admission_label }}</span>{% endif %}
+            <span class="done-at">{% if m.done and m.done_at %}✓ เสร็จ {{ m.done_at|date:"d/m/Y H:i" }}{% endif %}</span>
+          </div>
+        </div>
+        {% if m.done %}
+          <button class="act undo" type="button" data-set="0">↩ ยังไม่เสร็จ</button>
+        {% else %}
+          <button class="act do" type="button" data-set="1">✓ เสร็จแล้ว</button>
+        {% endif %}
+      </div>
+    {% empty %}
+      <div class="empty">ไม่มีงาน 🎉</div>
+    {% endfor %}
+  </div>
+</div>
+<script>
+(function(){
+  const CSRF = "{{ csrf_token }}", URL = "{% url 'core:memo_board_toggle' %}";
+  const list = document.getElementById("list");
+  function setButton(item, done){
+    const b = item.querySelector(".act");
+    b.className = "act " + (done ? "undo" : "do");
+    b.dataset.set = done ? "0" : "1";
+    b.textContent = done ? "↩ ยังไม่เสร็จ" : "✓ เสร็จแล้ว";
+  }
+  function refreshCount(){
+    document.getElementById("openCount").textContent = list.querySelectorAll(".item:not(.done)").length;
+  }
+  list.addEventListener("click", e => {
+    const b = e.target.closest(".act"); if(!b) return;
+    const item = b.closest(".item"), done = b.dataset.set === "1";
+    b.disabled = true;
+    const body = new URLSearchParams({id: item.dataset.id, done: done ? "1" : "0"});
+    fetch(URL, {method:"POST", headers:{"X-CSRFToken": CSRF}, body})
+      .then(r => r.json().then(j => { if(!r.ok || !j.ok) throw new Error(j.error || r.status); return j; }))
+      .then(j => {
+        item.classList.toggle("done", j.done);
+        item.classList.remove("overdue", "soon");
+        if(!j.done && item.dataset.cls) item.classList.add(item.dataset.cls);
+        item.querySelector(".done-at").textContent = j.done && j.done_at ? ("✓ เสร็จ " + j.done_at) : "";
+        setButton(item, j.done);
+        // done items sink to the bottom; un-done ones rise above the done block
+        if(j.done){ list.appendChild(item); }
+        else { const firstDone = list.querySelector(".item.done"); list.insertBefore(item, firstDone); }
+        refreshCount();
+      })
+      .catch(err => alert("บันทึกไม่สำเร็จ ลองใหม่อีกครั้ง (" + err.message + ")"))
+      .finally(() => { b.disabled = false; });
+  });
+})();
+</script>
+</body>
+</html>

@@ -98,6 +98,8 @@ urlpatterns = [
     path("memos/", views.memo_page, name="memo_page"),
     path("snack-shop/", views.snack_shop, name="snack_shop"),
     path("memos/api/", views.memo_api, name="memo_api"),
+    path("memos/board/", views.memo_board, name="memo_board"),
+    path("memos/board/toggle/", views.memo_board_toggle, name="memo_board_toggle"),
 
     # ระบบชีทสำหรับติวเตอร์ (PDF reader)
     path("tutor-sheets/", views.tutor_sheet_login, name="tutor_sheet_login"),

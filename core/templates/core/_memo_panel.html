@@ -1,7 +1,10 @@
 <div class="memo-panel" id="memoPanel">
   <div class="rt-block-title" style="justify-content:space-between;">
     <span>งานค้างทั้งหมด <span class="n">{{ memo_open_count }}</span></span>
-    <a href="{% url 'core:memo_page' %}" style="font-size:11px;font-weight:700;color:var(--accent);text-decoration:none;">ดูทั้งหมด →</a>
+    <span style="display:flex;gap:10px;">
+      <a href="{% url 'core:memo_board' %}" target="_blank" rel="noopener" style="font-size:11px;font-weight:700;color:var(--accent);text-decoration:none;">🔗 หน้าสำหรับทีม</a>
+      <a href="{% url 'core:memo_page' %}" style="font-size:11px;font-weight:700;color:var(--accent);text-decoration:none;">ดูทั้งหมด →</a>
+    </span>
   </div>
   <form class="memo-add" data-memo-add autocomplete="off">
     <input type="text" name="text" placeholder="จดงาน เช่น อย่าลืมแจกชีทให้น้อง…" maxlength="500" required>

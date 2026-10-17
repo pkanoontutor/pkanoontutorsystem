@@ -199,6 +199,7 @@ urlpatterns = [
 
     # Teaching schedule image generator
     path("teaching-schedule/", views.teaching_schedule_list, name="teaching_schedule_list"),
+    path("tutor-schedule/", views.tutor_schedule_view, name="tutor_schedule_view"),
     path("teaching-schedule/edit/", views.teaching_schedule_editor, name="teaching_schedule_editor"),
     path("teaching-schedule/image/<int:pk>/", views.teaching_schedule_image, name="teaching_schedule_image"),
     path("teaching-schedule/exam-dates/", views.teaching_schedule_exam_dates, name="teaching_schedule_exam_dates"),

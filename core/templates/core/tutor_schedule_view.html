@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ตารางสอนติวเตอร์</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<style>
+  *{box-sizing:border-box;}
+  body{margin:0;background:#f4f7fb;font-family:'IBM Plex Sans Thai',system-ui,sans-serif;color:#0f172a;}
+  .wrap{max-width:1100px;margin:0 auto;padding:16px;display:grid;gap:12px;}
+  .hero{background:linear-gradient(120deg,#0ea5e9,#6366f1 60%,#8b5cf6);color:#fff;border-radius:20px;padding:18px 20px;}
+  .hero h1{margin:0;font-size:23px;}
+  .hero p{margin:4px 0 0;font-size:13px;color:#e0e7ff;font-weight:600;}
+  .panel{background:#fff;border-radius:16px;padding:12px 14px;box-shadow:0 4px 14px rgba(15,23,42,.06);}
+  .lbl{font-size:11.5px;font-weight:700;color:#64748b;margin-bottom:6px;}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+  select{font-family:inherit;font-size:14px;font-weight:600;border:1px solid #cbd5e1;border-radius:12px;padding:9px 12px;background:#fff;}
+  .chip{border:1.5px solid #e2e8f0;background:#fff;border-radius:999px;padding:7px 13px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;color:#334155;display:inline-flex;align-items:center;gap:6px;}
+  .chip .dot{width:11px;height:11px;border-radius:50%;}
+  .chip.on{background:#6366f1;border-color:#6366f1;color:#fff;}
+  .chip.clear{color:#64748b;}
+  .btn{border:0;border-radius:12px;padding:10px 15px;font-weight:700;cursor:pointer;font-family:inherit;font-size:14px;}
+  .btn.dark{background:#0f172a;color:#fff;} .btn.soft{background:#eef2ff;color:#4338ca;}
+  /* schedule (the part that becomes the image) */
+  #sheet{background:#fff;border-radius:16px;padding:16px;overflow-x:auto;}
+  .sh-title{text-align:center;font-size:20px;font-weight:700;margin-bottom:10px;}
+  .sh-sub{text-align:center;font-size:12.5px;font-weight:600;color:#6366f1;margin:-6px 0 10px;}
+  table{border-collapse:separate;border-spacing:5px;width:100%;min-width:640px;}
+  th{font-size:13px;font-weight:700;padding:8px 6px;border-radius:10px;}
+  td.time{font-size:12px;font-weight:700;color:#475569;white-space:nowrap;text-align:center;background:#f1f5f9;border-radius:10px;padding:6px;}
+  td.cell{border-radius:12px;padding:8px 6px;text-align:center;vertical-align:middle;min-width:92px;height:62px;transition:filter .15s, opacity .15s;}
+  td.cell .g{font-size:11.5px;font-weight:700;opacity:.8;}
+  td.cell .s{font-size:14px;font-weight:700;line-height:1.25;}
+  td.cell .t{font-size:11.5px;font-weight:700;margin-top:2px;color:#334155;}
+  td.cell.empty{background:#f8fafc;}
+  td.cell.dim{filter:grayscale(1);opacity:.28;}
+  tr.break td{background:#fef9c3;color:#a16207;font-weight:700;font-size:12px;text-align:center;border-radius:10px;padding:6px;}
+  .empty-state{text-align:center;color:#94a3b8;font-weight:700;padding:30px;}
+  .preview{position:fixed;inset:0;background:rgba(15,23,42,.8);display:none;align-items:center;justify-content:center;padding:16px;z-index:50;flex-direction:column;gap:10px;}
+  .preview img{max-width:100%;max-height:80vh;border-radius:10px;}
+  .preview p{color:#fff;font-weight:700;font-size:13px;text-align:center;margin:0;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hero">
+    <h1>🗓️ ตารางสอนติวเตอร์</h1>
+    <p>เลือกชื่อตัวเองหรือวิชา เพื่อดูเฉพาะช่องที่เกี่ยวข้อง ช่องอื่นจะเป็นสีเทา</p>
+  </div>
+
+  {% if schedule %}
+  <div class="panel">
+    <div class="lbl">วันที่</div>
+    <div class="row">
+      <select onchange="location.href='?date='+this.value">
+        {% for d in schedule_dates %}<option value="{{ d.value }}" {% if d.value == schedule.date|date:'Y-m-d' %}selected{% endif %}>{{ d.label }}</option>{% endfor %}
+      </select>
+      <button class="btn dark" type="button" onclick="copyImage()">📋 Copy / Share รูป</button>
+      <button class="btn soft" type="button" onclick="downloadImage()">⬇️ Save Image</button>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="lbl">ติวเตอร์</div>
+    <div class="row" id="tutorChips">
+      {% for t in tutors %}<button type="button" class="chip" data-tutor="{{ t.id }}"><span class="dot" style="background:{{ t.color }}"></span>{{ t.name }}</button>{% endfor %}
+    </div>
+    <div class="lbl" style="margin-top:10px;">วิชา</div>
+    <div class="row" id="subjectChips">
+      {% for s in subjects %}<button type="button" class="chip" data-subject="{{ s }}">{{ s }}</button>{% endfor %}
+      <button type="button" class="chip clear" id="clearPick">✕ แสดงทั้งหมด</button>
+    </div>
+  </div>
+
+  <div id="sheet">
+    <div class="sh-title">ตารางเรียน {{ thai_date }}</div>
+    <div class="sh-sub" id="pickLabel"></div>
+    <table>
+      <thead><tr><th></th>{% for r in rooms %}<th style="background:{{ r.header_color }}">{{ r.icon }} {{ r.name }}</th>{% endfor %}</tr></thead>
+      <tbody>
+        {% for row in grid %}
+          {% if row.is_break %}
+            <tr class="break"><td class="time">{{ row.label }}</td><td colspan="{{ rooms|length }}">พักกลางวัน</td></tr>
+          {% else %}
+            <tr>
+              <td class="time">{{ row.label }}</td>
+              {% for rc in row.rooms %}
+                {% with c=rc.cell %}
+                {% if c and not c.is_empty %}
+                  <td class="cell" data-tutor="{{ c.tutor_id|default:'' }}" data-subject-raw="{{ c.subject_label }}"
+                      style="background:{{ rc.tutor_color|default:'#e2e8f0' }}2e;border:2px solid {{ rc.tutor_color|default:'#cbd5e1' }};">
+                    {% if c.grade_label %}<div class="g">{{ c.grade_label }}</div>{% endif %}
+                    <div class="s">{{ c.subject_label|default:"-" }}</div>
+                    {% if rc.tutor_name %}<div class="t">{{ rc.tutor_name }}</div>{% endif %}
+                  </td>
+                {% else %}
+                  <td class="cell empty"></td>
+                {% endif %}
+                {% endwith %}
+              {% endfor %}
+            </tr>
+          {% endif %}
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+    <div class="panel empty-state">ยังไม่มีตารางสอน</div>
+  {% endif %}
+</div>
+<div class="preview" id="imagePreview"><img id="previewImage" alt=""><p id="previewHint"></p></div>
+
+<script>
+(function(){
+  let pick = null;   // {kind:'tutor'|'subject', value}
+  const cells = () => document.querySelectorAll('td.cell:not(.empty)');
+  function apply(){
+    document.querySelectorAll('.chip[data-tutor],.chip[data-subject]').forEach(ch => {
+      ch.classList.toggle('on', !!pick && ((pick.kind === 'tutor' && ch.dataset.tutor === pick.value) || (pick.kind === 'subject' && ch.dataset.subject === pick.value)));
+    });
+    document.querySelectorAll('td.cell').forEach(td => {
+      if(!pick){ td.classList.remove('dim'); return; }
+      const match = pick.kind === 'tutor' ? td.dataset.tutor === pick.value : (td.dataset.subjectRaw || '').trim() === pick.value;
+      td.classList.toggle('dim', !match);
+    });
+    const lab = document.getElementById('pickLabel');
+    if(lab){
+      const on = document.querySelector('.chip.on');
+      lab.textContent = on ? ('เฉพาะ: ' + on.textContent.trim()) : '';
+    }
+  }
+  document.addEventListener('click', e => {
+    const t = e.target.closest('.chip[data-tutor]'), s = e.target.closest('.chip[data-subject]');
+    if(t){ pick = (pick && pick.kind === 'tutor' && pick.value === t.dataset.tutor) ? null : {kind:'tutor', value:t.dataset.tutor}; apply(); }
+    else if(s){ pick = (pick && pick.kind === 'subject' && pick.value === s.dataset.subject) ? null : {kind:'subject', value:s.dataset.subject}; apply(); }
+    else if(e.target.closest('#clearPick')){ pick = null; apply(); }
+  });
+  try{
+    const saved = JSON.parse(localStorage.getItem('pk_tutor_schedule_pick') || 'null');
+    if(saved && document.querySelector(saved.kind === 'tutor' ? '.chip[data-tutor="' + saved.value + '"]' : '.chip[data-subject]')) { pick = saved; }
+  }catch(e){}
+  const origApply = apply;
+  apply = function(){ origApply(); try{ localStorage.setItem('pk_tutor_schedule_pick', JSON.stringify(pick)); }catch(e){} };
+  apply();
+})();
+
+/* Same image helpers as the receipt / renewal notice pages. */
+function isIOSDevice(){
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+}
+function canvasToBlob(canvas){
+  return new Promise((resolve,reject)=>{ canvas.toBlob(b => b ? resolve(b) : reject(new Error('สร้างรูปไม่สำเร็จ')), 'image/png'); });
+}
+async function makeCanvas(){
+  const node=document.getElementById('sheet');
+  return await html2canvas(node,{scale:2,useCORS:true,backgroundColor:'#ffffff',windowWidth:node.scrollWidth+40});
+}
+function showPreview(url, hint){
+  document.getElementById('previewImage').src=url;
+  document.getElementById('previewHint').textContent=hint||'กดค้างที่รูป แล้วเลือก Copy Image หรือ Save Image';
+  document.getElementById('imagePreview').style.display='flex';
+}
+document.getElementById('imagePreview').addEventListener('click',function(e){ if(e.target===this) this.style.display='none'; });
+const FILE_NAME = 'schedule_{{ schedule.date|date:"Y-m-d"|default:"" }}.png';
+async function downloadImage(){
+  const canvas=await makeCanvas();
+  if(isIOSDevice()){ showPreview(canvas.toDataURL('image/png'),'กดค้างที่รูป แล้วเลือก Save Image'); return; }
+  const a=document.createElement('a'); a.download=FILE_NAME; a.href=canvas.toDataURL('image/png'); a.click();
+}
+async function copyImage(){
+  try{
+    const canvas=await makeCanvas();
+    const blob=await canvasToBlob(canvas);
+    const file=new File([blob], FILE_NAME, {type:'image/png'});
+    if(isIOSDevice() && navigator.canShare && navigator.canShare({files:[file]})){
+      await navigator.share({files:[file], title:'ตารางสอน'}); return;
+    }
+    if(navigator.clipboard && window.ClipboardItem){
+      await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]);
+      alert('Copy รูปตารางสอนแล้ว'); return;
+    }
+    showPreview(URL.createObjectURL(blob),'เครื่องนี้ยัง copy รูปตรง ๆ ไม่ได้ ให้กดค้างที่รูป แล้วเลือก Copy Image หรือ Save Image');
+  }catch(e){
+    try{ const canvas=await makeCanvas(); showPreview(canvas.toDataURL('image/png'),'ถ้า Copy / Share ไม่ขึ้น ให้กดค้างที่รูป แล้วเลือก Copy Image หรือ Save Image'); }
+    catch(inner){ alert('สร้างรูปไม่สำเร็จ ลองใหม่อีกครั้ง'); }
+  }
+}
+</script>
+</body>
+</html>

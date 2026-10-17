@@ -13848,3 +13848,37 @@ def snack_shop(request: HttpRequest) -> HttpResponse:
         "saved": request.GET.get("saved") or "",
         "error": request.GET.get("error") or "",
     })
+
+
+def memo_board(request: HttpRequest) -> HttpResponse:
+    """Shared checklist for admins / tutors (no login): they can only tick an
+    item done (it greys out and drops to the bottom, never deleted) or pull
+    it back to not-done. Adding / editing / deleting stays on /memos/."""
+    owner = (request.GET.get("owner") or "").strip()
+    since = timezone.now() - timedelta(days=30)
+    qs = MemoTask.objects.select_related("admission_inquiry").filter(Q(is_done=False) | Q(done_at__gte=since))
+    if owner:
+        qs = qs.filter(owner_name=owner)
+    rows = [_memo_row(m) for m in qs.order_by("is_done", F("due_date").asc(nulls_last=True), "-done_at", "-created_at")[:300]]
+    owners = sorted(set(MemoTask.objects.filter(Q(is_done=False) | Q(done_at__gte=since))
+                        .exclude(owner_name="").values_list("owner_name", flat=True)))
+    return render(request, "core/memo_board.html", {
+        "rows": rows, "owner": owner, "owners": owners,
+        "open_count": sum(1 for r in rows if not r["done"]),
+        "done_count": sum(1 for r in rows if r["done"]),
+    })
+
+
+@require_POST
+def memo_board_toggle(request: HttpRequest) -> JsonResponse:
+    """The only change the shared board can make: done <-> not done."""
+    memo = MemoTask.objects.filter(id=_id_or_none(request.POST.get("id"))).first()
+    if not memo:
+        return JsonResponse({"ok": False, "error": "ไม่พบรายการนี้"}, status=404)
+    want_done = request.POST.get("done") == "1"
+    if memo.is_done != want_done:
+        memo.is_done = want_done
+        memo.done_at = timezone.now() if want_done else None
+        memo.save(update_fields=["is_done", "done_at"])
+    return JsonResponse({"ok": True, "done": memo.is_done,
+                         "done_at": memo.done_at.strftime("%d/%m/%Y %H:%M") if memo.done_at else ""})

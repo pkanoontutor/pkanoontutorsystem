@@ -34,7 +34,10 @@
 <div class="mm-wrap">
   <div class="mm-hero">
     <div><h1>📝 Memo / Checklist</h1><p>จดงานให้ตัวเอง แอดมิน หรือติวเตอร์ · งานค้าง {{ counts.open }} รายการ</p></div>
-    <a class="tab" style="background:#fff" href="{% url 'core:pkanoon_admin_tool' %}">← Admin Tool</a>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;">
+      <a class="tab" style="background:#fff" href="{% url 'core:memo_board' %}" target="_blank" rel="noopener">🔗 หน้าสำหรับทีม (ติ๊กเสร็จได้อย่างเดียว)</a>
+      <a class="tab" style="background:#fff" href="{% url 'core:pkanoon_admin_tool' %}">← Admin Tool</a>
+    </div>
   </div>
 
   <form class="mm-panel mm-add" id="addForm" autocomplete="off">

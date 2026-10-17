@@ -104,6 +104,11 @@
   .muted{color:#64748b;font-size:12px;line-height:1.45;}
   .mini{font-size:11px;color:#64748b;font-weight:800;margin-top:4px;}
   .error-box{background:#fef2f2;border:1px solid #fecaca;color:#991b1b;border-radius:16px;padding:12px;font-size:13px;font-weight:1000;line-height:1.55;}
+  .sheet-src{display:flex;gap:6px;margin-bottom:6px;flex-wrap:wrap;}
+  .sheet-src label{cursor:pointer;}
+  .sheet-src input{display:none;}
+  .sheet-src span{display:inline-block;border:1px solid #cbd5e1;border-radius:999px;padding:6px 12px;font-size:12.5px;font-weight:900;background:#fff;color:#334155;}
+  .sheet-src input:checked + span{background:#2563eb;border-color:#2563eb;color:#fff;}
   .status-missing .sheet-status-toggle{outline:3px solid rgba(239,68,68,.45);border-radius:14px;}
   .field-error input{border-color:#ef4444!important;box-shadow:0 0 0 3px rgba(239,68,68,.12)!important;}
   .flash-saved{animation:flashSaved 1s ease;}
@@ -300,15 +305,21 @@
                       </div>
                     </div>
 
-                    <div class="field">
-                      <label>ชื่อชีท/เอกสาร</label>
-                      <input id="sheetInput{{ a.id }}" type="text" name="sheet_name" value="{% if curr %}{{ curr.sheet_name }}{% elif prev %}{{ prev.sheet_name }}{% else %}{{ a.subject_template.default_sheet_name }}{% endif %}" placeholder="ชื่อชีท/เอกสาร">
-                      <select class="sheet-update-picker" data-grade="{{ a.class_grade_level }}" data-target="#sheetInput{{ a.id }}" style="margin-top:6px;">
-                        <option value="">เลือกจาก Sheet Inventory / หรือกรอกเอง</option>
+                    <div class="field" data-sheet-field>
+                      <label>ชีท/เอกสาร</label>
+                      {# last saved sheet (this week, else last week) -- remembered for next time #}
+                      <input type="hidden" name="sheet_name" data-sheet-value value="{% if curr %}{{ curr.sheet_name }}{% elif prev %}{{ prev.sheet_name }}{% else %}{{ a.subject_template.default_sheet_name }}{% endif %}">
+                      <div class="sheet-src">
+                        <label><input type="radio" name="sheet_src_{{ a.id }}" value="system" data-src> <span>📚 ชีทในระบบ</span></label>
+                        <label><input type="radio" name="sheet_src_{{ a.id }}" value="extra" data-src> <span>✏️ ชีทเสริม</span></label>
+                      </div>
+                      <select class="sheet-update-picker" data-grade="{{ a.class_grade_level }}" data-sheet-select hidden>
+                        <option value="">— เลือกชีทในระบบ —</option>
                         {% for s in sheet_choices %}
-                          <option value="{{ s.code }} {{ s.title }}" data-grade="{{ s.grade_level }}">{{ s.get_grade_level_display|default:"ไม่ระบุ" }} · {{ s.code }} · {{ s.title }}</option>
+                          <option value="{{ s.code }} {{ s.title }}" data-code="{{ s.code }}" data-grade="{{ s.grade_level }}">{{ s.get_grade_level_display|default:"ไม่ระบุ" }} · {{ s.code }} · {{ s.title }}</option>
                         {% endfor %}
                       </select>
+                      <input type="text" data-sheet-text placeholder="พิมพ์ชื่อชีทเสริม / เอกสาร" hidden>
                     </div>
                     <div class="field" data-page-field>
                       <label>สอนถึงหน้า <span style="color:#dc2626;">*</span></label>
@@ -382,6 +393,12 @@
         const checkedNoTeaching = noTeaching && noTeaching.checked;
 
         if (!checkedNoTeaching) {
+          const sheetField = form.querySelector("[data-sheet-field]");
+          if (sheetField && !sheetField.querySelector("[data-sheet-value]").value.trim()) {
+            e.preventDefault();
+            alert("กรุณาเลือกชีทในระบบ หรือกรอกชื่อชีทเสริมก่อนบันทึก");
+            return;
+          }
           const statusField = form.querySelector("[data-status-field]");
           const pickedStatus = form.querySelector("input[name='sheet_status']:checked");
           if (statusField) statusField.classList.toggle("status-missing", !pickedStatus);
@@ -407,17 +424,39 @@
       });
     });
 
-    document.querySelectorAll(".sheet-update-picker").forEach(picker => {
-      const grade = picker.dataset.grade || "";
-      Array.from(picker.options).forEach(opt => {
-        if(!opt.value){ opt.hidden = false; return; }
-        const optGrade = opt.dataset.grade || "";
-        opt.hidden = !!(grade && optGrade && optGrade !== grade);
+    // ชีทในระบบ (dropdown of active sheets) vs ชีทเสริม (free text). The
+    // saved value decides which mode opens: a value that starts with an
+    // active sheet code reopens the dropdown on that sheet.
+    document.querySelectorAll("[data-sheet-field]").forEach(field => {
+      const hidden = field.querySelector("[data-sheet-value]");
+      const select = field.querySelector("[data-sheet-select]");
+      const text = field.querySelector("[data-sheet-text]");
+      const radios = field.querySelectorAll("[data-src]");
+      const grade = select.dataset.grade || "";
+      Array.from(select.options).forEach(opt => {
+        if(!opt.value) return;
+        const g = opt.dataset.grade || "";
+        opt.hidden = !!(grade && g && g !== grade);
       });
-      picker.addEventListener("change", function(){
-        const target = document.querySelector(picker.dataset.target || "");
-        if(target && picker.value) target.value = picker.value;
-      });
+      function setMode(mode){
+        radios.forEach(r => r.checked = r.value === mode);
+        select.hidden = mode !== "system";
+        text.hidden = mode !== "extra";
+        sync();
+      }
+      function sync(){
+        const mode = Array.from(radios).find(r => r.checked);
+        hidden.value = !mode ? hidden.value : (mode.value === "system" ? select.value : text.value.trim());
+      }
+      const saved = (hidden.value || "").trim();
+      const firstToken = saved.split(/\s+/)[0].toUpperCase();
+      const match = Array.from(select.options).find(o => o.dataset.code && o.dataset.code.toUpperCase() === firstToken);
+      if(match){ select.value = match.value; setMode("system"); }
+      else if(saved){ text.value = saved; setMode("extra"); }
+      else { setMode("system"); }
+      radios.forEach(r => r.addEventListener("change", () => setMode(r.value)));
+      select.addEventListener("change", sync);
+      text.addEventListener("input", sync);
     });
   });
 </script>

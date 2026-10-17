@@ -1,0 +1,35 @@
+<div class="memo-panel" id="memoPanel">
+  <div class="rt-block-title" style="justify-content:space-between;">
+    <span>📝 Memo / Checklist <span class="n">{{ memo_open_count }}</span></span>
+    <a href="{% url 'core:memo_page' %}" style="font-size:11px;font-weight:700;color:var(--accent);text-decoration:none;">ดูทั้งหมด →</a>
+  </div>
+  <form class="memo-add" data-memo-add autocomplete="off">
+    <input type="text" name="text" placeholder="จดงาน เช่น อย่าลืมแจกชีทให้น้อง…" maxlength="500" required>
+    <input type="text" name="owner" list="memoOwners" placeholder="ผู้รับผิดชอบ">
+    <input type="date" name="due_date" title="กำหนดเสร็จ">
+    <select name="admission_id" title="เชื่อมกับนักเรียนที่จะมาเรียน">
+      <option value="">— ไม่เชื่อมนักเรียน —</option>
+      {% for a in memo_admission_choices %}<option value="{{ a.id }}">🧒 {{ a.label }}</option>{% endfor %}
+    </select>
+    <button type="submit" class="rt-mini-btn receipt">＋ เพิ่ม</button>
+  </form>
+  <datalist id="memoOwners">{% for n in memo_owner_names %}<option value="{{ n }}">{% endfor %}</datalist>
+  <div class="memo-list">
+    {% for m in memos %}
+      <div class="memo-item{% if m.overdue %} overdue{% elif m.due_today %} today{% endif %}" data-memo-id="{{ m.id }}">
+        <input type="checkbox" data-memo-toggle="{{ m.id }}" title="ทำเสร็จแล้ว">
+        <div class="memo-main">
+          <div class="memo-text">{{ m.text }}</div>
+          <div class="memo-meta">
+            {% if m.owner %}<span class="memo-owner">👤 {{ m.owner }}</span>{% endif %}
+            {% if m.due %}<span class="memo-due">📅 {{ m.due_label }}{% if m.overdue %} · เลยกำหนด{% elif m.due_today %} · วันนี้{% endif %}</span>{% endif %}
+            {% if m.admission_label %}<span class="memo-link">🧒 {{ m.admission_label }}</span>{% endif %}
+          </div>
+        </div>
+        <button type="button" class="rt-row-clear" data-memo-delete="{{ m.id }}" title="ลบ">✕</button>
+      </div>
+    {% empty %}
+      <div class="rt-empty-mini">ไม่มีงานค้าง 🎉</div>
+    {% endfor %}
+  </div>
+</div>

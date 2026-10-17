@@ -1,0 +1,106 @@
+{% extends "core/base.html" %}
+{% block title %}Memo / Checklist{% endblock %}
+{% block head %}
+<style>
+  .mm-wrap{max-width:900px;margin:0 auto;display:grid;gap:12px;}
+  .mm-hero{background:linear-gradient(120deg,#f59e0b,#f97316);color:#fff;border-radius:20px;padding:18px 20px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center;}
+  .mm-hero h1{margin:0;font-size:23px;font-weight:1000;}
+  .mm-hero p{margin:3px 0 0;font-size:12.5px;font-weight:700;color:#fff7ed;}
+  .mm-panel{background:#fff;border-radius:16px;padding:14px;box-shadow:0 4px 12px rgba(15,23,42,.07);}
+  .mm-add{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+  .mm-add .full{grid-column:1/-1;}
+  .mm-add label{font-size:11px;font-weight:1000;color:#475569;display:block;margin-bottom:4px;}
+  .mm-add input,.mm-add select{width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:12px;padding:10px 12px;font-family:inherit;font-size:14px;font-weight:700;}
+  .mm-btn{border:0;border-radius:12px;padding:11px 16px;font-weight:1000;cursor:pointer;font-family:inherit;font-size:14px;background:#f97316;color:#fff;}
+  .tabs{display:flex;gap:6px;flex-wrap:wrap;align-items:center;}
+  .tab{border:1px solid #e2e8f0;border-radius:999px;padding:6px 13px;font-size:12.5px;font-weight:900;color:#334155;text-decoration:none;background:#f8fafc;}
+  .tab.on{background:#f97316;border-color:#f97316;color:#fff;}
+  .tabs select{border:1px solid #cbd5e1;border-radius:999px;padding:6px 12px;font-family:inherit;font-weight:800;font-size:12.5px;}
+  .list{display:grid;gap:7px;}
+  .item{display:flex;gap:10px;align-items:flex-start;border:1px solid #e2e8f0;border-radius:13px;padding:10px 12px;background:#fff;}
+  .item input[type=checkbox]{width:20px;height:20px;margin-top:2px;accent-color:#16a34a;cursor:pointer;flex:none;}
+  .item .main{flex:1;min-width:0;}
+  .item .txt{font-size:14.5px;font-weight:800;color:#0f172a;word-break:break-word;}
+  .item.done .txt{text-decoration:line-through;color:#94a3b8;}
+  .item .meta{display:flex;gap:9px;flex-wrap:wrap;margin-top:4px;font-size:12px;font-weight:700;color:#64748b;}
+  .item.overdue{border-color:#fca5a5;background:#fef2f2;} .item.overdue .due{color:#b91c1c;}
+  .item.today{border-color:#fcd34d;background:#fffbeb;} .item.today .due{color:#b45309;}
+  .del{border:1px solid #fecaca;background:#fff;color:#b91c1c;border-radius:9px;padding:4px 9px;font-weight:900;cursor:pointer;font-family:inherit;font-size:12px;}
+  .empty{text-align:center;color:#94a3b8;font-weight:800;padding:24px;border:1.5px dashed #e2e8f0;border-radius:14px;}
+  @media(max-width:620px){.mm-add{grid-template-columns:1fr;}}
+</style>
+{% endblock %}
+{% block content %}
+<div class="mm-wrap">
+  <div class="mm-hero">
+    <div><h1>📝 Memo / Checklist</h1><p>จดงานให้ตัวเอง แอดมิน หรือติวเตอร์ · งานค้าง {{ counts.open }} รายการ</p></div>
+    <a class="tab" style="background:#fff" href="{% url 'core:pkanoon_admin_tool' %}">← Admin Tool</a>
+  </div>
+
+  <form class="mm-panel mm-add" id="addForm" autocomplete="off">
+    <div class="full"><label>รายการ *</label><input type="text" name="text" maxlength="500" placeholder="เช่น อย่าลืมแจกชีทให้น้องต้นกล้า / โทรหาผู้ปกครองน้อง..." required></div>
+    <div><label>ผู้รับผิดชอบ (พิมพ์ชื่อได้)</label><input type="text" name="owner" list="ownerList" placeholder="เช่น ตัวเอง / แอดมิน / ครูบี"></div>
+    <div><label>กำหนดเสร็จ</label><input type="date" name="due_date"></div>
+    <div class="full"><label>เชื่อมกับนักเรียนที่จะมาเรียน (ภาพรวมเรียลไทม์)</label>
+      <select name="admission_id">
+        <option value="">— ไม่เชื่อม —</option>
+        {% for a in admission_choices %}<option value="{{ a.id }}">🧒 {{ a.label }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="full"><button class="mm-btn" type="submit">＋ เพิ่มรายการ</button></div>
+    <datalist id="ownerList">{% for n in owner_names %}<option value="{{ n }}">{% endfor %}</datalist>
+  </form>
+
+  <div class="mm-panel">
+    <div class="tabs" style="margin-bottom:10px;">
+      <a class="tab {% if status == 'open' %}on{% endif %}" href="?status=open{% if owner %}&owner={{ owner|urlencode }}{% endif %}">ค้างอยู่ {{ counts.open }}</a>
+      <a class="tab {% if status == 'done' %}on{% endif %}" href="?status=done{% if owner %}&owner={{ owner|urlencode }}{% endif %}">เสร็จแล้ว {{ counts.done }}</a>
+      <a class="tab {% if status == 'all' %}on{% endif %}" href="?status=all{% if owner %}&owner={{ owner|urlencode }}{% endif %}">ทั้งหมด</a>
+      <select onchange="location.href='?status={{ status }}&owner='+encodeURIComponent(this.value)">
+        <option value="">ทุกคน</option>
+        {% for n in owner_names %}<option value="{{ n }}" {% if n == owner %}selected{% endif %}>👤 {{ n }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="list">
+      {% for m in rows %}
+        <div class="item{% if m.done %} done{% elif m.overdue %} overdue{% elif m.due_today %} today{% endif %}">
+          <input type="checkbox" data-toggle="{{ m.id }}" {% if m.done %}checked{% endif %}>
+          <div class="main">
+            <div class="txt">{{ m.text }}</div>
+            <div class="meta">
+              {% if m.owner %}<span>👤 {{ m.owner }}</span>{% endif %}
+              {% if m.due %}<span class="due">📅 {{ m.due_label }}{% if m.overdue %} · เลยกำหนด{% elif m.due_today %} · วันนี้{% endif %}</span>{% endif %}
+              {% if m.admission_label %}<span>🧒 {{ m.admission_label }}</span>{% endif %}
+              {% if m.done and m.done_at %}<span>✓ เสร็จ {{ m.done_at|date:"d/m/Y H:i" }}</span>{% endif %}
+            </div>
+          </div>
+          <button class="del" type="button" data-del="{{ m.id }}">ลบ</button>
+        </div>
+      {% empty %}
+        <div class="empty">ไม่มีรายการ</div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+<script>
+(function(){
+  const CSRF = "{{ csrf_token }}", URL = "{% url 'core:memo_api' %}";
+  function post(body){
+    return fetch(URL, {method:"POST", headers:{"Content-Type":"application/json","X-CSRFToken":CSRF}, body:JSON.stringify(body)})
+      .then(r => r.json().then(j => { if(!r.ok || j.ok === false) throw new Error(j.error || ("HTTP " + r.status)); return j; }));
+  }
+  const fail = e => alert("บันทึกไม่สำเร็จ: " + e.message);
+  document.getElementById("addForm").addEventListener("submit", e => {
+    e.preventDefault();
+    const body = {"do":"add"}; new FormData(e.target).forEach((v, k) => body[k] = v);
+    post(body).then(() => location.reload()).catch(fail);
+  });
+  document.addEventListener("click", e => {
+    const t = e.target.closest("[data-toggle]");
+    if(t){ post({"do":"toggle", id:t.dataset.toggle}).then(() => location.reload()).catch(fail); return; }
+    const d = e.target.closest("[data-del]");
+    if(d && confirm("ลบรายการนี้?")) post({"do":"delete", id:d.dataset.del}).then(() => location.reload()).catch(fail);
+  });
+})();
+</script>
+{% endblock %}

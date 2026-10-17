@@ -115,6 +115,51 @@
   @keyframes flashSaved{0%{box-shadow:0 0 0 0 rgba(34,197,94,.55);}45%{box-shadow:0 0 0 8px rgba(34,197,94,.18);}100%{box-shadow:none;}}
   @media(max-width:900px){.tutor-summary-grid{grid-template-columns:repeat(2,minmax(0,1fr));}}
   @media(max-width:760px){.filter-grid,.form-grid{grid-template-columns:1fr;}.btnx{width:100%;}.title{font-size:21px;}.hero{padding:16px;border-radius:20px;}.card-head{display:grid;}.status-row{justify-content:flex-start;}.slot-header{display:grid;}.slot-header .slot-name{font-size:18px;}.tutor-summary-grid{grid-template-columns:1fr 1fr;}.status-field{grid-column:auto;}}
+
+  /* ---------- 2026-10 refresh: lighter, roomier, easier on a phone ---------- */
+  body{background:#f4f7fb!important;}
+  .public-wrap{max-width:980px;gap:14px;}
+  .hero{background:linear-gradient(120deg,#0ea5e9 0%,#6366f1 55%,#8b5cf6 100%);border-radius:22px;padding:20px 22px;box-shadow:0 14px 30px rgba(99,102,241,.25);}
+  .title{font-size:25px;}
+  .sub{color:#e0e7ff;font-weight:700;}
+  .week-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:#fff;border-radius:18px;padding:10px 12px;box-shadow:0 4px 14px rgba(15,23,42,.06);position:sticky;top:8px;z-index:20;}
+  .wk-form{display:flex;align-items:center;gap:8px;flex:1;min-width:220px;}
+  .wk-label{font-size:12px;font-weight:1000;color:#475569;white-space:nowrap;}
+  .wk-form input{max-width:170px;padding:8px 10px;border-radius:12px;}
+  .wk-range{font-size:13px;font-weight:1000;color:#0f172a;white-space:nowrap;}
+  .wk-arrow{width:36px;height:36px;border-radius:12px;display:grid;place-items:center;background:#f1f5f9;color:#334155;font-size:20px;font-weight:1000;text-decoration:none;}
+  .wk-arrow:hover{background:#e0e7ff;color:#4338ca;}
+  .wk-now{border-radius:12px;padding:9px 14px;font-size:13px;font-weight:1000;text-decoration:none;background:#6366f1;color:#fff;white-space:nowrap;}
+  .wk-now.on{background:#e0e7ff;color:#4338ca;}
+  .tutor-panel{background:#fff;border-radius:18px;padding:14px;box-shadow:0 4px 14px rgba(15,23,42,.06);}
+  .tp-head{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:baseline;margin-bottom:10px;font-size:15px;font-weight:1000;color:#0f172a;}
+  .tp-hint{font-size:11.5px;font-weight:800;color:#94a3b8;}
+  .tp-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px;}
+  .tp-item{display:grid;gap:5px;text-decoration:none;border-radius:14px;padding:10px 12px;border:1.5px solid #e2e8f0;background:#fff;transition:.15s;}
+  .tp-item[href]:hover{transform:translateY(-1px);box-shadow:0 8px 16px rgba(15,23,42,.08);}
+  .tp-name{font-size:14px;font-weight:1000;color:#0f172a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .tp-badge{font-size:11.5px;font-weight:1000;}
+  .tp-bar{height:6px;border-radius:999px;background:#e2e8f0;overflow:hidden;}
+  .tp-bar span{display:block;height:100%;border-radius:999px;background:#22c55e;}
+  .tp-item.done{border-color:#86efac;background:#f0fdf4;} .tp-item.done .tp-badge{color:#15803d;}
+  .tp-item.pending{border-color:#fcd34d;background:#fffbeb;} .tp-item.pending .tp-badge{color:#b45309;} .tp-item.pending .tp-bar span{background:#f59e0b;}
+  .tp-item.idle{background:#f8fafc;opacity:.65;} .tp-item.idle .tp-badge{color:#94a3b8;}
+  .slot-header{border-radius:18px;box-shadow:none;border:0;}
+  .class-card{border-radius:18px;box-shadow:0 4px 14px rgba(15,23,42,.06);border:0;}
+  .update-card{border-radius:16px;border:1.5px solid #fde68a;}
+  .update-card.saved{border-color:#86efac;}
+  .update-card summary{padding:14px 16px;}
+  .subject{font-size:17px;}
+  .update-body{padding:0 16px 16px;}
+  .form-grid{grid-template-columns:1fr 1fr;gap:12px;}
+  .form-grid .field[data-sheet-field],.form-grid .status-field{grid-column:1/-1;}
+  .form-grid > button[type=submit]{grid-column:1/-1;padding:13px;font-size:15px;border-radius:14px;background:linear-gradient(120deg,#22c55e,#16a34a);}
+  input,select{border-radius:12px;padding:11px 12px;font-size:14px;}
+  .sheet-src span{padding:8px 14px;font-size:13px;}
+  .sheet-src input:checked + span{background:#6366f1;border-color:#6366f1;}
+  .sheet-status-toggle span{padding:11px 10px;font-size:13px;}
+  .tp-item.flash, .update-card.flash{animation:flashSaved 1.2s ease;}
+  @media(max-width:620px){.form-grid{grid-template-columns:1fr;}.wk-form{min-width:0;}.week-bar{top:4px;}}
 </style>
 {% endblock %}
 
@@ -122,7 +167,8 @@
 <div class="public-wrap">
   <div class="hero">
     <div class="title">👩‍🏫 อัปเดตการสอนติวเตอร์</div>
-    <div class="sub">สัปดาห์เรียน {{ week_start|date:"d/m/Y" }} - {{ week_end|date:"d/m/Y" }} · กดชื่อของตัวเองด้านล่างเพื่อ filter ได้เลย</div>
+    <div class="sub">สัปดาห์เรียน {{ week_start|date:"d/m/Y" }} – {{ week_end|date:"d/m/Y" }} · เลือกวิชาของตัวเอง แล้วกรอก ชีท / หน้า / ข้อ / สถานะชีท</div>
+    <a href="{% url 'core:tutor_schedule_view' %}" style="display:inline-block;margin-top:10px;background:rgba(255,255,255,.2);color:#fff;border-radius:12px;padding:7px 13px;font-size:13px;font-weight:1000;text-decoration:none;">🗓️ ดูตารางสอน</a>
   </div>
 
   <details class="sheet-sum">
@@ -181,37 +227,35 @@
     <div class="error-box">กรุณากรอกทั้ง “สอนถึงหน้า” และ “สอนถึงข้อ” ก่อนบันทึก ถ้าไม่ต้องการใส่ตัวเลขให้กรอกเครื่องหมาย “-” ได้ครับ ยกเว้นกรณีติ๊ก “สัปดาห์นี้ไม่มีสอน”</div>
   {% endif %}
 
-  <div class="filter-card">
-    <form method="get" class="filter-grid">
-      <div class="field">
-        <label>เลือกสัปดาห์</label>
-        <input type="date" name="week_start" value="{{ week_start|date:'Y-m-d' }}">
-      </div>
-      <div class="field">
-        <label>Filter ชื่อติวเตอร์</label>
-        <select name="tutor_id">
-          <option value="">ดูทั้งหมด</option>
-          {% for t in tutors %}
-            <option value="{{ t.id }}" {% if selected_tutor_id == t.id|stringformat:"s" %}selected{% endif %}>{{ t.name }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      <button class="btnx primary" type="submit">แสดงผล</button>
+  <div class="week-bar">
+    <a class="wk-arrow" href="?week_start={{ prev_week_start|date:'Y-m-d' }}" title="สัปดาห์ก่อน">‹</a>
+    <form method="get" class="wk-form">
+      <label class="wk-label">📅 สัปดาห์</label>
+      <input type="date" name="week_start" value="{{ week_start|date:'Y-m-d' }}" onchange="this.form.submit()">
+      <span class="wk-range">{{ week_start|date:"d/m" }} – {{ week_end|date:"d/m/Y" }}</span>
     </form>
+    <a class="wk-arrow" href="?week_start={{ next_week_start|date:'Y-m-d' }}" title="สัปดาห์ถัดไป">›</a>
+    <a class="wk-now {% if is_current_week %}on{% endif %}" href="?week_start={{ current_week_start|date:'Y-m-d' }}">⟲ สัปดาห์ล่าสุด</a>
   </div>
 
-  <div class="summary-card">
-    <div class="summary-title">
-      <span>📊 Summary การอัปเดตของติวเตอร์</span>
-      <a class="btnx soft" href="/tutor-teaching-update/?week_start={{ week_start|date:'Y-m-d' }}">ดูทั้งหมด</a>
+  <div class="tutor-panel">
+    <div class="tp-head">
+      <span>👥 สถานะการอัปเดตของติวเตอร์</span>
+      <span class="tp-hint">กดชื่อเพื่อไปยังวิชาที่ยังไม่บันทึก</span>
     </div>
-    <div class="tutor-summary-grid">
+    <div class="tp-list">
       {% for row in tutor_summary_rows %}
-        <a class="tutor-summary {% if row.is_empty %}empty{% endif %} {% if row.is_selected %}selected{% endif %}" href="/tutor-teaching-update/?week_start={{ week_start|date:'Y-m-d' }}&tutor_id={{ row.tutor.id }}">
-          <div class="tutor-name">{{ row.tutor.name }}</div>
-          <div class="tutor-count"><b>{{ row.done_count }}</b> / {{ row.assigned_count }} Class</div>
-          <div class="bar"><span style="width:{{ row.percent }}%;"></span></div>
-          {% if row.is_empty %}<div class="muted">ยังไม่ได้ถูก assign</div>{% else %}<div class="muted">ค้าง {{ row.pending_count }} Class</div>{% endif %}
+        <a class="tp-item {% if row.is_empty %}idle{% elif row.pending_count == 0 %}done{% else %}pending{% endif %}"
+           {% if row.jump_id %}href="#assignment-{{ row.jump_id }}" data-jump="{{ row.jump_id }}"{% endif %}>
+          <span class="tp-name">{{ row.tutor.name }}</span>
+          {% if row.is_empty %}
+            <span class="tp-badge">ไม่มีสอน</span>
+          {% elif row.pending_count == 0 %}
+            <span class="tp-badge">✓ ครบ {{ row.done_count }}/{{ row.assigned_count }}</span>
+          {% else %}
+            <span class="tp-badge">ค้าง {{ row.pending_count }} · {{ row.done_count }}/{{ row.assigned_count }}</span>
+          {% endif %}
+          {% if not row.is_empty %}<span class="tp-bar"><span style="width:{{ row.percent }}%"></span></span>{% endif %}
         </a>
       {% empty %}
         <div class="muted">ยังไม่มีรายชื่อติวเตอร์</div>
@@ -307,8 +351,8 @@
 
                     <div class="field" data-sheet-field>
                       <label>ชีท/เอกสาร</label>
-                      {# last saved sheet (this week, else last week) -- remembered for next time #}
-                      <input type="hidden" name="sheet_name" data-sheet-value value="{% if curr %}{{ curr.sheet_name }}{% elif prev %}{{ prev.sheet_name }}{% else %}{{ a.subject_template.default_sheet_name }}{% endif %}">
+                      {# last saved sheet (this week, else last week; blank if saved before the 17/10 reset) #}
+                      <input type="hidden" name="sheet_name" data-sheet-value value="{{ a.sheet_prefill }}">
                       <div class="sheet-src">
                         <label><input type="radio" name="sheet_src_{{ a.id }}" value="system" data-src> <span>📚 ชีทในระบบ</span></label>
                         <label><input type="radio" name="sheet_src_{{ a.id }}" value="extra" data-src> <span>✏️ ชีทเสริม</span></label>
@@ -427,6 +471,11 @@
     // ชีทในระบบ (dropdown of active sheets) vs ชีทเสริม (free text). The
     // saved value decides which mode opens: a value that starts with an
     // active sheet code reopens the dropdown on that sheet.
+    document.querySelectorAll("[data-jump]").forEach(link => link.addEventListener("click", () => {
+      const card = document.getElementById("assignment-" + link.dataset.jump);
+      if(card){ card.open = true; card.classList.remove("flash"); void card.offsetWidth; card.classList.add("flash"); }
+    }));
+
     document.querySelectorAll("[data-sheet-field]").forEach(field => {
       const hidden = field.querySelector("[data-sheet-value]");
       const select = field.querySelector("[data-sheet-select]");

@@ -10310,6 +10310,21 @@ def _sheet_progress_sections(week_start) -> list[dict]:
     return sections
 
 
+# Sheet names saved before this moment are not pre-filled any more: on
+# 17/10/2026 every subject re-picks its sheet with the new system/extra
+# picker. Subjects not taught that day keep their old record untouched and
+# simply start blank the next time they are taught.
+SHEET_PICK_RESET_AT = datetime(2026, 10, 17, 0, 0)
+
+
+def _sheet_prefill_for(curr, prev) -> str:
+    cutoff = timezone.make_aware(SHEET_PICK_RESET_AT) if timezone.is_naive(SHEET_PICK_RESET_AT) else SHEET_PICK_RESET_AT
+    for upd in (curr, prev):
+        if upd is not None and not upd.no_teaching:
+            return upd.sheet_name if (upd.updated_at and upd.updated_at >= cutoff) else ""
+    return ""
+
+
 def tutor_teaching_update(request: HttpRequest) -> HttpResponse:
     week_start, week_end = _teaching_week_from_request(request)
     _ensure_teaching_assignments(week_start, week_end)
@@ -10392,9 +10407,9 @@ def tutor_teaching_update(request: HttpRequest) -> HttpResponse:
             if not has_no_teaching_update:
                 _sync_no_teaching_update_for_assignment(assignment, week_start, updated_by_name="Admin")
 
+    # No tutor filter any more: everyone sees every class; the tutor list
+    # above shows each tutor's status and jumps to their next card.
     display_assignments = all_week_assignments
-    if selected_tutor_id:
-        display_assignments = [a for a in all_week_assignments if str(a.tutor_id or "") == selected_tutor_id]
 
     all_assignments = display_assignments
     for a in all_assignments:
@@ -10425,6 +10440,8 @@ def tutor_teaching_update(request: HttpRequest) -> HttpResponse:
         )
         for upd in curr_qs:
             current_updates.setdefault(upd.assignment_id, upd)
+    for a in all_assignments:
+        a.sheet_prefill = _sheet_prefill_for(current_updates.get(a.id), previous_updates.get(a.subject_template_id))
 
     tutor_choices = list(TeachingTutor.objects.filter(is_active=True).order_by("name"))
 
@@ -10439,8 +10456,10 @@ def tutor_teaching_update(request: HttpRequest) -> HttpResponse:
         done_items = [a for a in assigned_items if a.id in all_current_updates]
         assigned_count = len(assigned_items)
         done_count = len(done_items)
+        pending = [a for a in assigned_items if a.id not in all_current_updates]
         tutor_summary_rows.append({
             "tutor": tutor,
+            "jump_id": (pending[0].id if pending else (assigned_items[0].id if assigned_items else None)),
             "assigned_count": assigned_count,
             "done_count": done_count,
             "pending_count": max(assigned_count - done_count, 0),
@@ -10453,8 +10472,15 @@ def tutor_teaching_update(request: HttpRequest) -> HttpResponse:
 
     sheet_choices = Sheet.objects.select_related("subject").filter(is_active=True).order_by("grade_level", "subject__name", "code")
     grouped_slots = _teaching_slot_groups_from_assignments(all_assignments, previous_updates, current_updates)
+    # Tutors with work this week first, then A-Z; idle tutors last.
+    tutor_summary_rows.sort(key=lambda r: (r["is_empty"], r["tutor"].name))
+    current_week_start, _ = _teaching_week_range(timezone.localdate())
 
     return render(request, "core/tutor_teaching_update.html", {
+        "current_week_start": current_week_start,
+        "is_current_week": week_start == current_week_start,
+        "prev_week_start": week_start - timedelta(days=7),
+        "next_week_start": week_start + timedelta(days=7),
         "week_start": week_start,
         "week_end": week_end,
         "today": timezone.localdate(),
@@ -13538,4 +13564,46 @@ def admission_sheet_checklist(request: HttpRequest, pk: int) -> HttpResponse:
         "lesson_label": _thai_schedule_date(inquiry.first_lesson_date) if inquiry.first_lesson_date else "",
         "initial_json": json.dumps(initial, ensure_ascii=False),
         "all_json": json.dumps(all_sheets, ensure_ascii=False),
+    })
+
+
+def tutor_schedule_view(request: HttpRequest) -> HttpResponse:
+    """ตารางสอนสำหรับติวเตอร์ -- public (no login), read-only view of the
+    teaching schedule built in /teaching-schedule/. Pick a tutor or a
+    subject to grey out everything else; save/share as an image."""
+    from .models import DailySchedule, ScheduleRoom, TeachingTutor
+    today = timezone.localdate()
+    schedules = list(DailySchedule.objects.order_by("-date")[:30])
+    schedule = None
+    picked = _parse_date(request.GET.get("date")) if request.GET.get("date") else None
+    if picked:
+        schedule = next((s for s in schedules if s.date == picked), None) or DailySchedule.objects.filter(date=picked).first()
+    if schedule is None:
+        upcoming = [s for s in schedules if s.date >= today]
+        schedule = (min(upcoming, key=lambda s: s.date) if upcoming else (schedules[0] if schedules else None))
+
+    grid, tutors, subjects = [], [], []
+    rooms = list(ScheduleRoom.objects.filter(is_active=True))
+    if schedule:
+        color_map = _schedule_tutor_color_map(list(TeachingTutor.objects.all()))
+        grid, _ = _annotate_schedule_grid(schedule, color_map=color_map)
+        tset, sset = {}, set()
+        for row in grid:
+            for rc in row["rooms"]:
+                c = rc["cell"]
+                if c and c.tutor_id:
+                    tset[c.tutor_id] = (c.tutor.name, rc["tutor_color"])
+                if c and c.subject_label:
+                    sset.add(c.subject_label.strip())
+        tutors = sorted(({"id": k, "name": v[0], "color": v[1]} for k, v in tset.items()), key=lambda t: t["name"])
+        subjects = sorted(sset)
+
+    return render(request, "core/tutor_schedule_view.html", {
+        "schedule": schedule,
+        "thai_date": _thai_schedule_date(schedule.date) if schedule else "",
+        "schedule_dates": [{"value": s.date.isoformat(), "label": _thai_schedule_date(s.date)} for s in sorted(schedules, key=lambda s: s.date, reverse=True)],
+        "rooms": rooms,
+        "grid": grid,
+        "tutors": tutors,
+        "subjects": subjects,
     })

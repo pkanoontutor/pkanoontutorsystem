@@ -1,0 +1,50 @@
+{% extends "core/base.html" %}
+{% block title %}ตารางเรียน Online{% endblock %}
+{% block head %}
+<style>
+  .os-wrap{max-width:860px;margin:0 auto;display:grid;gap:12px;}
+  .os-hero{background:linear-gradient(120deg,#6366f1,#8b5cf6 60%,#ec4899);color:#fff;border-radius:20px;padding:18px 20px;}
+  .os-hero h1{margin:0;font-size:23px;font-weight:1000;}
+  .os-hero p{margin:4px 0 0;font-size:13px;font-weight:700;color:#ede9fe;}
+  .os-panel{background:#fff;border-radius:16px;padding:14px;box-shadow:0 4px 12px rgba(15,23,42,.07);}
+  .os-new{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;}
+  .os-new label{font-size:11px;font-weight:1000;color:#475569;display:block;margin-bottom:4px;}
+  .os-new input{border:1px solid #cbd5e1;border-radius:12px;padding:9px 11px;font-family:inherit;font-weight:800;font-size:14px;}
+  .btn{border:0;border-radius:12px;padding:10px 16px;font-weight:1000;cursor:pointer;font-family:inherit;font-size:14px;background:#6366f1;color:#fff;text-decoration:none;display:inline-flex;align-items:center;gap:6px;}
+  .btn.soft{background:#eef2ff;color:#4338ca;}
+  .row{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;border-top:1px solid #f1f5f9;padding:11px 2px;}
+  .row:first-child{border-top:0;}
+  .row b{font-size:15px;}
+  .row small{display:block;font-size:12px;font-weight:700;color:#64748b;margin-top:2px;}
+  .pill{font-size:11px;font-weight:900;border-radius:999px;padding:2px 9px;background:#dcfce7;color:#166534;margin-left:6px;}
+  .empty{text-align:center;color:#94a3b8;font-weight:800;padding:20px;}
+</style>
+{% endblock %}
+{% block content %}
+<div class="os-wrap">
+  <div class="os-hero">
+    <h1>💻 ตารางเรียน Online</h1>
+    <p>สร้างปฏิทินตารางเรียนออนไลน์รายสัปดาห์ · Copy เป็นรูปส่งผู้ปกครอง · ส่งค่าติวเตอร์ชม.ละ 300 เข้าระบบรายรับรายจ่าย</p>
+  </div>
+  <form class="os-panel os-new" method="post">
+    {% csrf_token %}
+    <div><label>วันที่เริ่ม</label><input type="date" name="start_date" value="{{ default_start|date:'Y-m-d' }}" required></div>
+    <div><label>วันที่สิ้นสุด</label><input type="date" name="end_date" value="{{ default_end|date:'Y-m-d' }}"></div>
+    <button class="btn" type="submit">＋ สร้างตารางสัปดาห์ใหม่</button>
+  </form>
+  <div class="os-panel">
+    {% for s in schedules %}
+      <div class="row">
+        <div><b>📅 {{ s.range_label }}</b>{% if s.payroll_sent_at %}<span class="pill">ส่งค่าติวเตอร์แล้ว</span>{% endif %}
+          <small>{{ s.row_count }} คาบ · เวลา {{ s.time_text }}</small></div>
+        <div style="display:flex;gap:6px;">
+          <a class="btn soft" href="{% url 'core:online_schedule_edit' s.id %}">✏️ แก้ไข</a>
+          <a class="btn" href="{% url 'core:online_schedule_view' s.id %}">🖼️ ดูตาราง</a>
+        </div>
+      </div>
+    {% empty %}
+      <div class="empty">ยังไม่มีตารางออนไลน์</div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

@@ -143,6 +143,10 @@
   .tp-bar span{display:block;height:100%;border-radius:999px;background:#22c55e;}
   .tp-item.done{border-color:#86efac;background:#f0fdf4;} .tp-item.done .tp-badge{color:#15803d;}
   .tp-item.pending{border-color:#fcd34d;background:#fffbeb;} .tp-item.pending .tp-badge{color:#b45309;} .tp-item.pending .tp-bar span{background:#f59e0b;}
+  .tp-item.active{outline:3px solid #6366f1;outline-offset:1px;}
+  .tp-filter-note{margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:#eef2ff;border-radius:12px;padding:8px 12px;font-size:13px;font-weight:1000;color:#4338ca;}
+  .tp-filter-note button{border:0;background:#fff;color:#4338ca;border-radius:10px;padding:5px 10px;font-weight:1000;cursor:pointer;font-family:inherit;}
+  .update-card[hidden],.class-card[hidden],.slot-section[hidden]{display:none!important;}
   .tp-item.idle{background:#f8fafc;opacity:.65;} .tp-item.idle .tp-badge{color:#94a3b8;}
   .slot-header{border-radius:18px;box-shadow:none;border:0;}
   .class-card{border-radius:18px;box-shadow:0 4px 14px rgba(15,23,42,.06);border:0;}
@@ -241,12 +245,12 @@
   <div class="tutor-panel">
     <div class="tp-head">
       <span>👥 สถานะการอัปเดตของติวเตอร์</span>
-      <span class="tp-hint">กดชื่อเพื่อไปยังวิชาที่ยังไม่บันทึก</span>
+      <span class="tp-hint">กดชื่อตัวเองเพื่อแสดงเฉพาะวิชาของคุณ · กดซ้ำเพื่อดูทั้งหมด</span>
     </div>
     <div class="tp-list">
       {% for row in tutor_summary_rows %}
         <a class="tp-item {% if row.is_empty %}idle{% elif row.pending_count == 0 %}done{% else %}pending{% endif %}"
-           {% if row.jump_id %}href="#assignment-{{ row.jump_id }}" data-jump="{{ row.jump_id }}"{% endif %}>
+           {% if not row.is_empty %}href="#" data-tutor-filter="{{ row.tutor.id }}"{% endif %}>
           <span class="tp-name">{{ row.tutor.name }}</span>
           {% if row.is_empty %}
             <span class="tp-badge">ไม่มีสอน</span>
@@ -260,6 +264,10 @@
       {% empty %}
         <div class="muted">ยังไม่มีรายชื่อติวเตอร์</div>
       {% endfor %}
+    </div>
+    <div class="tp-filter-note" id="tpFilterNote" hidden>
+      <span id="tpFilterText"></span>
+      <button type="button" id="tpShowAll">✕ ดูทั้งหมด</button>
     </div>
     {% if unassigned_count %}<div class="muted" style="margin-top:8px;">ยังไม่ assign ติวเตอร์ {{ unassigned_count }} รายการ</div>{% endif %}
   </div>
@@ -281,7 +289,7 @@
           <div class="assignment-list">
             {% for item in group.assignments %}
               {% with a=item.assignment prev=item.previous_update curr=item.current_update %}
-              <details class="update-card {% if curr %}{% if curr.no_teaching %}no-teaching{% else %}saved{% if curr.sheet_near_end %} near-end{% endif %}{% endif %}{% endif %}" id="assignment-{{ a.id }}" {% if not curr %}open{% endif %}>
+              <details class="update-card {% if curr %}{% if curr.no_teaching %}no-teaching{% else %}saved{% if curr.sheet_near_end %} near-end{% endif %}{% endif %}{% endif %}" id="assignment-{{ a.id }}" data-tutor="{{ a.tutor_id|default:'' }}" {% if not curr %}open{% endif %}>
                 <summary>
                   <div class="card-head">
                     <div class="head-left">
@@ -471,10 +479,39 @@
     // ชีทในระบบ (dropdown of active sheets) vs ชีทเสริม (free text). The
     // saved value decides which mode opens: a value that starts with an
     // active sheet code reopens the dropdown on that sheet.
-    document.querySelectorAll("[data-jump]").forEach(link => link.addEventListener("click", () => {
-      const card = document.getElementById("assignment-" + link.dataset.jump);
-      if(card){ card.open = true; card.classList.remove("flash"); void card.offsetWidth; card.classList.add("flash"); }
-    }));
+    // Tutor filter: tap a name to show only that tutor's cards.
+    (function(){
+      const KEY = "pk_tutor_update_filter";
+      const note = document.getElementById("tpFilterNote"), noteText = document.getElementById("tpFilterText");
+      function apply(id){
+        document.querySelectorAll("[data-tutor-filter]").forEach(a => a.classList.toggle("active", a.dataset.tutorFilter === id));
+        document.querySelectorAll(".update-card").forEach(c => { c.hidden = !!id && c.dataset.tutor !== id; });
+        document.querySelectorAll(".class-card").forEach(cc => {
+          cc.hidden = !!id && !cc.querySelector(".update-card:not([hidden])");
+        });
+        document.querySelectorAll(".slot-section").forEach(sec => {
+          sec.hidden = !!id && !sec.querySelector(".class-card:not([hidden])");
+        });
+        const chip = id && document.querySelector('[data-tutor-filter="' + id + '"] .tp-name');
+        if(note){ note.hidden = !chip; noteText.textContent = chip ? ("แสดงเฉพาะของ " + chip.textContent.trim()) : ""; }
+        try { id ? localStorage.setItem(KEY, id) : localStorage.removeItem(KEY); } catch(e) {}
+      }
+      let current = null;
+      try { current = localStorage.getItem(KEY); } catch(e) {}
+      if(current && !document.querySelector('[data-tutor-filter="' + current + '"]')) current = null;
+      document.querySelectorAll("[data-tutor-filter]").forEach(a => a.addEventListener("click", e => {
+        e.preventDefault();
+        current = current === a.dataset.tutorFilter ? null : a.dataset.tutorFilter;
+        apply(current);
+        if(current){
+          const first = document.querySelector(".update-card:not([hidden]):not(.saved):not(.no-teaching)") || document.querySelector(".update-card:not([hidden])");
+          if(first){ first.open = true; first.scrollIntoView({behavior:"smooth", block:"start"}); }
+        }
+      }));
+      const showAll = document.getElementById("tpShowAll");
+      if(showAll) showAll.addEventListener("click", () => { current = null; apply(null); });
+      apply(current);
+    })();
 
     document.querySelectorAll("[data-sheet-field]").forEach(field => {
       const hidden = field.querySelector("[data-sheet-value]");

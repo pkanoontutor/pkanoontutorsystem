@@ -14291,3 +14291,64 @@ def sub_admin_page(request: HttpRequest, slug: str) -> HttpResponse:
         "cards": cards,
         "is_owner_preview": _is_tool_owner(request.user),
     })
+
+
+# =========================================================
+# 🎙️ Voice receipt: speak / type a command -> draft -> approve
+# =========================================================
+@login_required
+def course_payment_voice(request: HttpRequest) -> HttpResponse:
+    if not request.user.is_staff:
+        return HttpResponse(status=403)
+    return render(request, "core/course_payment_voice.html", {
+        "today": timezone.localdate(),
+        "payment_methods": CoursePayment.PaymentMethod.choices,
+    })
+
+
+@require_POST
+@login_required
+def course_payment_voice_parse(request: HttpRequest) -> JsonResponse:
+    """Turn the command into a draft: parsed fields + every enrollment that
+    fits (several when nicknames clash, so the user picks)."""
+    from .models import ScheduleRoom
+    from .voice_receipt import find_candidates, parse_command
+    if not request.user.is_staff:
+        return JsonResponse({"ok": False, "error": "forbidden"}, status=403)
+    payload = _admin_tool_card_payload(request)
+    text = (payload.get("text") or "").strip()
+    if not text:
+        return JsonResponse({"ok": False, "error": "ยังไม่มีคำสั่ง"}, status=400)
+    parsed = parse_command(text)
+    enrollments = list(_active_enrollments_for_payment())
+    rooms = list(ScheduleRoom.objects.filter(is_active=True))
+    matches, warnings = find_candidates(parsed, enrollments, rooms)
+
+    room_by_class: dict[int, list[str]] = {}
+    for r in rooms:
+        for attr in ("sat_morning_class_id", "sat_afternoon_class_id", "sun_morning_class_id", "sun_afternoon_class_id"):
+            cid = getattr(r, attr, None)
+            if cid:
+                room_by_class.setdefault(cid, []).append(r.name)
+
+    candidates = []
+    for e in matches[:20]:
+        candidates.append({
+            "enrollment_id": e.id,
+            "student_id": e.student_id,
+            "nickname": e.student.nickname or "",
+            "full_name": e.student.full_name or "",
+            "grade": e.student.grade_level or "",
+            "class_name": e.tutoring_class.name,
+            "slot": e.tutoring_class.get_time_slot_display(),
+            "rooms": ", ".join(sorted(set(room_by_class.get(e.tutoring_class_id, [])))),
+            "remaining": _sessions_num(e.remaining_sessions),
+            "course_price": str(e.tutoring_class.course_price or ""),
+        })
+    if parsed["action"] == "new":
+        warnings.append("คำสั่งนี้เหมือนเป็นการสมัครใหม่ — หน้านี้ทำได้เฉพาะต่อคอร์สให้นักเรียนที่มีคอร์สอยู่แล้ว (สมัครใหม่ให้ใช้หน้าสร้างใบเสร็จปกติ)")
+    if parsed["sessions"] is None:
+        warnings.append("ไม่ได้ยินจำนวนครั้ง — ใส่เองในดราฟได้")
+    if parsed["amount"] is None:
+        warnings.append("ไม่ได้ยินยอดเงิน — ใส่เองในดราฟได้")
+    return JsonResponse({"ok": True, "parsed": parsed, "candidates": candidates, "warnings": warnings})

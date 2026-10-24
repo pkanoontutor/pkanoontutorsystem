@@ -65,8 +65,7 @@
       <input type="date" name="start_date" value="{{ s.start_date|date:'Y-m-d' }}">
       <span>–</span>
       <input type="date" name="end_date" value="{{ s.end_date|date:'Y-m-d' }}">
-      <label>ชม./คาบ</label>
-      <input type="number" step="0.25" min="0.25" name="hours_per_session" value="{{ s.hours_per_session|floatformat:'-2' }}" style="width:70px;">
+      <span style="font-size:12px;font-weight:800;color:#64748b;">ค่าสอน: 1 วิชา/วัน = 1 ชม. × 300</span>
     </div>
     <div class="l">
       {% if other_weeks %}<button class="btn amber" type="button" onclick="openCopy()">📋 ดึงข้อมูลจากสัปดาห์ก่อน…</button>{% endif %}

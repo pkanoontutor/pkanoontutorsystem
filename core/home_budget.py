@@ -199,3 +199,16 @@ def home_budget_api(request: HttpRequest) -> JsonResponse:
     else:
         return err("ไม่รู้จักคำสั่งนี้")
     return JsonResponse({"ok": True, "state": _state(p)})
+
+
+EXTRA_SYSTEMS = [
+    {"icon": "🏠", "name": "งบตกแต่งบ้าน", "desc": "วางแผนงบซื้อของและค่าแรง แยกตามโซนในบ้าน บันทึกค่าใช้จ่ายจริงพร้อมใบเสร็จ และดูบนแปลนบ้าน", "url": "/home-budget/"},
+]
+
+
+@login_required
+def extras_hub(request: HttpRequest) -> HttpResponse:
+    """ระบบส่วนเสริม -- personal tools that aren't part of the tutoring school."""
+    if not request.user.is_staff:
+        return HttpResponse(status=403)
+    return render(request, "core/extras_hub.html", {"systems": EXTRA_SYSTEMS})

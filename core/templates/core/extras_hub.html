@@ -1,0 +1,26 @@
+{% extends "core/base.html" %}
+{% block title %}ระบบส่วนเสริม{% endblock %}
+{% block head %}
+<style>
+  .ex-wrap{max-width:900px;margin:0 auto;display:grid;gap:14px;}
+  .ex-hero{background:linear-gradient(120deg,#134e4a,#0f766e 55%,#a3a35a);color:#fff;border-radius:20px;padding:18px 20px;}
+  .ex-hero h1{margin:0;font-size:22px;font-weight:1000;}
+  .ex-hero p{margin:4px 0 0;font-size:13px;color:#ccfbf1;font-weight:700;}
+  .ex-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;}
+  .ex-tile{display:flex;gap:12px;align-items:flex-start;text-decoration:none;color:#0f172a;background:#fff;border-radius:18px;padding:16px;box-shadow:0 4px 14px rgba(15,23,42,.07);transition:.15s;}
+  .ex-tile:hover{transform:translateY(-2px);box-shadow:0 10px 22px rgba(15,23,42,.12);}
+  .ex-ic{width:48px;height:48px;border-radius:14px;display:grid;place-items:center;font-size:24px;background:#ccfbf1;flex:none;}
+  .ex-nm{font-size:16px;font-weight:1000;} .ex-ds{font-size:12.5px;font-weight:700;color:#64748b;margin-top:3px;line-height:1.45;}
+</style>
+{% endblock %}
+{% block content %}
+<div class="ex-wrap">
+  <div class="ex-hero"><h1>🧩 ระบบส่วนเสริม</h1><p>เครื่องมือส่วนตัวที่ไม่เกี่ยวกับระบบกวดวิชา</p></div>
+  <div class="ex-grid">
+    {% for s in systems %}
+      <a class="ex-tile" href="{{ s.url }}"><span class="ex-ic">{{ s.icon }}</span><span><span class="ex-nm">{{ s.name }}</span><div class="ex-ds">{{ s.desc }}</div></span></a>
+    {% endfor %}
+  </div>
+  <div><a href="{% url 'core:pkanoon_admin_tool' %}" style="font-size:13px;font-weight:800;color:#64748b;text-decoration:none;">← กลับหน้า Admin Tool</a></div>
+</div>
+{% endblock %}

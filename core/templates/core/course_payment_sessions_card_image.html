@@ -58,8 +58,11 @@
     .hero-num{font-size:82px;line-height:.92;font-weight:700;letter-spacing:-.045em;color:#14532d;
       text-shadow:0 6px 22px rgba(20,83,45,.18);}
     .hero-unit{font-size:19px;font-weight:700;color:#166534;}
-    .hero-end{display:inline-block;margin-top:12px;background:#166534;color:#fff;border-radius:12px;padding:8px 18px;
-      font-size:17px;font-weight:700;letter-spacing:-.01em;box-shadow:0 3px 0 rgba(20,83,45,.25);}
+    .hero-end{display:inline-block;margin-top:12px;background:#166534;color:#fff;border-radius:12px;padding:8px 20px;
+      text-align:center;letter-spacing:-.01em;box-shadow:0 3px 0 rgba(20,83,45,.25);}
+    .hero-end .he-k{font-size:13px;font-weight:600;opacity:.9;}
+    .hero-end .he-date{font-size:19px;font-weight:700;line-height:1.3;}
+    .hero-end .he-note{font-size:11px;font-weight:400;opacity:.85;margin-top:1px;}
     .hero-end.done{background:#64748b;}
     .hero-asof{font-size:11px;font-weight:500;color:var(--ink-soft);margin-top:9px;}
 
@@ -137,7 +140,15 @@
               <div class="hero-num">{{ remaining_sessions|sessions }}</div>
               <div class="hero-unit">ครั้ง</div>
             </div>
-            <div class="hero-end{% if is_complete %} done{% endif %}">{% if is_complete %}✓ {{ expected_completion_label }}{% else %}📅 คาดว่าจะครบคอร์ส {{ expected_completion_label }}{% endif %}</div>
+            {% if is_complete %}
+              <div class="hero-end done"><div class="he-date">✓ {{ expected_completion_label }}</div></div>
+            {% else %}
+              <div class="hero-end">
+                <div class="he-k">📅 คาดว่าจะครบคอร์ส</div>
+                <div class="he-date">{{ expected_completion_label }}</div>
+                <div class="he-note">ไม่นับวันลาและวันหยุดโรงเรียน</div>
+              </div>
+            {% endif %}
             <div class="hero-asof">ข้อมูล ณ วันที่ {% now "d/m/Y" %}</div>
           </div>
 

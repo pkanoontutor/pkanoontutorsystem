@@ -163,6 +163,9 @@
   $("dSessions").addEventListener("input", updateSummary);
   $("dAmount").addEventListener("input", updateSummary);
   $("parseBtn").addEventListener("click", parse);
+  // Arrived from the admin tool with the command already typed/spoken: draft straight away.
+  const preset = new URLSearchParams(location.search).get("text");
+  if(preset){ $("cmd").value = preset; parse(); }
   $("resetBtn").addEventListener("click", () => { $("cmd").value = ""; $("candPanel").hidden = true; $("draftPanel").hidden = true; $("warns").innerHTML = ""; $("chips").innerHTML = ""; chosen = null; });
   $("draftPanel").addEventListener("submit", e => {
     updateSummary();

@@ -1,0 +1,80 @@
+{% extends "core/base.html" %}
+{% load humanize %}
+{% block title %}รายจ่ายประจำเดือน{% endblock %}
+{% block head %}
+<style>
+  .mf-wrap{max-width:900px;margin:0 auto;display:grid;gap:12px;}
+  .mf-hero{background:linear-gradient(120deg,#9a3412,#ea580c);color:#fff;border-radius:20px;padding:18px 20px;}
+  .mf-hero h1{margin:0;font-size:22px;font-weight:1000;}
+  .mf-hero p{margin:4px 0 0;font-size:13px;color:#ffedd5;font-weight:700;line-height:1.5;}
+  .panel{background:#fff;border-radius:16px;padding:14px;box-shadow:0 4px 12px rgba(15,23,42,.07);}
+  .month-bar{display:flex;align-items:center;justify-content:center;gap:10px;}
+  .month-bar a{text-decoration:none;font-weight:1000;color:#334155;background:#f1f5f9;border-radius:10px;padding:7px 12px;}
+  .month-bar b{font-size:18px;}
+  .row{display:grid;grid-template-columns:28px 1fr 150px 90px;gap:10px;align-items:center;border-top:1px solid #f1f5f9;padding:10px 2px;}
+  .row:first-child{border-top:0;}
+  .row input[type=checkbox]{width:19px;height:19px;accent-color:#ea580c;}
+  .row b{font-size:14.5px;} .row small{display:block;font-size:12px;color:#64748b;font-weight:700;}
+  .row input[type=number]{width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:10px;padding:8px 10px;font-family:inherit;font-weight:900;font-size:15px;text-align:right;}
+  .pill{font-size:11px;font-weight:900;border-radius:999px;padding:2px 9px;margin-left:6px;}
+  .pill.ok{background:#dcfce7;color:#166534;} .pill.draft{background:#fef3c7;color:#92400e;}
+  .mini{border:1px solid #e2e8f0;background:#fff;border-radius:8px;padding:4px 8px;font-size:11.5px;font-weight:800;cursor:pointer;font-family:inherit;color:#64748b;}
+  .new{display:grid;grid-template-columns:1.4fr 1fr 1fr 130px;gap:6px;margin-top:6px;}
+  .new input,.new select{border:1px solid #cbd5e1;border-radius:10px;padding:8px 10px;font-family:inherit;font-weight:700;font-size:13.5px;min-width:0;}
+  .btn{border:0;border-radius:12px;padding:11px 18px;font-weight:1000;cursor:pointer;font-family:inherit;font-size:15px;background:#ea580c;color:#fff;}
+  .btn.soft{background:#f1f5f9;color:#0f172a;font-size:13px;padding:8px 12px;}
+  .sum{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;font-weight:900;font-size:14px;margin-top:10px;}
+  .msg{border-radius:12px;padding:9px 12px;font-weight:900;font-size:13px;background:#f0fdf4;color:#166534;}
+  .empty{text-align:center;color:#94a3b8;font-weight:800;padding:14px;}
+  @media(max-width:640px){.row{grid-template-columns:24px 1fr 110px;}.row .act{grid-column:2/-1;}.new{grid-template-columns:1fr 1fr;}}
+</style>
+{% endblock %}
+{% block content %}
+<div class="mf-wrap">
+  <div class="mf-hero">
+    <h1>📅 รายจ่ายประจำเดือน</h1>
+    <p>กรอกล่วงหน้า เช่น เงินเดือนเจ้าหน้าที่ ค่าเช่า · บันทึกแล้วเข้ารายรับรายจ่ายทันที (ลงวันที่ 1 ของเดือน) กำไรสุทธิอัปเดตเลยไม่ต้องรอสิ้นเดือน · ยอดที่บันทึกจะจำไว้เป็นร่างของเดือนถัดไป</p>
+  </div>
+  {% if msg %}<div class="msg">{% if msg == "removed" %}เอารายการออกจากรายจ่ายประจำแล้ว (เดือนที่บันทึกไปแล้วยังอยู่){% elif msg == "undone" %}ยกเลิกรายการของเดือนนี้แล้ว{% else %}✅ บันทึกรายจ่ายประจำเดือนแล้ว{% endif %}</div>{% endif %}
+
+  <form class="panel" method="post">
+    {% csrf_token %}
+    <input type="hidden" name="month" value="{{ month_q }}">
+    <div class="month-bar"><a href="?month={{ prev_q }}">‹</a><b>{{ month_label }}</b><a href="?month={{ next_q }}">›</a></div>
+    <div style="margin-top:10px;">
+      {% for r in rows %}
+        <div class="row">
+          <input type="checkbox" name="include" value="{{ r.t.id }}" checked>
+          <div><b>{{ r.t.description }}</b>{% if r.saved %}<span class="pill ok">บันทึกแล้ว</span>{% else %}<span class="pill draft">ร่าง</span>{% endif %}
+            <small>{{ r.t.category.name }}{% if r.t.vendor %} · {{ r.t.vendor }}{% endif %}</small></div>
+          <input type="number" name="amount_{{ r.t.id }}" min="0" step="0.01" value="{{ r.amount|floatformat:'-2' }}">
+          <div class="act" style="display:flex;gap:4px;justify-content:flex-end;">
+            {% if r.saved %}<button class="mini" type="submit" name="action" value="undo" formnovalidate onclick="this.form.expense_id.value='{{ r.saved.id }}';return confirm('ยกเลิกรายการนี้ของเดือน {{ month_label }}?')">ยกเลิกเดือนนี้</button>{% endif %}
+            <button class="mini" type="submit" name="action" value="remove_template" formnovalidate onclick="this.form.template_id.value='{{ r.t.id }}';return confirm('เลิกใช้ “{{ r.t.description|escapejs }}” เป็นรายจ่ายประจำ? (เดือนที่บันทึกแล้วไม่หาย)')">เลิกใช้</button>
+          </div>
+        </div>
+      {% empty %}
+        <div class="empty">ยังไม่มีรายจ่ายประจำ — เพิ่มด้านล่างได้เลย</div>
+      {% endfor %}
+    </div>
+    <input type="hidden" name="expense_id"><input type="hidden" name="template_id">
+
+    <div style="margin-top:12px;font-size:12px;font-weight:1000;color:#475569;">＋ เพิ่มรายจ่ายประจำใหม่ (จะถูกบันทึกเดือนนี้ด้วย และจำไว้ใช้เดือนต่อไป)</div>
+    <div id="newRows">
+      <div class="new">
+        <input name="new_description" placeholder="รายการ เช่น เงินเดือนแอดมิน / ค่าเช่าที่">
+        <select name="new_category"><option value="">— ประเภท —</option>{% for c in categories %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}</select>
+        <input name="new_vendor" placeholder="ผู้รับเงิน (ไม่บังคับ)">
+        <input name="new_amount" type="number" min="0" step="0.01" placeholder="จำนวนเงิน">
+      </div>
+    </div>
+    <button type="button" class="btn soft" style="margin-top:6px;" onclick="const r=document.querySelector('#newRows .new').cloneNode(true);r.querySelectorAll('input').forEach(i=>i.value='');r.querySelector('select').value='';document.getElementById('newRows').appendChild(r);">＋ อีกแถว</button>
+
+    <div class="sum"><span>ร่างเดือนนี้รวม {{ total_draft|floatformat:0|intcomma }} บาท</span><span style="color:#166534">บันทึกแล้ว {{ total_saved|floatformat:0|intcomma }} บาท</span></div>
+    <div style="display:flex;justify-content:flex-end;margin-top:10px;">
+      <button class="btn" type="submit" name="action" value="save">💾 บันทึกรายจ่ายประจำเดือน {{ month_label }}</button>
+    </div>
+    <div style="font-size:12px;font-weight:700;color:#64748b;margin-top:8px;">ติ๊กเฉพาะรายการที่จะบันทึกเดือนนี้ · บันทึกซ้ำได้ (แก้ยอดทับรายการเดิมของเดือน ไม่สร้างซ้ำ)</div>
+  </form>
+</div>
+{% endblock %}

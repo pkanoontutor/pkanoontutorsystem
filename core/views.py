@@ -53,6 +53,7 @@ from .models import (
     OnlineScheduleRow,
     OnlineScheduleTestTutor,
     SubAdminTool,
+    MonthlyFixedExpense,
     AdmissionInquiry,
     FinanceSetting,
     ExpenseCategory,
@@ -13327,6 +13328,7 @@ def _money_widget_context() -> dict:
         "money_net_profit": recognized_total - expense_total,
         "money_recent": recent[:8],
         "money_payment_methods": SchoolExpense.PaymentMethod.choices,
+        "money_fixed_status": _fixed_month_status(month_start),
     }
 
 
@@ -14409,3 +14411,99 @@ def course_payment_voice_parse(request: HttpRequest) -> JsonResponse:
     if parsed["amount"] is None:
         warnings.append("ไม่ได้ยินยอดเงิน — ใส่เองในดราฟได้")
     return JsonResponse({"ok": True, "parsed": parsed, "candidates": candidates, "warnings": warnings})
+
+
+# =========================================================
+# 📅 Pre-monthly fixed expenses (salaries, rent...)
+# =========================================================
+def _month_start_from(raw, today=None) -> date:
+    today = today or timezone.localdate()
+    try:
+        y, m = (int(x) for x in str(raw or "").split("-")[:2])
+        return date(y, m, 1)
+    except (TypeError, ValueError):
+        return today.replace(day=1)
+
+
+def _fixed_month_status(month: date) -> dict:
+    active = MonthlyFixedExpense.objects.filter(is_active=True).count()
+    saved = SchoolExpense.objects.filter(fixed_month=month).exclude(fixed_template__isnull=True).values("fixed_template").distinct().count()
+    return {"active": active, "saved": saved, "done": active > 0 and saved >= active}
+
+
+@login_required
+def monthly_fixed_expenses(request: HttpRequest) -> HttpResponse:
+    """Draft this month's fixed expenses from last month's amounts, then
+    record them as real expenses (dated the 1st, so month-to-date profit
+    reflects them straight away). Saved amounts become next month's draft."""
+    if not request.user.is_staff:
+        return HttpResponse(status=403)
+    month = _month_start_from(request.GET.get("month") or request.POST.get("month"))
+    month_q = month.strftime("%Y-%m")
+
+    if request.method == "POST":
+        action = request.POST.get("action") or "save"
+        if action == "remove_template":
+            MonthlyFixedExpense.objects.filter(id=_id_or_none(request.POST.get("template_id"))).update(is_active=False)
+            return redirect(f"{reverse('core:monthly_fixed_expenses')}?month={month_q}&msg=removed")
+        if action == "undo":
+            SchoolExpense.objects.filter(id=_id_or_none(request.POST.get("expense_id")), fixed_month=month).delete()
+            return redirect(f"{reverse('core:monthly_fixed_expenses')}?month={month_q}&msg=undone")
+
+        saved = 0
+        with transaction.atomic():
+            included = set(request.POST.getlist("include"))
+            # brand-new recurring lines typed at the bottom become templates
+            new_desc = request.POST.getlist("new_description")
+            new_cat = request.POST.getlist("new_category")
+            new_vendor = request.POST.getlist("new_vendor")
+            new_amount = request.POST.getlist("new_amount")
+            at = lambda lst, i: lst[i] if i < len(lst) else ""
+            for i, desc in enumerate(new_desc):
+                desc = (desc or "").strip()[:255]
+                cat = ExpenseCategory.objects.filter(id=_id_or_none(at(new_cat, i))).first()
+                if desc and cat:
+                    t = MonthlyFixedExpense.objects.create(
+                        description=desc, category=cat, vendor=(at(new_vendor, i) or "").strip()[:255],
+                        amount=_money(at(new_amount, i)), order=MonthlyFixedExpense.objects.count(),
+                    )
+                    included.add(str(t.id))
+            for t in MonthlyFixedExpense.objects.filter(is_active=True):
+                if str(t.id) not in included:
+                    continue
+                raw = request.POST.get(f"amount_{t.id}")
+                amount = _money(raw) if raw not in (None, "") else t.amount
+                if amount <= 0:
+                    continue
+                exp = SchoolExpense.objects.filter(fixed_template=t, fixed_month=month).first() or SchoolExpense(
+                    fixed_template=t, fixed_month=month)
+                exp.expense_date = month
+                exp.category = t.category
+                exp.vendor = t.vendor
+                exp.description = f"{t.description} (ประจำเดือน {_THAI_MONTHS[month.month]} {month.year + 543})"
+                exp.amount = amount
+                exp.payment_method = t.payment_method or "transfer"
+                exp.note = exp.note or "รายจ่ายประจำเดือน (บันทึกล่วงหน้า)"
+                exp.save()
+                t.amount = amount            # remembered as next month's draft
+                t.save(update_fields=["amount"])
+                saved += 1
+        return redirect(f"{reverse('core:monthly_fixed_expenses')}?month={month_q}&msg=saved{saved}")
+
+    saved_by_template = {e.fixed_template_id: e for e in SchoolExpense.objects.filter(fixed_month=month, fixed_template__isnull=False)}
+    rows = []
+    for t in MonthlyFixedExpense.objects.filter(is_active=True).select_related("category"):
+        e = saved_by_template.get(t.id)
+        rows.append({"t": t, "saved": e, "amount": e.amount if e else t.amount})
+    prev_m = (month - timedelta(days=1)).replace(day=1)
+    next_m = (month + timedelta(days=32)).replace(day=1)
+    return render(request, "core/monthly_fixed_expenses.html", {
+        "month": month, "month_q": month_q,
+        "month_label": f"{_THAI_MONTHS[month.month]} {month.year + 543}",
+        "prev_q": prev_m.strftime("%Y-%m"), "next_q": next_m.strftime("%Y-%m"),
+        "rows": rows,
+        "total_saved": sum((r["saved"].amount for r in rows if r["saved"]), Decimal("0")),
+        "total_draft": sum((r["amount"] for r in rows), Decimal("0")),
+        "categories": ExpenseCategory.objects.filter(is_active=True, is_tutor_payroll=False).order_by("sort_order", "name"),
+        "msg": request.GET.get("msg") or "",
+    })

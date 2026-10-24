@@ -98,6 +98,7 @@ urlpatterns = [
     path("books/", views.book_list, name="book_list"),
     path("homework-stars/", views.homework_stars, name="homework_stars"),
     path("memos/", views.memo_page, name="memo_page"),
+    path("school-finance/monthly-fixed/", views.monthly_fixed_expenses, name="monthly_fixed_expenses"),
     path("official-docs/", official_docs.official_docs_home, name="official_docs"),
     path("official-docs/payslip/", official_docs.official_doc_payslip, name="official_doc_payslip"),
     path("official-docs/wht50/", official_docs.official_doc_wht50, name="official_doc_wht50"),

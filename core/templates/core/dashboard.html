@@ -1133,6 +1133,7 @@
                       <button type="button" class="stu-more-btn" title="เมนูเพิ่มเติม"
                               onclick="return toggleCardMenu(this);">⋯</button>
                       <div class="student-actions">
+                        <a class="student-mini-btn" href="/remaining-attendance/?student_id={{ e.student_id }}&enrollment_id={{ e.id }}" title="ประวัติ / ครั้งคงเหลือ (Remaining Attendance)">🕘</a>
                         <a class="student-mini-btn" href="/adminlublub/core/student/{{ e.student_id }}/change/" title="เปิด Student Profile">👤</a>
                         <a class="student-mini-btn" href="/adminlublub/core/enrollment/{{ e.id }}/change/" title="เปิด Enrollment">📑</a>
                         <button type="button" class="student-mini-btn not-renew-btn"

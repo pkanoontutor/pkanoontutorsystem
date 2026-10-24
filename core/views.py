@@ -4187,6 +4187,27 @@ def attendance_details(request: HttpRequest) -> HttpResponse:
 # =========================================================
 # ✅ Remaining Attendance (ค้นหาเด็ก ดูครั้งเรียนคงเหลือ)
 # =========================================================
+def _attendance_edit_weeks(enrollment, weeks: int = 12) -> list[dict]:
+    """The class's lesson dates over the last `weeks` weeks (newest first)
+    plus any other dates that already have a check-in, each with its status,
+    for correcting attendance from the remaining-attendance page."""
+    today = timezone.localdate()
+    wd = _class_weekday(enrollment.tutoring_class)
+    last = today - timedelta(days=(today.weekday() - wd) % 7)
+    dates = {last - timedelta(weeks=i) for i in range(weeks)}
+    records = {a.attendance_date: a for a in Attendance.objects.filter(
+        enrollment=enrollment, attendance_date__gte=last - timedelta(weeks=weeks - 1), attendance_date__lte=today)}
+    dates |= set(records)
+    labels = {"present": "มา", "excused": "ลา", "excused_half": "ลา½", "no_show": "ขาด"}
+    out = []
+    for d in sorted(dates, reverse=True):
+        a = records.get(d)
+        status = a.status if a else ""
+        out.append({"date": d, "label": _thai_schedule_date(d), "status": status,
+                    "status_label": labels.get(status, "ยังไม่เช็คชื่อ")})
+    return out
+
+
 @login_required
 def remaining_attendance_search(request: HttpRequest) -> HttpResponse:
     """Search a student and see remaining sessions, expected completion
@@ -4251,8 +4272,18 @@ def remaining_attendance_search(request: HttpRequest) -> HttpResponse:
                 for p in payments
             ]
 
+    att_n = _parse_att_count(request.GET.get("att_n"))
+    if selected_enrollment and att_n is not None:
+        att = _attendance_window_view(selected_enrollment, att_n)
+    elif selected_enrollment:
+        att = _attendance_round_view(selected_enrollment, _parse_round_index(request.GET.get("round")))
+    else:
+        att = {"has_round": False}
     return render(request, "core/remaining_attendance_search.html", {
-        "att": _attendance_round_view(selected_enrollment, _parse_round_index(request.GET.get("round"))) if selected_enrollment else {"has_round": False},
+        "att": att,
+        "att_n": att_n,
+        "current_round_used": _attendance_round_view(selected_enrollment).get("used", 0) if selected_enrollment else 0,
+        "edit_weeks": _attendance_edit_weeks(selected_enrollment) if (selected_enrollment and request.user.is_staff) else [],
         "round_qs": _querystring_without(request, "round"),
         "students_json": json.dumps(_allocation_students_json(), ensure_ascii=False),
         "student": student,

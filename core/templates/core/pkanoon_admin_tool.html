@@ -379,11 +379,41 @@
 
   <nav class="quick-bar" aria-label="ทางลัดที่ใช้บ่อย">
     <a class="quick-btn" href="{% url 'core:course_payment_create' %}"><span class="qi">🧾</span> ใบเสร็จใหม่</a>
-    <a class="quick-btn" href="{% url 'core:course_payment_voice' %}"><span class="qi">🎙️</span> ใบเสร็จด้วยเสียง</a>
+    <button class="quick-btn" type="button" id="voiceQuickBtn" style="cursor:pointer;font-family:inherit;"><span class="qi">🎙️</span> ใบเสร็จด้วยเสียง</button>
     <a class="quick-btn" href="{% url 'core:course_renewal_notice_list' %}"><span class="qi">🔁</span> ใบต่อคอร์ส</a>
     <a class="quick-btn" href="{% url 'core:dashboard' %}"><span class="qi">🏠</span> เช็คชื่อ</a>
     <a class="quick-btn" href="{% url 'core:sheet_allocation_scan' %}"><span class="qi">📤</span> แจกชีท</a>
   </nav>
+  <form class="vq-box" id="voiceQuickBox" hidden action="{% url 'core:course_payment_voice' %}" method="get" autocomplete="off">
+    <button type="button" class="vq-mic" id="vqMic" title="กดแล้วพูด">🎤</button>
+    <textarea name="text" id="vqText" rows="2" placeholder="พูดหรือพิมพ์ เช่น สร้างใบเสร็จต่อคอร์สให้คอปเตอร์ ป.6 เสาร์บ่าย 10 ครั้ง ยอด 3890 บาท"></textarea>
+    <button type="submit" class="vq-go">📝 สร้างดราฟ →</button>
+  </form>
+  <style>
+    .vq-box{display:flex;gap:8px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius-lg);padding:10px 12px;box-shadow:var(--shadow);}
+    .vq-box[hidden]{display:none;}
+    .vq-box textarea{flex:1;min-width:0;font-family:inherit;font-size:14px;font-weight:600;border:1px solid var(--line-strong);border-radius:12px;padding:9px 11px;resize:vertical;background:var(--panel);color:var(--ink);}
+    .vq-mic{width:48px;height:48px;border-radius:50%;border:0;background:#ef4444;color:#fff;font-size:20px;cursor:pointer;flex:none;}
+    .vq-mic.listening{animation:vqPulse 1.1s infinite;}
+    .vq-mic:disabled{background:#cbd5e1;}
+    @keyframes vqPulse{0%{box-shadow:0 0 0 0 rgba(239,68,68,.6);}70%{box-shadow:0 0 0 14px rgba(239,68,68,0);}100%{box-shadow:0 0 0 0 rgba(239,68,68,0);}}
+    .vq-go{border:0;border-radius:12px;padding:12px 14px;font-weight:700;cursor:pointer;font-family:inherit;background:var(--accent);color:#fff;white-space:nowrap;}
+    @media(max-width:620px){.vq-box{flex-wrap:wrap;}.vq-box textarea{flex-basis:calc(100% - 60px);}.vq-go{width:100%;}}
+  </style>
+  <script>
+  (function(){
+    var btn=document.getElementById("voiceQuickBtn"), box=document.getElementById("voiceQuickBox"),
+        txt=document.getElementById("vqText"), mic=document.getElementById("vqMic");
+    btn.addEventListener("click", function(){ box.hidden=!box.hidden; if(!box.hidden) txt.focus(); });
+    box.addEventListener("submit", function(e){ if(!txt.value.trim()){ e.preventDefault(); txt.focus(); } });
+    var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+    if(!SR){ mic.disabled=true; mic.title="เบราว์เซอร์นี้ไม่รองรับเสียง — พิมพ์แทนได้"; return; }
+    var rec=new SR(); rec.lang="th-TH"; rec.interimResults=true; rec.continuous=false; var on=false;
+    rec.onresult=function(e){ var t=""; for(var i=0;i<e.results.length;i++) t+=e.results[i][0].transcript; txt.value=t; };
+    rec.onend=function(){ on=false; mic.classList.remove("listening"); if(txt.value.trim()) box.submit(); };
+    mic.addEventListener("click", function(){ if(on){ rec.stop(); return; } txt.value=""; on=true; mic.classList.add("listening"); rec.start(); });
+  })();
+  </script>
 
   <div class="tool-hero">
     <div class="tool-hero-row">

@@ -9850,10 +9850,14 @@ def course_payment_sessions_card_image(request: HttpRequest, pk: int) -> HttpRes
         .order_by("-payment_date", "-created_at")
     )
 
+    # Same rule as remaining-attendance's "คาดว่าจะครบคอร์ส".
+    completion = _expected_course_completion_date(enrollment)
     return render(request, "core/course_payment_sessions_card_image.html", {
         "payment": payment,
         "enrollment": enrollment,
         "remaining_sessions": enrollment.remaining_sessions,
+        "expected_completion_label": _thai_schedule_date(completion) if completion else "ครบคอร์สแล้ว",
+        "is_complete": completion is None,
         "history": history,
     })
 

@@ -13948,6 +13948,8 @@ def memo_board_toggle(request: HttpRequest) -> JsonResponse:
 ONLINE_GRADE_CHOICES = ["ป.4", "ป.5", "ป.6", "ม.1", "ม.2", "ม.3", "ม.4", "ม.5", "ม.6"]
 ONLINE_DAY_COLORS = ["#fde68a", "#f5b8ec", "#bbf7a0", "#fbc98a", "#b4cafc", "#d8c4fb", "#fca5a5"]  # Mon..Sun
 ONLINE_HOURLY_RATE = Decimal("300")
+# Every online lesson (one subject on one evening) pays exactly 1 hour.
+ONLINE_HOURS_PER_LESSON = Decimal("1")
 
 
 def _online_range_label(s) -> str:
@@ -13983,10 +13985,10 @@ def _online_sections(s) -> list[dict]:
 
 
 def _online_payroll_rows(s) -> list[dict]:
-    """Per tutor per day: online hours = lessons x hours_per_session, plus
+    """Per tutor per day: online hours = 1 per lesson, plus
     ติวเตอร์เฉลยเทส hours on their chosen date. Flat 300/hr, no travel."""
     per: dict[tuple, dict] = {}
-    hrs = Decimal(str(s.hours_per_session or 1))
+    hrs = ONLINE_HOURS_PER_LESSON
 
     def slot(tutor, day):
         return per.setdefault((tutor.id, day), {"tutor": tutor, "date": day, "teach": Decimal("0"),
@@ -14019,8 +14021,8 @@ def online_schedule_list(request: HttpRequest) -> HttpResponse:
         s = OnlineSchedule.objects.create(start_date=start, end_date=end)
         prev = OnlineSchedule.objects.exclude(id=s.id).order_by("-start_date").first()
         if prev:
-            s.time_text, s.hours_per_session = prev.time_text, prev.hours_per_session
-            s.save(update_fields=["time_text", "hours_per_session"])
+            s.time_text = prev.time_text
+            s.save(update_fields=["time_text"])
         return redirect("core:online_schedule_edit", pk=s.id)
     today = timezone.localdate()
     next_monday = today + timedelta(days=(7 - today.weekday()) % 7 or 7)
@@ -14044,7 +14046,6 @@ def online_schedule_edit(request: HttpRequest, pk: int) -> HttpResponse:
         s.start_date = _parse_date(request.POST.get("start_date"))
         s.end_date = max(_parse_optional_date(request.POST.get("end_date")) or s.start_date, s.start_date)
         s.time_text = (request.POST.get("time_text") or "").strip()[:60]
-        s.hours_per_session = _decimal_from_post(request.POST.get("hours_per_session"), Decimal("1")) or Decimal("1")
         s.note = (request.POST.get("note") or "").strip()[:255]
         s.save()
         tutor_ids = set(TeachingTutor.objects.values_list("id", flat=True))
@@ -14216,8 +14217,8 @@ def online_schedule_copy_from(request: HttpRequest, pk: int) -> HttpResponse:
             for t in src.test_tutors.all():
                 OnlineScheduleTestTutor.objects.create(schedule=s, tutor_id=t.tutor_id, work_date=t.work_date + shift,
                                                        hours=t.hours, note=t.note)
-            s.time_text, s.hours_per_session = src.time_text, src.hours_per_session
-            s.save(update_fields=["time_text", "hours_per_session"])
+            s.time_text = src.time_text
+            s.save(update_fields=["time_text"])
     return redirect(f"{reverse('core:online_schedule_edit', args=[s.id])}?copied=1")
 
 

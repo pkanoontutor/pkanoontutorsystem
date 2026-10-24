@@ -17,6 +17,7 @@
   .ttl{text-align:right;} .ttl h1{margin:0;font-size:22px;} .ttl div{font-size:12.5px;}
   .info{display:grid;grid-template-columns:1fr 1fr;gap:4px 18px;margin:12px 0;font-size:13.5px;}
   .info span{color:#6b7280;}
+  .bankbox{display:flex;gap:16px;flex-wrap:wrap;align-items:center;border:1px solid #d1d5db;border-radius:8px;padding:7px 10px;margin:0 0 12px;font-size:13.5px;background:#f9fafb;}
   table{width:100%;border-collapse:collapse;font-size:13.5px;}
   th,td{border:1px solid #9ca3af;padding:6px 8px;vertical-align:top;}
   th{background:#f3f4f6;font-weight:700;}
@@ -44,6 +45,16 @@
     <div><span>ชื่อที่ใช้สอน:</span> {{ tutor.name }}</div>
     <div><span>เลขประจำตัวผู้เสียภาษี:</span> {{ tutor.national_id|default:"-" }}</div>
     <div><span>ตำแหน่ง:</span> ติวเตอร์</div>
+  </div>
+  <div class="bankbox">
+    <b>บัญชีรับเงิน</b>
+    {% if tutor.bank_account_no %}
+      <span>ธนาคาร: <b>{{ tutor.bank_name|default:"-" }}</b></span>
+      <span>เลขที่บัญชี: <b>{{ tutor.bank_account_no }}</b></span>
+      <span>ชื่อบัญชี: <b>{{ tutor.bank_account_name|default:tutor.legal_name }}</b></span>
+    {% else %}
+      <span style="color:#9ca3af">ยังไม่ได้กรอกบัญชีรับเงิน</span>
+    {% endif %}
   </div>
   <table>
     <thead><tr><th style="width:90px">วันที่</th><th>รายการ</th><th class="n" style="width:110px">จำนวนเงิน</th></tr></thead>

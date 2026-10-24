@@ -1967,6 +1967,9 @@ class Tutor(models.Model):
     last_name = models.CharField("นามสกุล", max_length=120, blank=True)
     national_id = models.CharField("เลขประจำตัวผู้เสียภาษี (13 หลัก)", max_length=20, blank=True)
     address = models.CharField("ที่อยู่", max_length=400, blank=True)
+    bank_name = models.CharField("ธนาคาร", max_length=100, blank=True)
+    bank_account_no = models.CharField("เลขที่บัญชี", max_length=40, blank=True)
+    bank_account_name = models.CharField("ชื่อบัญชี", max_length=150, blank=True)
     default_withhold_3 = models.BooleanField(
         "ค่าเริ่มต้นหักภาษี ณ ที่จ่าย 3%", default=False,
         help_text="ถ้าติ๊ก ตอนส่งค่าติวเตอร์ช่อง 'หัก 3%' จะถูกติ๊กให้คนนี้อัตโนมัติ",

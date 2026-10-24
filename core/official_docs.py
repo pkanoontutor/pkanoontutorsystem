@@ -16,6 +16,8 @@ from .analytics import school_week_start
 from .models import DocumentIssuer, Tutor, TutorPayrollEntry
 
 ZERO = Decimal("0")
+THAI_BANKS = ["กสิกรไทย", "ไทยพาณิชย์", "กรุงเทพ", "กรุงไทย", "กรุงศรีอยุธยา", "ทหารไทยธนชาต (ttb)", "ออมสิน",
+              "ธ.ก.ส.", "ยูโอบี", "ซีไอเอ็มบี ไทย", "เกียรตินาคินภัทร", "แลนด์ แอนด์ เฮ้าส์", "พร้อมเพย์"]
 _TH_MONTHS = ["", "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
               "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"]
 _TH_MONTHS_ABBR = ["", "ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."]
@@ -114,6 +116,9 @@ def official_docs_home(request: HttpRequest) -> HttpResponse:
             t.last_name = (request.POST.get("last_name") or "").strip()[:120]
             t.national_id = "".join(ch for ch in (request.POST.get("national_id") or "") if ch.isdigit())[:13]
             t.address = (request.POST.get("address") or "").strip()[:400]
+            t.bank_name = (request.POST.get("bank_name") or "").strip()[:100]
+            t.bank_account_no = (request.POST.get("bank_account_no") or "").strip()[:40]
+            t.bank_account_name = (request.POST.get("bank_account_name") or "").strip()[:150]
             t.default_withhold_3 = request.POST.get("default_withhold_3") == "on"
             t.save()
             return redirect(f"{reverse('core:official_docs')}?saved=tutor#tutor-{t.id}")
@@ -123,6 +128,7 @@ def official_docs_home(request: HttpRequest) -> HttpResponse:
     return render(request, "core/official_docs.html", {
         "issuer": issuer,
         "tutors": Tutor.objects.filter(is_active=True).order_by("name"),
+        "banks": THAI_BANKS,
         "weeks": [{"value": w.isoformat(), "label": f"{th_date_short(w)} – {th_date_short(w + timedelta(days=6))}"} for w in recent_weeks],
         "saved": request.GET.get("saved") or "",
     })

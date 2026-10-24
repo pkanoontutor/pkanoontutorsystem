@@ -15,6 +15,7 @@
   .btn.blue{background:#2563eb;} .btn.green{background:#16a34a;} .btn.soft{background:#f1f5f9;color:#0f172a;}
   .gen{display:grid;grid-template-columns:1.2fr 1fr auto auto;gap:8px;align-items:end;}
   .trow{display:grid;grid-template-columns:110px 1fr 1fr 150px 1.6fr 90px auto;gap:6px;align-items:center;border-top:1px solid #f1f5f9;padding:8px 0;}
+  .trow .bank{grid-column:2/6;display:grid;grid-template-columns:1fr 1fr 1.4fr;gap:6px;}
   .trow:first-of-type{border-top:0;}
   .trow b{font-size:14px;}
   .trow .miss{font-size:11px;color:#b45309;font-weight:800;}
@@ -72,11 +73,20 @@
     {% for t in tutors %}
       <form method="post" class="trow" id="tutor-{{ t.id }}">
         {% csrf_token %}<input type="hidden" name="action" value="tutor"><input type="hidden" name="tutor_id" value="{{ t.id }}">
-        <div><b>{{ t.name }}</b>{% if not t.first_name or not t.national_id %}<div class="miss">ข้อมูลยังไม่ครบ</div>{% endif %}</div>
+        <div><b>{{ t.name }}</b>{% if not t.first_name or not t.national_id or not t.bank_account_no %}<div class="miss">ข้อมูลยังไม่ครบ</div>{% endif %}</div>
         <input type="text" name="first_name" value="{{ t.first_name }}" placeholder="ชื่อจริง">
         <input type="text" name="last_name" value="{{ t.last_name }}" placeholder="นามสกุล">
         <input type="text" name="national_id" value="{{ t.national_id }}" placeholder="เลขบัตร 13 หลัก" inputmode="numeric" maxlength="17">
         <input type="text" name="address" value="{{ t.address }}" placeholder="ที่อยู่">
+        <span class="bank">
+          <select name="bank_name">
+            <option value="">— ธนาคาร —</option>
+            {% for b in banks %}<option {% if t.bank_name == b %}selected{% endif %}>{{ b }}</option>{% endfor %}
+            {% if t.bank_name and t.bank_name not in banks %}<option selected>{{ t.bank_name }}</option>{% endif %}
+          </select>
+          <input type="text" name="bank_account_no" value="{{ t.bank_account_no }}" placeholder="เลขที่บัญชี" inputmode="numeric">
+          <input type="text" name="bank_account_name" value="{{ t.bank_account_name }}" placeholder="ชื่อบัญชี (ถ้าไม่ตรงชื่อจริง)">
+        </span>
         <label class="chk"><input type="checkbox" name="default_withhold_3" {% if t.default_withhold_3 %}checked{% endif %}> หัก 3%</label>
         <button class="btn soft" type="submit">บันทึก</button>
       </form>

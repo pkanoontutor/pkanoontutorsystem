@@ -54,6 +54,8 @@
   .mn-msg{font-size:12.5px;font-weight:700;}
   .mn-msg.ok{color:#15803d;} .mn-msg.err{color:#b42318;}
 
+  .mn-fixed{display:block;margin-bottom:10px;border-radius:12px;padding:9px 12px;font-size:13px;font-weight:700;text-decoration:none;background:#fff7ed;color:#c2410c;border:1px solid #fed7aa;}
+  .mn-fixed.done{background:#f0fdf4;color:#15803d;border-color:#bbf7d0;}
   .mn-sum{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;}
   .mn-box{background:var(--panel-2);border:1px solid var(--line);border-radius:13px;padding:11px 13px;}
   .mn-box .k{font-size:11px;font-weight:800;color:var(--ink-faint);}
@@ -467,6 +469,9 @@
     </summary>
 
     <div class="mn-body">
+      <a class="mn-fixed{% if money_fixed_status.done %} done{% endif %}" href="{% url 'core:monthly_fixed_expenses' %}">
+        📅 รายจ่ายประจำเดือน{% if money_fixed_status.active %} · บันทึกแล้ว {{ money_fixed_status.saved }}/{{ money_fixed_status.active }} รายการ{% else %} · ตั้งค่ารายการประจำ (เงินเดือน ค่าเช่า ฯลฯ){% endif %} →
+      </a>
       <div class="mn-tabs">
         <button type="button" class="mn-tab on" data-kind="expense">➖ บันทึกรายจ่าย</button>
         <button type="button" class="mn-tab" data-kind="income">➕ บันทึกรายรับ</button>

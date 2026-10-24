@@ -1936,6 +1936,11 @@ class SchoolExpense(models.Model):
         default=PaymentMethod.TRANSFER,
     )
     note = models.TextField("หมายเหตุ", blank=True)
+    # set when this row was created from a monthly fixed expense
+    fixed_template = models.ForeignKey(
+        "MonthlyFixedExpense", on_delete=models.SET_NULL, null=True, blank=True, related_name="expenses",
+    )
+    fixed_month = models.DateField("รายจ่ายประจำของเดือน", null=True, blank=True)
     created_at = models.DateTimeField("วันที่บันทึก", default=timezone.now)
     updated_at = models.DateTimeField("อัปเดตล่าสุด", auto_now=True)
 
@@ -3740,3 +3745,23 @@ class DocumentIssuer(models.Model):
 
     def __str__(self) -> str:
         return self.name
+
+
+
+class MonthlyFixedExpense(models.Model):
+    """A recurring monthly expense (staff salary, rent...). Its amount is
+    the last value saved, so it doubles as next month's draft."""
+    description = models.CharField("รายการ", max_length=255)
+    category = models.ForeignKey(ExpenseCategory, verbose_name="ประเภทค่าใช้จ่าย", on_delete=models.PROTECT, related_name="fixed_templates")
+    vendor = models.CharField("ผู้รับเงิน", max_length=255, blank=True)
+    amount = models.DecimalField("จำนวนเงิน (ร่างของเดือนถัดไป)", max_digits=12, decimal_places=2, default=0)
+    payment_method = models.CharField("ช่องทาง", max_length=20, default="transfer")
+    is_active = models.BooleanField("ใช้งาน", default=True)
+    order = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ("order", "id")
+
+    def __str__(self) -> str:
+        return self.description

@@ -1,5 +1,6 @@
 from django.urls import path
 from . import views
+from . import home_budget
 
 app_name = "core"
 
@@ -96,6 +97,8 @@ urlpatterns = [
     path("books/", views.book_list, name="book_list"),
     path("homework-stars/", views.homework_stars, name="homework_stars"),
     path("memos/", views.memo_page, name="memo_page"),
+    path("home-budget/", home_budget.home_budget_page, name="home_budget"),
+    path("home-budget/api/", home_budget.home_budget_api, name="home_budget_api"),
     path("sub-admin/manage/", views.sub_admin_manage, name="sub_admin_manage"),
     path("sub-admin/<slug:slug>/", views.sub_admin_page, name="sub_admin_page"),
     path("snack-shop/", views.snack_shop, name="snack_shop"),

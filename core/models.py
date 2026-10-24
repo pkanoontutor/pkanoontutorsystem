@@ -3643,3 +3643,64 @@ class SubAdminTool(models.Model):
 
     def __str__(self) -> str:
         return self.name
+
+
+
+# =========================================================
+# 🏠 Home decoration budget (personal, unrelated to tutoring)
+# =========================================================
+class HomeBudgetProject(models.Model):
+    name = models.CharField("ชื่อโปรเจกต์", max_length=120, default="ตกแต่งบ้านใหม่")
+    total_budget = models.DecimalField("งบประมาณทั้งหมด", max_digits=12, decimal_places=2, default=0)
+    floor_plan = models.ImageField("แปลนบ้าน", upload_to="home_budget/plans/", blank=True, null=True)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    def __str__(self) -> str:
+        return self.name
+
+
+class HomeBudgetZone(models.Model):
+    project = models.ForeignKey(HomeBudgetProject, on_delete=models.CASCADE, related_name="zones")
+    name = models.CharField("ชื่อโซน", max_length=80)
+    color = models.CharField("สี", max_length=20, default="#6366f1")
+    budget = models.DecimalField("งบของโซน (ไม่บังคับ)", max_digits=12, decimal_places=2, null=True, blank=True)
+    # area on the floor plan, in % of the image (x, y = top-left)
+    plan_x = models.FloatField(null=True, blank=True)
+    plan_y = models.FloatField(null=True, blank=True)
+    plan_w = models.FloatField(null=True, blank=True)
+    plan_h = models.FloatField(null=True, blank=True)
+    order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ("order", "id")
+
+
+class HomeBudgetItem(models.Model):
+    class Kind(models.TextChoices):
+        ITEM = "item", "ของที่จะซื้อ"
+        LABOR = "labor", "ค่าจ้าง / ค่าแรง"
+
+    project = models.ForeignKey(HomeBudgetProject, on_delete=models.CASCADE, related_name="items")
+    zone = models.ForeignKey(HomeBudgetZone, on_delete=models.SET_NULL, null=True, blank=True, related_name="items")
+    kind = models.CharField("ประเภท", max_length=10, choices=Kind.choices, default=Kind.ITEM)
+    name = models.CharField("รายการ", max_length=200)
+    planned_amount = models.DecimalField("งบที่ตั้งไว้", max_digits=12, decimal_places=2, default=0)
+    vendor = models.CharField("ร้าน / ผู้รับจ้าง", max_length=150, blank=True)
+    note = models.CharField("หมายเหตุ", max_length=300, blank=True)
+    is_done = models.BooleanField("ซื้อ/จ้างครบแล้ว", default=False)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ("is_done", "-created_at")
+
+
+class HomeBudgetExpense(models.Model):
+    item = models.ForeignKey(HomeBudgetItem, on_delete=models.CASCADE, related_name="expenses")
+    spent_on = models.DateField("วันที่จ่าย", default=timezone.localdate)
+    amount = models.DecimalField("จำนวนเงินที่จ่ายจริง", max_digits=12, decimal_places=2)
+    note = models.CharField("หมายเหตุ", max_length=300, blank=True)
+    receipt = models.FileField("ใบเสร็จ", upload_to="home_budget/receipts/", blank=True, null=True)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ("-spent_on", "-id")

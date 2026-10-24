@@ -1,0 +1,328 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>งบตกแต่งบ้าน</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box;}
+  :root{--ink:#0f172a;--soft:#64748b;--line:#e2e8f0;--bg:#f5f3ef;--card:#fff;--accent:#0f766e;}
+  body{margin:0;background:var(--bg);font-family:'IBM Plex Sans Thai',system-ui,sans-serif;color:var(--ink);}
+  .wrap{max-width:1100px;margin:0 auto;padding:16px;display:grid;gap:14px;}
+  .hero{background:linear-gradient(120deg,#134e4a,#0f766e 55%,#a3a35a);color:#fff;border-radius:22px;padding:20px 22px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:flex-end;}
+  .hero h1{margin:0;font-size:24px;cursor:pointer;}
+  .hero p{margin:4px 0 0;font-size:13px;color:#ccfbf1;}
+  .budget-edit{background:rgba(255,255,255,.15);border-radius:14px;padding:8px 14px;cursor:pointer;text-align:right;}
+  .budget-edit small{display:block;font-size:11.5px;color:#ccfbf1;}
+  .budget-edit b{font-size:24px;}
+  .cards{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;}
+  .card{background:var(--card);border-radius:16px;padding:14px;box-shadow:0 4px 14px rgba(15,23,42,.06);}
+  .stat small{font-size:12px;color:var(--soft);font-weight:600;}
+  .stat b{display:block;font-size:22px;margin-top:3px;}
+  .stat.good b{color:#0f766e;} .stat.bad b{color:#dc2626;} .stat.warn b{color:#b45309;}
+  .bar{height:16px;border-radius:999px;background:#e7e5e4;overflow:hidden;display:flex;margin-top:10px;}
+  .bar span{display:block;height:100%;}
+  .bar .s{background:#0f766e;} .bar .p{background:repeating-linear-gradient(45deg,#5eead4,#5eead4 6px,#99f6e4 6px,#99f6e4 12px);} .bar .o{background:#dc2626;}
+  .legend{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--soft);margin-top:6px;}
+  .legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px;vertical-align:middle;}
+  h2{margin:0 0 10px;font-size:16px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;}
+  .btn{border:0;border-radius:11px;padding:8px 13px;font-weight:600;cursor:pointer;font-family:inherit;font-size:13.5px;background:var(--accent);color:#fff;}
+  .btn.soft{background:#f1f5f9;color:var(--ink);} .btn.red{background:#fff;color:#b91c1c;border:1px solid #fecaca;} .btn.sm{padding:5px 9px;font-size:12px;}
+  .zones{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px;}
+  .zone{border:2px solid var(--line);border-radius:14px;padding:10px 12px;cursor:pointer;background:#fff;position:relative;}
+  .zone.on{border-color:var(--zc);box-shadow:0 0 0 3px color-mix(in srgb, var(--zc) 25%, transparent);}
+  .zone .zn{font-weight:700;display:flex;gap:6px;align-items:center;}
+  .zone .zn i{width:12px;height:12px;border-radius:4px;background:var(--zc);flex:none;}
+  .zone .zm{font-size:12px;color:var(--soft);margin-top:4px;}
+  .zone .zb{height:6px;border-radius:999px;background:#f1f5f9;margin-top:6px;overflow:hidden;}
+  .zone .zb span{display:block;height:100%;background:var(--zc);}
+  .zone .zedit{position:absolute;top:6px;right:8px;border:0;background:none;color:#94a3b8;cursor:pointer;font-size:14px;}
+  .plan-box{position:relative;display:inline-block;max-width:100%;user-select:none;}
+  .plan-box img{display:block;max-width:100%;border-radius:12px;}
+  .plan-zone{position:absolute;border:2px solid var(--zc);background:color-mix(in srgb, var(--zc) 22%, transparent);border-radius:8px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;font-size:12px;font-weight:700;color:#0f172a;padding:2px;overflow:hidden;}
+  .plan-zone small{font-weight:600;font-size:11px;background:rgba(255,255,255,.8);border-radius:6px;padding:0 4px;margin-top:2px;}
+  .plan-zone.on{background:color-mix(in srgb, var(--zc) 45%, transparent);}
+  .plan-draw{position:absolute;border:2px dashed #0f172a;background:rgba(15,23,42,.12);pointer-events:none;}
+  .plan-box.drawing{cursor:crosshair;}
+  .plan-tools{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px;font-size:13px;}
+  .plan-tools select{font-family:inherit;padding:6px 9px;border-radius:9px;border:1px solid var(--line);}
+  .filters{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;}
+  .chip{border:1.5px solid var(--line);background:#fff;border-radius:999px;padding:5px 12px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit;}
+  .chip.on{background:var(--ink);color:#fff;border-color:var(--ink);}
+  .items{display:grid;gap:8px;}
+  .item{border:1px solid var(--line);border-radius:14px;background:#fff;overflow:hidden;}
+  .item.done{opacity:.7;}
+  .ih{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;padding:10px 12px;cursor:pointer;}
+  .ih .tag{font-size:11px;font-weight:700;border-radius:999px;padding:2px 8px;background:#eef2ff;color:#4338ca;}
+  .ih .tag.labor{background:#fff7ed;color:#c2410c;}
+  .ih .nm{font-weight:700;}
+  .ih .meta{font-size:12px;color:var(--soft);margin-top:2px;display:flex;gap:8px;flex-wrap:wrap;}
+  .ih .meta .zd{display:inline-flex;align-items:center;gap:4px;} .ih .meta .zd i{width:9px;height:9px;border-radius:3px;display:inline-block;}
+  .money{text-align:right;white-space:nowrap;}
+  .money b{display:block;font-size:15px;}
+  .money small{font-size:11.5px;color:var(--soft);}
+  .money .over{color:#dc2626;} .money .under{color:#0f766e;}
+  .ib{border-top:1px dashed var(--line);padding:10px 12px;display:none;background:#fafaf9;}
+  .item.open .ib{display:block;}
+  .exp{display:flex;justify-content:space-between;gap:8px;align-items:center;font-size:13px;padding:5px 0;border-bottom:1px solid #f1f5f9;}
+  .exp a{color:var(--accent);font-weight:600;}
+  .xform{display:grid;grid-template-columns:130px 120px 1fr 1fr auto;gap:6px;margin-top:8px;}
+  .xform input{font-family:inherit;border:1px solid var(--line);border-radius:9px;padding:7px 8px;font-size:13px;min-width:0;}
+  .iactions{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;}
+  .modal-bg{position:fixed;inset:0;background:rgba(15,23,42,.5);display:none;align-items:center;justify-content:center;z-index:50;padding:14px;}
+  .modal-bg.show{display:flex;}
+  .modal{background:#fff;border-radius:18px;padding:18px;width:100%;max-width:480px;display:grid;gap:10px;}
+  .modal label{font-size:12px;font-weight:700;color:var(--soft);display:block;margin-bottom:3px;}
+  .modal input,.modal select{width:100%;font-family:inherit;border:1px solid var(--line);border-radius:10px;padding:9px 10px;font-size:14px;}
+  .seg{display:flex;gap:6px;} .seg label{flex:1;margin:0;} .seg input{display:none;}
+  .seg span{display:block;text-align:center;border:1.5px solid var(--line);border-radius:10px;padding:8px;font-weight:600;cursor:pointer;color:var(--ink);font-size:13.5px;}
+  .seg input:checked + span{background:var(--accent);color:#fff;border-color:var(--accent);}
+  .empty{text-align:center;color:#94a3b8;padding:20px;font-size:13.5px;}
+  @media(max-width:760px){.cards{grid-template-columns:1fr 1fr;}.xform{grid-template-columns:1fr 1fr;}.ih{grid-template-columns:1fr auto;}.ih .tagcol{display:none;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hero">
+    <div><h1 id="projName" title="กดเพื่อแก้ชื่อ"></h1><p>วางแผนงบ ซื้อของ ค่าแรง แยกตามโซนในบ้าน และบันทึกค่าใช้จ่ายจริงพร้อมใบเสร็จ</p></div>
+    <div class="budget-edit" id="budgetEdit" title="กดเพื่อแก้งบประมาณ"><small>งบประมาณทั้งหมด ✏️</small><b id="budgetVal"></b></div>
+  </div>
+
+  <div class="card">
+    <div class="cards" id="stats"></div>
+    <div class="bar" id="bar"></div>
+    <div class="legend"><span><i style="background:#0f766e"></i>จ่ายจริงแล้ว</span><span><i style="background:#5eead4"></i>ตั้งงบไว้ (ยังไม่จ่าย)</span><span><i style="background:#dc2626"></i>เกินงบ</span></div>
+  </div>
+
+  <div class="card">
+    <h2><span>🏠 โซนในบ้าน</span><button class="btn sm" id="addZone">＋ เพิ่มโซน</button></h2>
+    <div class="zones" id="zones"></div>
+  </div>
+
+  <div class="card">
+    <h2><span>🗺️ แปลนบ้าน</span>
+      <span style="display:flex;gap:6px;">
+        <label class="btn sm soft" style="cursor:pointer;">📤 อัปโหลดแปลน<input type="file" id="planFile" accept="image/*" hidden></label>
+        <button class="btn sm red" id="removePlan" hidden>ลบแปลน</button>
+      </span>
+    </h2>
+    <div id="planArea"></div>
+  </div>
+
+  <div class="card">
+    <h2><span>🧾 รายการ</span><button class="btn sm" id="addItem">＋ เพิ่มรายการ</button></h2>
+    <div class="filters" id="filters"></div>
+    <div class="items" id="items"></div>
+  </div>
+</div>
+
+<div class="modal-bg" id="itemModal">
+  <form class="modal" id="itemForm">
+    <b id="itemModalTitle">เพิ่มรายการ</b>
+    <input type="hidden" name="item_id">
+    <div class="seg">
+      <label><input type="radio" name="kind" value="item" checked><span>🛋️ ของที่จะซื้อ</span></label>
+      <label><input type="radio" name="kind" value="labor"><span>🛠️ ค่าจ้าง / ค่าแรง</span></label>
+    </div>
+    <div><label>รายการ *</label><input name="name" required placeholder="เช่น โซฟา 3 ที่นั่ง / ค่าช่างติดผ้าม่าน"></div>
+    <div><label>โซน</label><select name="item_zone" id="itemZoneSel"></select></div>
+    <div><label>งบที่ตั้งไว้ (บาท)</label><input name="planned" type="number" min="0" step="0.01" placeholder="0"></div>
+    <div><label>ร้าน / ผู้รับจ้าง</label><input name="vendor" placeholder="ไม่บังคับ"></div>
+    <div><label>หมายเหตุ</label><input name="note" placeholder="ไม่บังคับ เช่น ลิงก์สินค้า สี ขนาด"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;">
+      <button type="button" class="btn soft" data-close>ยกเลิก</button>
+      <button type="submit" class="btn">บันทึก</button>
+    </div>
+  </form>
+</div>
+
+<div class="modal-bg" id="zoneModal">
+  <form class="modal" id="zoneForm">
+    <b id="zoneModalTitle">เพิ่มโซน</b>
+    <input type="hidden" name="zone_id">
+    <div><label>ชื่อโซน *</label><input name="name" required placeholder="เช่น ห้องนั่งเล่น / ห้องนอนใหญ่ / ห้องครัว"></div>
+    <div><label>สี</label><input name="color" type="color" value="#6366f1" style="height:42px;padding:3px;"></div>
+    <div><label>งบของโซน (ไม่บังคับ)</label><input name="budget" type="number" min="0" step="0.01" placeholder="เว้นว่างได้"></div>
+    <div style="display:flex;gap:8px;justify-content:space-between;">
+      <button type="button" class="btn red" id="zoneDelete" hidden>ลบโซน</button>
+      <span style="display:flex;gap:8px;margin-left:auto;">
+        <button type="button" class="btn soft" data-close>ยกเลิก</button>
+        <button type="submit" class="btn">บันทึก</button>
+      </span>
+    </div>
+  </form>
+</div>
+
+{{ state|json_script:"hb-state" }}
+<script>
+(function(){
+  const CSRF = "{{ csrf_token }}", API = "{% url 'core:home_budget_api' %}", TODAY = "{{ today|date:'Y-m-d' }}";
+  let S = JSON.parse(document.getElementById("hb-state").textContent);
+  let fZone = "all", fKind = "all", openItems = new Set(), drawZone = "";
+  const $ = id => document.getElementById(id);
+  const esc = v => String(v == null ? "" : v).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+  const baht = n => (Math.round((n || 0) * 100) / 100).toLocaleString("th-TH", {maximumFractionDigits: 2});
+
+  function call(fields, file){
+    const fd = new FormData();
+    Object.entries(fields).forEach(([k, v]) => { if(v !== undefined && v !== null) fd.append(k, v); });
+    if(file) fd.append(file[0], file[1]);
+    return fetch(API, {method:"POST", headers:{"X-CSRFToken": CSRF}, body: fd})
+      .then(r => r.json().then(j => { if(!r.ok || !j.ok) throw new Error(j.error || r.status); return j; }))
+      .then(j => { S = j.state; render(); return j; })
+      .catch(e => { alert("บันทึกไม่สำเร็จ: " + e.message); throw e; });
+  }
+  const zoneById = id => S.zones.find(z => z.id === id);
+
+  function renderSummary(){
+    const t = S.totals;
+    $("projName").textContent = "🏠 " + S.project.name;
+    $("budgetVal").textContent = baht(t.budget) + " ฿";
+    const card = (label, val, cls) => '<div class="stat ' + (cls || '') + '"><small>' + label + '</small><b>' + baht(val) + ' ฿</b></div>';
+    $("stats").innerHTML = card("ตั้งงบรายการไว้รวม", t.planned) + card("จ่ายจริงแล้ว", t.spent) +
+      card("คงเหลือ (งบ − จ่ายจริง)", t.remaining, t.remaining < 0 ? "bad" : "good") +
+      card("คงเหลือหลังหักแผนทั้งหมด", t.remaining_after_plan, t.remaining_after_plan < 0 ? "bad" : (t.remaining_after_plan < t.budget * 0.1 ? "warn" : "good"));
+    const base = Math.max(t.budget, t.committed, 1);
+    const spent = Math.min(t.spent, t.budget || t.spent), planned = Math.max(Math.min(t.committed, t.budget || t.committed) - spent, 0);
+    const over = Math.max(t.committed - t.budget, 0);
+    $("bar").innerHTML = '<span class="s" style="width:' + (spent / base * 100) + '%"></span><span class="p" style="width:' + (planned / base * 100) + '%"></span>' +
+      (t.budget ? '<span class="o" style="width:' + (over / base * 100) + '%"></span>' : '');
+  }
+  function renderZones(){
+    const html = S.zones.map(z => {
+      const ref = z.budget || Math.max(z.planned, z.spent) || 1;
+      return '<div class="zone' + (fZone == z.id ? ' on' : '') + '" style="--zc:' + esc(z.color) + '" data-zone="' + z.id + '">' +
+        '<button class="zedit" data-zedit="' + z.id + '" title="แก้ไขโซน">✏️</button>' +
+        '<div class="zn"><i></i>' + esc(z.name) + '</div>' +
+        '<div class="zm">จ่ายแล้ว ' + baht(z.spent) + ' / ' + (z.budget ? 'งบโซน ' + baht(z.budget) : 'แผน ' + baht(z.planned)) + ' ฿ · ' + z.count + ' รายการ</div>' +
+        '<div class="zb"><span style="width:' + Math.min(z.spent / ref * 100, 100) + '%"></span></div></div>';
+    }).join("");
+    const u = S.unzoned;
+    $("zones").innerHTML = html + (u.count ? '<div class="zone' + (fZone === "none" ? ' on' : '') + '" style="--zc:#94a3b8" data-zone="none"><div class="zn"><i></i>ไม่ระบุโซน</div><div class="zm">จ่ายแล้ว ' + baht(u.spent) + ' / แผน ' + baht(u.planned) + ' ฿ · ' + u.count + ' รายการ</div></div>' : '') +
+      (!S.zones.length && !u.count ? '<div class="empty">ยังไม่มีโซน — กด “เพิ่มโซน” เช่น ห้องนั่งเล่น ห้องครัว ห้องนอน</div>' : '');
+  }
+  function renderPlan(){
+    const area = $("planArea");
+    $("removePlan").hidden = !S.project.floor_plan;
+    if(!S.project.floor_plan){ area.innerHTML = '<div class="empty">ยังไม่มีแปลนบ้าน — อัปโหลดรูปแปลน แล้ววาดกรอบให้แต่ละโซนเพื่อกดดูค่าใช้จ่ายของแต่ละห้องได้</div>'; return; }
+    const tools = '<div class="plan-tools">วาดโซนบนแปลน: <select id="drawSel"><option value="">— เลือกโซนแล้วลากบนรูป —</option>' +
+      S.zones.map(z => '<option value="' + z.id + '"' + (drawZone == z.id ? ' selected' : '') + '>' + esc(z.name) + (z.rect ? ' (มีกรอบแล้ว)' : '') + '</option>').join("") + '</select>' +
+      (drawZone && zoneById(+drawZone) && zoneById(+drawZone).rect ? '<button class="btn sm red" id="clearRect">ลบกรอบโซนนี้</button>' : '') +
+      '<span style="color:#64748b">· กดที่ห้องเพื่อดูรายการของห้องนั้น</span></div>';
+    const zonesHtml = S.zones.filter(z => z.rect).map(z => '<div class="plan-zone' + (fZone == z.id ? ' on' : '') + '" data-zone="' + z.id + '" style="--zc:' + esc(z.color) +
+      ';left:' + z.rect[0] + '%;top:' + z.rect[1] + '%;width:' + z.rect[2] + '%;height:' + z.rect[3] + '%">' + esc(z.name) + '<small>' + baht(z.spent) + ' ฿</small></div>').join("");
+    area.innerHTML = tools + '<div class="plan-box' + (drawZone ? ' drawing' : '') + '" id="planBox"><img src="' + esc(S.project.floor_plan) + '" alt="แปลนบ้าน" draggable="false">' + zonesHtml + '</div>';
+    $("drawSel").onchange = e => { drawZone = e.target.value; renderPlan(); };
+    if($("clearRect")) $("clearRect").onclick = () => call({do:"set_zone_rect", zone_id: drawZone, clear: 1});
+    bindDraw();
+  }
+  function bindDraw(){
+    const box = $("planBox"); if(!box || !drawZone) return;
+    let start = null, el = null;
+    const pt = e => { const r = box.getBoundingClientRect(); const p = e.touches ? e.touches[0] : e;
+      return [Math.max(0, Math.min(100, (p.clientX - r.left) / r.width * 100)), Math.max(0, Math.min(100, (p.clientY - r.top) / r.height * 100))]; };
+    const down = e => { e.preventDefault(); start = pt(e); el = document.createElement("div"); el.className = "plan-draw"; box.appendChild(el); };
+    const move = e => { if(!start) return; const p = pt(e); const x = Math.min(start[0], p[0]), y = Math.min(start[1], p[1]);
+      Object.assign(el.style, {left: x + "%", top: y + "%", width: Math.abs(p[0] - start[0]) + "%", height: Math.abs(p[1] - start[1]) + "%"}); };
+    const up = e => { if(!start) return; const p = e.changedTouches ? pt({touches: e.changedTouches}) : pt(e);
+      const x = Math.min(start[0], p[0]), y = Math.min(start[1], p[1]), w = Math.abs(p[0] - start[0]), h = Math.abs(p[1] - start[1]);
+      start = null; if(w < 2 || h < 2){ el.remove(); return; }
+      const z = drawZone; drawZone = ""; call({do:"set_zone_rect", zone_id: z, x, y, w, h}); };
+    box.addEventListener("mousedown", down); box.addEventListener("touchstart", down, {passive:false});
+    window.onmousemove = move; window.onmouseup = up;
+    box.addEventListener("touchmove", e => { e.preventDefault(); move(e); }, {passive:false}); box.addEventListener("touchend", up);
+  }
+  function renderItems(){
+    const zoneOpts = '<button class="chip' + (fZone === "all" ? ' on' : '') + '" data-fz="all">ทุกโซน</button>' +
+      S.zones.map(z => '<button class="chip' + (fZone == z.id ? ' on' : '') + '" data-fz="' + z.id + '">' + esc(z.name) + '</button>').join("") +
+      (S.unzoned.count ? '<button class="chip' + (fZone === "none" ? ' on' : '') + '" data-fz="none">ไม่ระบุโซน</button>' : '');
+    const kindOpts = [["all","ทั้งหมด"],["item","🛋️ ของ"],["labor","🛠️ ค่าแรง"]].map(k => '<button class="chip' + (fKind === k[0] ? ' on' : '') + '" data-fk="' + k[0] + '">' + k[1] + '</button>').join("");
+    $("filters").innerHTML = zoneOpts + '<span style="width:10px"></span>' + kindOpts;
+    const list = S.items.filter(it => (fZone === "all" || (fZone === "none" ? !it.zone_id : it.zone_id == fZone)) && (fKind === "all" || it.kind === fKind));
+    $("items").innerHTML = list.map(it => {
+      const z = zoneById(it.zone_id), diff = it.planned - it.spent;
+      return '<div class="item' + (it.is_done ? ' done' : '') + (openItems.has(it.id) ? ' open' : '') + '" data-item="' + it.id + '">' +
+        '<div class="ih" data-toggle="' + it.id + '"><span class="tagcol"><span class="tag ' + it.kind + '">' + (it.kind === "labor" ? "ค่าแรง" : "ของ") + '</span></span>' +
+        '<div><div class="nm">' + (it.is_done ? "✅ " : "") + esc(it.name) + '</div><div class="meta">' +
+        (z ? '<span class="zd"><i style="background:' + esc(z.color) + '"></i>' + esc(z.name) + '</span>' : '<span>ไม่ระบุโซน</span>') +
+        (it.vendor ? '<span>🏪 ' + esc(it.vendor) + '</span>' : '') + (it.note ? '<span>' + esc(it.note) + '</span>' : '') +
+        '<span>🧾 ' + it.expenses.length + '</span></div></div>' +
+        '<div class="money"><b>' + baht(it.spent) + ' ฿</b><small>งบ ' + baht(it.planned) + '</small>' +
+        (it.spent ? '<small class="' + (diff < 0 ? 'over' : 'under') + '"> · ' + (diff < 0 ? 'เกิน ' + baht(-diff) : 'เหลือ ' + baht(diff)) + '</small>' : '') + '</div></div>' +
+        '<div class="ib">' + (it.expenses.map(e => '<div class="exp"><span>' + esc(e.date) + ' · <b>' + baht(e.amount) + ' ฿</b>' + (e.note ? ' · ' + esc(e.note) : '') +
+          (e.receipt_url ? ' · <a href="' + esc(e.receipt_url) + '" target="_blank" rel="noopener">📎 ใบเสร็จ</a>' : '') + '</span>' +
+          '<button class="btn sm red" data-delexp="' + e.id + '">ลบ</button></div>').join("") || '<div style="font-size:12.5px;color:#94a3b8">ยังไม่มีค่าใช้จ่ายจริง</div>') +
+        '<form class="xform" data-xform="' + it.id + '"><input type="date" name="date" value="' + TODAY + '"><input type="number" name="amount" min="0" step="0.01" placeholder="จ่ายจริง ฿" required>' +
+        '<input name="note" placeholder="หมายเหตุ (ไม่บังคับ)"><input type="file" name="receipt" accept="image/*,application/pdf" title="แนบใบเสร็จ (ไม่บังคับ)"><button class="btn sm">＋ บันทึกจ่ายจริง</button></form>' +
+        '<div class="iactions"><button class="btn sm soft" data-edit="' + it.id + '">✏️ แก้ไขรายการ</button><button class="btn sm soft" data-done="' + it.id + '">' + (it.is_done ? '↩ ยังไม่ครบ' : '✅ ซื้อ/จ้างครบแล้ว') + '</button>' +
+        '<button class="btn sm red" data-delitem="' + it.id + '">ลบรายการ</button></div></div></div>';
+    }).join("") || '<div class="empty">ยังไม่มีรายการ' + (fZone !== "all" || fKind !== "all" ? 'ตามตัวกรองนี้' : ' — กด “เพิ่มรายการ” เพื่อเริ่มวางแผน') + '</div>';
+  }
+  function render(){ renderSummary(); renderZones(); renderPlan(); renderItems(); }
+
+  // ---- modals ----
+  const openModal = id => $(id).classList.add("show"), closeModals = () => document.querySelectorAll(".modal-bg").forEach(m => m.classList.remove("show"));
+  document.querySelectorAll(".modal-bg").forEach(m => m.addEventListener("click", e => { if(e.target === m || e.target.closest("[data-close]")) closeModals(); }));
+  function itemModal(it){
+    const f = $("itemForm"); f.reset();
+    $("itemZoneSel").innerHTML = '<option value="">— ไม่ระบุโซน —</option>' + S.zones.map(z => '<option value="' + z.id + '">' + esc(z.name) + '</option>').join("");
+    $("itemModalTitle").textContent = it ? "แก้ไขรายการ" : "เพิ่มรายการ";
+    f.item_id.value = it ? it.id : "";
+    if(it){ f.name.value = it.name; f.planned.value = it.planned || ""; f.vendor.value = it.vendor; f.note.value = it.note;
+      f.item_zone.value = it.zone_id || ""; f.querySelector('[name=kind][value="' + it.kind + '"]').checked = true; }
+    else if(fZone !== "all" && fZone !== "none") f.item_zone.value = fZone;
+    openModal("itemModal"); f.name.focus();
+  }
+  $("itemForm").addEventListener("submit", e => {
+    e.preventDefault(); const f = e.target, d = Object.fromEntries(new FormData(f));
+    call({...d, do: d.item_id ? "update_item" : "add_item"}).then(closeModals);
+  });
+  function zoneModal(z){
+    const f = $("zoneForm"); f.reset();
+    $("zoneModalTitle").textContent = z ? "แก้ไขโซน" : "เพิ่มโซน";
+    f.zone_id.value = z ? z.id : ""; $("zoneDelete").hidden = !z;
+    const palette = ["#6366f1","#f97316","#10b981","#ec4899","#0ea5e9","#eab308","#8b5cf6","#ef4444","#14b8a6","#64748b"];
+    f.color.value = z ? z.color : palette[S.zones.length % palette.length];
+    if(z){ f.name.value = z.name; f.budget.value = z.budget == null ? "" : z.budget; }
+    openModal("zoneModal"); f.name.focus();
+  }
+  $("zoneForm").addEventListener("submit", e => {
+    e.preventDefault(); const d = Object.fromEntries(new FormData(e.target));
+    call({...d, do: d.zone_id ? "update_zone" : "add_zone"}).then(closeModals);
+  });
+  $("zoneDelete").addEventListener("click", () => {
+    if(confirm("ลบโซนนี้? รายการในโซนจะยังอยู่ แต่จะกลายเป็น “ไม่ระบุโซน”")) call({do:"delete_zone", zone_id: $("zoneForm").zone_id.value}).then(closeModals);
+  });
+
+  // ---- clicks ----
+  document.addEventListener("click", e => {
+    const t = e.target;
+    const ze = t.closest("[data-zedit]"); if(ze){ e.stopPropagation(); zoneModal(zoneById(+ze.dataset.zedit)); return; }
+    const zc = t.closest("[data-zone]"); if(zc && !drawZone){ const v = zc.dataset.zone; fZone = (fZone == v) ? "all" : (v === "none" ? "none" : +v); render();
+      if(t.closest(".plan-zone")) $("items").scrollIntoView({behavior:"smooth"}); return; }
+    const fz = t.closest("[data-fz]"); if(fz){ const v = fz.dataset.fz; fZone = (v === "all" || v === "none") ? v : +v; render(); return; }
+    const fk = t.closest("[data-fk]"); if(fk){ fKind = fk.dataset.fk; render(); return; }
+    const tg = t.closest("[data-toggle]"); if(tg){ const id = +tg.dataset.toggle; openItems.has(id) ? openItems.delete(id) : openItems.add(id); renderItems(); return; }
+    const ed = t.closest("[data-edit]"); if(ed){ itemModal(S.items.find(i => i.id === +ed.dataset.edit)); return; }
+    const dn = t.closest("[data-done]"); if(dn){ call({do:"toggle_done", item_id: dn.dataset.done}); return; }
+    const di = t.closest("[data-delitem]"); if(di){ if(confirm("ลบรายการนี้และค่าใช้จ่ายจริงทั้งหมดของรายการ?")) call({do:"delete_item", item_id: di.dataset.delitem}); return; }
+    const dx = t.closest("[data-delexp]"); if(dx){ if(confirm("ลบค่าใช้จ่ายนี้?")) call({do:"delete_expense", expense_id: dx.dataset.delexp}); return; }
+  });
+  document.addEventListener("submit", e => {
+    const f = e.target.closest("[data-xform]"); if(!f) return;
+    e.preventDefault(); const d = Object.fromEntries(new FormData(f)); const file = f.receipt.files[0];
+    delete d.receipt; openItems.add(+f.dataset.xform);
+    call({...d, do:"add_expense", item_id: f.dataset.xform}, file ? ["receipt", file] : null);
+  });
+  $("addItem").onclick = () => itemModal(null);
+  $("addZone").onclick = () => zoneModal(null);
+  $("budgetEdit").onclick = () => { const v = prompt("งบประมาณทั้งหมด (บาท)", S.totals.budget || ""); if(v !== null) call({do:"set_project", budget: v}); };
+  $("projName").onclick = () => { const v = prompt("ชื่อโปรเจกต์", S.project.name); if(v) call({do:"set_project", name: v, budget: S.totals.budget}); };
+  $("planFile").onchange = e => { const f = e.target.files[0]; if(f) call({do:"upload_plan"}, ["plan", f]); e.target.value = ""; };
+  $("removePlan").onclick = () => { if(confirm("ลบรูปแปลน? (กรอบโซนที่วาดไว้จะยังจำไว้)")) call({do:"remove_plan"}); };
+  render();
+})();
+</script>
+</body>
+</html>

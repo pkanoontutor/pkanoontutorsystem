@@ -8314,6 +8314,7 @@ _ADMIN_TOOL_DEFAULTS = [
     ("private", "c-teal",  "📖", "ระบบชีทสำหรับติวเตอร์", "ติวเตอร์เข้าด้วย PIN เปิดชีท PDF ทีละหน้า สลับเนื้อหา/เฉลย และกดจบคาบเพื่อบันทึกหน้า/ข้อเข้าระบบอัปเดตชีท", "/tutor-sheets/"),
     ("private", "c-lilac", "📚", "คลังหนังสือ", "บันทึกโปรไฟล์หนังสือต้นทางที่ใช้ทำชีท ชื่อ/รหัส/วิชา/ระดับชั้น ลิงก์ไฟล์ และรูปปก", "/books/"),
     ("private", "c-stone", "🔎", "Remaining Attendance", "เสิร์ชชื่อเด็ก ดูครั้งเรียนคงเหลือ คาดว่าจะครบคอร์สวันไหน ประวัติมา/ลา/ขาดล่าสุด และประวัติการชำระเงินต่อคอร์ส", "/remaining-attendance/"),
+    ("private", "c-stone", "📄", "ออกเอกสารทางการ", "ใบสลิปค่าจ้างรายสัปดาห์ และหนังสือรับรองการหักภาษี ณ ที่จ่าย (50 ทวิ) ของติวเตอร์ พร้อมข้อมูลผู้ถูกหักภาษี", "/official-docs/"),
     ("private", "c-lilac", "💻", "ตารางเรียน Online", "สร้างปฏิทินตารางเรียนออนไลน์รายสัปดาห์เป็นรูป แล้วส่งค่าติวเตอร์ (ชม.ละ 300 + ติวเตอร์เฉลยเทส +2 ชม.) เข้าระบบรายรับรายจ่าย", "/online-schedule/"),
     ("private", "c-rose",  "🍬", "รายรับรายจ่ายร้านขนม", "บันทึกรับเงินสด · ซื้อสินค้า · นำเงินไปแลกเหรียญ ของร้านขนม แยกจากบัญชีโรงเรียน", "/snack-shop/"),
     ("private", "c-sage",  "💰", "รายรับรายจ่าย", "บันทึกค่าใช้จ่าย ค่าติวเตอร์ และ Export Excel", "/school-finance/"),
@@ -9453,6 +9454,7 @@ def school_finance(request: HttpRequest) -> HttpResponse:
                     entry.online_hourly_rate_override = None
                 entry.special_rate_325 = special_rate_325
                 entry.special_rate_350 = special_rate_350
+                entry.withholding_3 = request.POST.get(f"wht_{tid}") == "yes"
                 entry.idle_fee = idle_fee
                 entry.note = note_raw
                 entry.save()
@@ -11719,6 +11721,15 @@ def teaching_schedule_image(request: HttpRequest, pk: int) -> HttpResponse:
         online_week = OnlineSchedule.objects.filter(id=_id_or_none(request.GET.get("online"))).first()
     online_week = online_week or _online_week_before(schedule.date)
     online_rows = _online_payroll_by_tutor(online_week) if online_week else []
+    if online_rows:
+        from .models import TutorPayrollEntry
+        existing = {e.tutor_id: e for e in TutorPayrollEntry.objects.filter(work_date=schedule.date)}
+        for r in online_rows:
+            pt = r["tutor"].payroll_tutor
+            e = existing.get(pt.id) if pt else None
+            r["withhold_3"] = bool(e.withholding_3) if e is not None else bool(getattr(pt, "default_withhold_3", False))
+            r["rate_override"] = (e.online_hourly_rate_override if (e is not None and e.online_hourly_rate_override is not None
+                                  and e.online_hourly_rate_override != ONLINE_HOURLY_RATE) else None)
 
     return render(request, "core/teaching_schedule_image.html", {
         "schedule": schedule,
@@ -11938,7 +11949,10 @@ def _schedule_tutor_day_summary(schedule) -> list:
         # are always typed in here; a saved entry's values come back on reopen.
         online_hours = entry.online_teaching_hours if entry is not None else None
         online_rate_override = entry.online_hourly_rate_override if entry is not None else None
+        withhold_3 = (bool(entry.withholding_3) if entry is not None
+                      else bool(getattr(payroll_tutor, "default_withhold_3", False)))
         rows.append({
+            "withhold_3": withhold_3,
             "online_hours": online_hours,
             "online_rate_override": online_rate_override,
             "default_online_rate": TutorPayrollEntry.DEFAULT_ONLINE_HOURLY_RATE,
@@ -11999,6 +12013,7 @@ def teaching_schedule_send_payroll(request: HttpRequest, pk: int) -> HttpRespons
             # per send, so trust what was submitted for the approved rows.
             entry.special_rate_325 = request.POST.get(f"special_{tid}") == "yes"
             entry.special_rate_350 = request.POST.get(f"special350_{tid}") == "yes"
+            entry.withholding_3 = request.POST.get(f"wht_{tid}") == "yes"
 
             # Rate / travel fee inputs are pre-filled with the computed default
             # but editable; blank means "keep using the automatic default",
@@ -14200,10 +14215,16 @@ def teaching_schedule_send_online_payroll(request: HttpRequest, pk: int) -> Http
                 tt.save(update_fields=["payroll_tutor"])
             entry, _ = TutorPayrollEntry.objects.get_or_create(work_date=schedule.date, tutor=payroll_tutor)
             entry.online_teaching_hours = row["hours"]
-            entry.online_hourly_rate_override = ONLINE_HOURLY_RATE
+            # rate is editable per tutor in the popup; blank = the default 300
+            raw_rate = (request.POST.get(f"online_rate_{tt.id}") or "").strip()
+            try:
+                entry.online_hourly_rate_override = Decimal(raw_rate) if raw_rate else ONLINE_HOURLY_RATE
+            except Exception:
+                entry.online_hourly_rate_override = ONLINE_HOURLY_RATE
+            entry.withholding_3 = request.POST.get(f"online_wht_{tt.id}") == "yes"
             line = "ออนไลน์สัปดาห์ %s: %d คาบ" % (_online_range_label(online), len(row["subjects"]))
             if row["test"]:
-                line += " · เฉลยเทส +%s ชม." % row["test"].normalize()
+                line += " · เฉลยเทส +%s ชม." % (int(row["test"]) if row["test"] == int(row["test"]) else row["test"])
             if line not in (entry.note or ""):
                 entry.note = (entry.note + "\n" + line).strip() if entry.note else line
             if not entry.teaching_hours:
@@ -14224,7 +14245,7 @@ def _online_rows_payload(s) -> dict:
             "day": x["day"], "date_label": x["date_label"], "subject": x["row"].subject,
             "tutor": x["row"].tutor.name if x["row"].tutor_id else "", "sheet": x["row"].sheet_code,
         } for x in sec["rows"]]} for sec in _online_sections(s)],
-        "tests": [{"tutor": t.tutor.name, "date_label": _thai_date_short_be(t.work_date), "hours": str(t.hours.normalize())}
+        "tests": [{"tutor": t.tutor.name, "date_label": _thai_date_short_be(t.work_date), "hours": str(int(t.hours) if t.hours == int(t.hours) else t.hours)}
                   for t in s.test_tutors.select_related("tutor")],
     }
 

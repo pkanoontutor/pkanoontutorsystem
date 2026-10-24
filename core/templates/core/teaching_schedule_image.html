@@ -190,11 +190,12 @@
             <th class="num">ชม.แหว่ง</th>
             <th class="num">ค่าแหว่ง</th>
             <th class="num">เรทพิเศษ<br>325</th>
-            <th class="num">ห้อง 350<br><small style="font-weight:600;opacity:.7;">(ป.5)</small></th>
+            <th class="num">ห้อง 350</th>
             <th class="num">เรท/ชม.<br><small style="font-weight:600;opacity:.7;">(แก้ไขได้)</small></th>
             <th class="num">ชม.ออนไลน์<br><small style="font-weight:600;opacity:.7;">(กรอกเอง)</small></th>
             <th class="num">เรทออนไลน์/ชม.<br><small style="font-weight:600;opacity:.7;">(แก้ไขได้)</small></th>
             <th class="num">ค่าเดินทาง<br><small style="font-weight:600;opacity:.7;">(แก้ไขได้)</small></th>
+            <th class="num">หักภาษี<br>3%</th>
           </tr>
         </thead>
         <tbody>
@@ -241,6 +242,7 @@
                        {% if r.travel_fee_override is not None %}value="{{ r.travel_fee_override|floatformat:2 }}"{% endif %}
                        style="width:74px;text-align:right;">
               </td>
+              <td class="num"><input type="checkbox" class="chk" name="wht_{{ r.tutor.id }}" value="yes" {% if r.withhold_3 %}checked{% endif %} title="หักภาษี ณ ที่จ่าย 3%"></td>
             </tr>
           {% endfor %}
         </tbody>
@@ -248,8 +250,8 @@
       </div>
       <p class="sub" style="margin-top:8px;">
         เรทพิเศษ 325 บาท/ชม. จะมีผลเมื่อสอนตั้งแต่ 4 ชม.ขึ้นไป (ต่ำกว่านั้นใช้เรทปกติ 550/350 ตามชั่วโมง)<br>
-        ห้อง 350 = จ่าย 350 บาท/ชม. คงที่ทุกช่วงชั่วโมง ระบบติ๊กให้อัตโนมัติเมื่อสอน ป.5 — เอาติ๊กออกก่อนกดส่งได้
-        · ช่องนี้ติ๊กมาให้ตามค่าเริ่มต้นของติวเตอร์แต่ละคน แก้เฉพาะครั้งนี้ได้<br>
+        ห้อง 350 = จ่าย 350 บาท/ชม. คงที่ทุกช่วงชั่วโมง (ติ๊กเองเมื่อต้องการ)<br>
+        <b>หักภาษี 3%</b> ติ๊กมาตามค่าเริ่มต้นของติวเตอร์แต่ละคน (ตั้งได้ที่หน้าออกเอกสารทางการ) · ยอดโอนสุทธิ = ยอดรวม − 3%<br>
         <b>เรท/ชม.</b> และ <b>ค่าเดินทาง</b> ช่องว่าง = ใช้ค่าเริ่มต้นตามชั่วโมงสอน (เลขจาง ๆ ที่เห็นในช่อง) · กรอกตัวเลขเพื่อ override เฉพาะติวเตอร์คนนั้น
         · ลบตัวเลขออกให้ว่างเพื่อกลับไปใช้ค่าเริ่มต้นอีกครั้ง<br>
         <b>ชม.ออนไลน์</b> ตารางสอนนับเฉพาะ onsite จึงต้องกรอกชั่วโมงออนไลน์เอง · <b>เรทออนไลน์/ชม.</b> ว่าง = ใช้ 300 บาท/ชม.
@@ -278,7 +280,7 @@
       {% if online_week %}
         <input type="hidden" name="online_id" value="{{ online_week.id }}">
         <table class="pay">
-          <thead><tr><th><input type="checkbox" class="chk" checked onclick="document.querySelectorAll('.onrow').forEach(function(x){x.checked=this.checked;}, this)"></th><th>ติวเตอร์</th><th>คาบที่สอน</th><th class="num">ชม.</th><th class="num">ยอด</th></tr></thead>
+          <thead><tr><th><input type="checkbox" class="chk" checked onclick="document.querySelectorAll('.onrow').forEach(function(x){x.checked=this.checked;}, this)"></th><th>ติวเตอร์</th><th>คาบที่สอน</th><th class="num">ชม.</th><th class="num">เรท/ชม.<br><small style="font-weight:600;opacity:.7;">(แก้ไขได้)</small></th><th class="num">ยอด</th><th class="num">หัก 3%</th></tr></thead>
           <tbody>
             {% for r in online_rows %}
               <tr>
@@ -286,12 +288,15 @@
                 <td>{{ r.tutor.name }}</td>
                 <td style="font-size:12.5px;">{{ r.subjects|join:", "|default:"-" }}{% if r.test %} <span class="exist-tag">เฉลยเทส +{{ r.test|floatformat:"-2" }} ชม.</span>{% endif %}</td>
                 <td class="num">{{ r.hours|floatformat:"-2" }}</td>
-                <td class="num">{{ r.amount|floatformat:0|intcomma }}</td>
+                <td class="num"><input type="number" step="0.01" min="0" name="online_rate_{{ r.tutor.id }}" data-hours="{{ r.hours }}" class="js-online-rate"
+                       placeholder="300" {% if r.rate_override is not None %}value="{{ r.rate_override|floatformat:'-2' }}"{% endif %} style="width:70px;text-align:right;"></td>
+                <td class="num js-online-amount">{{ r.amount|floatformat:0|intcomma }}</td>
+                <td class="num"><input type="checkbox" class="chk" name="online_wht_{{ r.tutor.id }}" value="yes" {% if r.withhold_3 %}checked{% endif %}></td>
               </tr>
             {% empty %}
-              <tr><td colspan="5" style="text-align:center;color:#94a3b8;">สัปดาห์นี้ยังไม่มีคาบที่ระบุติวเตอร์</td></tr>
+              <tr><td colspan="7" style="text-align:center;color:#94a3b8;">สัปดาห์นี้ยังไม่มีคาบที่ระบุติวเตอร์</td></tr>
             {% endfor %}
-            {% if online_rows %}<tr><td colspan="4" class="num"><b>รวม</b></td><td class="num"><b>{{ online_total|floatformat:0|intcomma }}</b></td></tr>{% endif %}
+            {% if online_rows %}<tr><td colspan="5" class="num"><b>รวม</b></td><td class="num"><b id="onlineTotal">{{ online_total|floatformat:0|intcomma }}</b></td><td></td></tr>{% endif %}
           </tbody>
         </table>
       {% endif %}
@@ -303,6 +308,18 @@
   </div>
 
   <script>
+    // live total when a rate is edited (blank = 300)
+    document.querySelectorAll(".js-online-rate").forEach(function(inp){
+      inp.addEventListener("input", function(){
+        var sum = 0;
+        document.querySelectorAll(".js-online-rate").forEach(function(i){
+          var amt = parseFloat(i.dataset.hours || "0") * (i.value === "" ? 300 : parseFloat(i.value) || 0);
+          i.closest("tr").querySelector(".js-online-amount").textContent = Math.round(amt).toLocaleString();
+          sum += amt;
+        });
+        var t = document.getElementById("onlineTotal"); if(t) t.textContent = Math.round(sum).toLocaleString();
+      });
+    });
     function openOnlinePay(){document.getElementById("onlinePayBg").classList.add("show");}
     function closeOnlinePay(){document.getElementById("onlinePayBg").classList.remove("show");}
     (function(){

@@ -1,0 +1,88 @@
+{% extends "core/base.html" %}
+{% block title %}ออกเอกสารทางการ{% endblock %}
+{% block head %}
+<style>
+  .od-wrap{max-width:1000px;margin:0 auto;display:grid;gap:12px;}
+  .od-hero{background:linear-gradient(120deg,#1e293b,#475569);color:#fff;border-radius:20px;padding:18px 20px;}
+  .od-hero h1{margin:0;font-size:22px;font-weight:1000;}
+  .od-hero p{margin:4px 0 0;font-size:13px;color:#cbd5e1;font-weight:700;}
+  .panel{background:#fff;border-radius:16px;padding:14px;box-shadow:0 4px 12px rgba(15,23,42,.07);}
+  .panel h2{margin:0 0 10px;font-size:16px;}
+  .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;align-items:end;}
+  label.f{font-size:11px;font-weight:1000;color:#475569;display:block;margin-bottom:4px;}
+  input[type=text],select{width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:10px;padding:8px 10px;font-family:inherit;font-weight:700;font-size:13.5px;background:#fff;}
+  .btn{border:0;border-radius:11px;padding:9px 14px;font-weight:1000;cursor:pointer;font-family:inherit;font-size:13.5px;background:#0f172a;color:#fff;text-decoration:none;display:inline-flex;align-items:center;gap:6px;}
+  .btn.blue{background:#2563eb;} .btn.green{background:#16a34a;} .btn.soft{background:#f1f5f9;color:#0f172a;}
+  .gen{display:grid;grid-template-columns:1.2fr 1fr auto auto;gap:8px;align-items:end;}
+  .trow{display:grid;grid-template-columns:110px 1fr 1fr 150px 1.6fr 90px auto;gap:6px;align-items:center;border-top:1px solid #f1f5f9;padding:8px 0;}
+  .trow:first-of-type{border-top:0;}
+  .trow b{font-size:14px;}
+  .trow .miss{font-size:11px;color:#b45309;font-weight:800;}
+  .chk{display:flex;align-items:center;gap:4px;font-size:12px;font-weight:800;}
+  .msg{border-radius:12px;padding:9px 12px;font-weight:900;font-size:13px;background:#f0fdf4;color:#166534;}
+  .hint{font-size:12px;font-weight:700;color:#64748b;line-height:1.5;}
+  @media(max-width:860px){.grid,.gen{grid-template-columns:1fr 1fr;}.trow{grid-template-columns:1fr 1fr;}}
+</style>
+{% endblock %}
+{% block content %}
+<div class="od-wrap">
+  <div class="od-hero"><h1>📄 ออกเอกสารทางการ</h1><p>ใบสลิปค่าจ้างรายสัปดาห์ (ยอดโอนแต่ละสัปดาห์) และหนังสือรับรองการหักภาษี ณ ที่จ่าย ตามมาตรา 50 ทวิ</p></div>
+  {% if saved %}<div class="msg">✅ บันทึกแล้ว</div>{% endif %}
+
+  <div class="panel">
+    <h2>🖨️ ออกเอกสาร</h2>
+    <form class="gen" id="genForm" target="_blank">
+      <div><label class="f">ติวเตอร์</label>
+        <select name="tutor" required>{% for t in tutors %}<option value="{{ t.id }}">{{ t.name }}{% if t.first_name %} ({{ t.legal_name }}){% endif %}</option>{% endfor %}</select>
+      </div>
+      <div><label class="f">สัปดาห์ (เสาร์ – ศุกร์)</label>
+        <select name="week">{% for w in weeks %}<option value="{{ w.value }}">{{ w.label }}</option>{% endfor %}</select>
+      </div>
+      <button class="btn blue" type="submit" formaction="{% url 'core:official_doc_payslip' %}">🧾 ใบสลิปค่าจ้าง</button>
+      <button class="btn green" type="submit" formaction="{% url 'core:official_doc_wht50' %}">📑 หนังสือรับรอง 50 ทวิ</button>
+    </form>
+    <details style="margin-top:10px;">
+      <summary class="hint" style="cursor:pointer;">กำหนดช่วงวันที่เอง (เช่น ทั้งเดือน / ทั้งปีภาษี)</summary>
+      <form class="gen" target="_blank" style="margin-top:8px;">
+        <div><label class="f">ติวเตอร์</label><select name="tutor">{% for t in tutors %}<option value="{{ t.id }}">{{ t.name }}</option>{% endfor %}</select></div>
+        <div style="display:flex;gap:6px;"><div style="flex:1"><label class="f">ตั้งแต่</label><input type="date" name="start" required></div><div style="flex:1"><label class="f">ถึง</label><input type="date" name="end" required></div></div>
+        <button class="btn blue" type="submit" formaction="{% url 'core:official_doc_payslip' %}">🧾 สลิป</button>
+        <button class="btn green" type="submit" formaction="{% url 'core:official_doc_wht50' %}">📑 50 ทวิ</button>
+      </form>
+    </details>
+    <div class="hint" style="margin-top:8px;">ยอดมาจากระบบค่าติวเตอร์ (รายรับรายจ่าย) · 50 ทวิ รวมเฉพาะรายการที่ติ๊ก “หักภาษี 3%” ตอนส่งค่าติวเตอร์</div>
+  </div>
+
+  <div class="panel">
+    <h2>🏢 ข้อมูลผู้จ่ายเงิน / ผู้มีหน้าที่หักภาษี</h2>
+    <form method="post" class="grid">
+      {% csrf_token %}<input type="hidden" name="action" value="issuer">
+      <div><label class="f">ชื่อผู้จ่ายเงิน / สถาบัน</label><input type="text" name="name" value="{{ issuer.name }}"></div>
+      <div><label class="f">เลขประจำตัวผู้เสียภาษี (13 หลัก)</label><input type="text" name="tax_id" value="{{ issuer.tax_id }}" inputmode="numeric"></div>
+      <div><label class="f">ชื่อผู้ลงนาม</label><input type="text" name="signer_name" value="{{ issuer.signer_name }}"></div>
+      <div><label class="f">ตำแหน่งผู้ลงนาม</label><input type="text" name="signer_position" value="{{ issuer.signer_position }}"></div>
+      <div style="grid-column:1/-2;"><label class="f">ที่อยู่</label><input type="text" name="address" value="{{ issuer.address }}"></div>
+      <button class="btn" type="submit">💾 บันทึก</button>
+    </form>
+  </div>
+
+  <div class="panel">
+    <h2>👩‍🏫 ข้อมูลติวเตอร์ (ผู้ถูกหักภาษี)</h2>
+    <div class="hint" style="margin-bottom:6px;">ชื่อ–นามสกุลจริง เลขประจำตัวผู้เสียภาษี และที่อยู่ ใช้ในใบสลิปและ 50 ทวิ · “หัก 3%” = ค่าเริ่มต้นตอนส่งค่าติวเตอร์</div>
+    {% for t in tutors %}
+      <form method="post" class="trow" id="tutor-{{ t.id }}">
+        {% csrf_token %}<input type="hidden" name="action" value="tutor"><input type="hidden" name="tutor_id" value="{{ t.id }}">
+        <div><b>{{ t.name }}</b>{% if not t.first_name or not t.national_id %}<div class="miss">ข้อมูลยังไม่ครบ</div>{% endif %}</div>
+        <input type="text" name="first_name" value="{{ t.first_name }}" placeholder="ชื่อจริง">
+        <input type="text" name="last_name" value="{{ t.last_name }}" placeholder="นามสกุล">
+        <input type="text" name="national_id" value="{{ t.national_id }}" placeholder="เลขบัตร 13 หลัก" inputmode="numeric" maxlength="17">
+        <input type="text" name="address" value="{{ t.address }}" placeholder="ที่อยู่">
+        <label class="chk"><input type="checkbox" name="default_withhold_3" {% if t.default_withhold_3 %}checked{% endif %}> หัก 3%</label>
+        <button class="btn soft" type="submit">บันทึก</button>
+      </form>
+    {% empty %}
+      <div class="hint">ยังไม่มีติวเตอร์ในระบบค่าติวเตอร์</div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

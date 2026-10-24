@@ -1099,6 +1099,11 @@
                 <span>ห้อง 350<br>คงที่ทุกชั่วโมง</span>
               </label>
 
+              <label class="special-toggle">
+                <input type="checkbox" name="wht_{{ tutor.id }}" value="yes" {% if entry %}{% if entry.withholding_3 %}checked{% endif %}{% elif tutor.default_withhold_3 %}checked{% endif %}>
+                <span>หักภาษี<br>ณ ที่จ่าย 3%</span>
+              </label>
+
               <div class="field">
                 <label>ค่านั่งว่าง</label>
                 <input class="js-idle" type="number" name="idle_{{ tutor.id }}" step="0.01" min="0" value="{% if entry %}{{ entry.idle_fee }}{% endif %}">

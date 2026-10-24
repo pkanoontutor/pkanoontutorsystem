@@ -1,6 +1,6 @@
 import re
 from django.db import models, transaction
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 from django.utils import timezone
 
 class School(models.Model):
@@ -1957,6 +1957,15 @@ class Tutor(models.Model):
         default=False,
         help_text="ถ้าติ๊ก ช่องเรทพิเศษ 325 จะถูกติ๊กให้อัตโนมัติเมื่อกรอกค่าสอนของติวเตอร์คนนี้",
     )
+    # Details for official documents (payslip / 50 ทวิ)
+    first_name = models.CharField("ชื่อจริง", max_length=120, blank=True)
+    last_name = models.CharField("นามสกุล", max_length=120, blank=True)
+    national_id = models.CharField("เลขประจำตัวผู้เสียภาษี (13 หลัก)", max_length=20, blank=True)
+    address = models.CharField("ที่อยู่", max_length=400, blank=True)
+    default_withhold_3 = models.BooleanField(
+        "ค่าเริ่มต้นหักภาษี ณ ที่จ่าย 3%", default=False,
+        help_text="ถ้าติ๊ก ตอนส่งค่าติวเตอร์ช่อง 'หัก 3%' จะถูกติ๊กให้คนนี้อัตโนมัติ",
+    )
     is_active = models.BooleanField("ใช้งาน", default=True)
     created_at = models.DateTimeField("วันที่สร้าง", default=timezone.now)
     updated_at = models.DateTimeField("อัปเดตล่าสุด", auto_now=True)
@@ -1968,6 +1977,11 @@ class Tutor(models.Model):
 
     def __str__(self) -> str:
         return self.name
+
+    @property
+    def legal_name(self) -> str:
+        full = f"{self.first_name} {self.last_name}".strip()
+        return full or self.name
 
 
 class TutorPayrollEntry(models.Model):
@@ -2008,6 +2022,9 @@ class TutorPayrollEntry(models.Model):
     )
     idle_fee = models.DecimalField("ค่านั่งว่าง / ค่าอื่น ๆ", max_digits=12, decimal_places=2, default=0)
     total_amount = models.DecimalField("ยอดรวม", max_digits=12, decimal_places=2, default=0)
+    withholding_3 = models.BooleanField("หักภาษี ณ ที่จ่าย 3%", default=False)
+    withholding_amount = models.DecimalField("ภาษีหัก ณ ที่จ่าย", max_digits=12, decimal_places=2, default=0)
+    net_amount = models.DecimalField("ยอดโอนสุทธิ", max_digits=12, decimal_places=2, default=0)
     note = models.TextField("หมายเหตุ", blank=True)
     created_at = models.DateTimeField("วันที่บันทึก", default=timezone.now)
     updated_at = models.DateTimeField("อัปเดตล่าสุด", auto_now=True)
@@ -2087,6 +2104,11 @@ class TutorPayrollEntry(models.Model):
         )
         self.idle_fee = Decimal(str(self.idle_fee or 0))
         self.total_amount = self.teaching_fee + self.online_teaching_fee + self.travel_fee + self.idle_fee
+        self.withholding_amount = (
+            (self.total_amount * Decimal("0.03")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+            if self.withholding_3 else Decimal("0")
+        )
+        self.net_amount = self.total_amount - self.withholding_amount
 
     def save(self, *args, **kwargs):
         self.recalculate()
@@ -3704,3 +3726,17 @@ class HomeBudgetExpense(models.Model):
 
     class Meta:
         ordering = ("-spent_on", "-id")
+
+
+
+class DocumentIssuer(models.Model):
+    """ผู้มีหน้าที่หักภาษี ณ ที่จ่าย / ผู้ออกเอกสาร (single row)."""
+    name = models.CharField("ชื่อผู้จ่ายเงิน / สถาบัน", max_length=200, default="พี่ขนุนติวเตอร์")
+    tax_id = models.CharField("เลขประจำตัวผู้เสียภาษี", max_length=20, blank=True)
+    address = models.CharField("ที่อยู่", max_length=400, blank=True)
+    signer_name = models.CharField("ชื่อผู้ลงนาม", max_length=150, blank=True)
+    signer_position = models.CharField("ตำแหน่งผู้ลงนาม", max_length=100, blank=True, default="ผู้จ่ายเงิน")
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self) -> str:
+        return self.name

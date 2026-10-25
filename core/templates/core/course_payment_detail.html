@@ -54,6 +54,10 @@
       <a class="btnx soft" href="{% url 'core:course_payment_receipt_image' payment.id %}" target="_blank">เปิดใบเสร็จแท็บใหม่</a>
       {% if payment.enrollment_id %}
         <a class="btnx soft" href="{% url 'core:course_payment_sessions_card_image' payment.id %}" target="_blank">เปิดใบครั้งเรียนคงเหลือแท็บใหม่</a>
+        {% if next_inst %}
+          <a class="btnx soft" style="background:#fff7ed;border-color:#fdba74;color:#c2410c;" href="{% url 'core:course_installment_notice_create' payment.enrollment_id %}?installment_no={{ next_inst.installment_no }}">📨 สร้างใบแจ้งชำระงวดที่ {{ next_inst.installment_no }}/{{ next_pkg.installment_count }}</a>
+          <a class="btnx soft" style="background:#ecfdf5;border-color:#86efac;color:#15803d;" href="{% url 'core:course_payment_create' %}?enrollment_id={{ payment.enrollment_id }}&pay_installment=1">🧾 ออกใบเสร็จงวดที่ {{ next_inst.installment_no }}</a>
+        {% endif %}
       {% endif %}
     </div>
   </div>

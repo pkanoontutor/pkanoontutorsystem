@@ -5628,12 +5628,19 @@ def _pending_installments_by_enrollment(enrollment_ids) -> dict:
 
 
 def _default_payment_form_context(request: HttpRequest, errors: list[str] | None = None, posted: dict | None = None):
-    students = list(_active_students_for_payment())
+    # Students closed as "ไม่ต่อคอร์ส" are inactive but can come back, so
+    # they stay searchable (flagged) and a receipt reactivates them.
+    students = list(_active_students_for_payment()) + list(
+        Student.objects.filter(is_active=False).select_related("school").order_by("nickname", "full_name"))
     classes = list(TutoringClass.objects.filter(is_active=True).order_by("time_slot", "name"))
 
     # For the receipt form we use search boxes instead of long dropdowns.
     # Keep the queryset unrestricted to active records so the browser can filter instantly.
-    enrollments = list(_active_enrollments_for_payment())
+    enrollments = list(_active_enrollments_for_payment()) + list(
+        Enrollment.objects.select_related("student", "tutoring_class")
+        .filter(tutoring_class__is_active=True)
+        .filter(Q(is_active=False) | Q(student__is_active=False))
+        .order_by("student__nickname", "-created_at"))
     admission_inquiries = list(
         AdmissionInquiry.objects
         .order_by("-created_at")
@@ -5654,7 +5661,8 @@ def _default_payment_form_context(request: HttpRequest, errors: list[str] | None
     students_lookup_json = [
         {
             "id": s.id,
-            "label": f"{s.nickname or '-'} | {s.full_name or '-'} | {s.student_code or '-'} | {s.grade_level or '-'}",
+            "label": f"{s.nickname or '-'} | {s.full_name or '-'} | {s.student_code or '-'} | {s.grade_level or '-'}" + ("" if s.is_active else " · ⏸ ไม่ active (ไม่ต่อคอร์ส)"),
+            "inactive": not s.is_active,
             "nickname": s.nickname or "",
             "full_name": s.full_name or "",
             "student_code": s.student_code or "",
@@ -5675,7 +5683,8 @@ def _default_payment_form_context(request: HttpRequest, errors: list[str] | None
             "id": e.id,
             "student_id": e.student_id,
             "student_label": f"{e.student.nickname or '-'} | {e.student.full_name or '-'} | {e.student.student_code or '-'}",
-            "label": f"{e.student.nickname or '-'} | {e.student.full_name or '-'} | {e.tutoring_class.name} | {e.sale_run_no or e.id} | คงเหลือ {e.remaining_sessions}",
+            "label": f"{e.student.nickname or '-'} | {e.student.full_name or '-'} | {e.tutoring_class.name} | {e.sale_run_no or e.id} | คงเหลือ {e.remaining_sessions}" + ("" if (e.is_active and e.student.is_active) else " · ⏸ ไม่ active (ไม่ต่อคอร์ส)"),
+            "inactive": not (e.is_active and e.student.is_active),
             "class_name": e.tutoring_class.name,
             "time_slot": e.tutoring_class.get_time_slot_display() if hasattr(e.tutoring_class, "get_time_slot_display") else e.tutoring_class.time_slot,
             "sale_run_no": e.sale_run_no or str(e.id),
@@ -9621,7 +9630,7 @@ def course_payment_create(request: HttpRequest) -> HttpResponse:
                     )
             else:
                 student_id = post.get("student_id")
-                student = Student.objects.filter(id=student_id, is_active=True).first()
+                student = Student.objects.filter(id=student_id).first()
                 if not student and enrollment_action != CoursePayment.EnrollmentAction.ADD_EXISTING:
                     errors.append("กรุณาเลือกนักเรียนเดิม")
 
@@ -9631,7 +9640,7 @@ def course_payment_create(request: HttpRequest) -> HttpResponse:
                 # No class or Enrollment involved for a standalone receipt.
                 enrollment_action = CoursePayment.EnrollmentAction.NEW
             elif enrollment_action == CoursePayment.EnrollmentAction.ADD_EXISTING:
-                existing_enrollment = Enrollment.objects.select_related("student", "tutoring_class").filter(id=post.get("existing_enrollment_id"), is_active=True).first()
+                existing_enrollment = Enrollment.objects.select_related("student", "tutoring_class").filter(id=post.get("existing_enrollment_id")).first()
                 if not existing_enrollment:
                     errors.append("กรุณาเลือก Enrollment เดิมที่จะเพิ่มจำนวนครั้ง")
                 else:
@@ -9751,6 +9760,13 @@ def course_payment_create(request: HttpRequest) -> HttpResponse:
                             payment.amount_paid = plan[0]["amount"]
                             payment.save(update_fields=["sessions_granted", "amount_paid"])
                         enrollment = _apply_payment_to_enrollment(payment, enrollment_action, existing_enrollment)
+                        # A paying student is back: undo a "ไม่ต่อคอร์ส" close.
+                        if enrollment and not enrollment.is_active:
+                            enrollment.is_active = True
+                            enrollment.save(update_fields=["is_active"])
+                        if student and not student.is_active:
+                            student.is_active = True
+                            student.save(update_fields=["is_active"])
 
                         if pay_installment is not None:
                             pay_installment.receipt = payment
@@ -9820,7 +9836,8 @@ def course_payment_detail(request: HttpRequest, pk: int) -> HttpResponse:
         CoursePayment.objects.select_related("student", "student__school", "tutoring_class", "enrollment"),
         pk=pk,
     )
-    return render(request, "core/course_payment_detail.html", {"payment": payment})
+    next_inst, next_pkg = _next_unpaid_installment(payment.enrollment)
+    return render(request, "core/course_payment_detail.html", {"payment": payment, "next_inst": next_inst, "next_pkg": next_pkg})
 
 
 def _receipt_installment_plan(payment: CoursePayment) -> dict | None:
@@ -9864,6 +9881,21 @@ def course_payment_receipt_image(request: HttpRequest, pk: int) -> HttpResponse:
     })
 
 
+def _next_unpaid_installment(enrollment):
+    """(installment, package) for the first unpaid installment of the
+    enrollment's latest multi-installment plan, or (None, None)."""
+    if not enrollment:
+        return None, None
+    pkg = (CoursePackage.objects.filter(enrollment=enrollment, installment_count__gt=1)
+           .order_by("-created_at").first())
+    if not pkg:
+        return None, None
+    for inst in pkg.installments.select_related("receipt").order_by("installment_no"):
+        if not inst.is_paid:
+            return inst, pkg
+    return None, pkg
+
+
 @login_required
 @xframe_options_sameorigin
 def course_payment_sessions_card_image(request: HttpRequest, pk: int) -> HttpResponse:
@@ -9887,7 +9919,16 @@ def course_payment_sessions_card_image(request: HttpRequest, pk: int) -> HttpRes
 
     # Same rule as remaining-attendance's "คาดว่าจะครบคอร์ส".
     completion = _expected_course_completion_date(enrollment)
+    # Paying in installments and not on the last one yet: the band shows
+    # when the next installment falls due instead of the course end.
+    next_inst, next_pkg = _next_unpaid_installment(enrollment)
+    next_due = None
+    if next_inst:
+        next_due = next_inst.due_date or completion
     return render(request, "core/course_payment_sessions_card_image.html", {
+        "next_inst": next_inst,
+        "next_pkg": next_pkg,
+        "next_due_label": _thai_schedule_date(next_due) if next_due else "",
         "payment": payment,
         "enrollment": enrollment,
         "remaining_sessions": enrollment.remaining_sessions,

@@ -866,7 +866,19 @@ document.addEventListener('DOMContentLoaded',()=>{
   const params = new URLSearchParams(window.location.search);
   const admissionId = params.get('admission_id');
   const studentId = params.get('student_id');
-  if(studentId){ fillExistingStudentById(studentId); }
+  const enrollmentId = params.get('enrollment_id');
+  if(enrollmentId){
+    // From an installment notice / receipt: open that enrollment and, if
+    // asked, select its next unpaid installment straight away.
+    const enr = ENROLLMENTS.find(x => String(x.id) === String(enrollmentId));
+    if(enr){
+      fillExistingStudentById(enr.student_id);
+      setEnrollmentAction('add_existing');
+      selectEnrollmentCard(String(enr.id));
+      if(params.get('pay_installment') && enr.pending_installment){ togglePayPending(); }
+    }
+  }
+  else if(studentId){ fillExistingStudentById(studentId); }
   else if(admissionId){ fillFromAdmissionById(admissionId); }
 });
 </script>

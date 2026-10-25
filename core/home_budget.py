@@ -10,12 +10,16 @@ from decimal import Decimal, InvalidOperation
 from django.contrib.auth.decorators import login_required
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import render
+from django.templatetags.static import static
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from .models import HomeBudgetExpense, HomeBudgetItem, HomeBudgetProject, HomeBudgetZone
 
 ZERO = Decimal("0")
+# The supplied plans (cropped + mirrored to match the house's orientation);
+# an uploaded image for a floor replaces its default.
+DEFAULT_PLANS = {1: "core/home_plans/floor1.jpg", 2: "core/home_plans/floor2.jpg"}
 ZONE_COLORS = ["#6366f1", "#f97316", "#10b981", "#ec4899", "#0ea5e9", "#eab308", "#8b5cf6", "#ef4444", "#14b8a6", "#64748b"]
 
 
@@ -49,6 +53,7 @@ def _state(p: HomeBudgetProject) -> dict:
     zone_rows = {z.id: {"id": z.id, "name": z.name, "color": z.color,
                         "budget": _num(z.budget) if z.budget is not None else None,
                         "rect": ([z.plan_x, z.plan_y, z.plan_w, z.plan_h] if z.plan_w else None),
+                        "floor": z.floor or 1,
                         "planned": 0.0, "spent": 0.0, "count": 0} for z in zones}
     item_rows = []
     totals = {"planned": ZERO, "spent": ZERO, "committed": ZERO, "items_spent": ZERO, "labor_spent": ZERO}
@@ -77,7 +82,11 @@ def _state(p: HomeBudgetProject) -> dict:
     budget = p.total_budget or ZERO
     return {
         "project": {"name": p.name, "budget": _num(budget),
-                    "floor_plan": p.floor_plan.url if p.floor_plan else ""},
+                    "floor_plans": {
+                        "1": p.floor_plan.url if p.floor_plan else static(DEFAULT_PLANS[1]),
+                        "2": p.floor_plan_2.url if p.floor_plan_2 else static(DEFAULT_PLANS[2]),
+                    },
+                    "custom_plans": {"1": bool(p.floor_plan), "2": bool(p.floor_plan_2)}},
         "zones": list(zone_rows.values()),
         "unzoned": unzoned,
         "items": item_rows,
@@ -130,11 +139,14 @@ def home_budget_api(request: HttpRequest) -> JsonResponse:
             return err("กรุณาตั้งชื่อโซน")
         HomeBudgetZone.objects.create(project=p, name=name,
                                       color=(P.get("color") or ZONE_COLORS[p.zones.count() % len(ZONE_COLORS)])[:20],
+                                      floor=2 if P.get("floor") == "2" else 1,
                                       order=p.zones.count())
     elif act == "update_zone" and zone:
         zone.name = (P.get("name") or zone.name).strip()[:80]
         zone.color = (P.get("color") or zone.color)[:20]
         zone.budget = _money(P.get("budget")) if (P.get("budget") or "").strip() else None
+        if P.get("floor") in ("1", "2"):
+            zone.floor = int(P.get("floor"))
         zone.save()
     elif act == "delete_zone" and zone:
         zone.delete()  # items keep existing, just become "ไม่ระบุโซน"
@@ -187,14 +199,16 @@ def home_budget_api(request: HttpRequest) -> JsonResponse:
         f = request.FILES.get("plan")
         if not f or not (f.content_type or "").startswith("image/"):
             return err("แปลนต้องเป็นไฟล์รูปภาพ")
-        if p.floor_plan:
-            p.floor_plan.delete(save=False)
-        p.floor_plan = f
+        field = "floor_plan_2" if P.get("floor") == "2" else "floor_plan"
+        if getattr(p, field):
+            getattr(p, field).delete(save=False)
+        setattr(p, field, f)
         p.save()
-    elif act == "remove_plan":
-        if p.floor_plan:
-            p.floor_plan.delete(save=False)
-        p.floor_plan = None
+    elif act == "remove_plan":   # back to the default plan for that floor
+        field = "floor_plan_2" if P.get("floor") == "2" else "floor_plan"
+        if getattr(p, field):
+            getattr(p, field).delete(save=False)
+        setattr(p, field, None)
         p.save()
     else:
         return err("ไม่รู้จักคำสั่งนี้")

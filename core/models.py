@@ -3682,7 +3682,8 @@ class SubAdminTool(models.Model):
 class HomeBudgetProject(models.Model):
     name = models.CharField("ชื่อโปรเจกต์", max_length=120, default="ตกแต่งบ้านใหม่")
     total_budget = models.DecimalField("งบประมาณทั้งหมด", max_digits=12, decimal_places=2, default=0)
-    floor_plan = models.ImageField("แปลนบ้าน", upload_to="home_budget/plans/", blank=True, null=True)
+    floor_plan = models.ImageField("แปลนบ้าน ชั้น 1", upload_to="home_budget/plans/", blank=True, null=True)
+    floor_plan_2 = models.ImageField("แปลนบ้าน ชั้น 2", upload_to="home_budget/plans/", blank=True, null=True)
     created_at = models.DateTimeField(default=timezone.now)
 
     def __str__(self) -> str:
@@ -3694,6 +3695,7 @@ class HomeBudgetZone(models.Model):
     name = models.CharField("ชื่อโซน", max_length=80)
     color = models.CharField("สี", max_length=20, default="#6366f1")
     budget = models.DecimalField("งบของโซน (ไม่บังคับ)", max_digits=12, decimal_places=2, null=True, blank=True)
+    floor = models.PositiveSmallIntegerField("ชั้น", default=1)
     # area on the floor plan, in % of the image (x, y = top-left)
     plan_x = models.FloatField(null=True, blank=True)
     plan_y = models.FloatField(null=True, blank=True)

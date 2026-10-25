@@ -39,7 +39,7 @@
   .zone .zb span{display:block;height:100%;background:var(--zc);}
   .zone .zedit{position:absolute;top:6px;right:8px;border:0;background:none;color:#94a3b8;cursor:pointer;font-size:14px;}
   .plan-box{position:relative;display:inline-block;max-width:100%;user-select:none;}
-  .plan-box img{display:block;max-width:100%;border-radius:12px;}
+  .plan-box img{display:block;width:720px;max-width:100%;border-radius:12px;}
   .plan-zone{position:absolute;border:2px solid var(--zc);background:color-mix(in srgb, var(--zc) 22%, transparent);border-radius:8px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;font-size:12px;font-weight:700;color:#0f172a;padding:2px;overflow:hidden;}
   .plan-zone small{font-weight:600;font-size:11px;background:rgba(255,255,255,.8);border-radius:6px;padding:0 4px;margin-top:2px;}
   .plan-zone.on{background:color-mix(in srgb, var(--zc) 45%, transparent);}
@@ -103,8 +103,8 @@
   <div class="card">
     <h2><span>🗺️ แปลนบ้าน</span>
       <span style="display:flex;gap:6px;">
-        <label class="btn sm soft" style="cursor:pointer;">📤 อัปโหลดแปลน<input type="file" id="planFile" accept="image/*" hidden></label>
-        <button class="btn sm red" id="removePlan" hidden>ลบแปลน</button>
+        <label class="btn sm soft" style="cursor:pointer;">📤 เปลี่ยนรูปแปลนชั้นนี้<input type="file" id="planFile" accept="image/*" hidden></label>
+        <button class="btn sm red" id="removePlan" hidden>กลับไปใช้แปลนเดิม</button>
       </span>
     </h2>
     <div id="planArea"></div>
@@ -143,6 +143,7 @@
     <input type="hidden" name="zone_id">
     <div><label>ชื่อโซน *</label><input name="name" required placeholder="เช่น ห้องนั่งเล่น / ห้องนอนใหญ่ / ห้องครัว"></div>
     <div><label>สี</label><input name="color" type="color" value="#6366f1" style="height:42px;padding:3px;"></div>
+    <div><label>ชั้น</label><select name="floor"><option value="1">ชั้น 1</option><option value="2">ชั้น 2</option></select></div>
     <div><label>งบของโซน (ไม่บังคับ)</label><input name="budget" type="number" min="0" step="0.01" placeholder="เว้นว่างได้"></div>
     <div style="display:flex;gap:8px;justify-content:space-between;">
       <button type="button" class="btn red" id="zoneDelete" hidden>ลบโซน</button>
@@ -159,7 +160,7 @@
 (function(){
   const CSRF = "{{ csrf_token }}", API = "{% url 'core:home_budget_api' %}", TODAY = "{{ today|date:'Y-m-d' }}";
   let S = JSON.parse(document.getElementById("hb-state").textContent);
-  let fZone = "all", fKind = "all", openItems = new Set(), drawZone = "";
+  let fZone = "all", fKind = "all", openItems = new Set(), drawZone = "", floor = "1";
   const $ = id => document.getElementById(id);
   const esc = v => String(v == null ? "" : v).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
   const baht = n => (Math.round((n || 0) * 100) / 100).toLocaleString("th-TH", {maximumFractionDigits: 2});
@@ -194,7 +195,7 @@
       const ref = z.budget || Math.max(z.planned, z.spent) || 1;
       return '<div class="zone' + (fZone == z.id ? ' on' : '') + '" style="--zc:' + esc(z.color) + '" data-zone="' + z.id + '">' +
         '<button class="zedit" data-zedit="' + z.id + '" title="แก้ไขโซน">✏️</button>' +
-        '<div class="zn"><i></i>' + esc(z.name) + '</div>' +
+        '<div class="zn"><i></i>' + esc(z.name) + ' <small style="color:#94a3b8;font-weight:600">ชั้น ' + z.floor + '</small></div>' +
         '<div class="zm">จ่ายแล้ว ' + baht(z.spent) + ' / ' + (z.budget ? 'งบโซน ' + baht(z.budget) : 'แผน ' + baht(z.planned)) + ' ฿ · ' + z.count + ' รายการ</div>' +
         '<div class="zb"><span style="width:' + Math.min(z.spent / ref * 100, 100) + '%"></span></div></div>';
     }).join("");
@@ -204,15 +205,21 @@
   }
   function renderPlan(){
     const area = $("planArea");
-    $("removePlan").hidden = !S.project.floor_plan;
-    if(!S.project.floor_plan){ area.innerHTML = '<div class="empty">ยังไม่มีแปลนบ้าน — อัปโหลดรูปแปลน แล้ววาดกรอบให้แต่ละโซนเพื่อกดดูค่าใช้จ่ายของแต่ละห้องได้</div>'; return; }
-    const tools = '<div class="plan-tools">วาดโซนบนแปลน: <select id="drawSel"><option value="">— เลือกโซนแล้วลากบนรูป —</option>' +
-      S.zones.map(z => '<option value="' + z.id + '"' + (drawZone == z.id ? ' selected' : '') + '>' + esc(z.name) + (z.rect ? ' (มีกรอบแล้ว)' : '') + '</option>').join("") + '</select>' +
+    const plan = S.project.floor_plans[floor];
+    $("removePlan").hidden = !S.project.custom_plans[floor];
+    const onFloor = f => S.zones.filter(z => String(z.floor) === f);
+    const floorZones = onFloor(floor);
+    const spentOf = list => list.reduce((a, z) => a + z.spent, 0);
+    const tabs = '<div class="filters">' + ["1","2"].map(f => '<button class="chip' + (f === floor ? ' on' : '') + '" data-floor="' + f + '">ชั้น ' + f + ' · ' + baht(spentOf(onFloor(f))) + ' ฿</button>').join("") + '</div>';
+    const tools = tabs + '<div class="plan-tools">วาด/แก้กรอบห้อง: <select id="drawSel"><option value="">— เลือกโซนแล้วลากบนรูป —</option>' +
+      floorZones.map(z => '<option value="' + z.id + '"' + (drawZone == z.id ? ' selected' : '') + '>' + esc(z.name) + (z.rect ? ' (มีกรอบแล้ว)' : '') + '</option>').join("") + '</select>' +
       (drawZone && zoneById(+drawZone) && zoneById(+drawZone).rect ? '<button class="btn sm red" id="clearRect">ลบกรอบโซนนี้</button>' : '') +
       '<span style="color:#64748b">· กดที่ห้องเพื่อดูรายการของห้องนั้น</span></div>';
-    const zonesHtml = S.zones.filter(z => z.rect).map(z => '<div class="plan-zone' + (fZone == z.id ? ' on' : '') + '" data-zone="' + z.id + '" style="--zc:' + esc(z.color) +
+    const zonesHtml = floorZones.filter(z => z.rect).map(z => '<div class="plan-zone' + (fZone == z.id ? ' on' : '') + '" data-zone="' + z.id + '" style="--zc:' + esc(z.color) +
       ';left:' + z.rect[0] + '%;top:' + z.rect[1] + '%;width:' + z.rect[2] + '%;height:' + z.rect[3] + '%">' + esc(z.name) + '<small>' + baht(z.spent) + ' ฿</small></div>').join("");
-    area.innerHTML = tools + '<div class="plan-box' + (drawZone ? ' drawing' : '') + '" id="planBox"><img src="' + esc(S.project.floor_plan) + '" alt="แปลนบ้าน" draggable="false">' + zonesHtml + '</div>';
+    area.innerHTML = tools + '<div class="plan-box' + (drawZone ? ' drawing' : '') + '" id="planBox"><img src="' + esc(plan) + '" alt="แปลนบ้าน ชั้น ' + floor + '" draggable="false">' + zonesHtml + '</div>' +
+      '<div style="font-size:12px;color:#64748b;margin-top:6px">ชั้น ' + floor + ' ลงทุนไปแล้ว ' + baht(spentOf(floorZones)) + ' ฿ · กดห้องเพื่อดูรายการของห้องนั้น</div>';
+    area.querySelectorAll("[data-floor]").forEach(b => b.onclick = () => { floor = b.dataset.floor; drawZone = ""; renderPlan(); });
     $("drawSel").onchange = e => { drawZone = e.target.value; renderPlan(); };
     if($("clearRect")) $("clearRect").onclick = () => call({do:"set_zone_rect", zone_id: drawZone, clear: 1});
     bindDraw();
@@ -284,6 +291,7 @@
     f.zone_id.value = z ? z.id : ""; $("zoneDelete").hidden = !z;
     const palette = ["#6366f1","#f97316","#10b981","#ec4899","#0ea5e9","#eab308","#8b5cf6","#ef4444","#14b8a6","#64748b"];
     f.color.value = z ? z.color : palette[S.zones.length % palette.length];
+    f.floor.value = z ? String(z.floor) : floor;
     if(z){ f.name.value = z.name; f.budget.value = z.budget == null ? "" : z.budget; }
     openModal("zoneModal"); f.name.focus();
   }
@@ -299,7 +307,8 @@
   document.addEventListener("click", e => {
     const t = e.target;
     const ze = t.closest("[data-zedit]"); if(ze){ e.stopPropagation(); zoneModal(zoneById(+ze.dataset.zedit)); return; }
-    const zc = t.closest("[data-zone]"); if(zc && !drawZone){ const v = zc.dataset.zone; fZone = (fZone == v) ? "all" : (v === "none" ? "none" : +v); render();
+    const zc = t.closest("[data-zone]"); if(zc && !drawZone){ const v = zc.dataset.zone; fZone = (fZone == v) ? "all" : (v === "none" ? "none" : +v);
+      const zz = zoneById(+v); if(zz) floor = String(zz.floor); render();
       if(t.closest(".plan-zone")) $("items").scrollIntoView({behavior:"smooth"}); return; }
     const fz = t.closest("[data-fz]"); if(fz){ const v = fz.dataset.fz; fZone = (v === "all" || v === "none") ? v : +v; render(); return; }
     const fk = t.closest("[data-fk]"); if(fk){ fKind = fk.dataset.fk; render(); return; }
@@ -319,8 +328,8 @@
   $("addZone").onclick = () => zoneModal(null);
   $("budgetEdit").onclick = () => { const v = prompt("งบประมาณทั้งหมด (บาท)", S.totals.budget || ""); if(v !== null) call({do:"set_project", budget: v}); };
   $("projName").onclick = () => { const v = prompt("ชื่อโปรเจกต์", S.project.name); if(v) call({do:"set_project", name: v, budget: S.totals.budget}); };
-  $("planFile").onchange = e => { const f = e.target.files[0]; if(f) call({do:"upload_plan"}, ["plan", f]); e.target.value = ""; };
-  $("removePlan").onclick = () => { if(confirm("ลบรูปแปลน? (กรอบโซนที่วาดไว้จะยังจำไว้)")) call({do:"remove_plan"}); };
+  $("planFile").onchange = e => { const f = e.target.files[0]; if(f) call({do:"upload_plan", floor}, ["plan", f]); e.target.value = ""; };
+  $("removePlan").onclick = () => { if(confirm("กลับไปใช้แปลนเดิมของชั้นนี้? (กรอบห้องยังจำไว้)")) call({do:"remove_plan", floor}); };
   render();
 })();
 </script>

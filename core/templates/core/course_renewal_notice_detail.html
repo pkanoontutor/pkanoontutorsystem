@@ -112,6 +112,9 @@
 
         <div class="btnrow">
           <a class="btn soft" href="/course-renewal-notices/">← กลับหน้า list</a>
+          {% if notice.notice_type == "installment" and notice.enrollment_id %}
+            <a class="btn soft" style="background:#ecfdf5;color:#15803d;" href="/course-payments/new/?enrollment_id={{ notice.enrollment_id }}&pay_installment=1" title="ออกใบเสร็จงวดนี้">🧾 ออกใบเสร็จงวดนี้</a>
+          {% endif %}
           <a class="btn icon soft" title="Student" href="{{ student_admin_url }}">👤</a>
           <a class="btn icon soft" title="Enrollment" href="{{ enrollment_admin_url }}">📚</a>
         </div>

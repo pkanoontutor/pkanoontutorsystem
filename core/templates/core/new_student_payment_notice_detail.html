@@ -66,6 +66,13 @@
           <a class="btn green" href="{{ create_receipt_url }}">💳 ผู้ปกครองจ่ายแล้ว → ไปออกใบเสร็จ/สร้าง Enrollment</a>
         {% endif %}
 
+        <div class="field">
+          <label>ดึงชื่อจากนักเรียนเดิม (ไม่บังคับ)</label>
+          <input list="nsnStudentList" id="studentPick" placeholder="พิมพ์ชื่อเล่น / ชื่อจริง แล้วเลือก — ข้อมูลด้านล่างจะถูกเติมให้"
+                 value="{% if notice.student %}{{ notice.student.nickname }} | {{ notice.student.full_name }} | {{ notice.student.student_code }}{% endif %}">
+          <input type="hidden" name="student_id" id="studentIdField" value="{{ notice.student_id|default:'' }}">
+          <datalist id="nsnStudentList"></datalist>
+        </div>
         <div class="grid">
           <div class="field"><label>ชื่อเล่น</label><input name="nickname" value="{{ notice.nickname }}"></div>
           <div class="field"><label>โรงเรียน</label><input name="school_name" value="{{ notice.school_name }}"></div>
@@ -96,6 +103,23 @@
         </div>
 
         <div class="field">
+          <label>รูปแบบราคา</label>
+          <div class="opt-row">
+            <label class="opt-card"><input type="radio" name="price_mode" value="packages" {% if notice.price_mode != "custom" %}checked{% endif %} onchange="togglePriceMode()"> แพ็กเกจ 10 / 20 / 30</label>
+            <label class="opt-card"><input type="radio" name="price_mode" value="custom" {% if notice.price_mode == "custom" %}checked{% endif %} onchange="togglePriceMode()"> กำหนดคอร์สและราคาเอง</label>
+          </div>
+        </div>
+
+        <div class="pkg-edit" id="customEditor">
+          <div class="pkg-title">คอร์สที่แจ้งชำระ</div>
+          <div class="field"><label>ชื่อคอร์ส (เว้นว่าง = ใช้ชื่อ Class ที่เลือกด้านบน)</label><input name="custom_course_name" value="{{ notice.custom_course_name }}" placeholder="เช่น คอร์สติวสอบเข้า ม.1 เข้มข้น 12 ครั้ง"></div>
+          <div class="grid">
+            <div class="field"><label>ราคาเต็ม</label><input name="custom_full_price" value="{{ notice.custom_full_price }}"></div>
+            <div class="field"><label>ส่วนลด</label><input name="custom_discount" value="{{ notice.custom_discount }}"></div>
+          </div>
+        </div>
+
+        <div class="field" data-pkg-only>
           <label>รูปแบบการสมัคร</label>
           <div class="opt-row">
             <label class="opt-card">
@@ -109,21 +133,21 @@
           </div>
         </div>
 
-        <div class="pkg-edit">
+        <div class="pkg-edit" data-pkg-only>
           <div class="pkg-title" id="pkgTitle10">แพ็กเกจ {% if notice.pricing_option == "no_trial" %}10 แถม 2 ครั้ง{% else %}10 สัปดาห์{% endif %}</div>
           <div class="grid">
             <div class="field"><label>ราคาเต็ม</label><input name="package_10_full_price" value="{{ notice.package_10_full_price }}"></div>
             <div class="field"><label>ส่วนลด</label><input name="package_10_discount" id="package10Discount" value="{{ notice.package_10_discount }}"></div>
           </div>
         </div>
-        <div class="pkg-edit">
+        <div class="pkg-edit" data-pkg-only>
           <div class="pkg-title" id="pkgTitle20">แพ็กเกจ {% if notice.pricing_option == "no_trial" %}20 แถม 2 ครั้ง{% else %}20 สัปดาห์{% endif %}</div>
           <div class="grid">
             <div class="field"><label>ราคาเต็ม</label><input name="package_20_full_price" value="{{ notice.package_20_full_price }}"></div>
             <div class="field"><label>ส่วนลด</label><input name="package_20_discount" id="package20Discount" value="{{ notice.package_20_discount }}"></div>
           </div>
         </div>
-        <div class="pkg-edit">
+        <div class="pkg-edit" data-pkg-only>
           <div class="pkg-title" id="pkgTitle30">แพ็กเกจ {% if notice.pricing_option == "no_trial" %}30 แถม 2 ครั้ง{% else %}30 สัปดาห์{% endif %}</div>
           <div class="grid">
             <div class="field"><label>ราคาเต็ม</label><input name="package_30_full_price" value="{{ notice.package_30_full_price }}"></div>
@@ -182,6 +206,16 @@
         </div>
 
         <div class="packages">
+          {% if notice.price_mode == "custom" %}
+            <div class="pkg green">
+              <div class="pkg-head"><div class="pkg-name">{{ custom_course_label }}</div><div class="net">{{ notice.custom_net_price|floatformat:0|intcomma }} บาท</div></div>
+              {% if notice.custom_discount > 0 %}
+                <div class="price-line"><span>ราคาเต็ม</span><span class="full">{{ notice.custom_full_price|floatformat:0|intcomma }} บาท</span></div>
+                <div class="price-line"><span>ส่วนลด</span><span class="discount">-{{ notice.custom_discount|floatformat:0|intcomma }} บาท</span></div>
+              {% endif %}
+              <div class="price-line"><span>ยอดที่ต้องชำระ</span><span style="color:#15803d;font-weight:1000;">{{ notice.custom_net_price|floatformat:0|intcomma }} บาท</span></div>
+            </div>
+          {% else %}
           {% for p in packages %}
             <div class="pkg {{ p.accent }}">
               <div class="pkg-head"><div class="pkg-name">{{ p.label }}</div><div class="net">{{ p.net_price|floatformat:0|intcomma }} บาท</div></div>
@@ -189,6 +223,7 @@
               {% if p.discount > 0 %}<div class="price-line"><span>ส่วนลด</span><span class="discount">-{{ p.discount|floatformat:0|intcomma }} บาท</span></div>{% endif %}
             </div>
           {% endfor %}
+          {% endif %}
         </div>
 
         <div class="qr-zone">
@@ -210,6 +245,28 @@
     // in core/models.py -- "ทดลองเรียนแล้วสมัคร" tops each package's discount
     // up by 190 baht (the trial fee counts toward enrolling); "สมัครโดยไม่ทดลอง"
     // keeps the base discount but the package includes 2 bonus sessions.
+    function togglePriceMode(){
+      const custom = document.querySelector('input[name="price_mode"]:checked').value === 'custom';
+      document.getElementById('customEditor').style.display = custom ? '' : 'none';
+      document.querySelectorAll('[data-pkg-only]').forEach(el => el.style.display = custom ? 'none' : '');
+    }
+    togglePriceMode();
+    // ---- pull details from an existing student ----
+    (function(){
+      const STUDENTS = {{ students_json|safe }};
+      const list = document.getElementById('nsnStudentList'), pick = document.getElementById('studentPick');
+      const byLabel = {};
+      STUDENTS.forEach(s => { byLabel[s.label] = s; const o = document.createElement('option'); o.value = s.label; list.appendChild(o); });
+      const f = document.getElementById('editForm');
+      pick.addEventListener('change', () => {
+        const s = byLabel[pick.value]; if(!s) return;
+        document.getElementById('studentIdField').value = s.id;
+        f.nickname.value = s.nickname; f.first_name.value = s.first_name; f.last_name.value = s.last_name;
+        f.school_name.value = s.school_name; f.contact_phone.value = s.phone;
+        if(s.grade) f.grade_level.value = s.grade;
+        if(s.class_id) f.target_class_id.value = String(s.class_id);
+      });
+    })();
     const BASE_PACKAGE_DISCOUNTS = {10: 0, 20: 300, 30: 800};
     const TRIAL_TOPUP_DISCOUNT = 190;
     function applyPricingOptionDefaults(){

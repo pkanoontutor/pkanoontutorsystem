@@ -54,6 +54,24 @@
   </section>
 
   <section class="panel">
+    <div style="font-size:16px;font-weight:1000;color:#0f172a;margin-bottom:8px;">➕ สร้างใบแจ้งชำระใหม่ (ไม่ต้องมีใบสมัคร)</div>
+    <form method="get" action="{% url 'core:new_student_payment_notice_create_blank' %}" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+      <input list="nsnStudents" id="nsnStudentPick" placeholder="ดึงชื่อจากนักเรียนเดิม (พิมพ์ชื่อเล่น / ชื่อจริง) — เว้นว่างได้" style="flex:1;min-width:260px;border:1px solid #e2e8f0;border-radius:12px;padding:10px;font-weight:800;font-family:inherit;">
+      <input type="hidden" name="student_id" id="nsnStudentId">
+      <label style="display:flex;gap:6px;align-items:center;font-weight:900;font-size:13px;"><input type="checkbox" name="mode" value="custom"> กำหนดคอร์สและราคาเอง</label>
+      <button class="btnx" type="submit" style="background:#7c3aed;color:#fff;">สร้างใบแจ้ง</button>
+      <datalist id="nsnStudents">{% for s in student_choices %}<option value="{{ s.label }}" data-id="{{ s.id }}">{% endfor %}</datalist>
+    </form>
+    <script>
+      (function(){
+        const pick = document.getElementById("nsnStudentPick"), hid = document.getElementById("nsnStudentId");
+        const map = {}; document.querySelectorAll("#nsnStudents option").forEach(o => map[o.value] = o.dataset.id);
+        pick.addEventListener("input", () => { hid.value = map[pick.value] || ""; });
+      })();
+    </script>
+  </section>
+
+  <section class="panel">
     <form method="get" class="filter" id="searchFilterForm">
       <div class="field search-field" id="qSearchRoot">
         <label>ค้นหา</label>

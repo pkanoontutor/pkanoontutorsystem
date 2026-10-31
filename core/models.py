@@ -1797,6 +1797,20 @@ class NewStudentPaymentNotice(models.Model):
         related_name="new_student_payment_notices",
     )
     first_lesson_date = models.DateField("วันที่เริ่มเรียนวันแรก", null=True, blank=True)
+    student = models.ForeignKey(
+        Student, verbose_name="นักเรียนเดิมที่ดึงข้อมูลมา", on_delete=models.SET_NULL,
+        null=True, blank=True, related_name="new_student_payment_notices",
+    )
+
+    class PriceMode(models.TextChoices):
+        PACKAGES = "packages", "แพ็กเกจ 10 / 20 / 30"
+        CUSTOM = "custom", "กำหนดคอร์สและราคาเอง"
+
+    price_mode = models.CharField("รูปแบบราคา", max_length=10, choices=PriceMode.choices, default=PriceMode.PACKAGES)
+    custom_course_name = models.CharField("ชื่อคอร์ส (กำหนดเอง)", max_length=255, blank=True)
+    custom_full_price = models.DecimalField("ราคาเต็ม (กำหนดเอง)", max_digits=10, decimal_places=2, default=0)
+    custom_discount = models.DecimalField("ส่วนลด (กำหนดเอง)", max_digits=10, decimal_places=2, default=0)
+    custom_net_price = models.DecimalField("ราคาสุทธิ (กำหนดเอง)", max_digits=10, decimal_places=2, default=0)
 
     class PricingOption(models.TextChoices):
         TRIAL_THEN_ENROLL = "trial_then_enroll", "ทดลองเรียนแล้วสมัคร"
@@ -1875,6 +1889,7 @@ class NewStudentPaymentNotice(models.Model):
         self.package_10_net_price = max((self.package_10_full_price or 0) - (self.package_10_discount or 0), Decimal("0"))
         self.package_20_net_price = max((self.package_20_full_price or 0) - (self.package_20_discount or 0), Decimal("0"))
         self.package_30_net_price = max((self.package_30_full_price or 0) - (self.package_30_discount or 0), Decimal("0"))
+        self.custom_net_price = max((self.custom_full_price or 0) - (self.custom_discount or 0), Decimal("0"))
         super().save(*args, **kwargs)
 
 

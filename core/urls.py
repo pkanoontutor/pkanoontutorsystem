@@ -151,6 +151,7 @@ urlpatterns = [
 
     path("new-student-payment-notices/", views.new_student_payment_notice_list, name="new_student_payment_notice_list"),
     path("new-student-payment-notices/create/<int:admission_inquiry_id>/", views.new_student_payment_notice_create, name="new_student_payment_notice_create"),
+    path("new-student-payment-notices/create/", views.new_student_payment_notice_create_blank, name="new_student_payment_notice_create_blank"),
     path("new-student-payment-notices/<int:pk>/", views.new_student_payment_notice_detail, name="new_student_payment_notice_detail"),
     path("new-student-payment-notices/<int:pk>/mark-sent/", views.new_student_payment_notice_mark_sent, name="new_student_payment_notice_mark_sent"),
     path("new-student-payment-notices/<int:pk>/unmark-sent/", views.new_student_payment_notice_unmark_sent, name="new_student_payment_notice_unmark_sent"),

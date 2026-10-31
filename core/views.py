@@ -7336,6 +7336,8 @@ def new_student_payment_notice_list(request: HttpRequest) -> HttpResponse:
         "date_from": date_from.isoformat() if date_from else "",
         "date_to": date_to.isoformat() if date_to else "",
         "search_suggestions_json": json.dumps(_new_student_notice_search_suggestions(), ensure_ascii=False),
+        "student_choices": [{"id": s.id, "label": f"{s.nickname or '-'} | {s.full_name or '-'} | {s.student_code or '-'}" + ("" if s.is_active else " · ไม่ active")}
+                            for s in Student.objects.order_by("-is_active", "nickname")],
     })
 
 
@@ -7355,6 +7357,61 @@ def _new_student_notice_search_suggestions() -> list[str]:
         if n.full_name:
             names.add(n.full_name)
     return sorted(names)
+
+
+def _grade_value_from_label(label: str) -> str:
+    """'ป.6' -> AdmissionInquiry grade value ('p6'), '' if unknown."""
+    label = (label or "").strip()
+    for value, lbl in AdmissionInquiry.GradeLevel.choices:
+        if lbl == label or value == label:
+            return value
+    return ""
+
+
+def _notice_student_payload(s: Student) -> dict:
+    parts = (s.full_name or "").split(None, 1)
+    enr = Enrollment.objects.filter(student=s, tutoring_class__is_active=True).order_by("-is_active", "-created_at").first()
+    return {
+        "id": s.id,
+        "label": f"{s.nickname or '-'} | {s.full_name or '-'} | {s.student_code or '-'}" + ("" if s.is_active else " · ไม่ active"),
+        "nickname": s.nickname or "",
+        "first_name": parts[0] if parts else "",
+        "last_name": parts[1] if len(parts) > 1 else "",
+        "school_name": s.school.name if getattr(s, "school_id", None) and s.school else "",
+        "phone": s.parent_phone or "",
+        "grade": _grade_value_from_label(s.grade_level),
+        "class_id": enr.tutoring_class_id if enr else None,
+    }
+
+
+def _fill_notice_from_student(notice, s: Student) -> None:
+    d = _notice_student_payload(s)
+    notice.student = s
+    notice.nickname, notice.first_name, notice.last_name = d["nickname"], d["first_name"], d["last_name"]
+    notice.school_name, notice.contact_phone = d["school_name"], d["phone"]
+    if d["grade"]:
+        notice.grade_level = d["grade"]
+    if d["class_id"]:
+        notice.target_class_id = d["class_id"]
+
+
+@login_required
+def new_student_payment_notice_create_blank(request: HttpRequest) -> HttpResponse:
+    """A notice not tied to an admission form: blank, or pre-filled from an
+    existing student (?student_id=)."""
+    discounts = NewStudentPaymentNotice.default_discounts_for(NewStudentPaymentNotice.PricingOption.NO_TRIAL)
+    notice = NewStudentPaymentNotice(
+        pricing_option=NewStudentPaymentNotice.PricingOption.NO_TRIAL,
+        package_10_discount=discounts[10], package_20_discount=discounts[20], package_30_discount=discounts[30],
+        created_by=request.user if request.user.is_authenticated else None,
+    )
+    s = Student.objects.select_related("school").filter(id=_id_or_none(request.GET.get("student_id"))).first()
+    if s:
+        _fill_notice_from_student(notice, s)
+    if request.GET.get("mode") == "custom":
+        notice.price_mode = NewStudentPaymentNotice.PriceMode.CUSTOM
+    notice.save()
+    return redirect("core:new_student_payment_notice_detail", pk=notice.pk)
 
 
 @login_required
@@ -7430,6 +7487,17 @@ def new_student_payment_notice_detail(request: HttpRequest, pk: int) -> HttpResp
 
         notice.note_wording = (request.POST.get("note_wording") or "").strip() or notice.note_wording
 
+        # pulled from an existing student (the fields above were filled in the browser)
+        sid = _id_or_none(request.POST.get("student_id"))
+        if sid is not None:
+            notice.student = Student.objects.filter(id=sid).first()
+        mode = (request.POST.get("price_mode") or "").strip()
+        if mode in dict(NewStudentPaymentNotice.PriceMode.choices):
+            notice.price_mode = mode
+        notice.custom_course_name = (request.POST.get("custom_course_name") or "").strip()[:255]
+        notice.custom_full_price = _decimal_from_post(request.POST.get("custom_full_price"), notice.custom_full_price)
+        notice.custom_discount = _decimal_from_post(request.POST.get("custom_discount"), notice.custom_discount)
+
         notice.save()
         return redirect("core:new_student_payment_notice_detail", pk=notice.pk)
 
@@ -7451,6 +7519,8 @@ def new_student_payment_notice_detail(request: HttpRequest, pk: int) -> HttpResp
         "grade_choices": AdmissionInquiry.GradeLevel.choices,
         "admission_inquiry_admin_url": admission_inquiry_admin_url,
         "create_receipt_url": create_receipt_url,
+        "students_json": json.dumps([_notice_student_payload(s) for s in Student.objects.select_related("school").order_by("-is_active", "nickname")], ensure_ascii=False),
+        "custom_course_label": notice.custom_course_name or (notice.target_class.name if notice.target_class_id else "ค่าคอร์สเรียน"),
     })
 
 

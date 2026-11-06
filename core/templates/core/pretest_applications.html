@@ -12,7 +12,7 @@
   .pt-tools{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px;}
   .pt-tools input[type=search]{flex:1;min-width:220px;border:1px solid #e2e8f0;border-radius:10px;padding:9px 11px;font:inherit;font-weight:700;}
   .pt-scroll{overflow-x:auto;}
-  table.pt{border-collapse:collapse;width:100%;font-size:13px;min-width:1220px;}
+  table.pt{border-collapse:collapse;width:100%;font-size:13px;min-width:1320px;}
   table.pt th{background:#f1f5f9;padding:8px 6px;font-weight:900;color:#334155;text-align:left;white-space:nowrap;}
   table.pt td{border-top:1px solid #f1f5f9;padding:5px 6px;vertical-align:middle;}
   table.pt tr.done td{background:#f0fdf4;}
@@ -46,6 +46,13 @@
       <button class="pt-chip" type="submit" style="background:#7c3aed;color:#fff;border:0;">นำเข้า</button>
       <span style="color:#64748b;font-weight:700;">อัปโหลดไฟล์ล่าสุดซ้ำได้ ระบบเพิ่มเฉพาะคนใหม่ และไม่แตะสถานะเดิม</span>
     </form>
+    <form method="post" enctype="multipart/form-data" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:13px;font-weight:800;margin-top:10px;">
+      {% csrf_token %}
+      นำเข้าใบสมัคร PDF รวมของโรงเรียน:
+      <input type="file" name="pdf" accept=".pdf" required>
+      <button class="pt-chip" type="submit" style="background:#7c3aed;color:#fff;border:0;">แยกใบและจับคู่</button>
+      <span style="color:#64748b;font-weight:700;">จับคู่ด้วยเลขบัตรประชาชน อัปโหลดไฟล์ใหม่ซ้ำได้</span>
+    </form>
   </div>
 
   <div class="pt-panel">
@@ -53,6 +60,7 @@
       <span class="pt-chip" style="cursor:default;">ทั้งหมด <b>{{ apps|length }}</b> คน</span>
       <span class="pt-chip" style="cursor:default;">เงินที่รับแล้ว <b id="paidTotal">{{ paid_total }}</b> บาท</span>
       <button class="pt-chip" type="button" data-filter="unlinked">ยังไม่ผูกนักเรียน <b>{{ unlinked }}</b></button>
+      <button class="pt-chip" type="button" data-filter="noform">ยังไม่มีใบสมัคร <b>{{ no_form }}</b></button>
       {% for s in step_stats %}<button class="pt-chip" type="button" data-filter="{{ s.field }}" title="ดูคนที่ยังไม่ได้ทำขั้นนี้">{{ s.label }} <b data-stat="{{ s.field }}">{{ s.count }}</b>/{{ apps|length }}</button>{% endfor %}
     </div>
     <div class="pt-tools"><input type="search" id="q" placeholder="ค้นหาชื่อเล่น ชื่อจริง เบอร์ เลขบัตร หมายเลขผู้สอบ"><span id="shown" style="font-size:12px;font-weight:800;color:#64748b;"></span></div>
@@ -62,13 +70,13 @@
   <div class="pt-panel pt-scroll">
     <table class="pt">
       <thead><tr>
-        <th>#</th><th>ชื่อเล่น</th><th>ชื่อจริง</th><th>นามสกุล</th><th>เลขบัตรประชาชน</th><th>เบอร์มือถือ</th><th>นักเรียนในระบบ</th>
+        <th>#</th><th>ชื่อเล่น</th><th>ชื่อจริง</th><th>นามสกุล</th><th>เลขบัตรประชาชน</th><th>เบอร์มือถือ</th><th>นักเรียนในระบบ</th><th>ใบสมัคร</th>
         <th class="c-step">ปรินท์แล้ว</th><th class="c-step">ส่งให้เซ็นแล้ว</th><th class="c-step">รับเงินแล้ว</th><th class="c-step">นำไปยื่นแล้ว</th><th class="c-step">ส่งกลับแล้ว</th>
         <th>หมายเลขผู้สอบ</th><th></th>
       </tr></thead>
       <tbody>
       {% for a in apps %}
-        <tr data-id="{{ a.id }}" data-student="{{ a.student_id|default:'' }}" class="{% if a.done_count == 5 %}done{% endif %}">
+        <tr data-id="{{ a.id }}" data-student="{{ a.student_id|default:'' }}" data-form="{{ a.application_no }}" class="{% if a.done_count == 5 %}done{% endif %}">
           <td>{{ forloop.counter }}</td>
           <td style="width:100px;"><input type="text" data-field="nickname" value="{{ a.nickname }}"></td>
           <td style="width:130px;"><input type="text" data-field="first_name" value="{{ a.first_name }}"></td>
@@ -79,12 +87,13 @@
             {% if a.student_id %}<span class="st-ok" title="{{ a.student.full_name }}">✓ {{ a.student.nickname }} · {{ a.student.student_code }}</span> <button class="st-x" type="button" title="ยกเลิกการผูก">✕</button>
             {% else %}<input type="text" class="st-pick" list="ptStudents" placeholder="เลือกนักเรียน…">{% endif %}
           </td>
+          <td style="white-space:nowrap;font-size:12px;font-weight:800;">{% if a.application_no %}<a href="{% url 'core:pretest_form_pdf' a.id %}" target="_blank" rel="noopener">📄 {{ a.application_no }}</a>{% else %}<span style="color:#94a3b8;">ยังไม่มี</span>{% endif %}</td>
           {% for f, label, on in a.steps %}<td class="c-step"><input type="checkbox" data-step="{{ f }}" aria-label="{{ label }}" {% if on %}checked{% endif %}></td>{% endfor %}
           <td style="width:120px;"><input type="text" class="exam" data-field="exam_number" value="{{ a.exam_number }}"></td>
           <td><button class="del" type="button" title="ลบรายการ">🗑</button></td>
         </tr>
       {% empty %}
-        <tr><td colspan="14" style="text-align:center;padding:30px;font-weight:800;color:#64748b;">ยังไม่มีรายการ — อัปโหลดไฟล์ Excel ด้านบนเพื่อเริ่มต้น</td></tr>
+        <tr><td colspan="15" style="text-align:center;padding:30px;font-weight:800;color:#64748b;">ยังไม่มีรายการ — อัปโหลดไฟล์ Excel ด้านบนเพื่อเริ่มต้น</td></tr>
       {% endfor %}
       </tbody>
     </table>
@@ -119,6 +128,7 @@
       const text = [...tr.querySelectorAll("input[type=text]")].map(i => i.value).join(" ").toLowerCase();
       let show = !q || text.includes(q);
       if(show && activeFilter === "unlinked") show = !tr.dataset.student;
+      else if(show && activeFilter === "noform") show = !tr.dataset.form;
       else if(show && activeFilter) show = !tr.querySelector(`input[data-step="${activeFilter}"]`).checked;
       tr.style.display = show ? "" : "none"; if(show) n++;
     });

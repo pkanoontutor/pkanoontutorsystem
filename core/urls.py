@@ -106,6 +106,7 @@ urlpatterns = [
     path("home-budget/", home_budget.home_budget_page, name="home_budget"),
     path("extras/", home_budget.extras_hub, name="extras_hub"),
     path("pretest-applications/", pretest.pretest_page, name="pretest_applications"),
+    path("pretest-applications/<int:pk>/form.pdf", pretest.pretest_form_pdf, name="pretest_form_pdf"),
     path("pretest-applications/api/", pretest.pretest_api, name="pretest_api"),
     path("home-budget/api/", home_budget.home_budget_api, name="home_budget_api"),
     path("sub-admin/manage/", views.sub_admin_manage, name="sub_admin_manage"),

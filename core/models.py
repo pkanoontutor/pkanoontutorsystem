@@ -3785,3 +3785,29 @@ class MonthlyFixedExpense(models.Model):
 
     def __str__(self) -> str:
         return self.description
+
+
+class PretestApplication(models.Model):
+    """ใบสมัครสอบ Pre-test ที่ฝากนำส่งโรงเรียน: เด็ก 1 คน ยื่นได้ 1 ใบ (เลขบัตรไม่ซ้ำ)."""
+
+    student = models.ForeignKey(Student, verbose_name="นักเรียนในระบบ", on_delete=models.SET_NULL, null=True, blank=True, related_name="pretest_applications")
+    nickname = models.CharField("ชื่อเล่น", max_length=100, blank=True)
+    first_name = models.CharField("ชื่อจริง", max_length=150, blank=True)
+    last_name = models.CharField("นามสกุล", max_length=150, blank=True)
+    national_id = models.CharField("เลขบัตรประชาชน", max_length=13, unique=True)
+    phone = models.CharField("เบอร์มือถือ", max_length=20, blank=True)
+    submitted_at = models.DateTimeField("เวลาที่กรอกฟอร์ม", null=True, blank=True)
+    is_printed = models.BooleanField("ปรินท์แล้ว", default=False)
+    is_signed = models.BooleanField("ส่งใบให้เด็กเซ็นแล้ว", default=False)
+    is_paid = models.BooleanField("รับเงินจากเด็กแล้ว", default=False)
+    is_filed = models.BooleanField("นำไปยื่นแล้ว", default=False)
+    is_returned = models.BooleanField("ส่งกลับให้เด็กแล้ว", default=False)
+    exam_number = models.CharField("หมายเลขผู้สอบ", max_length=50, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ("submitted_at", "id")
+
+    def __str__(self) -> str:
+        return f"{self.nickname} {self.first_name}".strip()

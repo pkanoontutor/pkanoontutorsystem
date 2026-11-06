@@ -191,7 +191,8 @@ def pretest_page(request: HttpRequest) -> HttpResponse:
         "apps": apps,
         "fee": FEE,
         "paid_total": sum(1 for a in apps if a.is_paid) * FEE,
-        "unlinked": sum(1 for a in apps if not a.student_id),
+        "unlinked": sum(1 for a in apps if not a.student_id and not a.is_external),
+        "external": sum(1 for a in apps if a.is_external),
         "no_form": sum(1 for a in apps if not a.application_no),
         "step_stats": [{"field": f, "label": label, "count": sum(1 for a in apps if getattr(a, f))} for f, label in STEPS],
         "student_options": [{"id": s.id, "label": _student_label(s)} for s in Student.objects.order_by("-is_active", "nickname")],
@@ -208,6 +209,26 @@ def pretest_form_pdf(request: HttpRequest, pk: int) -> HttpResponse:
     return resp
 
 
+def _add_application(v: dict) -> JsonResponse:
+    """Manual entry; without a linked student the applicant counts as external."""
+    nid = _digits(v.get("national_id"))
+    first = str(v.get("first_name") or "").strip()
+    if not first:
+        return JsonResponse({"ok": False, "error": "กรุณากรอกชื่อจริง"}, status=400)
+    if len(nid) != 13:
+        return JsonResponse({"ok": False, "error": "เลขบัตรต้องมี 13 หลัก"}, status=400)
+    if PretestApplication.objects.filter(national_id=nid).exists():
+        return JsonResponse({"ok": False, "error": "เลขบัตรนี้มีใบสมัครแล้ว (1 คนยื่นได้ 1 ใบ)"}, status=400)
+    student = Student.objects.filter(id=v["student"]).first() if v.get("student") else None
+    PretestApplication.objects.create(
+        nickname=str(v.get("nickname") or "").strip()[:100], first_name=first[:150],
+        last_name=str(v.get("last_name") or "").strip()[:150], national_id=nid,
+        phone=_digits(v.get("phone"))[:20], student=student, is_external=student is None,
+        submitted_at=timezone.now(),
+    )
+    return JsonResponse({"ok": True})
+
+
 @login_required
 @require_POST
 def pretest_api(request: HttpRequest) -> JsonResponse:
@@ -215,6 +236,8 @@ def pretest_api(request: HttpRequest) -> JsonResponse:
         return JsonResponse({"ok": False, "error": "forbidden"}, status=403)
     try:
         p = json.loads(request.body or "{}")
+        if p.get("field") == "add":
+            return _add_application(p.get("value") or {})
         app = PretestApplication.objects.defer("application_pdf").get(id=int(p.get("id")))
     except (ValueError, TypeError, PretestApplication.DoesNotExist):
         return JsonResponse({"ok": False, "error": "ไม่พบรายการ"}, status=404)
@@ -237,6 +260,12 @@ def pretest_api(request: HttpRequest) -> JsonResponse:
         if value and not Student.objects.filter(id=value).exists():
             return JsonResponse({"ok": False, "error": "ไม่พบนักเรียน"}, status=400)
         app.student_id = value or None
+        if value:
+            app.is_external = False
+    elif field == "is_external":
+        app.is_external = bool(value)
+        if value:
+            app.student = None
     else:
         return JsonResponse({"ok": False, "error": "ไม่รู้จักช่องนี้"}, status=400)
     app.save()

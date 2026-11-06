@@ -2,6 +2,7 @@ from django.urls import path
 from . import views
 from . import home_budget
 from . import official_docs
+from . import pretest
 
 app_name = "core"
 
@@ -104,6 +105,8 @@ urlpatterns = [
     path("official-docs/wht50/", official_docs.official_doc_wht50, name="official_doc_wht50"),
     path("home-budget/", home_budget.home_budget_page, name="home_budget"),
     path("extras/", home_budget.extras_hub, name="extras_hub"),
+    path("pretest-applications/", pretest.pretest_page, name="pretest_applications"),
+    path("pretest-applications/api/", pretest.pretest_api, name="pretest_api"),
     path("home-budget/api/", home_budget.home_budget_api, name="home_budget_api"),
     path("sub-admin/manage/", views.sub_admin_manage, name="sub_admin_manage"),
     path("sub-admin/<slug:slug>/", views.sub_admin_page, name="sub_admin_page"),

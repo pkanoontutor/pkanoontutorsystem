@@ -1,0 +1,194 @@
+"""📝 Pre-test applications the school files on students' behalf.
+
+One page (/pretest-applications/). Rows come from the Google Form export
+(.xlsx) uploaded on the page -- the file holds children's national IDs, so it
+is never committed to the repo or kept on disk. Re-uploading is safe: rows are
+keyed by national ID, so only new students are added.
+"""
+from __future__ import annotations
+
+import json
+import re
+from datetime import datetime
+
+import openpyxl
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.http import HttpRequest, HttpResponse, JsonResponse
+from django.shortcuts import redirect, render
+from django.utils import timezone
+from django.views.decorators.http import require_POST
+
+from .models import PretestApplication, Student
+
+FEE = 200
+STEPS = [
+    ("is_printed", "ปรินท์แล้ว"),
+    ("is_signed", "ส่งเซ็นแล้ว"),
+    ("is_paid", "รับเงินแล้ว"),
+    ("is_filed", "ยื่นแล้ว"),
+    ("is_returned", "ส่งกลับแล้ว"),
+]
+TEXT_FIELDS = {"nickname": 100, "first_name": 150, "last_name": 150, "phone": 20, "exam_number": 50}
+_PREFIX = re.compile(r"^(เด็กหญิง|เด็กชาย|ด\.?\s?ญ\.?|ด\.?\s?ช\.?|นางสาว|นาย)\s*")
+
+
+def _can_use(user) -> bool:
+    from .views import _is_tool_owner
+    return _is_tool_owner(user)  # sub-admins must not see national IDs
+
+
+def _digits(value) -> str:
+    return re.sub(r"\D", "", str(value if value is not None else ""))
+
+
+def valid_national_id(value: str) -> bool:
+    if not re.fullmatch(r"\d{13}", value or ""):
+        return False
+    return (11 - sum(int(value[i]) * (13 - i) for i in range(12)) % 11) % 10 == int(value[12])
+
+
+def split_name(raw) -> tuple[str, str]:
+    """'ด.ญ.ธัญญลักษณ์ วรเวทวุฒิคุณ' -> ('ธัญญลักษณ์', 'วรเวทวุฒิคุณ')."""
+    parts = _PREFIX.sub("", str(raw or "").strip()).split(None, 1)
+    return (parts[0] if parts else "", parts[1].strip() if len(parts) > 1 else "")
+
+
+def clean_nickname(raw) -> str:
+    """'น้องบัว (ป.5)' / 'น้องคุน ป5/เสาร์บ่าย' -> 'บัว' / 'คุน'."""
+    s = re.sub(r"\(.*?\)", "", str(raw or "")).strip()
+    s = re.sub(r"\s*ป\.?\s?\d.*$", "", s).strip()
+    return re.sub(r"^น้อง\s*", "", s).strip()
+
+
+def _nick_key(value) -> str:
+    return clean_nickname(value).replace(" ", "")
+
+
+def find_student(app, students) -> Student | None:
+    """Link only when the first name AND something else agree: first names
+    repeat (two applicants here are both ธนภัทร), and siblings share a phone."""
+    nick, phone = _nick_key(app.nickname), _digits(app.phone)
+    scored = []
+    for s in students:
+        first, last = split_name(s.full_name)
+        same_nick = bool(nick) and _nick_key(s.nickname) == nick
+        same_phone = bool(phone) and _digits(s.parent_phone) == phone
+        if first == app.first_name:
+            hits = same_nick + same_phone + bool(app.last_name and last == app.last_name)
+            if hits or not s.nickname:
+                scored.append(s)
+        elif same_nick and same_phone:
+            scored.append(s)
+    return scored[0] if len(scored) == 1 else None
+
+
+def _column(headers, *keywords):
+    for i, h in enumerate(headers):
+        if any(k in str(h or "") for k in keywords):
+            return i
+    return None
+
+
+def import_rows(rows) -> dict:
+    """rows[0] is the header. Existing national IDs are left untouched."""
+    rows = list(rows)
+    headers = rows[0] if rows else []
+    c_nick = _column(headers, "ชื่อเล่น")
+    c_first = _column(headers, "ชื่อจริง")
+    c_id = _column(headers, "บัตรประชาชน")
+    c_phone = _column(headers, "เบอร์มือถือ")
+    c_time = _column(headers, "Timestamp")
+    if None in (c_nick, c_first, c_id, c_phone):
+        raise ValueError("ไฟล์นี้ไม่มีคอลัมน์ ชื่อเล่น / ชื่อจริง / บัตรประชาชน / เบอร์มือถือ")
+    existing = set(PretestApplication.objects.values_list("national_id", flat=True))
+    students = list(Student.objects.all())
+    out = {"added": 0, "duplicate": 0, "skipped": 0, "linked": 0}
+    for r in rows[1:]:
+        nid = _digits(r[c_id])
+        if not r[c_first] and not nid:
+            continue
+        if len(nid) != 13:
+            out["skipped"] += 1
+            continue
+        if nid in existing:
+            out["duplicate"] += 1
+            continue
+        first, last = split_name(r[c_first])
+        when = r[c_time] if c_time is not None else None
+        when = timezone.make_aware(when) if isinstance(when, datetime) and timezone.is_naive(when) else None
+        app = PretestApplication(nickname=clean_nickname(r[c_nick])[:100], first_name=first[:150], last_name=last[:150],
+                                 national_id=nid, phone=_digits(r[c_phone])[:20], submitted_at=when)
+        app.student = find_student(app, students)
+        app.save()
+        existing.add(nid)
+        out["added"] += 1
+        out["linked"] += 1 if app.student_id else 0
+    return out
+
+
+def _student_label(s: Student) -> str:
+    return f"{s.nickname or '-'} | {s.full_name or '-'} | {s.student_code or '-'}"
+
+
+@login_required
+def pretest_page(request: HttpRequest) -> HttpResponse:
+    if not _can_use(request.user):
+        return HttpResponse(status=403)
+    if request.method == "POST":
+        try:
+            sheet = openpyxl.load_workbook(request.FILES["file"], read_only=True, data_only=True).worksheets[0]
+            r = import_rows(sheet.iter_rows(values_only=True))
+            messages.success(request, f"นำเข้าใหม่ {r['added']} คน (ผูกกับนักเรียนอัตโนมัติ {r['linked']}) · ข้ามรายการซ้ำ {r['duplicate']} · เลขบัตรไม่ครบ {r['skipped']}")
+        except Exception as e:  # not a readable .xlsx, or the wrong sheet
+            messages.error(request, f"นำเข้าไม่สำเร็จ: {e}")
+        return redirect("core:pretest_applications")
+    apps = list(PretestApplication.objects.select_related("student"))
+    for a in apps:
+        a.id_ok = valid_national_id(a.national_id)
+        a.phone_ok = len(_digits(a.phone)) == 10
+        a.steps = [(f, label, getattr(a, f)) for f, label in STEPS]
+        a.done_count = sum(1 for f, _ in STEPS if getattr(a, f))
+    return render(request, "core/pretest_applications.html", {
+        "apps": apps,
+        "fee": FEE,
+        "paid_total": sum(1 for a in apps if a.is_paid) * FEE,
+        "unlinked": sum(1 for a in apps if not a.student_id),
+        "step_stats": [{"field": f, "label": label, "count": sum(1 for a in apps if getattr(a, f))} for f, label in STEPS],
+        "student_options": [{"id": s.id, "label": _student_label(s)} for s in Student.objects.order_by("-is_active", "nickname")],
+    })
+
+
+@login_required
+@require_POST
+def pretest_api(request: HttpRequest) -> JsonResponse:
+    if not _can_use(request.user):
+        return JsonResponse({"ok": False, "error": "forbidden"}, status=403)
+    try:
+        p = json.loads(request.body or "{}")
+        app = PretestApplication.objects.get(id=int(p.get("id")))
+    except (ValueError, TypeError, PretestApplication.DoesNotExist):
+        return JsonResponse({"ok": False, "error": "ไม่พบรายการ"}, status=404)
+    field, value = p.get("field"), p.get("value")
+    if field == "delete":
+        app.delete()
+        return JsonResponse({"ok": True})
+    if field in dict(STEPS):
+        setattr(app, field, bool(value))
+    elif field in TEXT_FIELDS:
+        setattr(app, field, str(value or "").strip()[:TEXT_FIELDS[field]])
+    elif field == "national_id":
+        nid = _digits(value)
+        if len(nid) != 13:
+            return JsonResponse({"ok": False, "error": "เลขบัตรต้องมี 13 หลัก"}, status=400)
+        if PretestApplication.objects.filter(national_id=nid).exclude(id=app.id).exists():
+            return JsonResponse({"ok": False, "error": "เลขบัตรนี้มีใบสมัครแล้ว (1 คนยื่นได้ 1 ใบ)"}, status=400)
+        app.national_id = nid
+    elif field == "student":
+        if value and not Student.objects.filter(id=value).exists():
+            return JsonResponse({"ok": False, "error": "ไม่พบนักเรียน"}, status=400)
+        app.student_id = value or None
+    else:
+        return JsonResponse({"ok": False, "error": "ไม่รู้จักช่องนี้"}, status=400)
+    app.save()
+    return JsonResponse({"ok": True, "id_ok": valid_national_id(app.national_id), "phone_ok": len(_digits(app.phone)) == 10})

@@ -1,0 +1,170 @@
+{% extends "core/base.html" %}
+{% block title %}ใบสมัครสอบ Pre-test{% endblock %}
+{% block head %}
+<style>
+  .pt-wrap{max-width:1500px;margin:0 auto;display:grid;gap:12px;}
+  .pt-hero{background:linear-gradient(120deg,#4c1d95,#7c3aed);color:#fff;border-radius:20px;padding:18px 20px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center;}
+  .pt-hero h1{margin:0;font-size:22px;font-weight:1000;} .pt-hero p{margin:4px 0 0;font-size:13px;font-weight:700;color:#ede9fe;}
+  .pt-panel{background:#fff;border-radius:16px;padding:12px 14px;box-shadow:0 4px 14px rgba(15,23,42,.07);}
+  .pt-chips{display:flex;gap:8px;flex-wrap:wrap;}
+  .pt-chip{border:1px solid #e2e8f0;background:#f8fafc;border-radius:12px;padding:7px 12px;font:inherit;font-size:13px;font-weight:800;color:#334155;cursor:pointer;}
+  .pt-chip b{color:#6d28d9;font-size:15px;} .pt-chip.on{background:#ede9fe;border-color:#7c3aed;}
+  .pt-tools{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px;}
+  .pt-tools input[type=search]{flex:1;min-width:220px;border:1px solid #e2e8f0;border-radius:10px;padding:9px 11px;font:inherit;font-weight:700;}
+  .pt-scroll{overflow-x:auto;}
+  table.pt{border-collapse:collapse;width:100%;font-size:13px;min-width:1220px;}
+  table.pt th{background:#f1f5f9;padding:8px 6px;font-weight:900;color:#334155;text-align:left;white-space:nowrap;}
+  table.pt td{border-top:1px solid #f1f5f9;padding:5px 6px;vertical-align:middle;}
+  table.pt tr.done td{background:#f0fdf4;}
+  table.pt input[type=text]{width:100%;box-sizing:border-box;border:1px solid transparent;background:transparent;border-radius:8px;padding:6px;font:inherit;font-weight:700;color:#0f172a;}
+  table.pt input[type=text]:hover,table.pt input[type=text]:focus{border-color:#cbd5e1;background:#fff;outline:none;}
+  table.pt input.warn{border-color:#f87171;background:#fef2f2;}
+  table.pt input.saved{background:#dcfce7;}
+  .c-step{text-align:center;width:66px;} .c-step input{width:20px;height:20px;accent-color:#7c3aed;cursor:pointer;}
+  table.pt th.c-step{white-space:normal;font-size:12px;line-height:1.2;text-align:center;}
+  table.pt input.exam{border-color:#c4b5fd;background:#faf5ff;}
+  .st-ok{color:#15803d;font-weight:800;font-size:12px;white-space:nowrap;}
+  .st-x,.del{border:0;background:none;color:#94a3b8;cursor:pointer;font-size:13px;}
+  .del:hover,.st-x:hover{color:#dc2626;}
+  .copy{border:0;background:#f1f5f9;border-radius:7px;cursor:pointer;padding:3px 6px;font-size:12px;}
+</style>
+{% endblock %}
+{% block content %}
+<div class="pt-wrap">
+  <div class="pt-hero">
+    <div><h1>📝 ใบสมัครสอบ Pre-test</h1><p>โรงเรียนสตรีสมุทรปราการ · เด็ก 1 คน ยื่นได้ 1 ใบ · ค่าสมัคร {{ fee }} บาท</p></div>
+    <a href="{% url 'core:pkanoon_admin_tool' %}" style="color:#fff;font-weight:800;font-size:13px;text-decoration:none;">← Admin Tool</a>
+  </div>
+
+  {% for m in messages %}<div class="pt-panel" style="font-weight:800;">{{ m }}</div>{% endfor %}
+
+  <div class="pt-panel">
+    <form method="post" enctype="multipart/form-data" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:13px;font-weight:800;">
+      {% csrf_token %}
+      นำเข้าจากไฟล์ Excel ของฟอร์ม:
+      <input type="file" name="file" accept=".xlsx" required>
+      <button class="pt-chip" type="submit" style="background:#7c3aed;color:#fff;border:0;">นำเข้า</button>
+      <span style="color:#64748b;font-weight:700;">อัปโหลดไฟล์ล่าสุดซ้ำได้ ระบบเพิ่มเฉพาะคนใหม่ และไม่แตะสถานะเดิม</span>
+    </form>
+  </div>
+
+  <div class="pt-panel">
+    <div class="pt-chips">
+      <span class="pt-chip" style="cursor:default;">ทั้งหมด <b>{{ apps|length }}</b> คน</span>
+      <span class="pt-chip" style="cursor:default;">เงินที่รับแล้ว <b id="paidTotal">{{ paid_total }}</b> บาท</span>
+      <button class="pt-chip" type="button" data-filter="unlinked">ยังไม่ผูกนักเรียน <b>{{ unlinked }}</b></button>
+      {% for s in step_stats %}<button class="pt-chip" type="button" data-filter="{{ s.field }}" title="ดูคนที่ยังไม่ได้ทำขั้นนี้">{{ s.label }} <b data-stat="{{ s.field }}">{{ s.count }}</b>/{{ apps|length }}</button>{% endfor %}
+    </div>
+    <div class="pt-tools"><input type="search" id="q" placeholder="ค้นหาชื่อเล่น ชื่อจริง เบอร์ เลขบัตร หมายเลขผู้สอบ"><span id="shown" style="font-size:12px;font-weight:800;color:#64748b;"></span></div>
+    <div style="font-size:12px;font-weight:700;color:#64748b;margin-top:6px;">กดปุ่มขั้นตอนด้านบนเพื่อดูคนที่ยังไม่ได้ทำขั้นนั้น · ช่องสีแดง = เลขบัตรหรือเบอร์น่าจะผิด</div>
+  </div>
+
+  <div class="pt-panel pt-scroll">
+    <table class="pt">
+      <thead><tr>
+        <th>#</th><th>ชื่อเล่น</th><th>ชื่อจริง</th><th>นามสกุล</th><th>เลขบัตรประชาชน</th><th>เบอร์มือถือ</th><th>นักเรียนในระบบ</th>
+        <th class="c-step">ปรินท์แล้ว</th><th class="c-step">ส่งให้เซ็นแล้ว</th><th class="c-step">รับเงินแล้ว</th><th class="c-step">นำไปยื่นแล้ว</th><th class="c-step">ส่งกลับแล้ว</th>
+        <th>หมายเลขผู้สอบ</th><th></th>
+      </tr></thead>
+      <tbody>
+      {% for a in apps %}
+        <tr data-id="{{ a.id }}" data-student="{{ a.student_id|default:'' }}" class="{% if a.done_count == 5 %}done{% endif %}">
+          <td>{{ forloop.counter }}</td>
+          <td style="width:100px;"><input type="text" data-field="nickname" value="{{ a.nickname }}"></td>
+          <td style="width:130px;"><input type="text" data-field="first_name" value="{{ a.first_name }}"></td>
+          <td style="width:130px;"><input type="text" data-field="last_name" value="{{ a.last_name }}" placeholder="-"></td>
+          <td style="width:170px;white-space:nowrap;"><input type="text" style="width:130px;" data-field="national_id" maxlength="13" value="{{ a.national_id }}" class="{% if not a.id_ok %}warn{% endif %}"><button class="copy" type="button" title="คัดลอก">📋</button></td>
+          <td style="width:115px;"><input type="text" data-field="phone" value="{{ a.phone }}" class="{% if not a.phone_ok %}warn{% endif %}"></td>
+          <td style="width:190px;">
+            {% if a.student_id %}<span class="st-ok" title="{{ a.student.full_name }}">✓ {{ a.student.nickname }} · {{ a.student.student_code }}</span> <button class="st-x" type="button" title="ยกเลิกการผูก">✕</button>
+            {% else %}<input type="text" class="st-pick" list="ptStudents" placeholder="เลือกนักเรียน…">{% endif %}
+          </td>
+          {% for f, label, on in a.steps %}<td class="c-step"><input type="checkbox" data-step="{{ f }}" aria-label="{{ label }}" {% if on %}checked{% endif %}></td>{% endfor %}
+          <td style="width:120px;"><input type="text" class="exam" data-field="exam_number" value="{{ a.exam_number }}"></td>
+          <td><button class="del" type="button" title="ลบรายการ">🗑</button></td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="14" style="text-align:center;padding:30px;font-weight:800;color:#64748b;">ยังไม่มีรายการ — อัปโหลดไฟล์ Excel ด้านบนเพื่อเริ่มต้น</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    <datalist id="ptStudents">{% for s in student_options %}<option value="{{ s.label }}" data-id="{{ s.id }}">{% endfor %}</datalist>
+  </div>
+</div>
+<script>
+(function(){
+  const API = "{% url 'core:pretest_api' %}", FEE = {{ fee }}, CSRF = "{{ csrf_token }}";
+  const rows = [...document.querySelectorAll("tr[data-id]")];
+  const optionIds = {}; document.querySelectorAll("#ptStudents option").forEach(o => optionIds[o.value] = o.dataset.id);
+  let activeFilter = "";
+
+  async function save(tr, field, value){
+    const r = await fetch(API, {method:"POST", headers:{"Content-Type":"application/json","X-CSRFToken":CSRF},
+      body: JSON.stringify({id: Number(tr.dataset.id), field, value})});
+    const d = await r.json().catch(() => ({ok:false, error:"บันทึกไม่สำเร็จ"}));
+    if(!d.ok) alert(d.error || "บันทึกไม่สำเร็จ");
+    return d;
+  }
+  function refreshStats(){
+    document.querySelectorAll("[data-stat]").forEach(el => {
+      el.textContent = document.querySelectorAll(`tr[data-id] input[data-step="${el.dataset.stat}"]:checked`).length;
+    });
+    document.getElementById("paidTotal").textContent = document.querySelectorAll('tr[data-id] input[data-step="is_paid"]:checked').length * FEE;
+    rows.forEach(tr => tr.classList.toggle("done", tr.querySelectorAll("input[data-step]:checked").length === 5));
+  }
+  function applyFilter(){
+    const q = document.getElementById("q").value.trim().toLowerCase();
+    let n = 0;
+    rows.forEach(tr => {
+      const text = [...tr.querySelectorAll("input[type=text]")].map(i => i.value).join(" ").toLowerCase();
+      let show = !q || text.includes(q);
+      if(show && activeFilter === "unlinked") show = !tr.dataset.student;
+      else if(show && activeFilter) show = !tr.querySelector(`input[data-step="${activeFilter}"]`).checked;
+      tr.style.display = show ? "" : "none"; if(show) n++;
+    });
+    document.getElementById("shown").textContent = `แสดง ${n} คน`;
+  }
+  document.getElementById("q").addEventListener("input", applyFilter);
+  document.querySelectorAll("[data-filter]").forEach(b => b.addEventListener("click", () => {
+    activeFilter = activeFilter === b.dataset.filter ? "" : b.dataset.filter;
+    document.querySelectorAll("[data-filter]").forEach(x => x.classList.toggle("on", x.dataset.filter === activeFilter));
+    applyFilter();
+  }));
+  rows.forEach(tr => {
+    tr.querySelectorAll("input[data-step]").forEach(cb => cb.addEventListener("change", async () => {
+      const d = await save(tr, cb.dataset.step, cb.checked);
+      if(!d.ok) cb.checked = !cb.checked;
+      refreshStats();
+    }));
+    tr.querySelectorAll("input[data-field]").forEach(inp => {
+      let last = inp.value;
+      inp.addEventListener("change", async () => {
+        const d = await save(tr, inp.dataset.field, inp.value);
+        if(!d.ok){ inp.value = last; return; }
+        last = inp.value;
+        if(inp.dataset.field === "national_id") inp.classList.toggle("warn", !d.id_ok);
+        if(inp.dataset.field === "phone") inp.classList.toggle("warn", !d.phone_ok);
+        inp.classList.add("saved"); setTimeout(() => inp.classList.remove("saved"), 700);
+      });
+    });
+    tr.querySelector(".copy").addEventListener("click", e => navigator.clipboard.writeText(tr.querySelector('[data-field="national_id"]').value).then(() => {
+      e.target.textContent = "✓"; setTimeout(() => e.target.textContent = "📋", 800);
+    }));
+    tr.querySelector(".del").addEventListener("click", async () => {
+      if(!confirm("ลบรายการนี้?")) return;
+      if((await save(tr, "delete", true)).ok) location.reload();
+    });
+    const pick = tr.querySelector(".st-pick");
+    if(pick) pick.addEventListener("change", async () => {
+      const id = optionIds[pick.value]; if(!id) return;
+      if((await save(tr, "student", Number(id))).ok) location.reload();
+    });
+    const unlink = tr.querySelector(".st-x");
+    if(unlink) unlink.addEventListener("click", async () => {
+      if((await save(tr, "student", null)).ok) location.reload();
+    });
+  });
+  applyFilter();
+})();
+</script>
+{% endblock %}

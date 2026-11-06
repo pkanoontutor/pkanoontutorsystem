@@ -80,7 +80,12 @@
       <button class="pt-chip" type="button" data-filter="noform">ยังไม่มีใบสมัคร <b>{{ no_form }}</b></button>
       {% for s in step_stats %}<button class="pt-chip" type="button" data-filter="{{ s.field }}" title="ดูคนที่ยังไม่ได้ทำขั้นนี้">{{ s.label }} <b data-stat="{{ s.field }}">{{ s.count }}</b>/{{ apps|length }}</button>{% endfor %}
     </div>
-    <div class="pt-tools"><input type="search" id="q" placeholder="ค้นหาชื่อเล่น ชื่อจริง เบอร์ เลขบัตร หมายเลขผู้สอบ"><span id="shown" style="font-size:12px;font-weight:800;color:#64748b;"></span></div>
+    <div class="pt-tools"><input type="search" id="q" placeholder="ค้นหาชื่อเล่น ชื่อจริง เบอร์ เลขบัตร หมายเลขผู้สอบ">
+      <select id="classFilter" style="border:1px solid #e2e8f0;border-radius:10px;padding:9px 11px;font:inherit;font-weight:700;">
+        <option value="">ทุก Class</option>
+        {% for c in class_options %}<option value="{{ c.id }}">{{ c.name }} ({{ c.count }})</option>{% endfor %}
+        <option value="none">ไม่มี Class ({{ no_class }})</option>
+      </select><span id="shown" style="font-size:12px;font-weight:800;color:#64748b;"></span></div>
     <div style="font-size:12px;font-weight:700;color:#64748b;margin-top:6px;">กดปุ่มขั้นตอนด้านบนเพื่อดูคนที่ยังไม่ได้ทำขั้นนั้น · ช่องสีแดง = เลขบัตรหรือเบอร์น่าจะผิด</div>
   </div>
 
@@ -93,7 +98,7 @@
       </tr></thead>
       <tbody>
       {% for a in apps %}
-        <tr data-id="{{ a.id }}" data-student="{{ a.student_id|default:'' }}" data-form="{{ a.application_no }}" data-external="{% if a.is_external %}1{% endif %}" class="{% if a.done_count == 5 %}done{% endif %}">
+        <tr data-id="{{ a.id }}" data-student="{{ a.student_id|default:'' }}" data-form="{{ a.application_no }}" data-classes="{{ a.class_ids }}" data-external="{% if a.is_external %}1{% endif %}" class="{% if a.done_count == 5 %}done{% endif %}">
           <td>{{ forloop.counter }}</td>
           <td style="width:100px;"><input type="text" data-field="nickname" value="{{ a.nickname }}"></td>
           <td style="width:130px;"><input type="text" data-field="first_name" value="{{ a.first_name }}"></td>
@@ -102,6 +107,7 @@
           <td style="width:115px;"><input type="text" data-field="phone" value="{{ a.phone }}" class="{% if not a.phone_ok %}warn{% endif %}"></td>
           <td style="width:190px;">
             {% if a.student_id %}<span class="st-ok" title="{{ a.student.full_name }}">✓ {{ a.student.nickname }} · {{ a.student.student_code }}</span> <button class="st-x" type="button" title="ยกเลิกการผูก">✕</button>
+            {% if a.class_names %}<div style="font-size:11px;font-weight:700;color:#64748b;">{{ a.class_names }}</div>{% endif %}
             {% elif a.is_external %}<span class="st-ext">คนนอก</span> <button class="st-x ext-off" type="button" title="ยกเลิกสถานะคนนอก">✕</button>
             {% else %}<input type="text" class="st-pick" list="ptStudents" placeholder="เลือกนักเรียน…"><button class="ext-on" type="button">ไม่ใช่นักเรียนปัจจุบัน</button>{% endif %}
           </td>
@@ -149,11 +155,14 @@
       else if(show && activeFilter === "external") show = !!tr.dataset.external;
       else if(show && activeFilter === "noform") show = !tr.dataset.form;
       else if(show && activeFilter) show = !tr.querySelector(`input[data-step="${activeFilter}"]`).checked;
+      const cls = document.getElementById("classFilter").value, mine = tr.dataset.classes ? tr.dataset.classes.split(",") : [];
+      if(show && cls) show = cls === "none" ? !mine.length : mine.includes(cls);
       tr.style.display = show ? "" : "none"; if(show) n++;
     });
     document.getElementById("shown").textContent = `แสดง ${n} คน`;
   }
   document.getElementById("q").addEventListener("input", applyFilter);
+  document.getElementById("classFilter").addEventListener("change", applyFilter);
   document.querySelectorAll("[data-filter]").forEach(b => b.addEventListener("click", () => {
     activeFilter = activeFilter === b.dataset.filter ? "" : b.dataset.filter;
     document.querySelectorAll("[data-filter]").forEach(x => x.classList.toggle("on", x.dataset.filter === activeFilter));

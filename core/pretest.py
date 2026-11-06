@@ -21,7 +21,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from .models import PretestApplication, Student
+from .models import Enrollment, PretestApplication, Student
 
 FEE = 200
 STEPS = [
@@ -158,6 +158,18 @@ def import_forms_pdf(data: bytes) -> dict:
     return out
 
 
+def _classes_by_student(student_ids) -> dict:
+    """{student_id: {class_id: name}} -- current classes, or the latest one for
+    a student with no active enrollment."""
+    out: dict = {}
+    latest: dict = {}
+    for e in Enrollment.objects.filter(student_id__in=student_ids).select_related("tutoring_class").order_by("-created_at"):
+        latest.setdefault(e.student_id, {e.tutoring_class_id: e.tutoring_class.name})
+        if e.is_active:
+            out.setdefault(e.student_id, {})[e.tutoring_class_id] = e.tutoring_class.name
+    return {**latest, **out}
+
+
 def _student_label(s: Student) -> str:
     return f"{s.nickname or '-'} | {s.full_name or '-'} | {s.student_code or '-'}"
 
@@ -182,7 +194,11 @@ def pretest_page(request: HttpRequest) -> HttpResponse:
             messages.error(request, f"นำเข้าไม่สำเร็จ: {e}")
         return redirect("core:pretest_applications")
     apps = list(PretestApplication.objects.select_related("student").defer("application_pdf"))
+    classes = _classes_by_student({a.student_id for a in apps if a.student_id})
     for a in apps:
+        mine = classes.get(a.student_id, {})
+        a.class_ids = ",".join(str(i) for i in mine)
+        a.class_names = ", ".join(sorted(mine.values()))
         a.id_ok = valid_national_id(a.national_id)
         a.phone_ok = len(_digits(a.phone)) == 10
         a.steps = [(f, label, getattr(a, f)) for f, label in STEPS]
@@ -193,6 +209,12 @@ def pretest_page(request: HttpRequest) -> HttpResponse:
         "paid_total": sum(1 for a in apps if a.is_paid) * FEE,
         "unlinked": sum(1 for a in apps if not a.student_id and not a.is_external),
         "external": sum(1 for a in apps if a.is_external),
+        "class_options": sorted(
+            ({"id": i, "name": n, "count": sum(1 for a in apps if i in classes.get(a.student_id, {}))}
+             for i, n in {i: n for m in classes.values() for i, n in m.items()}.items()),
+            key=lambda c: c["name"],
+        ),
+        "no_class": sum(1 for a in apps if a.student_id not in classes),
         "no_form": sum(1 for a in apps if not a.application_no),
         "step_stats": [{"field": f, "label": label, "count": sum(1 for a in apps if getattr(a, f))} for f, label in STEPS],
         "student_options": [{"id": s.id, "label": _student_label(s)} for s in Student.objects.order_by("-is_active", "nickname")],

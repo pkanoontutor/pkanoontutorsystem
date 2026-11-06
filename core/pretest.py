@@ -10,12 +10,14 @@ from __future__ import annotations
 import json
 import re
 from datetime import datetime
+from io import BytesIO
 
 import openpyxl
+import pypdfium2
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import HttpRequest, HttpResponse, JsonResponse
-from django.shortcuts import redirect, render
+from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
@@ -127,6 +129,35 @@ def import_rows(rows) -> dict:
     return out
 
 
+def import_forms_pdf(data: bytes) -> dict:
+    """Split the school's combined PDF (one form per page) and attach each page
+    to the application with the same national ID. Re-uploading replaces forms."""
+    pdf = pypdfium2.PdfDocument(data)
+    by_id = {a.national_id: a for a in PretestApplication.objects.defer("application_pdf")}
+    out = {"pages": len(pdf), "matched": 0, "unmatched": []}
+    for i in range(len(pdf)):
+        text = pdf[i].get_textpage().get_text_range()
+        ids = {_digits(x) for x in re.findall(r"\d(?:[ \-]*\d){12}", text)}
+        ids = {x for x in ids if valid_national_id(x)}
+        m = re.search(r"SSP\d*-\d+", text)
+        no = m.group() if m else ""
+        app = by_id.get(next(iter(ids))) if len(ids) == 1 else None
+        if not app:
+            out["unmatched"].append(no or f"หน้า {i + 1}")
+            continue
+        one = pypdfium2.PdfDocument.new()
+        one.import_pages(pdf, [i])
+        buf = BytesIO()
+        one.save(buf)
+        one.close()
+        app.application_pdf = buf.getvalue()
+        app.application_no = no[:30]
+        app.save(update_fields=["application_pdf", "application_no", "updated_at"])
+        out["matched"] += 1
+    pdf.close()
+    return out
+
+
 def _student_label(s: Student) -> str:
     return f"{s.nickname or '-'} | {s.full_name or '-'} | {s.student_code or '-'}"
 
@@ -135,6 +166,13 @@ def _student_label(s: Student) -> str:
 def pretest_page(request: HttpRequest) -> HttpResponse:
     if not _can_use(request.user):
         return HttpResponse(status=403)
+    if request.method == "POST" and request.FILES.get("pdf"):
+        try:
+            r = import_forms_pdf(request.FILES["pdf"].read())
+            messages.success(request, f"แยกใบสมัคร {r['pages']} หน้า · จับคู่ได้ {r['matched']} ใบ" + (f" · จับคู่ไม่ได้: {', '.join(r['unmatched'])}" if r["unmatched"] else ""))
+        except Exception as e:  # not a readable PDF
+            messages.error(request, f"นำเข้า PDF ไม่สำเร็จ: {e}")
+        return redirect("core:pretest_applications")
     if request.method == "POST":
         try:
             sheet = openpyxl.load_workbook(request.FILES["file"], read_only=True, data_only=True).worksheets[0]
@@ -143,7 +181,7 @@ def pretest_page(request: HttpRequest) -> HttpResponse:
         except Exception as e:  # not a readable .xlsx, or the wrong sheet
             messages.error(request, f"นำเข้าไม่สำเร็จ: {e}")
         return redirect("core:pretest_applications")
-    apps = list(PretestApplication.objects.select_related("student"))
+    apps = list(PretestApplication.objects.select_related("student").defer("application_pdf"))
     for a in apps:
         a.id_ok = valid_national_id(a.national_id)
         a.phone_ok = len(_digits(a.phone)) == 10
@@ -154,9 +192,20 @@ def pretest_page(request: HttpRequest) -> HttpResponse:
         "fee": FEE,
         "paid_total": sum(1 for a in apps if a.is_paid) * FEE,
         "unlinked": sum(1 for a in apps if not a.student_id),
+        "no_form": sum(1 for a in apps if not a.application_no),
         "step_stats": [{"field": f, "label": label, "count": sum(1 for a in apps if getattr(a, f))} for f, label in STEPS],
         "student_options": [{"id": s.id, "label": _student_label(s)} for s in Student.objects.order_by("-is_active", "nickname")],
     })
+
+
+@login_required
+def pretest_form_pdf(request: HttpRequest, pk: int) -> HttpResponse:
+    if not _can_use(request.user):
+        return HttpResponse(status=403)
+    app = get_object_or_404(PretestApplication, pk=pk, application_pdf__isnull=False)
+    resp = HttpResponse(bytes(app.application_pdf), content_type="application/pdf")
+    resp["Cache-Control"] = "private, no-store"
+    return resp
 
 
 @login_required
@@ -166,7 +215,7 @@ def pretest_api(request: HttpRequest) -> JsonResponse:
         return JsonResponse({"ok": False, "error": "forbidden"}, status=403)
     try:
         p = json.loads(request.body or "{}")
-        app = PretestApplication.objects.get(id=int(p.get("id")))
+        app = PretestApplication.objects.defer("application_pdf").get(id=int(p.get("id")))
     except (ValueError, TypeError, PretestApplication.DoesNotExist):
         return JsonResponse({"ok": False, "error": "ไม่พบรายการ"}, status=404)
     field, value = p.get("field"), p.get("value")

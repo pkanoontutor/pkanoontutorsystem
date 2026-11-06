@@ -26,6 +26,9 @@
   .st-ok{color:#15803d;font-weight:800;font-size:12px;white-space:nowrap;}
   .st-x,.del{border:0;background:none;color:#94a3b8;cursor:pointer;font-size:13px;}
   .del:hover,.st-x:hover{color:#dc2626;}
+  .st-ext{color:#b45309;background:#fef3c7;border-radius:7px;padding:2px 7px;font-weight:800;font-size:12px;}
+  .ext-on{border:0;background:none;color:#b45309;cursor:pointer;font:inherit;font-size:11px;font-weight:800;text-decoration:underline;padding:2px 6px;}
+  .add-in{border:1px solid #e2e8f0;border-radius:10px;padding:8px 10px;font:inherit;font-size:13px;font-weight:700;min-width:130px;}
   .copy{border:0;background:#f1f5f9;border-radius:7px;cursor:pointer;padding:3px 6px;font-size:12px;}
 </style>
 {% endblock %}
@@ -55,11 +58,25 @@
     </form>
   </div>
 
+  <details class="pt-panel">
+    <summary style="font-size:14px;font-weight:900;cursor:pointer;">➕ เพิ่มผู้สมัครเอง (รวมคนที่ไม่ใช่นักเรียนปัจจุบัน)</summary>
+    <form id="addForm" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px;">
+      <input class="add-in" name="nickname" placeholder="ชื่อเล่น">
+      <input class="add-in" name="first_name" placeholder="ชื่อจริง *" required>
+      <input class="add-in" name="last_name" placeholder="นามสกุล">
+      <input class="add-in" name="national_id" placeholder="เลขบัตรประชาชน 13 หลัก *" maxlength="17" required>
+      <input class="add-in" name="phone" placeholder="เบอร์มือถือ">
+      <input class="add-in" id="addStudent" list="ptStudents" placeholder="นักเรียนในระบบ (เว้นว่าง = คนนอก)" style="min-width:240px;">
+      <button class="pt-chip" type="submit" style="background:#7c3aed;color:#fff;border:0;">เพิ่มผู้สมัคร</button>
+    </form>
+  </details>
+
   <div class="pt-panel">
     <div class="pt-chips">
       <span class="pt-chip" style="cursor:default;">ทั้งหมด <b>{{ apps|length }}</b> คน</span>
       <span class="pt-chip" style="cursor:default;">เงินที่รับแล้ว <b id="paidTotal">{{ paid_total }}</b> บาท</span>
       <button class="pt-chip" type="button" data-filter="unlinked">ยังไม่ผูกนักเรียน <b>{{ unlinked }}</b></button>
+      <button class="pt-chip" type="button" data-filter="external">ไม่ใช่นักเรียนปัจจุบัน <b>{{ external }}</b></button>
       <button class="pt-chip" type="button" data-filter="noform">ยังไม่มีใบสมัคร <b>{{ no_form }}</b></button>
       {% for s in step_stats %}<button class="pt-chip" type="button" data-filter="{{ s.field }}" title="ดูคนที่ยังไม่ได้ทำขั้นนี้">{{ s.label }} <b data-stat="{{ s.field }}">{{ s.count }}</b>/{{ apps|length }}</button>{% endfor %}
     </div>
@@ -76,7 +93,7 @@
       </tr></thead>
       <tbody>
       {% for a in apps %}
-        <tr data-id="{{ a.id }}" data-student="{{ a.student_id|default:'' }}" data-form="{{ a.application_no }}" class="{% if a.done_count == 5 %}done{% endif %}">
+        <tr data-id="{{ a.id }}" data-student="{{ a.student_id|default:'' }}" data-form="{{ a.application_no }}" data-external="{% if a.is_external %}1{% endif %}" class="{% if a.done_count == 5 %}done{% endif %}">
           <td>{{ forloop.counter }}</td>
           <td style="width:100px;"><input type="text" data-field="nickname" value="{{ a.nickname }}"></td>
           <td style="width:130px;"><input type="text" data-field="first_name" value="{{ a.first_name }}"></td>
@@ -85,7 +102,8 @@
           <td style="width:115px;"><input type="text" data-field="phone" value="{{ a.phone }}" class="{% if not a.phone_ok %}warn{% endif %}"></td>
           <td style="width:190px;">
             {% if a.student_id %}<span class="st-ok" title="{{ a.student.full_name }}">✓ {{ a.student.nickname }} · {{ a.student.student_code }}</span> <button class="st-x" type="button" title="ยกเลิกการผูก">✕</button>
-            {% else %}<input type="text" class="st-pick" list="ptStudents" placeholder="เลือกนักเรียน…">{% endif %}
+            {% elif a.is_external %}<span class="st-ext">คนนอก</span> <button class="st-x ext-off" type="button" title="ยกเลิกสถานะคนนอก">✕</button>
+            {% else %}<input type="text" class="st-pick" list="ptStudents" placeholder="เลือกนักเรียน…"><button class="ext-on" type="button">ไม่ใช่นักเรียนปัจจุบัน</button>{% endif %}
           </td>
           <td style="white-space:nowrap;font-size:12px;font-weight:800;">{% if a.application_no %}<a href="{% url 'core:pretest_form_pdf' a.id %}" target="_blank" rel="noopener">📄 {{ a.application_no }}</a>{% else %}<span style="color:#94a3b8;">ยังไม่มี</span>{% endif %}</td>
           {% for f, label, on in a.steps %}<td class="c-step"><input type="checkbox" data-step="{{ f }}" aria-label="{{ label }}" {% if on %}checked{% endif %}></td>{% endfor %}
@@ -127,7 +145,8 @@
     rows.forEach(tr => {
       const text = [...tr.querySelectorAll("input[type=text]")].map(i => i.value).join(" ").toLowerCase();
       let show = !q || text.includes(q);
-      if(show && activeFilter === "unlinked") show = !tr.dataset.student;
+      if(show && activeFilter === "unlinked") show = !tr.dataset.student && !tr.dataset.external;
+      else if(show && activeFilter === "external") show = !!tr.dataset.external;
       else if(show && activeFilter === "noform") show = !tr.dataset.form;
       else if(show && activeFilter) show = !tr.querySelector(`input[data-step="${activeFilter}"]`).checked;
       tr.style.display = show ? "" : "none"; if(show) n++;
@@ -169,10 +188,26 @@
       const id = optionIds[pick.value]; if(!id) return;
       if((await save(tr, "student", Number(id))).ok) location.reload();
     });
-    const unlink = tr.querySelector(".st-x");
+    const extOn = tr.querySelector(".ext-on");
+    if(extOn) extOn.addEventListener("click", async () => {
+      if((await save(tr, "is_external", true)).ok) location.reload();
+    });
+    const extOff = tr.querySelector(".ext-off");
+    if(extOff) extOff.addEventListener("click", async () => {
+      if((await save(tr, "is_external", false)).ok) location.reload();
+    });
+    const unlink = tr.querySelector(".st-x:not(.ext-off)");
     if(unlink) unlink.addEventListener("click", async () => {
       if((await save(tr, "student", null)).ok) location.reload();
     });
+  });
+  document.getElementById("addForm").addEventListener("submit", async e => {
+    e.preventDefault();
+    const f = e.target, picked = document.getElementById("addStudent").value.trim();
+    if(picked && !optionIds[picked]){ alert("ไม่พบนักเรียนคนนี้ กรุณาเลือกจากรายการ หรือเว้นว่าง"); return; }
+    const value = {nickname:f.nickname.value, first_name:f.first_name.value, last_name:f.last_name.value,
+      national_id:f.national_id.value, phone:f.phone.value, student: picked ? Number(optionIds[picked]) : null};
+    if((await save({dataset:{id:0}}, "add", value)).ok) location.reload();
   });
   applyFilter();
 })();

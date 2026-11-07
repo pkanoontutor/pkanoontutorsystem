@@ -13,7 +13,7 @@
   .pt-tools{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px;}
   .pt-tools input[type=search]{flex:1;min-width:220px;border:1px solid #e2e8f0;border-radius:10px;padding:9px 11px;font:inherit;font-weight:700;}
   .pt-scroll{overflow-x:auto;}
-  table.pt{border-collapse:collapse;width:100%;font-size:13px;min-width:1320px;}
+  table.pt{border-collapse:collapse;width:100%;font-size:13px;min-width:1550px;}
   table.pt th{background:#f1f5f9;padding:8px 6px;font-weight:900;color:#334155;text-align:left;white-space:nowrap;}
   table.pt td{border-top:1px solid #f1f5f9;padding:5px 6px;vertical-align:middle;}
   table.pt tr.done td{background:#f0fdf4;}
@@ -21,6 +21,7 @@
   table.pt input[type=text]:hover,table.pt input[type=text]:focus{border-color:#cbd5e1;background:#fff;outline:none;}
   table.pt input.warn{border-color:#f87171;background:#fef2f2;}
   table.pt input.saved{background:#dcfce7;}
+  .pt-sel{border:1px solid #cbd5e1;border-radius:8px;padding:5px;font:inherit;font-size:12px;font-weight:700;background:#fff;}
   .room-btn{border:2px solid transparent;border-radius:12px;padding:7px 12px;font:inherit;font-size:13px;font-weight:900;color:#0f172a;cursor:pointer;}
   .room-btn.on{border-color:#0f172a;}
   #imgStage{overflow-x:auto;margin-top:10px;}
@@ -99,6 +100,11 @@
         <option value="">ทุก Class</option>
         {% for c in class_options %}<option value="{{ c.id }}">{{ c.name }} ({{ c.count }})</option>{% endfor %}
         <option value="none">ไม่มี Class ({{ no_class }})</option>
+      </select>
+      <select id="roundFilter" style="border:1px solid #e2e8f0;border-radius:10px;padding:9px 11px;font:inherit;font-weight:700;">
+        <option value="">ทุกรอบที่ยื่น</option>
+        {% for r in filing_rounds %}<option value="{{ r.n }}">รอบ {{ r.n }} ({{ r.count }})</option>{% endfor %}
+        <option value="none">ยังไม่เลือกรอบ ({{ no_round }})</option>
       </select><span id="shown" style="font-size:12px;font-weight:800;color:#64748b;"></span></div>
     <div style="font-size:12px;font-weight:700;color:#64748b;margin-top:6px;">กดปุ่มขั้นตอนด้านบนเพื่อดูคนที่ยังไม่ได้ทำขั้นนั้น · ช่องสีแดง = เลขบัตรหรือเบอร์น่าจะผิด</div>
   </div>
@@ -119,6 +125,7 @@
       <thead><tr>
         <th>#</th><th>ชื่อเล่น</th><th>ชื่อจริง</th><th>นามสกุล</th><th>เลขบัตรประชาชน</th><th>เบอร์มือถือ</th><th>นักเรียนในระบบ</th><th>ใบสมัคร</th>
         <th class="c-step">🖨️ ปรินท์แล้ว</th><th class="c-step">✍️ ส่งให้เซ็นแล้ว</th><th class="c-step">💰 รับเงินแล้ว</th><th class="c-step">🏫 นำไปยื่นแล้ว</th><th class="c-step">📨 ส่งกลับแล้ว</th>
+        <th>รอบที่ยื่น</th><th>วันที่ยื่น</th>
         <th>หมายเลขผู้สอบ</th><th></th>
       </tr></thead>
       <tbody>
@@ -138,11 +145,13 @@
           </td>
           <td style="white-space:nowrap;font-size:12px;font-weight:800;">{% if a.application_no %}<a href="{% url 'core:pretest_form_pdf' a.id %}" target="_blank" rel="noopener">📄 {{ a.application_no }}</a>{% else %}<span style="color:#94a3b8;">ยังไม่มี</span>{% endif %}</td>
           {% for f, label, on, icon in a.steps %}<td class="c-step"><label class="step-box" title="{{ label }}"><input type="checkbox" data-step="{{ f }}" aria-label="{{ label }}" {% if on %}checked{% endif %}><span>{{ icon }}</span></label></td>{% endfor %}
+          <td><select class="pt-sel" data-field="filing_round"><option value="">-</option>{% for r in filing_rounds %}<option value="{{ r.n }}" {% if a.filing_round == r.n %}selected{% endif %}>รอบ {{ r.n }}</option>{% endfor %}</select></td>
+          <td><input type="date" class="pt-sel" data-field="filing_date" value="{{ a.filing_date|date:'Y-m-d' }}"></td>
           <td style="width:120px;"><input type="text" class="exam" data-field="exam_number" value="{{ a.exam_number }}"></td>
           <td><button class="del" type="button" title="ลบรายการ">🗑</button></td>
         </tr>
       {% empty %}
-        <tr><td colspan="15" style="text-align:center;padding:30px;font-weight:800;color:#64748b;">ยังไม่มีรายการ — อัปโหลดไฟล์ Excel ด้านบนเพื่อเริ่มต้น</td></tr>
+        <tr><td colspan="17" style="text-align:center;padding:30px;font-weight:800;color:#64748b;">ยังไม่มีรายการ — อัปโหลดไฟล์ Excel ด้านบนเพื่อเริ่มต้น</td></tr>
       {% endfor %}
       </tbody>
     </table>
@@ -180,6 +189,8 @@
       else if(show && activeFilter === "external") show = !!tr.dataset.external;
       else if(show && activeFilter === "noform") show = !tr.dataset.form;
       else if(show && activeFilter) show = !tr.querySelector(`input[data-step="${activeFilter}"]`).checked;
+      const rnd = document.getElementById("roundFilter").value, myRnd = tr.querySelector('[data-field="filing_round"]').value;
+      if(show && rnd) show = rnd === "none" ? !myRnd : myRnd === rnd;
       const cls = document.getElementById("classFilter").value, mine = tr.dataset.classes ? tr.dataset.classes.split(",") : [];
       if(show && cls) show = cls === "none" ? !mine.length : mine.includes(cls);
       tr.style.display = show ? "" : "none"; if(show) n++;
@@ -188,6 +199,7 @@
   }
   document.getElementById("q").addEventListener("input", applyFilter);
   document.getElementById("classFilter").addEventListener("change", applyFilter);
+  document.getElementById("roundFilter").addEventListener("change", applyFilter);
   document.querySelectorAll("[data-filter]").forEach(b => b.addEventListener("click", () => {
     activeFilter = activeFilter === b.dataset.filter ? "" : b.dataset.filter;
     document.querySelectorAll("[data-filter]").forEach(x => x.classList.toggle("on", x.dataset.filter === activeFilter));
@@ -199,7 +211,7 @@
       if(!d.ok) cb.checked = !cb.checked;
       refreshStats();
     }));
-    tr.querySelectorAll("input[data-field]").forEach(inp => {
+    tr.querySelectorAll("[data-field]").forEach(inp => {
       let last = inp.value;
       inp.addEventListener("change", async () => {
         const d = await save(tr, inp.dataset.field, inp.value);

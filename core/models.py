@@ -1340,7 +1340,6 @@ class PrintSupply(models.Model):
     spine_size = models.CharField("ขนาดสัน", max_length=30, blank=True)
     unit = models.CharField("หน่วย", max_length=20, default="ชิ้น")
     quantity = models.IntegerField("คงเหลือ", default=0)  # may go negative: a short stock never blocks an order
-    low_threshold = models.PositiveIntegerField("เตือนเมื่อเหลือไม่เกิน", default=0)
     is_active = models.BooleanField(default=True)
     order = models.PositiveIntegerField(default=50)
 
@@ -1350,6 +1349,28 @@ class PrintSupply(models.Model):
 
     def __str__(self) -> str:
         return self.name
+
+    SHEETS_PER_REAM = 500
+    # low when below this many: 5,000 sheets (10 reams) of paper, 12 of a spine, 5 ink/drums
+    LOW_BELOW = {"cover_paper": 5000, "a4_paper": 5000, "spine": 12, "ink": 5, "drum": 5}
+
+    @property
+    def is_paper(self) -> bool:
+        return self.category in (self.Category.COVER_PAPER, self.Category.A4_PAPER)
+
+    @property
+    def is_low(self) -> bool:
+        return self.quantity < self.LOW_BELOW[self.category]
+
+    @property
+    def quantity_label(self) -> str:
+        return f"{self.quantity:,} {self.unit}"
+
+    @property
+    def reams_label(self) -> str:
+        if not self.is_paper:
+            return ""
+        return f"{self.quantity / self.SHEETS_PER_REAM:,.2f}".rstrip("0").rstrip(".") + " รีม"
 
 
 class SheetPrintOrder(models.Model):

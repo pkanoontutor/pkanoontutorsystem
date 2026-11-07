@@ -577,7 +577,7 @@
 
   <details class="rt-details">
     <summary class="rt-summary">
-      <span class="rt-summary-title">📡 ภาพรวมเรียลไทม์</span>
+      <span class="rt-summary-title">📡 ภาพรวมเรียลไทม์{% if print_supply_alerts %} <span class="rt-tag" style="background:#fee2e2;color:#991b1b;">⚠ ของปรินท์ใกล้หมด {{ print_supply_alerts|length }}</span>{% endif %}</span>
       <span class="rt-summary-hint">นักเรียนที่จะมาเสาร์-อาทิตย์นี้ · ชีทใกล้หมด — กดเพื่อซ่อน/แสดง</span>
     </summary>
     <div class="rt-body">
@@ -640,6 +640,17 @@
               <div class="rt-empty-mini">ยังไม่มีวิชาที่ติวเตอร์แจ้งใกล้จบชีท</div>
             {% endfor %}
           </div>
+          {% if print_supply_alerts %}
+            <div class="rt-block-title" style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+              <span>📦 ของปรินท์ใกล้หมด <span class="n">{{ print_supply_alerts|length }}</span></span>
+              <a href="{% url 'core:print_shop_order_list' %}?supplies=1#supplies" style="font-size:11px;font-weight:700;color:var(--accent);text-decoration:none;">แก้ไขสต๊อก</a>
+            </div>
+            <div class="rt-list">
+              {% for a in print_supply_alerts %}
+                <div class="rt-row low"><div class="rt-row-main"><div class="rt-row-name">{{ a.name }}</div><div class="rt-row-meta">เหลือ {{ a.left }}</div></div></div>
+              {% endfor %}
+            </div>
+          {% endif %}
           <div class="rt-block-title">📄 ชีทใกล้หมด (เหลือน้อยกว่า 3 เล่ม) <span class="n" id="rtLowStockCount">{{ low_stock_sheets|length }}</span></div>
           <div class="rt-list" id="rtLowStockList">
             {% for s in low_stock_sheets %}

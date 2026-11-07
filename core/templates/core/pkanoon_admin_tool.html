@@ -743,6 +743,13 @@
       </div>
     </div>
     <div class="pk-field">
+      <label>การปรินท์</label>
+      <div class="rt-choice-row">
+              <label class="rt-radio-card"><input type="radio" name="rtPrintSides" value="single" checked> ด้านเดียว</label>
+              <label class="rt-radio-card"><input type="radio" name="rtPrintSides" value="double"> หน้าหลัง</label>
+      </div>
+    </div>
+    <div class="pk-field">
       <label>รูปแบบการเย็บ</label>
       <div class="rt-choice-row" id="rtPrintBindingRow">
         {% for value,label in binding_type_choices %}
@@ -1124,6 +1131,7 @@
       quantity: qty,
       due_date: $("rtPrintDueDate").value||"",
       binding_type: binding ? binding.value : "side",
+      print_sides: (document.querySelector('input[name="rtPrintSides"]:checked') || {}).value || "single",
       spine_color: color ? color.value : ""
     };
     var submitBtn=$("rtPrintSubmit");

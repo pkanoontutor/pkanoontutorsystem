@@ -3,6 +3,7 @@ from . import views
 from . import home_budget
 from . import official_docs
 from . import pretest
+from . import print_supplies
 
 app_name = "core"
 
@@ -138,6 +139,9 @@ urlpatterns = [
     # Sheet print orders
     path("sheet-print-orders/", views.sheet_print_order_admin, name="sheet_print_order_admin"),
     path("print-shop/", views.print_shop_order_list, name="print_shop_order_list"),
+    path("print-shop/supplies/", print_supplies.print_supplies_page, name="print_supplies"),
+    path("print-shop/supplies/update/", print_supplies.print_supply_update, name="print_supply_update"),
+    path("print-shop/order/<int:pk>/spine/", print_supplies.print_shop_pick_spine, name="print_shop_pick_spine"),
     path("print-shop/queue-preview/", views.print_shop_queue_preview, name="print_shop_queue_preview"),
     path("print-shop/order/<int:pk>/ready/", views.print_shop_mark_ready, name="print_shop_mark_ready"),
     path("print-shop/order/<int:pk>/update/", views.print_shop_update_order, name="print_shop_update_order"),

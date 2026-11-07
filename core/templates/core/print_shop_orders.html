@@ -92,6 +92,13 @@
   </section>
 
   <section class="panel">
+    <div class="section-title">📦 สินค้าคงเหลือ <a class="btn soft" href="{% url 'core:print_supplies' %}" style="text-decoration:none;">แก้ไข / ดูประวัติ</a></div>
+    <div class="pillrow">
+      {% for s in supply_rows %}<span class="pill {% if s.is_low %}warn{% endif %}">{{ s.name }}: {{ s.quantity }} {{ s.unit }}</span>{% endfor %}
+    </div>
+  </section>
+
+  <section class="panel">
     <div class="section-title"><span>⏳ รายการรอปรินท์</span><span class="refresh-hint" id="refreshHint"></span></div>
     <div class="cards">
       {% for o in pending_orders %}
@@ -110,6 +117,9 @@
                 <span class="pill">เสร็จ {{ o.printed_quantity }}/{{ o.quantity }}</span>
                 <span class="pill bind">{{ o.binding_label }}</span>
                 <span class="pill">{{ o.spine_color_label }}</span>
+                <span class="pill">ปรินท์{{ o.get_print_sides_display }}</span>
+                {% if o.content_pages %}<span class="pill">{{ o.content_pages }} หน้า/เล่ม</span>{% endif %}
+                {% if o.a4_used %}<span class="pill">A4 {{ o.a4_used }} แผ่น</span>{% endif %}
                 {% if o.spine_unavailable %}<span class="pill warn">สันรูดหมด</span>{% endif %}
               </div>
               {% if o.note %}<div class="note" style="margin-top:10px">{{ o.note }}</div>{% endif %}
@@ -156,6 +166,18 @@
               </form>
             {% endif %}
           </div>
+
+          {% if o.binding_type == "side" %}
+            <form class="link-row" method="post" action="{% url 'core:print_shop_pick_spine' o.id %}">
+              {% csrf_token %}
+              <span class="link-label" style="color:#0f172a">เลือกขนาดสัน (หัก {{ o.quantity }} อัน)</span>
+              <select name="spine_supply" style="border:1px solid #cbd5e1;border-radius:10px;padding:8px;font:inherit;font-weight:800;">
+                <option value="">ยังไม่เลือก</option>
+                {% for s in o.spine_choices %}<option value="{{ s.id }}" {% if s.id == o.spine_supply_id %}selected{% endif %}>{{ s.name }} (เหลือ {{ s.quantity }})</option>{% endfor %}
+              </select>
+              <button class="btn dark" type="submit">บันทึกขนาดสัน</button>
+            </form>
+          {% endif %}
 
           <form class="status-form" method="post" action="{% url 'core:print_shop_update_order' o.id %}">
             {% csrf_token %}

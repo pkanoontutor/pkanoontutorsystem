@@ -22,10 +22,9 @@ from django.utils import timezone
 from django.utils.dateparse import parse_date
 from django.views.decorators.http import require_POST
 
-from .models import Enrollment, PretestApplication, Student
+from .models import Enrollment, PretestApplication, PretestRound, Student
 
 FEE = 200
-FILING_ROUNDS = range(1, 6)
 STEPS = [
     ("is_printed", "ปรินท์แล้ว"),
     ("is_signed", "ส่งเซ็นแล้ว"),
@@ -205,6 +204,9 @@ def pretest_page(request: HttpRequest) -> HttpResponse:
             messages.error(request, f"นำเข้าไม่สำเร็จ: {e}")
         return redirect("core:pretest_applications")
     apps = list(PretestApplication.objects.select_related("student").defer("application_pdf"))
+    rounds = list(PretestRound.objects.all())
+    for r in rounds:
+        r.count = sum(1 for a in apps if a.round_id == r.id)
     classes = _classes_by_student({a.student_id for a in apps if a.student_id})
     for a in apps:
         mine = classes.get(a.student_id, {})
@@ -221,8 +223,8 @@ def pretest_page(request: HttpRequest) -> HttpResponse:
         "unlinked": sum(1 for a in apps if not a.student_id and not a.is_external),
         "external": sum(1 for a in apps if a.is_external),
         "rooms": ROOMS,
-        "filing_rounds": [{"n": r, "count": sum(1 for a in apps if a.filing_round == r)} for r in FILING_ROUNDS],
-        "no_round": sum(1 for a in apps if not a.filing_round),
+        "rounds": rounds,
+        "no_round": sum(1 for a in apps if not a.round_id),
         "class_options": sorted(
             ({"id": i, "name": n, "count": sum(1 for a in apps if i in classes.get(a.student_id, {}))}
              for i, n in {i: n for m in classes.values() for i, n in m.items()}.items()),
@@ -243,6 +245,31 @@ def pretest_form_pdf(request: HttpRequest, pk: int) -> HttpResponse:
     resp = HttpResponse(bytes(app.application_pdf), content_type="application/pdf")
     resp["Cache-Control"] = "private, no-store"
     return resp
+
+
+def _round_action(action: str, v: dict) -> JsonResponse:
+    if action == "bulk_round":
+        round_id = v.get("round") or None
+        if round_id and not PretestRound.objects.filter(id=round_id).exists():
+            return JsonResponse({"ok": False, "error": "ไม่พบรอบนี้"}, status=400)
+        done = PretestApplication.objects.filter(id__in=[int(i) for i in v.get("ids") or []]).update(round_id=round_id)
+        return JsonResponse({"ok": True, "updated": done})
+    existing = PretestRound.objects.filter(id=v.get("id")).first() if v.get("id") else None
+    if action == "round_delete":
+        if existing:
+            existing.delete()  # its children go back to "no round"
+        return JsonResponse({"ok": True})
+    name = str(v.get("name") or "").strip()[:50]
+    try:
+        when = parse_date(str(v.get("filing_date") or ""))
+    except ValueError:
+        when = None
+    if not name or not when:
+        return JsonResponse({"ok": False, "error": "กรุณากรอกชื่อรอบและวันที่ยื่น"}, status=400)
+    round_ = existing or PretestRound()
+    round_.name, round_.filing_date = name, when
+    round_.save()
+    return JsonResponse({"ok": True})
 
 
 def _add_application(v: dict) -> JsonResponse:
@@ -274,6 +301,8 @@ def pretest_api(request: HttpRequest) -> JsonResponse:
         p = json.loads(request.body or "{}")
         if p.get("field") == "add":
             return _add_application(p.get("value") or {})
+        if p.get("field") in ("round_save", "round_delete", "bulk_round"):
+            return _round_action(p.get("field"), p.get("value") or {})
         app = PretestApplication.objects.defer("application_pdf").get(id=int(p.get("id")))
     except (ValueError, TypeError, PretestApplication.DoesNotExist):
         return JsonResponse({"ok": False, "error": "ไม่พบรายการ"}, status=404)
@@ -298,18 +327,10 @@ def pretest_api(request: HttpRequest) -> JsonResponse:
         app.student_id = value or None
         if value:
             app.is_external = False
-    elif field == "filing_round":
-        if value and str(value) not in {str(r) for r in FILING_ROUNDS}:
-            return JsonResponse({"ok": False, "error": "ไม่รู้จักรอบนี้"}, status=400)
-        app.filing_round = int(value) if value else None
-    elif field == "filing_date":
-        try:
-            when = parse_date(str(value)) if value else None
-        except ValueError:
-            when = None
-        if value and not when:
-            return JsonResponse({"ok": False, "error": "วันที่ไม่ถูกต้อง"}, status=400)
-        app.filing_date = when
+    elif field == "round":
+        if value and not PretestRound.objects.filter(id=value).exists():
+            return JsonResponse({"ok": False, "error": "ไม่พบรอบนี้"}, status=400)
+        app.round_id = value or None
     elif field == "is_external":
         app.is_external = bool(value)
         if value:

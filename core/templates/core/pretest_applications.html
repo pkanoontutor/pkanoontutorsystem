@@ -103,10 +103,34 @@
       </select>
       <select id="roundFilter" style="border:1px solid #e2e8f0;border-radius:10px;padding:9px 11px;font:inherit;font-weight:700;">
         <option value="">ทุกรอบที่ยื่น</option>
-        {% for r in filing_rounds %}<option value="{{ r.n }}">รอบ {{ r.n }} ({{ r.count }})</option>{% endfor %}
+        {% for r in rounds %}<option value="{{ r.id }}">{{ r.name }} · {{ r.filing_date|date:"d/m/Y" }} ({{ r.count }})</option>{% endfor %}
         <option value="none">ยังไม่เลือกรอบ ({{ no_round }})</option>
       </select><span id="shown" style="font-size:12px;font-weight:800;color:#64748b;"></span></div>
     <div style="font-size:12px;font-weight:700;color:#64748b;margin-top:6px;">กดปุ่มขั้นตอนด้านบนเพื่อดูคนที่ยังไม่ได้ทำขั้นนั้น · ช่องสีแดง = เลขบัตรหรือเบอร์น่าจะผิด</div>
+  </div>
+
+  <div class="pt-panel">
+    <div style="font-size:14px;font-weight:900;margin-bottom:8px;">📅 รอบที่ยื่น</div>
+    {% for r in rounds %}
+      <div class="round-row" data-round="{{ r.id }}" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:6px;font-size:13px;font-weight:800;">
+        <input class="add-in r-name" value="{{ r.name }}" maxlength="50">
+        <input class="add-in r-date" type="date" value="{{ r.filing_date|date:'Y-m-d' }}">
+        <button class="pt-chip r-save" type="button">บันทึก</button>
+        <button class="pt-chip r-del" type="button">ลบ</button>
+        <span style="color:#64748b;">{{ r.count }} คน</span>
+      </div>
+    {% endfor %}
+    <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+      <input class="add-in" id="newRoundName" maxlength="50" value="รอบ {{ rounds|length|add:1 }}">
+      <input class="add-in" id="newRoundDate" type="date">
+      <button class="pt-chip" type="button" id="newRoundAdd" style="background:#7c3aed;color:#fff;border:0;">➕ เพิ่มรอบ</button>
+    </div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:12px;padding-top:10px;border-top:1px solid #e2e8f0;font-size:13px;font-weight:900;">
+      เลือกแล้ว <span id="pickCount">0</span> คน · ปรับเป็น:
+      <select class="pt-sel" id="bulkRound" style="font-size:13px;padding:8px;"><option value="">ไม่มีรอบ</option>{% for r in rounds %}<option value="{{ r.id }}">{{ r.name }} · {{ r.filing_date|date:"d/m/Y" }}</option>{% endfor %}</select>
+      <button class="pt-chip" type="button" id="bulkApply" style="background:#7c3aed;color:#fff;border:0;">ปรับรอบ</button>
+      <span style="color:#64748b;font-weight:700;">ติ๊กช่องหน้าชื่อในตาราง · ใช้กับคนที่แสดงอยู่เท่านั้น</span>
+    </div>
   </div>
 
   <div class="pt-panel">
@@ -123,14 +147,15 @@
   <div class="pt-panel pt-scroll">
     <table class="pt">
       <thead><tr>
-        <th>#</th><th>ชื่อเล่น</th><th>ชื่อจริง</th><th>นามสกุล</th><th>เลขบัตรประชาชน</th><th>เบอร์มือถือ</th><th>นักเรียนในระบบ</th><th>ใบสมัคร</th>
+        <th><input type="checkbox" id="pickAll" title="เลือกทุกคนที่แสดงอยู่" aria-label="เลือกทุกคนที่แสดงอยู่"></th><th>#</th><th>ชื่อเล่น</th><th>ชื่อจริง</th><th>นามสกุล</th><th>เลขบัตรประชาชน</th><th>เบอร์มือถือ</th><th>นักเรียนในระบบ</th><th>ใบสมัคร</th>
         <th class="c-step">🖨️ ปรินท์แล้ว</th><th class="c-step">✍️ ส่งให้เซ็นแล้ว</th><th class="c-step">💰 รับเงินแล้ว</th><th class="c-step">🏫 นำไปยื่นแล้ว</th><th class="c-step">📨 ส่งกลับแล้ว</th>
-        <th>รอบที่ยื่น</th><th>วันที่ยื่น</th>
+        <th>รอบ · วันที่ยื่น</th>
         <th>หมายเลขผู้สอบ</th><th></th>
       </tr></thead>
       <tbody>
       {% for a in apps %}
         <tr data-id="{{ a.id }}" data-student="{{ a.student_id|default:'' }}" data-form="{{ a.application_no }}" data-classes="{{ a.class_ids }}" data-classnames="{{ a.class_names }}" data-external="{% if a.is_external %}1{% endif %}" class="{% if a.done_count == 5 %}done{% endif %}">
+          <td><input type="checkbox" class="row-pick" aria-label="เลือก {{ a.nickname }}"></td>
           <td>{{ forloop.counter }}</td>
           <td style="width:100px;"><input type="text" data-field="nickname" value="{{ a.nickname }}"></td>
           <td style="width:130px;"><input type="text" data-field="first_name" value="{{ a.first_name }}"></td>
@@ -145,8 +170,7 @@
           </td>
           <td style="white-space:nowrap;font-size:12px;font-weight:800;">{% if a.application_no %}<a href="{% url 'core:pretest_form_pdf' a.id %}" target="_blank" rel="noopener">📄 {{ a.application_no }}</a>{% else %}<span style="color:#94a3b8;">ยังไม่มี</span>{% endif %}</td>
           {% for f, label, on, icon in a.steps %}<td class="c-step"><label class="step-box" title="{{ label }}"><input type="checkbox" data-step="{{ f }}" aria-label="{{ label }}" {% if on %}checked{% endif %}><span>{{ icon }}</span></label></td>{% endfor %}
-          <td><select class="pt-sel" data-field="filing_round"><option value="">-</option>{% for r in filing_rounds %}<option value="{{ r.n }}" {% if a.filing_round == r.n %}selected{% endif %}>รอบ {{ r.n }}</option>{% endfor %}</select></td>
-          <td><input type="date" class="pt-sel" data-field="filing_date" value="{{ a.filing_date|date:'Y-m-d' }}"></td>
+          <td><select class="pt-sel" data-field="round"><option value="">-</option>{% for r in rounds %}<option value="{{ r.id }}" {% if a.round_id == r.id %}selected{% endif %}>{{ r.name }} · {{ r.filing_date|date:"d/m/Y" }}</option>{% endfor %}</select></td>
           <td style="width:120px;"><input type="text" class="exam" data-field="exam_number" value="{{ a.exam_number }}"></td>
           <td><button class="del" type="button" title="ลบรายการ">🗑</button></td>
         </tr>
@@ -179,6 +203,8 @@
     document.getElementById("paidTotal").textContent = document.querySelectorAll('tr[data-id] input[data-step="is_paid"]:checked').length * FEE;
     rows.forEach(tr => tr.classList.toggle("done", tr.querySelectorAll("input[data-step]:checked").length === 5));
   }
+  const picked = () => rows.filter(tr => tr.querySelector(".row-pick").checked);
+  function refreshPicks(){ document.getElementById("pickCount").textContent = picked().length; }
   function applyFilter(){
     const q = document.getElementById("q").value.trim().toLowerCase();
     let n = 0;
@@ -189,13 +215,15 @@
       else if(show && activeFilter === "external") show = !!tr.dataset.external;
       else if(show && activeFilter === "noform") show = !tr.dataset.form;
       else if(show && activeFilter) show = !tr.querySelector(`input[data-step="${activeFilter}"]`).checked;
-      const rnd = document.getElementById("roundFilter").value, myRnd = tr.querySelector('[data-field="filing_round"]').value;
+      const rnd = document.getElementById("roundFilter").value, myRnd = tr.querySelector('[data-field="round"]').value;
       if(show && rnd) show = rnd === "none" ? !myRnd : myRnd === rnd;
       const cls = document.getElementById("classFilter").value, mine = tr.dataset.classes ? tr.dataset.classes.split(",") : [];
       if(show && cls) show = cls === "none" ? !mine.length : mine.includes(cls);
       tr.style.display = show ? "" : "none"; if(show) n++;
+      else { const p = tr.querySelector(".row-pick"); if(p) p.checked = false; }
     });
     document.getElementById("shown").textContent = `แสดง ${n} คน`;
+    refreshPicks();
   }
   document.getElementById("q").addEventListener("input", applyFilter);
   document.getElementById("classFilter").addEventListener("change", applyFilter);
@@ -303,6 +331,23 @@
   document.getElementById("imgSave").addEventListener("click", async () => {
     const a = document.createElement("a");
     a.href = (await toCanvas()).toDataURL("image/png"); a.download = `pretest-${room.room}.png`; a.click();
+  });
+  // ---- preset rounds + changing many children at once ----
+  const roundCall = async (field, value) => { if((await save({dataset:{id:0}}, field, value)).ok) location.reload(); };
+  document.querySelectorAll(".round-row").forEach(row => {
+    row.querySelector(".r-save").addEventListener("click", () => roundCall("round_save", {id: Number(row.dataset.round), name: row.querySelector(".r-name").value, filing_date: row.querySelector(".r-date").value}));
+    row.querySelector(".r-del").addEventListener("click", () => { if(confirm("ลบรอบนี้? เด็กในรอบนี้จะกลับเป็นไม่มีรอบ")) roundCall("round_delete", {id: Number(row.dataset.round)}); });
+  });
+  document.getElementById("newRoundAdd").addEventListener("click", () => roundCall("round_save", {name: document.getElementById("newRoundName").value, filing_date: document.getElementById("newRoundDate").value}));
+  document.querySelectorAll(".row-pick").forEach(p => p.addEventListener("change", refreshPicks));
+  document.getElementById("pickAll").addEventListener("change", e => {
+    rows.forEach(tr => { if(tr.style.display !== "none") tr.querySelector(".row-pick").checked = e.target.checked; });
+    refreshPicks();
+  });
+  document.getElementById("bulkApply").addEventListener("click", () => {
+    const ids = picked().map(tr => Number(tr.dataset.id));
+    if(!ids.length){ alert("กรุณาติ๊กเลือกเด็กก่อน"); return; }
+    roundCall("bulk_round", {ids, round: Number(document.getElementById("bulkRound").value) || null});
   });
   document.getElementById("addForm").addEventListener("submit", async e => {
     e.preventDefault();

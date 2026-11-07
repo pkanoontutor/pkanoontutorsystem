@@ -3846,6 +3846,19 @@ class MonthlyFixedExpense(models.Model):
         return self.description
 
 
+class PretestRound(models.Model):
+    """รอบที่นำใบสมัครไปยื่น: ตั้งไว้ก่อน แล้วค่อยเลือกให้เด็กแต่ละคน."""
+
+    name = models.CharField("ชื่อรอบ", max_length=50)
+    filing_date = models.DateField("วันที่ยื่น")
+
+    class Meta:
+        ordering = ("filing_date", "id")
+
+    def __str__(self) -> str:
+        return f"{self.name} ({self.filing_date:%d/%m/%Y})"
+
+
 class PretestApplication(models.Model):
     """ใบสมัครสอบ Pre-test ที่ฝากนำส่งโรงเรียน: เด็ก 1 คน ยื่นได้ 1 ใบ (เลขบัตรไม่ซ้ำ)."""
 
@@ -3863,8 +3876,7 @@ class PretestApplication(models.Model):
     is_returned = models.BooleanField("ส่งกลับให้เด็กแล้ว", default=False)
     exam_number = models.CharField("หมายเลขผู้สอบ", max_length=50, blank=True)
     is_external = models.BooleanField("ไม่ใช่นักเรียนปัจจุบัน", default=False)
-    filing_round = models.PositiveSmallIntegerField("รอบที่ยื่น", null=True, blank=True)
-    filing_date = models.DateField("วันที่ยื่น", null=True, blank=True)
+    round = models.ForeignKey(PretestRound, verbose_name="รอบที่ยื่น", on_delete=models.SET_NULL, null=True, blank=True, related_name="applications")
     application_no = models.CharField("เลขที่ใบสมัคร", max_length=30, blank=True)
     # kept in the DB, not /media/ (public URLs): the form holds the child's ID and address
     application_pdf = models.BinaryField("ไฟล์ใบสมัคร", null=True, blank=True, editable=False)

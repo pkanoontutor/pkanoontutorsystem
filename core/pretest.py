@@ -32,6 +32,14 @@ STEPS = [
     ("is_returned", "ส่งกลับแล้ว"),
 ]
 STEP_ICONS = {"is_printed": "🖨️", "is_signed": "✍️", "is_paid": "💰", "is_filed": "🏫", "is_returned": "📨"}
+# (button, full name, colour, icon) -- same names and colours as the teaching schedule's rooms
+ROOMS = [
+    ("ทุเรียน", "ห้องทุเรียนหมอนทอง", "#f6e88a", "🍈"),
+    ("มะม่วง", "ห้องมะม่วงเขียวเสวย", "#c6e2a8", "🥭"),
+    ("แตงโม", "ห้องแตงโมจินตหรา", "#f5bcc7", "🍉"),
+    ("มังคุด", "ห้องมังคุดคัด", "#dfc6ea", "🍇"),
+    ("มะพร้าว", "ห้องมะพร้าว", "#cbbfae", "🥥"),
+]
 TEXT_FIELDS = {"nickname": 100, "first_name": 150, "last_name": 150, "phone": 20, "exam_number": 50}
 _PREFIX = re.compile(r"^(เด็กหญิง|เด็กชาย|ด\.?\s?ญ\.?|ด\.?\s?ช\.?|นางสาว|นาย)\s*")
 
@@ -210,6 +218,7 @@ def pretest_page(request: HttpRequest) -> HttpResponse:
         "paid_total": sum(1 for a in apps if a.is_paid) * FEE,
         "unlinked": sum(1 for a in apps if not a.student_id and not a.is_external),
         "external": sum(1 for a in apps if a.is_external),
+        "rooms": ROOMS,
         "class_options": sorted(
             ({"id": i, "name": n, "count": sum(1 for a in apps if i in classes.get(a.student_id, {}))}
              for i, n in {i: n for m in classes.values() for i, n in m.items()}.items()),

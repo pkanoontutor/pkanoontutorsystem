@@ -1,0 +1,171 @@
+{% extends "core/base.html" %}
+{% load humanize %}
+{% block title %}ค่าสอนติวเตอร์{% endblock %}
+{% block head %}
+<style>
+  .tp{max-width:1400px;margin:0 auto;display:grid;gap:14px;}
+  .tp-hero{background:linear-gradient(120deg,#0f766e,#14b8a6);color:#fff;border-radius:20px;padding:16px 20px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center;}
+  .tp-hero h1{margin:0;font-size:22px;font-weight:1000;} .tp-hero p{margin:4px 0 0;font-size:13px;font-weight:700;color:#ccfbf1;}
+  .tp-hero a{color:#fff;font-weight:800;font-size:13px;}
+  .tp-panel{background:#fff;border-radius:16px;padding:14px;box-shadow:0 4px 14px rgba(15,23,42,.07);}
+  .tp-panel h2{margin:0 0 10px;font-size:16px;font-weight:900;color:#0f172a;}
+  .tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;}
+  .tab{border:1px solid #cbd5e1;background:#f8fafc;border-radius:10px;padding:7px 12px;font:inherit;font-size:13px;font-weight:800;color:#334155;cursor:pointer;}
+  .tab.on{background:#0f766e;border-color:#0f766e;color:#fff;}
+  .pane{display:none;gap:8px;flex-wrap:wrap;align-items:center;font-size:13px;font-weight:700;} .pane.on{display:flex;}
+  .pane input[type=date], .pane input[type=month]{border:1px solid #cbd5e1;border-radius:10px;padding:7px 9px;font:inherit;font-weight:700;}
+  .btn{border:0;background:#0f766e;color:#fff;border-radius:10px;padding:8px 14px;font:inherit;font-size:13px;font-weight:800;cursor:pointer;}
+  .btn.soft{background:#f1f5f9;color:#334155;border:1px solid #cbd5e1;} .btn.warn{background:#b45309;}
+  .weeks{display:flex;gap:6px;flex-wrap:wrap;}
+  .wk{display:inline-flex;gap:5px;align-items:center;border:1px solid #e2e8f0;border-radius:10px;padding:5px 9px;background:#f8fafc;font-size:12px;font-weight:800;cursor:pointer;}
+  .wk:has(input:checked){background:#ccfbf1;border-color:#0f766e;}
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;}
+  .kpi{background:#f0fdfa;border-radius:14px;padding:10px 12px;} .kpi span{display:block;font-size:12px;font-weight:800;color:#0f766e;} .kpi b{font-size:22px;font-weight:1000;color:#0f172a;}
+  .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;}
+  .card{border:1px solid #e2e8f0;border-radius:16px;padding:12px;display:grid;gap:8px;background:#fff;}
+  .card-top{display:flex;justify-content:space-between;align-items:baseline;gap:8px;}
+  .card-top b{font-size:17px;font-weight:1000;} .money{font-size:20px;font-weight:1000;color:#0f766e;}
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;font-size:12px;font-weight:700;color:#475569;}
+  .stats div{background:#f8fafc;border-radius:10px;padding:6px 8px;} .stats b{display:block;font-size:15px;color:#0f172a;}
+  .flag{display:inline-block;background:#fef3c7;color:#92400e;border-radius:8px;padding:2px 7px;font-size:11px;font-weight:800;}
+  details summary{cursor:pointer;font-size:13px;font-weight:800;color:#0f766e;}
+  table.tp-t{width:100%;border-collapse:collapse;font-size:12px;margin-top:6px;}
+  table.tp-t th{background:#f1f5f9;padding:6px;text-align:left;font-weight:900;color:#334155;white-space:nowrap;}
+  table.tp-t td{border-top:1px solid #f1f5f9;padding:6px;font-weight:700;vertical-align:top;}
+  table.tp-t td.n, table.tp-t th.n{text-align:right;white-space:nowrap;}
+  tr.bad td{background:#fffbeb;}
+  .issue{color:#b45309;font-size:11px;font-weight:800;}
+  .scroll{overflow-x:auto;}
+  .muted{color:#64748b;font-size:12px;font-weight:700;}
+  form.inline{display:inline;}
+</style>
+{% endblock %}
+{% block content %}
+<div class="tp">
+  <div class="tp-hero">
+    <div>
+      <h1>👩‍🏫 ค่าสอนติวเตอร์</h1>
+      <p>ชั่วโมงสอนและยอดเงินของติวเตอร์แต่ละคน · ช่วง {{ start|date:"d/m/Y" }} – {{ end|date:"d/m/Y" }} · {{ entry_count }} รายการ</p>
+    </div>
+    <a href="/school-finance/">← ไปหน้ารายรับรายจ่าย (บันทึก/แก้ไขค่าสอน)</a>
+  </div>
+
+  <div class="tp-panel">
+    <div class="tabs">
+      <button class="tab" data-mode="month">📅 รายเดือน</button>
+      <button class="tab" data-mode="weeks">🗓️ เลือกบางสัปดาห์</button>
+      <button class="tab" data-mode="range">↔️ กำหนดช่วงวันที่</button>
+    </div>
+    <form method="get" class="pane" data-pane="month">
+      <input type="hidden" name="mode" value="month">
+      เดือน <input type="month" name="month" value="{{ month_value }}">
+      <button class="btn">ดู</button>
+      <span class="muted">ค่าเริ่มต้น = เดือนล่าสุดที่มีการบันทึก ({{ latest|date:"m/Y" }})</span>
+    </form>
+    <form method="get" class="pane" data-pane="weeks" style="flex-direction:column;align-items:flex-start;">
+      <input type="hidden" name="mode" value="weeks">
+      <div class="weeks">
+        {% for w in week_choices %}<label class="wk"><input type="checkbox" name="week" value="{{ w.start|date:'Y-m-d' }}" {% if w.on %}checked{% endif %}>{{ w.start|date:"d/m" }}–{{ w.end|date:"d/m" }}</label>{% endfor %}
+      </div>
+      <div><button class="btn">ดูสัปดาห์ที่เลือก</button> <span class="muted">สัปดาห์ = จันทร์–อาทิตย์ · ย้อนหลัง 16 สัปดาห์</span></div>
+    </form>
+    <form method="get" class="pane" data-pane="range">
+      <input type="hidden" name="mode" value="range">
+      ตั้งแต่ <input type="date" name="from" value="{{ start|date:'Y-m-d' }}"> ถึง <input type="date" name="to" value="{{ end|date:'Y-m-d' }}">
+      <button class="btn">ดู</button>
+    </form>
+  </div>
+
+  <div class="kpis">
+    <div class="kpi"><span>ติวเตอร์</span><b>{{ rows|length }}</b></div>
+    <div class="kpi"><span>ชม.สอนรวม</span><b>{{ totals.hours|floatformat:"-2" }}</b></div>
+    <div class="kpi"><span>onsite / online</span><b style="font-size:17px;">{{ totals.onsite_hours|floatformat:"-2" }} / {{ totals.online_hours|floatformat:"-2" }}</b></div>
+    <div class="kpi"><span>ยอดรวม (ก่อนหักภาษี)</span><b>{{ totals.total|floatformat:0|intcomma }}</b></div>
+    <div class="kpi"><span>ยอดโอนสุทธิ</span><b>{{ totals.net|floatformat:0|intcomma }}</b></div>
+  </div>
+
+  {% if problems %}
+  <div class="tp-panel" style="border:2px solid #f59e0b;">
+    <h2>⚠️ รายการที่ยอดไม่ตรงกับเกณฑ์ ({{ problems|length }})</h2>
+    <div class="muted">ระบบคำนวณทุกรายการใหม่ตามเกณฑ์ปัจจุบัน แล้วแสดงรายการที่ยอดไม่ตรงกัน หรือรายการที่มีเรท/ค่าเดินทางที่กรอกเองทับเรทอัตโนมัติ</div>
+    <div class="scroll"><table class="tp-t">
+      <tr><th>วันที่</th><th>ติวเตอร์</th><th class="n">ชม.</th><th class="n">เรทที่ใช้</th><th class="n">ยอดที่บันทึก</th><th class="n">ถ้าคำนวณใหม่</th><th>ปัญหา</th><th></th></tr>
+      {% for e in problems %}
+      <tr class="bad"><td>{{ e.work_date|date:"d/m/Y" }}</td><td>{{ e.tutor.name }}</td><td class="n">{{ e.teaching_hours|floatformat:"-2" }}</td><td class="n">{{ e.hourly_rate|floatformat:0 }}</td><td class="n">{{ e.total_amount|floatformat:0|intcomma }}</td>
+        <td class="n">{{ e.exp_total|floatformat:0|intcomma }}<div class="muted">ถ้าใช้เรทอัตโนมัติ {{ e.auto_total|floatformat:0|intcomma }}</div></td>
+        <td>{% for i in e.issues %}<div class="issue">{{ i }}</div>{% endfor %}</td>
+        <td style="white-space:nowrap;">
+          {% if e.hourly_rate_override is not None or e.travel_fee_override is not None %}
+          <form method="post" class="inline">{% csrf_token %}<input type="hidden" name="action" value="clear_override"><input type="hidden" name="id" value="{{ e.id }}"><button class="btn warn" onclick="return confirm('ลบเรท/ค่าเดินทางที่กรอกเอง แล้วคิดใหม่ตามเกณฑ์อัตโนมัติ?')">ใช้เรทอัตโนมัติ</button></form>
+          {% endif %}
+          <form method="post" class="inline">{% csrf_token %}<input type="hidden" name="action" value="recalc"><input type="hidden" name="id" value="{{ e.id }}"><button class="btn soft">คำนวณใหม่</button></form>
+        </td></tr>
+      {% endfor %}
+    </table></div>
+    <div class="muted" style="margin-top:6px;">"คำนวณใหม่" = คิดยอดใหม่โดยยังใช้เรทที่กรอกเองไว้ · "ใช้เรทอัตโนมัติ" = ลบเรทที่กรอกเองออก แล้วคิดตามเกณฑ์ชั่วโมง/เรทพิเศษ</div>
+  </div>
+  {% endif %}
+
+  <div class="tp-panel">
+    <h2>👤 โปรไฟล์ติวเตอร์ (เรียงตามยอดเงิน)</h2>
+    {% if rows %}
+    <div class="cards">
+      {% for r in rows %}
+      <div class="card">
+        <div class="card-top"><b>{{ r.tutor.name }}</b><span class="money">{{ r.total|floatformat:0|intcomma }} ฿</span></div>
+        <div class="stats">
+          <div>ชม.รวม<b>{{ r.hours|floatformat:"-2" }}</b></div>
+          <div>onsite<b>{{ r.onsite_hours|floatformat:"-2" }}</b></div>
+          <div>online<b>{{ r.online_hours|floatformat:"-2" }}</b></div>
+          <div>ค่าสอน<b>{{ r.onsite_fee|add:r.online_fee|floatformat:0|intcomma }}</b></div>
+          <div>เดินทาง<b>{{ r.travel_fee|floatformat:0|intcomma }}</b></div>
+          <div>นั่งว่าง/อื่นๆ<b>{{ r.idle_fee|floatformat:0|intcomma }}</b></div>
+          <div>เฉลี่ย/ชม.<b>{{ r.avg_rate|floatformat:0 }}</b></div>
+          <div>หักภาษี<b>{{ r.wht|floatformat:0|intcomma }}</b></div>
+          <div>โอนสุทธิ<b>{{ r.net|floatformat:0|intcomma }}</b></div>
+        </div>
+        <div>{{ r.days }} วัน {% if r.tutor.default_special_rate_325 %}<span class="flag" style="background:#ffedd5;">ค่าเริ่มต้นเรท 325</span>{% endif %} {% if r.issue_count %}<span class="flag">⚠️ {{ r.issue_count }} รายการต้องตรวจ</span>{% endif %}</div>
+        <details>
+          <summary>ดูรายวัน</summary>
+          <div class="scroll"><table class="tp-t">
+            <tr><th>วันที่</th><th class="n">onsite</th><th class="n">เรท</th><th class="n">online</th><th class="n">เดินทาง</th><th class="n">อื่นๆ</th><th class="n">รวม</th></tr>
+            {% for e in r.entries %}
+            <tr class="{% if e.issues %}bad{% endif %}"><td>{{ e.work_date|date:"D d/m" }}{% if e.special_rate_325 %} <span class="flag" style="background:#ffedd5;">325</span>{% endif %}{% if e.special_rate_350 %} <span class="flag" style="background:#ffedd5;">350</span>{% endif %}
+              {% for i in e.issues %}<div class="issue">{{ i }}</div>{% endfor %}</td>
+              <td class="n">{{ e.teaching_hours|floatformat:"-2" }}</td><td class="n">{{ e.hourly_rate|floatformat:0 }}{% if e.hourly_rate_override is not None %}✎{% endif %}</td>
+              <td class="n">{{ e.online_teaching_hours|floatformat:"-2" }}</td><td class="n">{{ e.travel_fee|floatformat:0 }}</td><td class="n">{{ e.idle_fee|floatformat:0 }}</td>
+              <td class="n"><b>{{ e.total_amount|floatformat:0|intcomma }}</b></td></tr>
+            {% endfor %}
+          </table></div>
+        </details>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}<div class="muted">ไม่มีข้อมูลค่าสอนในช่วงนี้</div>{% endif %}
+  </div>
+
+  <div class="tp-panel">
+    <h2>🕒 บันทึกล่าสุด (รวมที่ส่งมาจากระบบตารางสอน)</h2>
+    <div class="scroll"><table class="tp-t">
+      <tr><th>บันทึกเมื่อ</th><th>วันที่สอน</th><th>ติวเตอร์</th><th class="n">onsite</th><th class="n">เรท</th><th class="n">online</th><th class="n">เดินทาง</th><th class="n">อื่นๆ</th><th class="n">รวม</th></tr>
+      {% for e in recent %}
+      <tr class="{% if e.issues %}bad{% endif %}"><td>{{ e.updated_at|date:"d/m H:i" }}</td><td>{{ e.work_date|date:"D d/m/Y" }}</td><td>{{ e.tutor.name }}{% for i in e.issues %}<div class="issue">{{ i }}</div>{% endfor %}</td>
+        <td class="n">{{ e.teaching_hours|floatformat:"-2" }}</td><td class="n">{{ e.hourly_rate|floatformat:0 }}{% if e.hourly_rate_override is not None %}✎{% endif %}</td><td class="n">{{ e.online_teaching_hours|floatformat:"-2" }}</td>
+        <td class="n">{{ e.travel_fee|floatformat:0 }}</td><td class="n">{{ e.idle_fee|floatformat:0 }}</td><td class="n"><b>{{ e.total_amount|floatformat:0|intcomma }}</b></td></tr>
+      {% empty %}<tr><td colspan="9" class="muted">ยังไม่มีรายการ</td></tr>{% endfor %}
+    </table></div>
+    <div class="muted" style="margin-top:6px;">✎ = เรทที่กรอกเอง (ไม่ใช่เรทอัตโนมัติ)</div>
+  </div>
+</div>
+<script>
+(function(){
+  const mode = "{{ mode }}";
+  const show = m => {
+    document.querySelectorAll(".tab").forEach(t => t.classList.toggle("on", t.dataset.mode === m));
+    document.querySelectorAll(".pane").forEach(p => p.classList.toggle("on", p.dataset.pane === m));
+  };
+  document.querySelectorAll(".tab").forEach(t => t.addEventListener("click", () => show(t.dataset.mode)));
+  show(mode);
+})();
+</script>
+{% endblock %}

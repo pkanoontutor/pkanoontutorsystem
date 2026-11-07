@@ -1,0 +1,540 @@
+{% extends "core/base.html" %}
+{% load static %}
+{% block title %}สร้างประกาศ{% endblock %}
+{% block head %}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;600;700&family=Prompt:wght@400;600;700&family=Sarabun:wght@400;700&family=Mitr:wght@400;600&family=Noto+Sans+Thai:wght@400;700&family=Chakra+Petch:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  .an-wrap{max-width:1500px;margin:0 auto;display:grid;grid-template-columns:minmax(330px,460px) 1fr;gap:14px;align-items:start;}
+  @media (max-width:900px){.an-wrap{grid-template-columns:1fr;}}
+  .an-hero{grid-column:1/-1;background:linear-gradient(120deg,#65a30d,#facc15);color:#fff;border-radius:20px;padding:16px 20px;}
+  .an-hero h1{margin:0;font-size:22px;font-weight:1000;text-shadow:0 1px 2px rgba(0,0,0,.2);} .an-hero p{margin:4px 0 0;font-size:13px;font-weight:700;}
+  .an-panel{background:#fff;border-radius:16px;padding:12px 14px;box-shadow:0 4px 14px rgba(15,23,42,.07);display:grid;gap:10px;}
+  .an-panel h3{margin:0;font-size:15px;font-weight:900;color:#334155;}
+  .an-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:13px;font-weight:700;color:#334155;}
+  .an-row label{display:inline-flex;gap:5px;align-items:center;}
+  .an-in, .an-ta, .an-sel{border:1px solid #cbd5e1;border-radius:10px;padding:8px 10px;font:inherit;font-weight:700;background:#fff;box-sizing:border-box;}
+  .an-in{width:100%;} .an-ta{width:100%;min-height:90px;resize:vertical;line-height:1.5;}
+  .an-num{width:76px;}
+  .an-btn{border:1px solid #cbd5e1;background:#f8fafc;border-radius:10px;padding:7px 11px;font:inherit;font-size:13px;font-weight:800;color:#334155;cursor:pointer;}
+  .an-btn:hover{background:#eef2ff;} .an-btn.pri{background:#65a30d;border-color:#65a30d;color:#fff;} .an-btn.pri:hover{background:#4d7c0f;}
+  .an-btn.on{background:#ecfccb;border-color:#65a30d;color:#365314;}
+  .an-seg{display:inline-flex;border:1px solid #cbd5e1;border-radius:10px;overflow:hidden;}
+  .an-seg button{border:0;background:#fff;padding:6px 9px;font:inherit;font-size:12px;font-weight:800;color:#475569;cursor:pointer;}
+  .an-seg button.on{background:#65a30d;color:#fff;}
+  .blk{border:1px solid #e2e8f0;border-radius:14px;padding:10px;display:grid;gap:8px;background:#fcfdf8;}
+  .blk.sel{border-color:#65a30d;box-shadow:0 0 0 3px #d9f99d;}
+  .blk-top{display:flex;gap:6px;align-items:center;flex-wrap:wrap;}
+  .blk-top .grow{flex:1;}
+  .an-stage{position:sticky;top:10px;display:grid;gap:10px;}
+  .an-canvas-box{background:repeating-conic-gradient(#e2e8f0 0% 25%,#f8fafc 0% 50%) 50%/20px 20px;border-radius:16px;padding:14px;display:flex;justify-content:center;align-items:center;min-height:300px;}
+  #cv{max-width:100%;max-height:78vh;box-shadow:0 8px 30px rgba(0,0,0,.18);touch-action:none;cursor:default;}
+  .an-hint{font-size:12px;color:#64748b;font-weight:700;}
+  .an-color{width:34px;height:28px;padding:0;border:1px solid #cbd5e1;border-radius:6px;background:#fff;}
+  .an-toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#0f172a;color:#fff;padding:10px 16px;border-radius:12px;font-weight:800;font-size:14px;opacity:0;transition:.25s;pointer-events:none;z-index:99;}
+  .an-toast.show{opacity:1;}
+</style>
+{% endblock %}
+{% block content %}
+<div class="an-wrap">
+  <div class="an-hero">
+    <h1>📢 สร้างประกาศเป็นรูปภาพ</h1>
+    <p>พิมพ์หัวข้อและเนื้อหาด้านซ้าย ระบบจัดวางและปรับขนาดตัวอักษรให้พอดีอัตโนมัติ · ลากข้อความบนรูปเพื่อย้ายตำแหน่ง · ดับเบิลคลิกเพื่อคืนตำแหน่งเดิม</p>
+  </div>
+
+  <div style="display:grid;gap:12px;">
+    <div class="an-panel">
+      <h3>📝 หัวข้อ</h3>
+      <input class="an-in" id="title" placeholder="หัวข้อประกาศ">
+      <div class="an-row">
+        <label>สี <input type="color" class="an-color" id="titleColor"></label>
+        <label>ขนาด <input type="range" id="titleSize" min="50" max="160" step="5"> <span id="titleSizeV"></span></label>
+        <span class="an-seg" id="titleAlign"><button data-v="left">ชิดซ้าย</button><button data-v="center">กลาง</button><button data-v="right">ชิดขวา</button></span>
+      </div>
+    </div>
+
+    <div class="an-panel">
+      <div class="an-row" style="justify-content:space-between;"><h3>📄 เนื้อหา</h3>
+        <span class="an-row">
+          <button class="an-btn" data-add="heading">+ หัวข้อย่อย</button>
+          <button class="an-btn" data-add="paragraph">+ เรียงความ</button>
+          <button class="an-btn" data-add="bullet">+ ข้อๆ (•)</button>
+          <button class="an-btn" data-add="number">+ ข้อๆ (1.)</button>
+        </span>
+      </div>
+      <div class="an-hint">แบบข้อๆ: ขึ้นบรรทัดใหม่ = ข้อใหม่ · แบบเรียงความ: ขึ้นบรรทัดใหม่ = ย่อหน้าใหม่ · ใส่ **ข้อความ** เพื่อทำตัวหนาเฉพาะคำ</div>
+      <div id="blocks" style="display:grid;gap:10px;"></div>
+    </div>
+
+    <div class="an-panel">
+      <h3>🖼️ ขนาดภาพและการจัดวาง</h3>
+      <div class="an-row">
+        <select class="an-sel" id="preset">
+          <option value="1080x1080">สี่เหลี่ยมจัตุรัส 1080×1080 (โพสต์)</option>
+          <option value="1080x1350">แนวตั้ง 4:5 1080×1350 (IG/FB)</option>
+          <option value="1080x1920">สตอรี่ 9:16 1080×1920</option>
+          <option value="1920x1080">แนวนอน 16:9 1920×1080</option>
+          <option value="1240x1754">A4 แนวตั้ง 1240×1754</option>
+          <option value="1754x1240">A4 แนวนอน 1754×1240</option>
+          <option value="2000x2000">สี่เหลี่ยม 2000×2000 (ละเอียด)</option>
+          <option value="custom">กำหนดเอง…</option>
+        </select>
+        <input type="number" class="an-sel an-num" id="cw" min="300" max="4000"> × <input type="number" class="an-sel an-num" id="ch" min="300" max="4000">
+      </div>
+      <div class="an-row">
+        <label><input type="checkbox" id="autoFit"> ปรับขนาดตัวอักษรอัตโนมัติ</label>
+        <label id="manualWrap">ขนาดเนื้อหา <input type="range" id="bodySize" min="16" max="160"> <span id="bodySizeV"></span>px</label>
+      </div>
+      <div class="an-row">
+        เนื้อหาวางที่
+        <span class="an-seg" id="vAlign"><button data-v="top">ด้านบน</button><button data-v="center">กึ่งกลาง</button></span>
+        ระยะบรรทัด <input type="range" id="lineH" min="110" max="200" step="5"> <span id="lineHV"></span>
+      </div>
+      <div class="an-row">
+        ฟอนต์ <select class="an-sel" id="font">
+          <option>Kanit</option><option>Prompt</option><option>Mitr</option><option>Sarabun</option><option>Noto Sans Thai</option><option>Chakra Petch</option>
+        </select>
+        <label><input type="checkbox" id="showLogo"> โลโก้</label>
+        <label>ขนาดโลโก้ <input type="range" id="logoSize" min="40" max="200" step="5"></label>
+      </div>
+    </div>
+
+    <div class="an-panel">
+      <h3>🎨 กรอบและสี</h3>
+      <div class="an-row">
+        <label><input type="checkbox" id="showFrame"> แสดงกรอบ</label>
+        <label>กรอบนอก <input type="color" class="an-color" id="cOuter"></label>
+        <label>กรอบใน <input type="color" class="an-color" id="cMid"></label>
+        <label>พื้นหลัง <input type="color" class="an-color" id="cInner"></label>
+        <label>ตัวอักษร <input type="color" class="an-color" id="cText"></label>
+      </div>
+      <div class="an-row">
+        ธีม:
+        <button class="an-btn" data-theme="#7ab648,#ffd54f,#ffffff,#111111,#7ab648">เขียว-เหลือง</button>
+        <button class="an-btn" data-theme="#0ea5e9,#bae6fd,#ffffff,#0f172a,#0284c7">ฟ้า</button>
+        <button class="an-btn" data-theme="#ec4899,#fbcfe8,#ffffff,#1f2937,#db2777">ชมพู</button>
+        <button class="an-btn" data-theme="#7c3aed,#ddd6fe,#ffffff,#1e1b4b,#6d28d9">ม่วง</button>
+        <button class="an-btn" data-theme="#ea580c,#fed7aa,#fffbeb,#1c1917,#c2410c">ส้ม</button>
+        <button class="an-btn" data-theme="#b91c1c,#fde68a,#fffbeb,#1c1917,#b91c1c">แดง-ทอง</button>
+      </div>
+    </div>
+
+    <div class="an-panel">
+      <h3>💾 แบบร่าง</h3>
+      <div class="an-hint">บันทึกอัตโนมัติในเครื่องนี้ · ตั้งชื่อเพื่อเก็บไว้ใช้ซ้ำเป็นแม่แบบ</div>
+      <div class="an-row">
+        <input class="an-in" id="draftName" placeholder="ชื่อแบบร่าง" style="flex:1;width:auto;">
+        <button class="an-btn" id="saveDraft">บันทึก</button>
+      </div>
+      <div class="an-row">
+        <select class="an-sel" id="draftList" style="flex:1;"><option value="">— เลือกแบบร่างที่บันทึกไว้ —</option></select>
+        <button class="an-btn" id="loadDraft">เปิด</button>
+        <button class="an-btn" id="delDraft">ลบ</button>
+        <button class="an-btn" id="newDraft">เริ่มใหม่</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="an-stage">
+    <div class="an-row">
+      <button class="an-btn pri" id="dl">⬇️ ดาวน์โหลด PNG</button>
+      <button class="an-btn" id="dlJpg">⬇️ JPG</button>
+      <button class="an-btn" id="copy">📋 คัดลอกรูป</button>
+      <button class="an-btn" id="resetPos">↺ คืนตำแหน่งทั้งหมด</button>
+      <span class="an-hint" id="fitInfo"></span>
+    </div>
+    <div class="an-canvas-box"><canvas id="cv"></canvas></div>
+    <div class="an-hint">คลิกข้อความบนรูปเพื่อเลือก แล้วลากเพื่อย้าย (เส้นประสีชมพู = แนวกึ่งกลาง ดูดเข้าอัตโนมัติ) · ปุ่มลูกศรเลื่อนทีละนิด (Shift = ทีละมาก) · ดับเบิลคลิกคืนตำแหน่ง</div>
+  </div>
+</div>
+<div class="an-toast" id="toast"></div>
+
+<script>
+(function(){
+  const LOGO_URL = "{% static 'core/logo_transparent.png' %}";
+  const KEY = "pk_announce_current", DRAFTS = "pk_announce_drafts";
+  const $ = id => document.getElementById(id);
+  const cv = $("cv"), ctx = cv.getContext("2d");
+  const store = {
+    get(k){ try { return JSON.parse(localStorage.getItem(k)); } catch(e){ return null; } },
+    set(k, v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch(e){} },
+  };
+  let uid = Date.now();
+  const nid = () => "b" + (uid++).toString(36);
+
+  function defaults(){
+    return {
+      w: 2000, h: 2000, preset: "2000x2000",
+      title: "หัวข้อประกาศ", titleColor: "#7ab648", titleSize: 100, titleAlign: "center",
+      blocks: [
+        {id: nid(), type: "heading", text: "เนื้อหาประกาศตัวหนา", color: "", size: 100, align: "left"},
+        {id: nid(), type: "paragraph", text: "เนื้อหาประกาศตัวบาง", color: "", size: 100, align: "left"},
+      ],
+      autoFit: true, bodySize: 60, vAlign: "top", lineH: 145, font: "Kanit",
+      showLogo: true, logoSize: 100, showFrame: true,
+      cOuter: "#7ab648", cMid: "#ffd54f", cInner: "#ffffff", cText: "#111111",
+      offsets: {},
+    };
+  }
+  let S = Object.assign(defaults(), store.get(KEY) || {});
+  let selected = null, layoutCache = [], fitSize = S.bodySize;
+
+  const logo = new Image(); logo.onload = () => draw(); logo.src = LOGO_URL;
+
+  // ---------- text helpers ----------
+  const seg = (window.Intl && Intl.Segmenter) ? new Intl.Segmenter("th", {granularity: "word"}) : null;
+  function words(t){
+    if(seg) return Array.from(seg.segment(t), s => s.segment);
+    return t.split(/(\s+)/).filter(Boolean);
+  }
+  // parse **bold** into runs
+  function runs(text, bold){
+    const out = []; const re = /\*\*(.+?)\*\*/g; let i = 0, m;
+    while((m = re.exec(text))){ if(m.index > i) out.push({t: text.slice(i, m.index), b: bold}); out.push({t: m[1], b: true}); i = re.lastIndex; }
+    if(i < text.length) out.push({t: text.slice(i), b: bold});
+    return out;
+  }
+  const fontStr = (b, px) => `${b ? 700 : 400} ${px}px "${S.font}", sans-serif`;
+  function measure(t, b, px){ ctx.font = fontStr(b, px); return ctx.measureText(t).width; }
+  // wrap runs into lines of tokens [{t,b,w}]
+  function wrapRuns(rs, px, maxW){
+    const toks = [];
+    rs.forEach(r => words(r.t).forEach(w => toks.push({t: w, b: r.b})));
+    const lines = []; let line = [], lw = 0;
+    const push = () => { while(line.length && !line[line.length-1].t.trim()){ lw -= line.pop().w; } lines.push({toks: line, w: lw}); line = []; lw = 0; };
+    toks.forEach(tok => {
+      tok.w = measure(tok.t, tok.b, px);
+      if(lw + tok.w > maxW && line.length){
+        push();
+        if(!tok.t.trim()) return;
+      }
+      if(tok.w > maxW){ // break very long word by characters
+        let buf = "";
+        for(const ch of tok.t){
+          const nw = measure(buf + ch, tok.b, px);
+          if(lw + nw > maxW && (buf || line.length)){ if(buf){ line.push({t: buf, b: tok.b, w: measure(buf, tok.b, px)}); lw += line[line.length-1].w; } push(); buf = ch; }
+          else buf += ch;
+        }
+        tok = {t: buf, b: tok.b, w: measure(buf, tok.b, px)};
+      }
+      line.push(tok); lw += tok.w;
+    });
+    if(line.length || !lines.length) push();
+    return lines;
+  }
+
+  // Build one content block's lines at a given base px. Returns {h, w, rows:[{x, y, toks, px, marker}]}
+  function buildBlock(b, base, maxW){
+    const px = base * (b.size / 100) * (b.type === "heading" ? 1.25 : 1);
+    const lh = px * S.lineH / 100;
+    const rows = []; let y = 0, maxRowW = 0;
+    const paras = (b.text || "").split("\n");
+    const listy = b.type === "bullet" || b.type === "number";
+    let n = 0;
+    paras.forEach((p, pi) => {
+      if(listy && !p.trim()) return;
+      let marker = "", indent = 0;
+      if(listy){
+        n++; marker = b.type === "bullet" ? "•" : n + ".";
+        indent = Math.max(measure(b.type === "bullet" ? "•" : (paras.length > 9 ? "10." : "9."), false, px) + px * 0.45, px * 0.9);
+      }
+      const ls = wrapRuns(runs(p, b.type === "heading"), px, maxW - indent);
+      ls.forEach((ln, li) => {
+        rows.push({x: indent, y, toks: ln.toks, w: ln.w, px, marker: li === 0 ? marker : "", indent});
+        maxRowW = Math.max(maxRowW, ln.w + indent);
+        y += lh;
+      });
+      if(listy && pi < paras.length - 1) y += px * 0.25;
+      else if(b.type === "paragraph" && pi < paras.length - 1 && p.trim()) y += px * 0.3;
+    });
+    return {h: y, w: maxRowW, rows, px, lh};
+  }
+
+  // ---------- layout ----------
+  function geometry(){
+    const W = S.w, H = S.h, m = Math.min(W, H);
+    const f = S.showFrame ? {o: m * 0.02, mid: m * 0.02, r: m * 0.06} : {o: 0, mid: 0, r: 0};
+    const ix = f.o + f.mid, iy = ix; // inner rect origin
+    const pad = m * 0.045;
+    return {W, H, m, f, inner: {x: ix, y: iy, w: W - 2 * ix, h: H - 2 * iy}, pad};
+  }
+  function layout(){
+    const g = geometry(), I = g.inner;
+    const left = I.x + g.pad, right = I.x + I.w - g.pad, cw = right - left;
+    const els = [];
+    let y = I.y + g.m * 0.012;
+    if(S.showLogo && logo.complete && logo.naturalWidth){
+      const lh = g.m * 0.11 * S.logoSize / 100, lw = lh * logo.naturalWidth / logo.naturalHeight;
+      els.push({key: "logo", kind: "logo", x: g.W / 2 - lw / 2, y, w: lw, h: lh});
+      y += lh + g.m * 0.02;
+    } else y += g.pad;
+    if(S.title.trim()){
+      let px = g.m * 0.075 * S.titleSize / 100;
+      let lines = wrapRuns(runs(S.title, true), px, cw);
+      while(lines.length > 2 && px > 12){ px *= 0.93; lines = wrapRuns(runs(S.title, true), px, cw); }
+      const lh = px * 1.25, h = lines.length * lh;
+      els.push({key: "title", kind: "text", x: left, y, w: cw, h, rows: lines.map((ln, i) => ({x: 0, y: i * lh, toks: ln.toks, w: ln.w, px, marker: ""})), align: S.titleAlign, color: S.titleColor, lh});
+      y += h + g.m * 0.035;
+    }
+    const top = y, bottom = I.y + I.h - g.pad, avail = bottom - top;
+    const gap = base => base * 0.55;
+    const measureAll = base => {
+      const bs = S.blocks.filter(b => (b.text || "").trim()).map(b => ({b, r: buildBlock(b, base, cw)}));
+      const total = bs.reduce((s, x) => s + x.r.h, 0) + Math.max(0, bs.length - 1) * gap(base);
+      return {bs, total};
+    };
+    let base = S.bodySize;
+    if(S.autoFit){
+      let lo = 8, hi = g.m * 0.04;
+      for(let i = 0; i < 22; i++){ const mid = (lo + hi) / 2; if(measureAll(mid).total <= avail) lo = mid; else hi = mid; }
+      base = Math.floor(lo);
+    }
+    fitSize = base;
+    const res = measureAll(base);
+    let cy = S.vAlign === "center" ? top + Math.max(0, (avail - res.total) / 2) : top;
+    res.bs.forEach(({b, r}) => {
+      els.push({key: b.id, kind: "text", x: left, y: cy, w: cw, h: r.h, rows: r.rows, align: b.align, color: b.color || S.cText, lh: r.lh, block: b});
+      cy += r.h + gap(base);
+    });
+    const overflow = res.total > avail + 1;
+    $("fitInfo").textContent = `ขนาดตัวอักษรเนื้อหา ${base}px` + (overflow ? " · ⚠️ ข้อความล้นกรอบ ลองลดขนาดหรือเปิดปรับอัตโนมัติ" : "");
+    // apply drag offsets & compute bounding boxes
+    els.forEach(e => {
+      const o = S.offsets[e.key] || {dx: 0, dy: 0};
+      e.ox = o.dx * g.W; e.oy = o.dy * g.H;
+      if(e.kind === "text"){
+        const tw = Math.max(...e.rows.map(r => r.w + (r.indent || 0)), 0);
+        e.tw = tw;
+        e.bx = e.x + (e.align === "center" ? (e.w - tw) / 2 : e.align === "right" ? e.w - tw : 0) + e.ox;
+        e.bw = tw;
+      } else { e.bx = e.x + e.ox; e.bw = e.w; }
+      e.by = e.y + e.oy; e.bh = e.h;
+    });
+    return {g, els};
+  }
+
+  function rr(x, y, w, h, r){ ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
+
+  function render(overlay){
+    const {g, els} = layout(); layoutCache = els;
+    if(cv.width !== g.W) cv.width = g.W; if(cv.height !== g.H) cv.height = g.H;
+    ctx.clearRect(0, 0, g.W, g.H);
+    if(S.showFrame){
+      ctx.fillStyle = S.cOuter; ctx.fillRect(0, 0, g.W, g.H);
+      ctx.fillStyle = S.cMid; rr(g.f.o, g.f.o, g.W - 2 * g.f.o, g.H - 2 * g.f.o, g.f.r * 1.15); ctx.fill();
+      ctx.fillStyle = S.cInner; rr(g.inner.x, g.inner.y, g.inner.w, g.inner.h, g.f.r); ctx.fill();
+    } else { ctx.fillStyle = S.cInner; ctx.fillRect(0, 0, g.W, g.H); }
+    ctx.save();
+    if(S.showFrame){ rr(g.inner.x, g.inner.y, g.inner.w, g.inner.h, g.f.r); ctx.clip(); }
+    ctx.textBaseline = "alphabetic";
+    els.forEach(e => {
+      if(e.kind === "logo"){ ctx.drawImage(logo, e.bx, e.by, e.w, e.h); return; }
+      ctx.fillStyle = e.color;
+      e.rows.forEach(r => {
+        const base = e.y + e.oy + r.y + r.px * 1.02;
+        const ind = r.indent || 0;
+        const rowX = e.x + e.ox + (e.align === "center" ? (e.w - r.w - ind) / 2 : e.align === "right" ? e.w - r.w - ind : 0);
+        if(r.marker){ ctx.font = fontStr(e.block && e.block.type === "number", r.px); ctx.fillText(r.marker, rowX, base); }
+        let x = rowX + ind;
+        r.toks.forEach(t => { ctx.font = fontStr(t.b, r.px); ctx.fillText(t.t, x, base); x += t.w; });
+      });
+    });
+    ctx.restore();
+    if(overlay && selected){
+      const e = els.find(x => x.key === selected);
+      if(e){
+        const p = g.m * 0.008;
+        ctx.save(); ctx.strokeStyle = "#2563eb"; ctx.lineWidth = Math.max(2, g.m * 0.002); ctx.setLineDash([g.m * 0.01, g.m * 0.006]);
+        ctx.strokeRect(e.bx - p, e.by - p, e.bw + 2 * p, e.bh + 2 * p); ctx.restore();
+      }
+      if(drag && drag.snapped){
+        ctx.save(); ctx.strokeStyle = "#ec4899"; ctx.lineWidth = Math.max(2, g.m * 0.002); ctx.setLineDash([g.m * 0.012, g.m * 0.008]);
+        ctx.beginPath(); ctx.moveTo(g.W / 2, 0); ctx.lineTo(g.W / 2, g.H); ctx.stroke(); ctx.restore();
+      }
+    }
+  }
+  let raf = 0;
+  function draw(){ clearTimeout(raf); raf = setTimeout(() => render(true), 16); }
+
+  // ---------- drag ----------
+  let drag = null;
+  function pt(ev){ const r = cv.getBoundingClientRect(); return {x: (ev.clientX - r.left) * cv.width / r.width, y: (ev.clientY - r.top) * cv.height / r.height}; }
+  function hit(p){
+    const m = Math.min(S.w, S.h) * 0.01;
+    for(let i = layoutCache.length - 1; i >= 0; i--){ const e = layoutCache[i]; if(p.x >= e.bx - m && p.x <= e.bx + e.bw + m && p.y >= e.by - m && p.y <= e.by + e.bh + m) return e; }
+    return null;
+  }
+  cv.addEventListener("pointerdown", ev => {
+    const p = pt(ev), e = hit(p);
+    selectEl(e ? e.key : null);
+    if(e){
+      const o = S.offsets[e.key] || {dx: 0, dy: 0};
+      drag = {key: e.key, sx: p.x, sy: p.y, dx: o.dx, dy: o.dy, el: e, snapped: false};
+      cv.setPointerCapture(ev.pointerId); cv.style.cursor = "grabbing";
+    }
+    draw();
+  });
+  cv.addEventListener("pointermove", ev => {
+    const p = pt(ev);
+    if(!drag){ cv.style.cursor = hit(p) ? "grab" : "default"; return; }
+    let dx = drag.dx + (p.x - drag.sx) / S.w, dy = drag.dy + (p.y - drag.sy) / S.h;
+    // snap horizontally to centre
+    const e = drag.el, baseCx = e.bx - e.ox + e.bw / 2, cx = baseCx + dx * S.w;
+    drag.snapped = Math.abs(cx - S.w / 2) < S.w * 0.012;
+    if(drag.snapped) dx = (S.w / 2 - baseCx) / S.w;
+    S.offsets[drag.key] = {dx, dy}; draw();
+  });
+  const endDrag = () => { if(drag){ drag = null; cv.style.cursor = "default"; save(); draw(); } };
+  cv.addEventListener("pointerup", endDrag); cv.addEventListener("pointercancel", endDrag);
+  cv.addEventListener("dblclick", ev => { const e = hit(pt(ev)); if(e){ delete S.offsets[e.key]; save(); draw(); } });
+  document.addEventListener("keydown", ev => {
+    if(!selected || /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) return;
+    const step = ev.shiftKey ? 0.02 : 0.002, d = {ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1]}[ev.key];
+    if(!d) return;
+    ev.preventDefault();
+    const o = S.offsets[selected] || {dx: 0, dy: 0};
+    S.offsets[selected] = {dx: o.dx + d[0] * step, dy: o.dy + d[1] * step}; save(); draw();
+  });
+  function selectEl(key){
+    selected = key;
+    document.querySelectorAll(".blk").forEach(b => b.classList.toggle("sel", b.dataset.id === key));
+    const box = key && document.querySelector(`.blk[data-id="${key}"]`);
+    if(box) box.scrollIntoView({block: "nearest", behavior: "smooth"});
+  }
+
+  // ---------- blocks UI ----------
+  const TYPES = {heading: "หัวข้อย่อย (ตัวหนา)", paragraph: "เรียงความ", bullet: "ข้อๆ •", number: "ข้อๆ 1. 2. 3."};
+  function renderBlocks(){
+    const wrap = $("blocks"); wrap.innerHTML = "";
+    S.blocks.forEach((b, i) => {
+      const d = document.createElement("div"); d.className = "blk" + (b.id === selected ? " sel" : ""); d.dataset.id = b.id;
+      d.innerHTML = `
+        <div class="blk-top">
+          <select class="an-sel" data-k="type">${Object.entries(TYPES).map(([k, v]) => `<option value="${k}" ${k === b.type ? "selected" : ""}>${v}</option>`).join("")}</select>
+          <span class="an-seg" data-k="align">${[["left","ซ้าย"],["center","กลาง"],["right","ขวา"]].map(([v, l]) => `<button data-v="${v}" class="${b.align === v ? "on" : ""}">${l}</button>`).join("")}</span>
+          <span class="grow"></span>
+          <button class="an-btn" data-act="up" title="เลื่อนขึ้น" ${i === 0 ? "disabled" : ""}>↑</button>
+          <button class="an-btn" data-act="down" title="เลื่อนลง" ${i === S.blocks.length - 1 ? "disabled" : ""}>↓</button>
+          <button class="an-btn" data-act="dup" title="ทำซ้ำ">⧉</button>
+          <button class="an-btn" data-act="del" title="ลบ">🗑</button>
+        </div>
+        <textarea class="an-ta" data-k="text" placeholder="${b.type === "bullet" || b.type === "number" ? "พิมพ์ข้อละบรรทัด" : "พิมพ์ข้อความ"}"></textarea>
+        <div class="an-row">
+          <label>ขนาด <input type="range" data-k="size" min="50" max="200" step="5" value="${b.size}"> <span>${b.size}%</span></label>
+          <label>สี <input type="color" class="an-color" data-k="color" value="${b.color || S.cText}"></label>
+          <button class="an-btn" data-act="resetColor" ${b.color ? "" : "hidden"}>ใช้สีหลัก</button>
+        </div>`;
+      d.querySelector("textarea").value = b.text;
+      d.addEventListener("input", ev => {
+        const k = ev.target.dataset.k; if(!k) return;
+        b[k] = k === "size" ? +ev.target.value : ev.target.value;
+        if(k === "size") ev.target.nextElementSibling.textContent = b.size + "%";
+        if(k === "color") d.querySelector('[data-act="resetColor"]').hidden = false;
+        save(); draw();
+      });
+      d.addEventListener("change", ev => { if(ev.target.dataset.k === "type"){ b.type = ev.target.value; save(); renderBlocks(); draw(); } });
+      d.addEventListener("focusin", () => { selectEl(b.id); draw(); });
+      d.addEventListener("click", ev => {
+        const seg = ev.target.closest('[data-k="align"] button');
+        if(seg){ b.align = seg.dataset.v; save(); renderBlocks(); draw(); return; }
+        const act = ev.target.dataset.act; if(!act) return;
+        if(act === "del"){ S.blocks.splice(i, 1); delete S.offsets[b.id]; }
+        if(act === "up"){ S.blocks.splice(i - 1, 0, S.blocks.splice(i, 1)[0]); }
+        if(act === "down"){ S.blocks.splice(i + 1, 0, S.blocks.splice(i, 1)[0]); }
+        if(act === "dup"){ S.blocks.splice(i + 1, 0, Object.assign({}, b, {id: nid()})); }
+        if(act === "resetColor"){ b.color = ""; }
+        save(); renderBlocks(); draw();
+      });
+      wrap.appendChild(d);
+    });
+  }
+  document.querySelectorAll("[data-add]").forEach(btn => btn.addEventListener("click", () => {
+    const t = btn.dataset.add;
+    const b = {id: nid(), type: t, text: t === "bullet" || t === "number" ? "ข้อที่ 1\nข้อที่ 2" : "", color: "", size: 100, align: "left"};
+    S.blocks.push(b); selected = b.id; save(); renderBlocks(); draw();
+    const ta = document.querySelector(`.blk[data-id="${b.id}"] textarea`); if(ta){ ta.focus(); ta.select(); }
+  }));
+
+  // ---------- global controls ----------
+  function bindSeg(id, key){
+    const el = $(id);
+    const paint = () => el.querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.v === S[key]));
+    el.addEventListener("click", ev => { const b = ev.target.closest("button"); if(!b) return; S[key] = b.dataset.v; paint(); save(); draw(); });
+    paint();
+  }
+  const fields = {title: "value", titleColor: "value", titleSize: "num", font: "value", bodySize: "num", lineH: "num", logoSize: "num",
+                  cOuter: "value", cMid: "value", cInner: "value", cText: "value", autoFit: "check", showLogo: "check", showFrame: "check"};
+  function syncInputs(){
+    Object.entries(fields).forEach(([k, t]) => { const el = $(k); if(t === "check") el.checked = !!S[k]; else el.value = S[k]; });
+    $("preset").value = S.preset; $("cw").value = S.w; $("ch").value = S.h;
+    labels();
+  }
+  function labels(){
+    $("titleSizeV").textContent = S.titleSize + "%"; $("bodySizeV").textContent = S.bodySize; $("lineHV").textContent = (S.lineH / 100).toFixed(2);
+    $("manualWrap").style.opacity = S.autoFit ? .45 : 1; $("bodySize").disabled = S.autoFit;
+  }
+  Object.entries(fields).forEach(([k, t]) => $(k).addEventListener("input", () => {
+    const el = $(k); S[k] = t === "check" ? el.checked : t === "num" ? +el.value : el.value;
+    if(k === "autoFit" && !S.autoFit) { S.bodySize = fitSize; $("bodySize").value = fitSize; }
+    if(k === "font") document.fonts.load(`700 40px "${S.font}"`).then(draw);
+    labels(); save(); draw();
+    if(k === "cText") renderBlocks();
+  }));
+  $("preset").addEventListener("change", () => {
+    S.preset = $("preset").value;
+    if(S.preset !== "custom"){ const [w, h] = S.preset.split("x").map(Number); S.w = w; S.h = h; $("cw").value = w; $("ch").value = h; }
+    save(); draw();
+  });
+  ["cw", "ch"].forEach(id => $(id).addEventListener("change", () => {
+    const v = Math.min(4000, Math.max(300, +$(id).value || 1080)); $(id).value = v;
+    S[id === "cw" ? "w" : "h"] = v; S.preset = "custom"; $("preset").value = "custom"; save(); draw();
+  }));
+  document.querySelectorAll("[data-theme]").forEach(b => b.addEventListener("click", () => {
+    const [o, m, i, t, ti] = b.dataset.theme.split(",");
+    Object.assign(S, {cOuter: o, cMid: m, cInner: i, cText: t, titleColor: ti}); syncInputs(); renderBlocks(); save(); draw();
+  }));
+  bindSeg("titleAlign", "titleAlign"); bindSeg("vAlign", "vAlign");
+  $("resetPos").addEventListener("click", () => { S.offsets = {}; save(); draw(); });
+
+  // ---------- export ----------
+  function toast(msg){ const t = $("toast"); t.textContent = msg; t.classList.add("show"); setTimeout(() => t.classList.remove("show"), 1800); }
+  function exportBlob(type){
+    render(false);
+    return new Promise(res => cv.toBlob(b => { draw(); res(b); }, type, 0.95));
+  }
+  const fname = ext => (S.title.trim() || "ประกาศ").replace(/[\\/:*?"<>|]/g, "").slice(0, 40) + "." + ext;
+  async function download(type, ext){
+    const b = await exportBlob(type); const a = document.createElement("a");
+    a.href = URL.createObjectURL(b); a.download = fname(ext); a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  }
+  $("dl").addEventListener("click", () => download("image/png", "png"));
+  $("dlJpg").addEventListener("click", () => download("image/jpeg", "jpg"));
+  $("copy").addEventListener("click", async () => {
+    try { const b = await exportBlob("image/png"); await navigator.clipboard.write([new ClipboardItem({"image/png": b})]); toast("คัดลอกรูปแล้ว วางในแชทได้เลย"); }
+    catch(e){ toast("เบราว์เซอร์นี้คัดลอกรูปไม่ได้ ใช้ปุ่มดาวน์โหลดแทน"); }
+  });
+
+  // ---------- drafts ----------
+  let saveT = 0;
+  function save(){ clearTimeout(saveT); saveT = setTimeout(() => store.set(KEY, S), 300); }
+  function drafts(){ return store.get(DRAFTS) || {}; }
+  function fillDrafts(){
+    const d = drafts(), sel = $("draftList"), cur = sel.value;
+    sel.innerHTML = '<option value="">— เลือกแบบร่างที่บันทึกไว้ —</option>' + Object.keys(d).sort().map(n => `<option>${n.replace(/</g, "&lt;")}</option>`).join("");
+    sel.value = cur in d ? cur : "";
+  }
+  function load(obj){ S = Object.assign(defaults(), JSON.parse(JSON.stringify(obj))); selected = null; syncInputs(); renderBlocks(); save(); document.fonts.load(`700 40px "${S.font}"`).then(draw); draw(); }
+  $("saveDraft").addEventListener("click", () => {
+    const n = $("draftName").value.trim() || S.title.trim() || "แบบร่าง"; const d = drafts(); d[n] = S; store.set(DRAFTS, d); fillDrafts(); $("draftList").value = n; toast("บันทึก “" + n + "” แล้ว");
+  });
+  $("loadDraft").addEventListener("click", () => { const n = $("draftList").value, d = drafts(); if(d[n]){ load(d[n]); $("draftName").value = n; toast("เปิด “" + n + "” แล้ว"); } });
+  $("delDraft").addEventListener("click", () => { const n = $("draftList").value, d = drafts(); if(d[n] && confirm("ลบแบบร่าง “" + n + "” ?")){ delete d[n]; store.set(DRAFTS, d); fillDrafts(); } });
+  $("newDraft").addEventListener("click", () => { if(confirm("เริ่มประกาศใหม่? (ข้อความปัจจุบันจะถูกแทนที่ ถ้ายังไม่ได้บันทึกเป็นแบบร่าง)")){ load(defaults()); $("draftName").value = ""; } });
+
+  syncInputs(); renderBlocks(); fillDrafts(); draw();
+  Promise.all(["Kanit", "Prompt", "Mitr", "Sarabun", "Noto Sans Thai", "Chakra Petch"].filter(f => f === S.font).flatMap(f => [document.fonts.load(`700 40px "${f}"`), document.fonts.load(`400 40px "${f}"`)])).then(draw, draw);
+  document.fonts.ready.then(draw);
+})();
+</script>
+{% endblock %}

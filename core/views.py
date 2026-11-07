@@ -8411,6 +8411,7 @@ _ADMIN_TOOL_DEFAULTS = [
     ("private", "c-stone", "📄", "ออกเอกสารทางการ", "ใบสลิปค่าจ้างรายสัปดาห์ และหนังสือรับรองการหักภาษี ณ ที่จ่าย (50 ทวิ) ของติวเตอร์ พร้อมข้อมูลผู้ถูกหักภาษี", "/official-docs/"),
     ("private", "c-lilac", "💻", "ตารางเรียน Online", "สร้างปฏิทินตารางเรียนออนไลน์รายสัปดาห์เป็นรูป แล้วส่งค่าติวเตอร์ (ชม.ละ 300 + ติวเตอร์เฉลยเทส +2 ชม.) เข้าระบบรายรับรายจ่าย", "/online-schedule/"),
     ("private", "c-rose",  "🍬", "รายรับรายจ่ายร้านขนม", "บันทึกรับเงินสด · ซื้อสินค้า · นำเงินไปแลกเหรียญ ของร้านขนม แยกจากบัญชีโรงเรียน", "/snack-shop/"),
+    ("private", "c-teal",  "👩‍🏫", "ค่าสอนติวเตอร์", "โปรไฟล์ติวเตอร์แต่ละคน สอนกี่ชม. ได้กี่บาท เลือกเดือน/บางสัปดาห์/ช่วงวันที่ได้ พร้อมตรวจยอดที่คิดไม่ตรงเกณฑ์", "/tutor-pay/"),
     ("private", "c-sage",  "💰", "รายรับรายจ่าย", "บันทึกค่าใช้จ่าย ค่าติวเตอร์ และ Export Excel", "/school-finance/"),
     ("private", "c-clay",  "📊", "วิเคราะห์รายได้-ต้นทุน-กำไร", "ดูกำไรรายห้อง ปรับสมมติฐานค่าสอน/รายได้ต่อคนได้เอง ปันส่วน fixed cost หาจุดคุ้มทุน และจำลอง what-if", "/revenue-analysis/"),
     ("private", "c-rose",  "📌", "รายงานสมัคร/ทดลองเรียน", "ติดตามใบสมัคร จองทดลองเรียน และสถานะภายใน", "/admission-report/"),
@@ -9504,6 +9505,8 @@ def school_finance(request: HttpRequest) -> HttpResponse:
                 note_raw = (request.POST.get(f"note_{tid}") or "").strip()
                 special_rate_325 = request.POST.get(f"special_rate_325_{tid}") == "yes"
                 special_rate_350 = request.POST.get(f"special_rate_350_{tid}") == "yes"
+                rate_ov_raw = (request.POST.get(f"rate_override_{tid}") or "").strip()
+                travel_ov_raw = (request.POST.get(f"travel_override_{tid}") or "").strip()
 
                 # Skip blank rows when saving all.
                 if (
@@ -9551,6 +9554,18 @@ def school_finance(request: HttpRequest) -> HttpResponse:
                     entry.online_hourly_rate_override = None
                 entry.special_rate_325 = special_rate_325
                 entry.special_rate_350 = special_rate_350
+                # These were invisible here before, so an override typed in the
+                # schedule popup silently beat the 325 tick. Now shown + editable.
+                if f"rate_override_{tid}" in request.POST:
+                    try:
+                        entry.hourly_rate_override = Decimal(rate_ov_raw) if rate_ov_raw else None
+                    except Exception:
+                        entry.hourly_rate_override = None
+                if f"travel_override_{tid}" in request.POST:
+                    try:
+                        entry.travel_fee_override = Decimal(travel_ov_raw) if travel_ov_raw else None
+                    except Exception:
+                        entry.travel_fee_override = None
                 entry.withholding_3 = request.POST.get(f"wht_{tid}") == "yes"
                 entry.idle_fee = idle_fee
                 entry.note = note_raw

@@ -4,6 +4,7 @@ from . import home_budget
 from . import official_docs
 from . import pretest
 from . import announcements
+from . import tutor_pay
 from . import print_supplies
 
 app_name = "core"
@@ -107,6 +108,7 @@ urlpatterns = [
     path("official-docs/wht50/", official_docs.official_doc_wht50, name="official_doc_wht50"),
     path("home-budget/", home_budget.home_budget_page, name="home_budget"),
     path("extras/", home_budget.extras_hub, name="extras_hub"),
+    path("tutor-pay/", tutor_pay.tutor_pay_page, name="tutor_pay"),
     path("announcements/", announcements.announcement_builder, name="announcement_builder"),
     path("pretest-applications/", pretest.pretest_page, name="pretest_applications"),
     path("pretest-applications/<int:pk>/form.pdf", pretest.pretest_form_pdf, name="pretest_form_pdf"),

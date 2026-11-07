@@ -186,6 +186,10 @@
     line-height:1;cursor:pointer;transition:all .15s;z-index:2;}
   .card-quick-add:hover{border-color:var(--accent);color:var(--accent-strong);transform:scale(1.08);}
   .managing .card-quick-add{display:none;}
+  .card-shortcut{position:absolute;top:8px;right:8px;border:1px solid #cbd5e1;background:#fff;border-radius:999px;padding:3px 9px;
+    font-size:11px;font-weight:800;color:#334155;white-space:nowrap;cursor:pointer;transition:.15s;z-index:2;}
+  .card-shortcut:hover{border-color:var(--accent);color:var(--accent-strong);transform:scale(1.05);}
+  .managing .card-shortcut{display:none;}
   .card-ctrls{display:none;position:absolute;top:8px;right:8px;gap:6px;}
   .managing .card-ctrls{display:flex;}
   .card-ctrls button{width:26px;height:26px;border-radius:8px;border:1px solid var(--line-strong);
@@ -905,7 +909,10 @@
     });
   }
 
+  // card url -> small extra link shown top-right of that card
+  var CARD_SHORTCUTS={"/teaching-schedule/":{url:"/tutor-teaching-update/",label:"📝 อัปเดตการสอน"}};
   function cardEl(c){
+    var sc=CARD_SHORTCUTS[c.url];
     var a=document.createElement("a");
     a.className="tool-card";
     a.href=managing?"javascript:void(0)":c.url;
@@ -919,10 +926,13 @@
       +((!managing && c.quick_add_url)
         ? '<span class="card-quick-add" data-quick-url="'+esc(c.quick_add_url)+'" role="button" tabindex="0" title="สร้างรายการใหม่">+</span>'
         : '')
+      +((!managing && sc && !c.quick_add_url)
+        ? '<span class="card-shortcut" data-quick-url="'+esc(sc.url)+'" role="button" tabindex="0" title="ไปหน้า '+esc(sc.url)+'">'+esc(sc.label)+'</span>'
+        : '')
       +'<div class="tool-icon '+esc(c.color)+'">'+esc(c.icon)+'</div>'
       +'<div class="tool-name">'+esc(c.name)+'</div>'
       +'<div class="tool-desc">'+esc(c.desc)+'</div>';
-    var quick=a.querySelector(".card-quick-add");
+    var quick=a.querySelector(".card-quick-add, .card-shortcut");
     if(quick){
       var goQuick=function(e){
         e.preventDefault(); e.stopPropagation();

@@ -26,7 +26,7 @@
         {% csrf_token %}
         <input type="hidden" name="next" value="{{ supply_next }}">
         <input type="hidden" name="supply" value="{{ s.id }}"><input type="hidden" name="actor" class="ps-actor-field">
-        <input type="number" name="amount" {% if s.is_paper %}step="0.01" min="0" placeholder="จำนวนรีม"{% else %}step="1" min="0" placeholder="จำนวน{{ s.unit }}"{% endif %} required>
+        <input type="number" name="amount" {% if s.in_reams %}step="0.01" min="0" placeholder="จำนวนรีม"{% else %}step="1" min="0" placeholder="จำนวน{{ s.unit }}"{% endif %} required>
         <input name="note" placeholder="หมายเหตุ" style="width:120px">
         <button class="ps-btn add" name="action" value="add">+ เพิ่ม</button>
         <button class="ps-btn rm" name="action" value="remove">− ลด</button>

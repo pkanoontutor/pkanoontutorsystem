@@ -4,8 +4,8 @@ Sending an order to print takes its paper out of stock straight away. The spine
 comes out when the print shop picks a size for the order (colour is set by the
 order, size by the shop); changing the size puts the old ones back. Ink and
 drums have no per-order usage, so they only change by hand. Every change writes
-a PrintSupplyLog row. Paper is entered in reams but stored and deducted in
-sheets. Like /print-shop/ itself these pages need no login.
+a PrintSupplyLog row. A4 is entered in reams but stored and deducted in
+sheets (cover paper is entered in sheets). Like /print-shop/ itself these pages need no login.
 """
 from __future__ import annotations
 
@@ -120,12 +120,12 @@ def _back(request: HttpRequest) -> HttpResponse:
 
 
 def _amount(supply: PrintSupply, raw) -> int | None:
-    """The typed amount in stock units: paper is typed in reams."""
+    """The typed amount in stock units: A4 is typed in reams."""
     try:
         value = Decimal(str(raw).strip())
         if not value.is_finite():
             return None
-        if supply.is_paper:
+        if supply.in_reams:
             value *= PrintSupply.SHEETS_PER_REAM
         return int(value)
     except (InvalidOperation, ValueError, OverflowError):

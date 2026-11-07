@@ -110,6 +110,7 @@ urlpatterns = [
     path("announcements/", announcements.announcement_builder, name="announcement_builder"),
     path("pretest-applications/", pretest.pretest_page, name="pretest_applications"),
     path("pretest-applications/<int:pk>/form.pdf", pretest.pretest_form_pdf, name="pretest_form_pdf"),
+    path("pretest-applications/combined.pdf", pretest.pretest_combined_pdf, name="pretest_combined_pdf"),
     path("pretest-applications/api/", pretest.pretest_api, name="pretest_api"),
     path("home-budget/api/", home_budget.home_budget_api, name="home_budget_api"),
     path("sub-admin/manage/", views.sub_admin_manage, name="sub_admin_manage"),

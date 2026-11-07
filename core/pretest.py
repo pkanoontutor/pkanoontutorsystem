@@ -253,6 +253,59 @@ def pretest_form_pdf(request: HttpRequest, pk: int) -> HttpResponse:
     return resp
 
 
+def _cover_pdf(image_data_url: str) -> bytes:
+    """Put the list image on one A4 portrait page (scaled to fit, white margins)."""
+    import base64
+    from PIL import Image
+    raw = base64.b64decode(image_data_url.split(",", 1)[1])
+    img = Image.open(BytesIO(raw)).convert("RGB")
+    page_w, page_h, margin = 1240, 1754, 50  # A4 at 150 dpi
+    scale = min((page_w - 2 * margin) / img.width, (page_h - 2 * margin) / img.height)
+    img = img.resize((max(1, int(img.width * scale)), max(1, int(img.height * scale))), Image.LANCZOS)
+    page = Image.new("RGB", (page_w, page_h), "white")
+    page.paste(img, ((page_w - img.width) // 2, margin))
+    buf = BytesIO()
+    page.save(buf, "PDF", resolution=150)
+    return buf.getvalue()
+
+
+@login_required
+def pretest_combined_pdf(request: HttpRequest) -> HttpResponse:
+    """Cover image + every listed child's form, in the order given."""
+    if not _can_use(request.user):
+        return HttpResponse(status=403)
+    if request.method != "POST":
+        return HttpResponse(status=405)
+    try:
+        p = json.loads(request.body or b"{}")
+        ids = [int(i) for i in p.get("ids") or []]
+    except (ValueError, TypeError):
+        return HttpResponse("ข้อมูลไม่ถูกต้อง", status=400)
+    apps = {a.id: a for a in PretestApplication.objects.filter(id__in=ids, application_pdf__isnull=False)}
+    out = pypdfium2.PdfDocument.new()
+    if p.get("image"):
+        try:
+            cover = pypdfium2.PdfDocument(_cover_pdf(p["image"]))
+        except Exception:
+            return HttpResponse("รูปปกไม่ถูกต้อง", status=400)
+        out.import_pages(cover)
+    added = 0
+    for i in ids:
+        a = apps.get(i)
+        if not a:
+            continue
+        doc = pypdfium2.PdfDocument(bytes(a.application_pdf))
+        out.import_pages(doc)
+        added += 1
+    buf = BytesIO()
+    out.save(buf)
+    resp = HttpResponse(buf.getvalue(), content_type="application/pdf")
+    resp["X-Forms-Added"] = str(added)
+    resp["X-Forms-Missing"] = str(len(ids) - added)
+    resp["Cache-Control"] = "private, no-store"
+    return resp
+
+
 def _round_action(action: str, v: dict) -> JsonResponse:
     if action == "bulk_round":
         round_id = v.get("round") or None

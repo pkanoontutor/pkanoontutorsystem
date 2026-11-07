@@ -140,6 +140,7 @@
       <button class="pt-chip" type="button" id="imgBuild" style="background:#7c3aed;color:#fff;border:0;">สร้างรูป</button>
       <button class="pt-chip" type="button" id="imgCopy" hidden>Copy รูป</button>
       <button class="pt-chip" type="button" id="imgSave" hidden>บันทึกรูป</button>
+      <button class="pt-chip" type="button" id="pdfCombine" style="background:#0f766e;color:#fff;border:0;" title="รูปรายชื่อเป็นหน้าแรก ตามด้วยใบสมัครของทุกคนที่แสดงอยู่ เรียงตามตาราง">📑 รวม PDF ใบสมัคร</button>
     </div>
     <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:10px;font-size:13px;font-weight:800;">
       🎨 สีตัวอักษรสถานะ:
@@ -350,6 +351,30 @@
   document.getElementById("imgSave").addEventListener("click", async () => {
     const a = document.createElement("a");
     a.href = (await toCanvas()).toDataURL("image/png"); a.download = `pretest-${room.room}.png`; a.click();
+  });
+  document.getElementById("pdfCombine").addEventListener("click", async ev => {
+    if(!room){ alert("กรุณาเลือกห้องก่อน"); return; }
+    const {card, count} = buildCard();
+    if(!count){ alert("ตัวกรองนี้ไม่มีรายชื่อ"); return; }
+    document.getElementById("imgStage").replaceChildren(card);
+    document.getElementById("imgCopy").hidden = document.getElementById("imgSave").hidden = false;
+    const btn = ev.currentTarget, label = btn.textContent;
+    btn.disabled = true; btn.textContent = "กำลังรวม PDF…";
+    try {
+      const image = (await toCanvas()).toDataURL("image/jpeg", 0.92);
+      const ids = rows.filter(tr => tr.style.display !== "none").map(tr => Number(tr.dataset.id));
+      const r = await fetch("{% url 'core:pretest_combined_pdf' %}", {method: "POST", headers: {"Content-Type": "application/json", "X-CSRFToken": CSRF},
+        body: JSON.stringify({ids, image})});
+      if(!r.ok){ alert("รวม PDF ไม่สำเร็จ: " + await r.text()); return; }
+      const blob = await r.blob(), a = document.createElement("a");
+      a.href = URL.createObjectURL(blob); a.download = `ใบสมัคร-${room.room}.pdf`; a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+      const missing = Number(r.headers.get("X-Forms-Missing") || 0);
+      if(missing){
+        const names = rows.filter(tr => tr.style.display !== "none" && !tr.dataset.form).map(tr => tr.querySelector('[data-field="nickname"]').value || tr.querySelector('[data-field="first_name"]').value);
+        alert(`รวมใบสมัครได้ ${r.headers.get("X-Forms-Added")} ใบ · ยังไม่มีไฟล์ใบสมัคร ${missing} คน: ${names.join(", ")}`);
+      }
+    } finally { btn.disabled = false; btn.textContent = label; }
   });
   // ---- preset rounds + changing many children at once ----
   const roundCall = async (field, value) => { if((await save({dataset:{id:0}}, field, value)).ok) location.reload(); };

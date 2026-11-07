@@ -31,6 +31,7 @@ STEPS = [
     ("is_filed", "ยื่นแล้ว"),
     ("is_returned", "ส่งกลับแล้ว"),
 ]
+STEP_ICONS = {"is_printed": "🖨️", "is_signed": "✍️", "is_paid": "💰", "is_filed": "🏫", "is_returned": "📨"}
 TEXT_FIELDS = {"nickname": 100, "first_name": 150, "last_name": 150, "phone": 20, "exam_number": 50}
 _PREFIX = re.compile(r"^(เด็กหญิง|เด็กชาย|ด\.?\s?ญ\.?|ด\.?\s?ช\.?|นางสาว|นาย)\s*")
 
@@ -201,7 +202,7 @@ def pretest_page(request: HttpRequest) -> HttpResponse:
         a.class_names = ", ".join(sorted(mine.values()))
         a.id_ok = valid_national_id(a.national_id)
         a.phone_ok = len(_digits(a.phone)) == 10
-        a.steps = [(f, label, getattr(a, f)) for f, label in STEPS]
+        a.steps = [(f, label, getattr(a, f), STEP_ICONS[f]) for f, label in STEPS]
         a.done_count = sum(1 for f, _ in STEPS if getattr(a, f))
     return render(request, "core/pretest_applications.html", {
         "apps": apps,
@@ -216,7 +217,7 @@ def pretest_page(request: HttpRequest) -> HttpResponse:
         ),
         "no_class": sum(1 for a in apps if a.student_id not in classes),
         "no_form": sum(1 for a in apps if not a.application_no),
-        "step_stats": [{"field": f, "label": label, "count": sum(1 for a in apps if getattr(a, f))} for f, label in STEPS],
+        "step_stats": [{"field": f, "label": label, "icon": STEP_ICONS[f], "count": sum(1 for a in apps if getattr(a, f))} for f, label in STEPS],
         "student_options": [{"id": s.id, "label": _student_label(s)} for s in Student.objects.order_by("-is_active", "nickname")],
     })
 

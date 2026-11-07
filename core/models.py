@@ -1355,8 +1355,8 @@ class PrintSupply(models.Model):
     LOW_BELOW = {"cover_paper": 5000, "a4_paper": 5000, "spine": 12, "ink": 5, "drum": 5}
 
     @property
-    def is_paper(self) -> bool:
-        return self.category in (self.Category.COVER_PAPER, self.Category.A4_PAPER)
+    def in_reams(self) -> bool:
+        return self.category == self.Category.A4_PAPER
 
     @property
     def is_low(self) -> bool:
@@ -1368,7 +1368,7 @@ class PrintSupply(models.Model):
 
     @property
     def reams_label(self) -> str:
-        if not self.is_paper:
+        if not self.in_reams:
             return ""
         return f"{self.quantity / self.SHEETS_PER_REAM:,.2f}".rstrip("0").rstrip(".") + " รีม"
 

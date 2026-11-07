@@ -20,6 +20,7 @@
   table.pt input[type=text]:hover,table.pt input[type=text]:focus{border-color:#cbd5e1;background:#fff;outline:none;}
   table.pt input.warn{border-color:#f87171;background:#fef2f2;}
   table.pt input.saved{background:#dcfce7;}
+  .step-box{display:inline-flex;align-items:center;gap:4px;cursor:pointer;font-size:15px;line-height:1;}
   .c-step{text-align:center;width:66px;} .c-step input{width:20px;height:20px;accent-color:#7c3aed;cursor:pointer;}
   table.pt th.c-step{white-space:normal;font-size:12px;line-height:1.2;text-align:center;}
   table.pt input.exam{border-color:#c4b5fd;background:#faf5ff;}
@@ -78,7 +79,7 @@
       <button class="pt-chip" type="button" data-filter="unlinked">ยังไม่ผูกนักเรียน <b>{{ unlinked }}</b></button>
       <button class="pt-chip" type="button" data-filter="external">ไม่ใช่นักเรียนปัจจุบัน <b>{{ external }}</b></button>
       <button class="pt-chip" type="button" data-filter="noform">ยังไม่มีใบสมัคร <b>{{ no_form }}</b></button>
-      {% for s in step_stats %}<button class="pt-chip" type="button" data-filter="{{ s.field }}" title="ดูคนที่ยังไม่ได้ทำขั้นนี้">{{ s.label }} <b data-stat="{{ s.field }}">{{ s.count }}</b>/{{ apps|length }}</button>{% endfor %}
+      {% for s in step_stats %}<button class="pt-chip" type="button" data-filter="{{ s.field }}" title="ดูคนที่ยังไม่ได้ทำขั้นนี้">{{ s.icon }} {{ s.label }} <b data-stat="{{ s.field }}">{{ s.count }}</b>/{{ apps|length }}</button>{% endfor %}
     </div>
     <div class="pt-tools"><input type="search" id="q" placeholder="ค้นหาชื่อเล่น ชื่อจริง เบอร์ เลขบัตร หมายเลขผู้สอบ">
       <select id="classFilter" style="border:1px solid #e2e8f0;border-radius:10px;padding:9px 11px;font:inherit;font-weight:700;">
@@ -93,7 +94,7 @@
     <table class="pt">
       <thead><tr>
         <th>#</th><th>ชื่อเล่น</th><th>ชื่อจริง</th><th>นามสกุล</th><th>เลขบัตรประชาชน</th><th>เบอร์มือถือ</th><th>นักเรียนในระบบ</th><th>ใบสมัคร</th>
-        <th class="c-step">ปรินท์แล้ว</th><th class="c-step">ส่งให้เซ็นแล้ว</th><th class="c-step">รับเงินแล้ว</th><th class="c-step">นำไปยื่นแล้ว</th><th class="c-step">ส่งกลับแล้ว</th>
+        <th class="c-step">🖨️ ปรินท์แล้ว</th><th class="c-step">✍️ ส่งให้เซ็นแล้ว</th><th class="c-step">💰 รับเงินแล้ว</th><th class="c-step">🏫 นำไปยื่นแล้ว</th><th class="c-step">📨 ส่งกลับแล้ว</th>
         <th>หมายเลขผู้สอบ</th><th></th>
       </tr></thead>
       <tbody>
@@ -112,7 +113,7 @@
             {% else %}<input type="text" class="st-pick" list="ptStudents" placeholder="เลือกนักเรียน…"><button class="ext-on" type="button">ไม่ใช่นักเรียนปัจจุบัน</button>{% endif %}
           </td>
           <td style="white-space:nowrap;font-size:12px;font-weight:800;">{% if a.application_no %}<a href="{% url 'core:pretest_form_pdf' a.id %}" target="_blank" rel="noopener">📄 {{ a.application_no }}</a>{% else %}<span style="color:#94a3b8;">ยังไม่มี</span>{% endif %}</td>
-          {% for f, label, on in a.steps %}<td class="c-step"><input type="checkbox" data-step="{{ f }}" aria-label="{{ label }}" {% if on %}checked{% endif %}></td>{% endfor %}
+          {% for f, label, on, icon in a.steps %}<td class="c-step"><label class="step-box" title="{{ label }}"><input type="checkbox" data-step="{{ f }}" aria-label="{{ label }}" {% if on %}checked{% endif %}><span>{{ icon }}</span></label></td>{% endfor %}
           <td style="width:120px;"><input type="text" class="exam" data-field="exam_number" value="{{ a.exam_number }}"></td>
           <td><button class="del" type="button" title="ลบรายการ">🗑</button></td>
         </tr>

@@ -1,6 +1,7 @@
 {% extends "core/base.html" %}
 {% block title %}ใบสมัครสอบ Pre-test{% endblock %}
 {% block head %}
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 <style>
   .pt-wrap{max-width:1500px;margin:0 auto;display:grid;gap:12px;}
   .pt-hero{background:linear-gradient(120deg,#4c1d95,#7c3aed);color:#fff;border-radius:20px;padding:18px 20px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center;}
@@ -20,6 +21,18 @@
   table.pt input[type=text]:hover,table.pt input[type=text]:focus{border-color:#cbd5e1;background:#fff;outline:none;}
   table.pt input.warn{border-color:#f87171;background:#fef2f2;}
   table.pt input.saved{background:#dcfce7;}
+  .room-btn{border:2px solid transparent;border-radius:12px;padding:7px 12px;font:inherit;font-size:13px;font-weight:900;color:#0f172a;cursor:pointer;}
+  .room-btn.on{border-color:#0f172a;}
+  #imgStage{overflow-x:auto;margin-top:10px;}
+  #imgCard{width:900px;background:#fff;padding:22px;box-sizing:border-box;font-family:inherit;color:#0f172a;}
+  #imgCard .ic-head{border-radius:14px;padding:12px 16px;margin-bottom:12px;}
+  #imgCard .ic-title{font-size:21px;font-weight:900;}
+  #imgCard .ic-sub{font-size:14px;font-weight:800;margin-top:3px;}
+  #imgCard table{width:100%;border-collapse:collapse;font-size:14px;}
+  #imgCard th{background:#f1f5f9;padding:8px 6px;font-size:13px;font-weight:900;text-align:left;}
+  #imgCard td{border-top:1px solid #e2e8f0;padding:8px 6px;font-weight:700;}
+  #imgCard .ic-c{text-align:center;width:38px;}
+  #imgCard .ic-foot{margin-top:10px;font-size:12px;font-weight:700;color:#64748b;}
   .step-box{display:inline-flex;align-items:center;gap:4px;cursor:pointer;font-size:15px;line-height:1;}
   .c-step{text-align:center;width:66px;} .c-step input{width:20px;height:20px;accent-color:#7c3aed;cursor:pointer;}
   table.pt th.c-step{white-space:normal;font-size:12px;line-height:1.2;text-align:center;}
@@ -90,6 +103,17 @@
     <div style="font-size:12px;font-weight:700;color:#64748b;margin-top:6px;">กดปุ่มขั้นตอนด้านบนเพื่อดูคนที่ยังไม่ได้ทำขั้นนั้น · ช่องสีแดง = เลขบัตรหรือเบอร์น่าจะผิด</div>
   </div>
 
+  <div class="pt-panel">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:13px;font-weight:900;">
+      📸 สร้างรูปรายชื่อตามตัวกรองปัจจุบัน · เลือกห้อง:
+      {% for short, full, color, icon in rooms %}<button class="room-btn" type="button" data-room="{{ full }}" data-color="{{ color }}" data-icon="{{ icon }}" style="background:{{ color }};">{{ icon }} {{ short }}</button>{% endfor %}
+      <button class="pt-chip" type="button" id="imgBuild" style="background:#7c3aed;color:#fff;border:0;">สร้างรูป</button>
+      <button class="pt-chip" type="button" id="imgCopy" hidden>Copy รูป</button>
+      <button class="pt-chip" type="button" id="imgSave" hidden>บันทึกรูป</button>
+    </div>
+    <div id="imgStage"></div>
+  </div>
+
   <div class="pt-panel pt-scroll">
     <table class="pt">
       <thead><tr>
@@ -99,7 +123,7 @@
       </tr></thead>
       <tbody>
       {% for a in apps %}
-        <tr data-id="{{ a.id }}" data-student="{{ a.student_id|default:'' }}" data-form="{{ a.application_no }}" data-classes="{{ a.class_ids }}" data-external="{% if a.is_external %}1{% endif %}" class="{% if a.done_count == 5 %}done{% endif %}">
+        <tr data-id="{{ a.id }}" data-student="{{ a.student_id|default:'' }}" data-form="{{ a.application_no }}" data-classes="{{ a.class_ids }}" data-classnames="{{ a.class_names }}" data-external="{% if a.is_external %}1{% endif %}" class="{% if a.done_count == 5 %}done{% endif %}">
           <td>{{ forloop.counter }}</td>
           <td style="width:100px;"><input type="text" data-field="nickname" value="{{ a.nickname }}"></td>
           <td style="width:130px;"><input type="text" data-field="first_name" value="{{ a.first_name }}"></td>
@@ -210,6 +234,63 @@
     if(unlink) unlink.addEventListener("click", async () => {
       if((await save(tr, "student", null)).ok) location.reload();
     });
+  });
+  // ---- list image: whatever rows the current filters show (no national ID / phone) ----
+  const STEP_ORDER = [["is_printed","🖨️","ปรินท์แล้ว"],["is_signed","✍️","ส่งให้เซ็นแล้ว"],["is_paid","💰","รับเงินแล้ว"],["is_filed","🏫","นำไปยื่นแล้ว"],["is_returned","📨","ส่งกลับแล้ว"]];
+  let room = null;
+  const el = (tag, cls, text) => { const e = document.createElement(tag); if(cls) e.className = cls; if(text !== undefined) e.textContent = text; return e; };
+  document.querySelectorAll(".room-btn").forEach(b => b.addEventListener("click", () => {
+    document.querySelectorAll(".room-btn").forEach(x => x.classList.toggle("on", x === b));
+    room = b.dataset;
+  }));
+  function buildCard(){
+    const sel = document.getElementById("classFilter"), one = sel.value && sel.value !== "none";
+    const className = sel.value ? sel.options[sel.selectedIndex].text.replace(/ \(\d+\)$/, "") : "ทุก Class";
+    const list = rows.filter(tr => tr.style.display !== "none");
+    const card = el("div"); card.id = "imgCard";
+    const head = el("div", "ic-head"); head.style.background = room.color;
+    head.append(el("div", "ic-title", `${room.icon} ${room.room}`), el("div", "ic-sub", `ใบสมัครสอบ Pre-test · Class: ${className} · ${list.length} คน`));
+    card.append(head);
+    const table = el("table"), hr = el("tr");
+    ["#","ชื่อเล่น","ชื่อจริง"].concat(one ? [] : ["Class"], ["สถานะล่าสุด"]).forEach(t => hr.append(el("th", "", t)));
+    STEP_ORDER.forEach(s => hr.append(el("th", "ic-c", s[1])));
+    hr.append(el("th", "", "เลขผู้สอบ"));
+    table.append(hr);
+    list.forEach((tr, i) => {
+      const val = f => tr.querySelector(`[data-field="${f}"]`).value;
+      const on = STEP_ORDER.map(s => tr.querySelector(`input[data-step="${s[0]}"]`).checked);
+      const last = on.lastIndexOf(true);
+      const r = el("tr");
+      r.append(el("td", "", i + 1), el("td", "", val("nickname")), el("td", "", val("first_name")));
+      if(!one) r.append(el("td", "", tr.dataset.classnames || (tr.dataset.external ? "คนนอก" : "-")));
+      const st = el("td", "", last < 0 ? "ยังไม่เริ่ม" : STEP_ORDER[last][2]);
+      st.style.color = last === 4 ? "#15803d" : last < 0 ? "#94a3b8" : "#6d28d9";
+      r.append(st);
+      on.forEach(v => { const c = el("td", "ic-c", v ? "✓" : ""); c.style.color = "#15803d"; c.style.fontWeight = "900"; r.append(c); });
+      r.append(el("td", "", val("exam_number") || "-"));
+      table.append(r);
+    });
+    card.append(table);
+    card.append(el("div", "ic-foot", `พี่ขนุนติวเตอร์ · ข้อมูล ณ ${new Date().toLocaleString("th-TH", {dateStyle:"medium", timeStyle:"short"})} · ` + STEP_ORDER.map(s => `${s[1]} ${s[2]}`).join("  ")));
+    return {card, count: list.length};
+  }
+  const toCanvas = () => html2canvas(document.getElementById("imgCard"), {scale: 2, backgroundColor: "#ffffff"});
+  document.getElementById("imgBuild").addEventListener("click", () => {
+    if(!room){ alert("กรุณาเลือกห้องก่อน"); return; }
+    const {card, count} = buildCard();
+    if(!count){ alert("ตัวกรองนี้ไม่มีรายชื่อ"); return; }
+    document.getElementById("imgStage").replaceChildren(card);
+    document.getElementById("imgCopy").hidden = document.getElementById("imgSave").hidden = false;
+  });
+  document.getElementById("imgCopy").addEventListener("click", () => {
+    if(!navigator.clipboard || !window.ClipboardItem){ alert("เบราว์เซอร์นี้ Copy รูปไม่ได้ ให้ใช้บันทึกรูปแทน"); return; }
+    // ClipboardItem gets the unresolved promise so Safari keeps the click's permission
+    const blob = toCanvas().then(c => new Promise(res => c.toBlob(res, "image/png")));
+    navigator.clipboard.write([new ClipboardItem({"image/png": blob})]).then(() => alert("Copy รูปแล้ว")).catch(() => alert("Copy ไม่สำเร็จ ให้ใช้บันทึกรูปแทน"));
+  });
+  document.getElementById("imgSave").addEventListener("click", async () => {
+    const a = document.createElement("a");
+    a.href = (await toCanvas()).toDataURL("image/png"); a.download = `pretest-${room.room}.png`; a.click();
   });
   document.getElementById("addForm").addEventListener("submit", async e => {
     e.preventDefault();

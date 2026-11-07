@@ -3354,7 +3354,7 @@ def print_shop_order_list(request: HttpRequest) -> HttpResponse:
         "total_pending_books": total_pending_books,
         "pending_count": len(pending_list),
         "overdue_count": overdue_count,
-        "supply_rows": print_supplies.stock_rows(),
+        **print_supplies.editor_context(next_page="shop"),
     })
 
 
@@ -8757,6 +8757,7 @@ def pkanoon_admin_tool(request: HttpRequest) -> HttpResponse:
         "can_edit": can_edit,
         "upcoming_admissions": _upcoming_weekend_admissions(),
         "low_stock_sheets": _low_stock_sheets(),
+        "print_supply_alerts": print_supplies.low_stock_alerts(),
         "near_end_sheets": _near_end_sheet_flags(),
         **_memo_panel_context(),
         "assign_classes": _active_classes_for_assign(),

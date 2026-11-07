@@ -39,52 +39,7 @@
   </section>
 
   <section class="panel">
-    <label class="muted">ชื่อผู้แก้ไข (บันทึกลงประวัติ):
-      <input id="actorName" placeholder="{% if request.user.is_authenticated %}{{ request.user.get_username }}{% else %}ร้านปรินท์{% endif %}" {% if request.user.is_authenticated %}disabled{% endif %}>
-    </label>
-  </section>
-
-  {% for label, items in groups %}
-    <section class="panel">
-      <div class="title">{{ label }}</div>
-      {% for s in items %}
-        <div class="row {% if s.is_low %}low{% endif %}">
-          <div class="name">{{ s.name }} {% if s.is_low %}<span class="low-tag">ใกล้หมด</span>{% endif %}</div>
-          <div class="qty">{{ s.quantity }} <small>{{ s.unit }}</small></div>
-          <form class="inline" method="post" action="{% url 'core:print_supply_update' %}">
-            {% csrf_token %}
-            <input type="hidden" name="supply" value="{{ s.id }}"><input type="hidden" name="actor" class="actor-field">
-            <input type="number" name="amount" placeholder="จำนวน" required>
-            <input name="note" placeholder="หมายเหตุ" style="width:130px">
-            <button class="btn add" name="action" value="add">+ เพิ่ม</button>
-            <button class="btn rm" name="action" value="remove">− ลด</button>
-            <button class="btn" name="action" value="set">ตั้งยอดเป็น</button>
-          </form>
-          <form class="inline" method="post" action="{% url 'core:print_supply_update' %}">
-            {% csrf_token %}
-            <input type="hidden" name="supply" value="{{ s.id }}">
-            <span class="muted">เตือนเมื่อเหลือ ≤</span>
-            <input type="number" min="0" name="low_threshold" value="{{ s.low_threshold }}" style="width:76px">
-            <button class="btn" name="action" value="threshold">บันทึก</button>
-            {% if s.category == "spine" %}<button class="btn" name="action" value="hide" onclick="return confirm('ซ่อนขนาดสันนี้?')">ซ่อน</button>{% endif %}
-          </form>
-        </div>
-      {% empty %}
-        <div class="muted">ยังไม่มีรายการ เพิ่มขนาดสันได้จากฟอร์มด้านล่าง</div>
-      {% endfor %}
-    </section>
-  {% endfor %}
-
-  <section class="panel">
-    <div class="title">➕ เพิ่มสันสี/ขนาดใหม่</div>
-    <form class="inline" method="post" action="{% url 'core:print_supply_update' %}">
-      {% csrf_token %}
-      <input type="hidden" name="action" value="add_spine"><input type="hidden" name="actor" class="actor-field">
-      <select name="spine_color" required>{% for v, l in colors %}<option value="{{ v }}">{{ l }}</option>{% endfor %}</select>
-      <input name="spine_size" placeholder="ขนาด เช่น 6 มม." required>
-      <input type="number" min="0" name="quantity" placeholder="จำนวนตั้งต้น">
-      <button class="btn dark">เพิ่ม</button>
-    </form>
+    {% include "core/_print_supply_editor.html" %}
   </section>
 
   <section class="panel">
@@ -115,17 +70,5 @@
     </div>
   </section>
 </div>
-<script>
-  // remember who is editing on this device, and send the name with each stock change
-  (function(){
-    const box = document.getElementById("actorName");
-    try { box.value = localStorage.getItem("printSupplyActor") || ""; } catch(e) {}
-    const sync = () => {
-      document.querySelectorAll(".actor-field").forEach(f => f.value = box.value);
-      try { localStorage.setItem("printSupplyActor", box.value); } catch(e) {}
-    };
-    box.addEventListener("input", sync); sync();
-  })();
-</script>
 </body>
 </html>

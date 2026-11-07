@@ -91,12 +91,19 @@
     </div>
   </section>
 
-  <section class="panel">
-    <div class="section-title">📦 สินค้าคงเหลือ <a class="btn soft" href="{% url 'core:print_supplies' %}" style="text-decoration:none;">แก้ไข / ดูประวัติ</a></div>
-    <div class="pillrow">
-      {% for s in supply_rows %}<span class="pill {% if s.is_low %}warn{% endif %}">{{ s.name }}: {{ s.quantity }} {{ s.unit }}</span>{% endfor %}
+  <details class="panel" id="supplies" {% if request.GET.supplies %}open{% endif %}>
+    <summary style="cursor:pointer;">
+      <span class="section-title" style="display:inline-flex;margin:0 0 8px;">📦 สินค้าคงเหลือ <span class="refresh-hint">กดเพื่อแก้ไข</span></span>
+      <div class="pillrow">
+        {% for s in supply_rows %}<span class="pill {% if s.is_low %}warn{% endif %}">{{ s.name }}: {{ s.quantity_label }}{% if s.reams_label %} ({{ s.reams_label }}){% endif %}</span>{% endfor %}
+      </div>
+      {% if supply_alerts %}<div class="note" style="margin-top:8px;color:#991b1b;font-weight:1000;">⚠ ใกล้หมด {{ supply_alerts|length }} รายการ</div>{% endif %}
+    </summary>
+    <div style="margin-top:10px;">
+      {% include "core/_print_supply_editor.html" %}
+      <div style="margin-top:12px;"><a href="{% url 'core:print_supplies' %}" target="_blank" style="font-size:13px;font-weight:900;">🧾 ดูประวัติการเปลี่ยนแปลง</a></div>
     </div>
-  </section>
+  </details>
 
   <section class="panel">
     <div class="section-title"><span>⏳ รายการรอปรินท์</span><span class="refresh-hint" id="refreshHint"></span></div>

@@ -19,11 +19,13 @@ from django.contrib.auth.decorators import login_required
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
+from django.utils.dateparse import parse_date
 from django.views.decorators.http import require_POST
 
 from .models import Enrollment, PretestApplication, Student
 
 FEE = 200
+FILING_ROUNDS = range(1, 6)
 STEPS = [
     ("is_printed", "ปรินท์แล้ว"),
     ("is_signed", "ส่งเซ็นแล้ว"),
@@ -219,6 +221,8 @@ def pretest_page(request: HttpRequest) -> HttpResponse:
         "unlinked": sum(1 for a in apps if not a.student_id and not a.is_external),
         "external": sum(1 for a in apps if a.is_external),
         "rooms": ROOMS,
+        "filing_rounds": [{"n": r, "count": sum(1 for a in apps if a.filing_round == r)} for r in FILING_ROUNDS],
+        "no_round": sum(1 for a in apps if not a.filing_round),
         "class_options": sorted(
             ({"id": i, "name": n, "count": sum(1 for a in apps if i in classes.get(a.student_id, {}))}
              for i, n in {i: n for m in classes.values() for i, n in m.items()}.items()),
@@ -294,6 +298,18 @@ def pretest_api(request: HttpRequest) -> JsonResponse:
         app.student_id = value or None
         if value:
             app.is_external = False
+    elif field == "filing_round":
+        if value and str(value) not in {str(r) for r in FILING_ROUNDS}:
+            return JsonResponse({"ok": False, "error": "ไม่รู้จักรอบนี้"}, status=400)
+        app.filing_round = int(value) if value else None
+    elif field == "filing_date":
+        try:
+            when = parse_date(str(value)) if value else None
+        except ValueError:
+            when = None
+        if value and not when:
+            return JsonResponse({"ok": False, "error": "วันที่ไม่ถูกต้อง"}, status=400)
+        app.filing_date = when
     elif field == "is_external":
         app.is_external = bool(value)
         if value:

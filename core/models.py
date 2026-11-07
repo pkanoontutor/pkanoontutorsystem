@@ -3863,6 +3863,8 @@ class PretestApplication(models.Model):
     is_returned = models.BooleanField("ส่งกลับให้เด็กแล้ว", default=False)
     exam_number = models.CharField("หมายเลขผู้สอบ", max_length=50, blank=True)
     is_external = models.BooleanField("ไม่ใช่นักเรียนปัจจุบัน", default=False)
+    filing_round = models.PositiveSmallIntegerField("รอบที่ยื่น", null=True, blank=True)
+    filing_date = models.DateField("วันที่ยื่น", null=True, blank=True)
     application_no = models.CharField("เลขที่ใบสมัคร", max_length=30, blank=True)
     # kept in the DB, not /media/ (public URLs): the form holds the child's ID and address
     application_pdf = models.BinaryField("ไฟล์ใบสมัคร", null=True, blank=True, editable=False)

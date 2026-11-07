@@ -141,6 +141,10 @@
       <button class="pt-chip" type="button" id="imgCopy" hidden>Copy รูป</button>
       <button class="pt-chip" type="button" id="imgSave" hidden>บันทึกรูป</button>
     </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:10px;font-size:13px;font-weight:800;">
+      🎨 สีตัวอักษรสถานะ:
+      {% for c in status_color_rows %}<label class="status-color" style="display:inline-flex;gap:4px;align-items:center;color:{{ c.color }};"><input type="color" data-status="{{ c.key }}" value="{{ c.color }}" aria-label="สี{{ c.label }}">{{ c.label }}</label>{% endfor %}
+    </div>
     <div id="imgStage"></div>
   </div>
 
@@ -182,6 +186,7 @@
     <datalist id="ptStudents">{% for s in student_options %}<option value="{{ s.label }}" data-id="{{ s.id }}">{% endfor %}</datalist>
   </div>
 </div>
+{{ status_colors|json_script:"statusColors" }}
 <script>
 (function(){
   const API = "{% url 'core:pretest_api' %}", FEE = {{ fee }}, CSRF = "{{ csrf_token }}";
@@ -278,6 +283,20 @@
   // ---- list image: whatever rows the current filters show (no national ID / phone) ----
   const STEP_ORDER = [["is_printed","🖨️","ปรินท์แล้ว"],["is_signed","✍️","ส่งให้เซ็นแล้ว"],["is_paid","💰","รับเงินแล้ว"],["is_filed","🏫","นำไปยื่นแล้ว"],["is_returned","📨","ส่งกลับแล้ว"]];
   let room = null;
+  const statusColors = JSON.parse(document.getElementById("statusColors").textContent);
+  function paintChips(){
+    document.querySelectorAll("button[data-filter]").forEach(b => { if(statusColors[b.dataset.filter]) b.style.color = statusColors[b.dataset.filter]; });
+  }
+  paintChips();
+  document.querySelectorAll("input[data-status]").forEach(inp => inp.addEventListener("change", async () => {
+    const key = inp.dataset.status, before = statusColors[key];
+    const d = await save({dataset:{id:0}}, "status_color", {status: key, color: inp.value});
+    if(!d.ok){ inp.value = before; return; }
+    statusColors[key] = inp.value;
+    inp.parentElement.style.color = inp.value;
+    paintChips();
+    if(document.getElementById("imgCard")) document.getElementById("imgBuild").click();
+  }));
   const el = (tag, cls, text) => { const e = document.createElement(tag); if(cls) e.className = cls; if(text !== undefined) e.textContent = text; return e; };
   document.querySelectorAll(".room-btn").forEach(b => b.addEventListener("click", () => {
     document.querySelectorAll(".room-btn").forEach(x => x.classList.toggle("on", x === b));
@@ -304,7 +323,7 @@
       r.append(el("td", "", i + 1), el("td", "", val("nickname")), el("td", "", val("first_name")));
       if(!one) r.append(el("td", "", tr.dataset.classnames || (tr.dataset.external ? "คนนอก" : "-")));
       const st = el("td", "", last < 0 ? "ยังไม่เริ่ม" : STEP_ORDER[last][2]);
-      st.style.color = last === 4 ? "#15803d" : last < 0 ? "#94a3b8" : "#6d28d9";
+      st.style.color = statusColors[last < 0 ? "not_started" : STEP_ORDER[last][0]];
       r.append(st);
       on.forEach(v => { const c = el("td", "ic-c", v ? "✓" : ""); c.style.color = "#15803d"; c.style.fontWeight = "900"; r.append(c); });
       r.append(el("td", "", val("exam_number") || "-"));

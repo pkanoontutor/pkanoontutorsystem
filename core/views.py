@@ -3191,6 +3191,7 @@ def _print_color_choices() -> list[dict]:
         {"value": SheetPrintOrder.SpineColor.PINK, "label": "สีชมพู", "bg": "#fce7f3", "border": "#f9a8d4"},
         {"value": SheetPrintOrder.SpineColor.GREEN, "label": "สีเขียว", "bg": "#dcfce7", "border": "#86efac"},
         {"value": SheetPrintOrder.SpineColor.ORANGE, "label": "สีส้ม", "bg": "#ffedd5", "border": "#fdba74"},
+        {"value": SheetPrintOrder.SpineColor.YELLOW, "label": "สีเหลือง", "bg": "#fef9c3", "border": "#fde047"},
     ]
 
 

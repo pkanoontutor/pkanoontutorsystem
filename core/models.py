@@ -1324,7 +1324,39 @@ class SheetInventoryMovement(models.Model):
         return f"{self.sheet.code} | {self.get_movement_type_display()} | {self.quantity}"
 
 
+class PrintSupply(models.Model):
+    """Consumables at the print shop; a spine row is one colour + size."""
+
+    class Category(models.TextChoices):
+        COVER_PAPER = "cover_paper", "กระดาษปก"
+        A4_PAPER = "a4_paper", "กระดาษ A4"
+        SPINE = "spine", "สันรูด"
+        INK = "ink", "หมึก"
+        DRUM = "drum", "Drum หมึก"
+
+    category = models.CharField("ประเภท", max_length=20, choices=Category.choices)
+    name = models.CharField("ชื่อ", max_length=100)
+    spine_color = models.CharField("สีสัน", max_length=20, blank=True)
+    spine_size = models.CharField("ขนาดสัน", max_length=30, blank=True)
+    unit = models.CharField("หน่วย", max_length=20, default="ชิ้น")
+    quantity = models.IntegerField("คงเหลือ", default=0)  # may go negative: a short stock never blocks an order
+    low_threshold = models.PositiveIntegerField("เตือนเมื่อเหลือไม่เกิน", default=0)
+    is_active = models.BooleanField(default=True)
+    order = models.PositiveIntegerField(default=50)
+
+    class Meta:
+        ordering = ("order", "spine_color", "spine_size")
+        constraints = [models.UniqueConstraint(fields=("category", "spine_color", "spine_size"), name="uniq_print_supply")]
+
+    def __str__(self) -> str:
+        return self.name
+
+
 class SheetPrintOrder(models.Model):
+    class PrintSides(models.TextChoices):
+        SINGLE = "single", "ด้านเดียว"
+        DOUBLE = "double", "หน้าหลัง"
+
     class Status(models.TextChoices):
         PENDING = "pending", "รอปรินท์"
         READY = "ready", "ปรินท์เสร็จแล้วพร้อมส่ง"
@@ -1378,6 +1410,12 @@ class SheetPrintOrder(models.Model):
         help_text="ใช้เฉพาะกรณีเย็บข้าง",
     )
     note = models.TextField("หมายเหตุ", blank=True)
+    print_sides = models.CharField("การปรินท์", max_length=10, choices=PrintSides.choices, default=PrintSides.SINGLE)
+    content_pages = models.PositiveIntegerField("จำนวนหน้าเนื้อหาต่อเล่ม", default=0)
+    covers_used = models.PositiveIntegerField("กระดาษปกที่หัก", default=0)
+    a4_used = models.PositiveIntegerField("กระดาษ A4 ที่หัก", default=0)
+    spine_supply = models.ForeignKey(PrintSupply, verbose_name="ขนาดสันที่ร้านเลือก", on_delete=models.SET_NULL, null=True, blank=True, related_name="orders")
+    spine_used = models.PositiveIntegerField("สันที่หัก", default=0)
     status = models.CharField(
         "สถานะ",
         max_length=20,
@@ -3815,3 +3853,26 @@ class PretestApplication(models.Model):
 
     def __str__(self) -> str:
         return f"{self.nickname} {self.first_name}".strip()
+
+
+class PrintSupplyLog(models.Model):
+    class Reason(models.TextChoices):
+        ORDER = "order", "สั่งปรินท์"
+        SPINE = "spine", "ร้านเลือกสัน"
+        SPINE_RETURN = "spine_return", "คืนสัน (เปลี่ยนขนาด)"
+        ADJUST = "adjust", "แก้ไขเอง"
+
+    supply = models.ForeignKey(PrintSupply, on_delete=models.CASCADE, related_name="logs")
+    delta = models.IntegerField("เปลี่ยนแปลง")
+    balance_after = models.IntegerField("คงเหลือหลังเปลี่ยน")
+    reason = models.CharField("สาเหตุ", max_length=20, choices=Reason.choices)
+    actor = models.CharField("โดย", max_length=100, blank=True)
+    note = models.CharField("หมายเหตุ", max_length=255, blank=True)
+    order = models.ForeignKey(SheetPrintOrder, on_delete=models.SET_NULL, null=True, blank=True, related_name="supply_logs")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ("-created_at", "-id")
+
+    def __str__(self) -> str:
+        return f"{self.supply} {self.delta:+d}"

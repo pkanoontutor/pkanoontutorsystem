@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>สินค้าคงคลังงานปรินท์ | PKanoon Tutor</title>
+  <style>
+    *{box-sizing:border-box}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:#f1f5f9;color:#0f172a}
+    .wrap{max-width:1080px;margin:0 auto;padding:14px;display:grid;gap:14px}
+    .hero{background:linear-gradient(135deg,#0f172a,#2563eb);color:#fff;border-radius:24px;padding:20px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center}
+    .hero h1{margin:0;font-size:24px;font-weight:1000}
+    .hero a{color:#fff;font-weight:900;font-size:13px}
+    .panel{background:#fff;border-radius:22px;padding:15px;box-shadow:0 6px 16px rgba(15,23,42,.08);border:1px solid #e2e8f0}
+    .title{font-size:17px;font-weight:1000;margin-bottom:10px}
+    .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between;border-top:1px solid #e2e8f0;padding:10px 0}
+    .name{font-weight:1000;min-width:170px}
+    .qty{font-size:22px;font-weight:1000;min-width:100px}
+    .qty small{font-size:12px;color:#64748b}
+    .low .qty{color:#dc2626}
+    .low-tag{font-size:11px;font-weight:1000;color:#991b1b;background:#fee2e2;border-radius:999px;padding:2px 8px}
+    form.inline{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+    input,select{border:1px solid #cbd5e1;border-radius:10px;padding:8px;font:inherit;font-size:13px;font-weight:700;background:#fff}
+    input[type=number]{width:90px}
+    .btn{border:0;border-radius:10px;padding:8px 11px;font:inherit;font-size:13px;font-weight:900;cursor:pointer;background:#e2e8f0;color:#0f172a}
+    .btn.add{background:#16a34a;color:#fff}.btn.rm{background:#dc2626;color:#fff}.btn.dark{background:#0f172a;color:#fff}
+    .muted{font-size:12px;font-weight:700;color:#64748b}
+    .scroll{overflow-x:auto}
+    table{border-collapse:collapse;width:100%;font-size:13px;min-width:680px}
+    th{background:#f1f5f9;padding:8px;text-align:left;font-weight:900;white-space:nowrap}
+    td{border-top:1px solid #e2e8f0;padding:7px 8px;font-weight:700}
+    .plus{color:#15803d;font-weight:1000}.minus{color:#dc2626;font-weight:1000}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <section class="hero">
+    <h1>📦 สินค้าคงคลังงานปรินท์</h1>
+    <a href="{% url 'core:print_shop_order_list' %}">← กลับหน้าร้านปรินท์</a>
+  </section>
+
+  <section class="panel">
+    <label class="muted">ชื่อผู้แก้ไข (บันทึกลงประวัติ):
+      <input id="actorName" placeholder="{% if request.user.is_authenticated %}{{ request.user.get_username }}{% else %}ร้านปรินท์{% endif %}" {% if request.user.is_authenticated %}disabled{% endif %}>
+    </label>
+  </section>
+
+  {% for label, items in groups %}
+    <section class="panel">
+      <div class="title">{{ label }}</div>
+      {% for s in items %}
+        <div class="row {% if s.is_low %}low{% endif %}">
+          <div class="name">{{ s.name }} {% if s.is_low %}<span class="low-tag">ใกล้หมด</span>{% endif %}</div>
+          <div class="qty">{{ s.quantity }} <small>{{ s.unit }}</small></div>
+          <form class="inline" method="post" action="{% url 'core:print_supply_update' %}">
+            {% csrf_token %}
+            <input type="hidden" name="supply" value="{{ s.id }}"><input type="hidden" name="actor" class="actor-field">
+            <input type="number" name="amount" placeholder="จำนวน" required>
+            <input name="note" placeholder="หมายเหตุ" style="width:130px">
+            <button class="btn add" name="action" value="add">+ เพิ่ม</button>
+            <button class="btn rm" name="action" value="remove">− ลด</button>
+            <button class="btn" name="action" value="set">ตั้งยอดเป็น</button>
+          </form>
+          <form class="inline" method="post" action="{% url 'core:print_supply_update' %}">
+            {% csrf_token %}
+            <input type="hidden" name="supply" value="{{ s.id }}">
+            <span class="muted">เตือนเมื่อเหลือ ≤</span>
+            <input type="number" min="0" name="low_threshold" value="{{ s.low_threshold }}" style="width:76px">
+            <button class="btn" name="action" value="threshold">บันทึก</button>
+            {% if s.category == "spine" %}<button class="btn" name="action" value="hide" onclick="return confirm('ซ่อนขนาดสันนี้?')">ซ่อน</button>{% endif %}
+          </form>
+        </div>
+      {% empty %}
+        <div class="muted">ยังไม่มีรายการ เพิ่มขนาดสันได้จากฟอร์มด้านล่าง</div>
+      {% endfor %}
+    </section>
+  {% endfor %}
+
+  <section class="panel">
+    <div class="title">➕ เพิ่มสันสี/ขนาดใหม่</div>
+    <form class="inline" method="post" action="{% url 'core:print_supply_update' %}">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="add_spine"><input type="hidden" name="actor" class="actor-field">
+      <select name="spine_color" required>{% for v, l in colors %}<option value="{{ v }}">{{ l }}</option>{% endfor %}</select>
+      <input name="spine_size" placeholder="ขนาด เช่น 6 มม." required>
+      <input type="number" min="0" name="quantity" placeholder="จำนวนตั้งต้น">
+      <button class="btn dark">เพิ่ม</button>
+    </form>
+  </section>
+
+  <section class="panel">
+    <div class="title">🧾 ประวัติการเปลี่ยนแปลง (200 รายการล่าสุด)</div>
+    <form method="get" style="margin-bottom:10px">
+      <select name="supply" onchange="this.form.submit()">
+        <option value="">ทุกรายการ</option>
+        {% for s in rows %}<option value="{{ s.id }}" {% if s.id == picked %}selected{% endif %}>{{ s.name }}</option>{% endfor %}
+      </select>
+    </form>
+    <div class="scroll">
+      <table>
+        <tr><th>เวลา</th><th>รายการ</th><th>เปลี่ยนแปลง</th><th>คงเหลือ</th><th>สาเหตุ</th><th>โดย</th><th>หมายเหตุ</th></tr>
+        {% for l in logs %}
+          <tr>
+            <td style="white-space:nowrap">{{ l.created_at|date:"d/m/Y H:i" }}</td>
+            <td>{{ l.supply.name }}</td>
+            <td class="{% if l.delta > 0 %}plus{% else %}minus{% endif %}">{% if l.delta > 0 %}+{% endif %}{{ l.delta }}</td>
+            <td>{{ l.balance_after }}</td>
+            <td>{{ l.get_reason_display }}</td>
+            <td>{{ l.actor }}</td>
+            <td>{{ l.note }}</td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="7" class="muted">ยังไม่มีประวัติ</td></tr>
+        {% endfor %}
+      </table>
+    </div>
+  </section>
+</div>
+<script>
+  // remember who is editing on this device, and send the name with each stock change
+  (function(){
+    const box = document.getElementById("actorName");
+    try { box.value = localStorage.getItem("printSupplyActor") || ""; } catch(e) {}
+    const sync = () => {
+      document.querySelectorAll(".actor-field").forEach(f => f.value = box.value);
+      try { localStorage.setItem("printSupplyActor", box.value); } catch(e) {}
+    };
+    box.addEventListener("input", sync); sync();
+  })();
+</script>
+</body>
+</html>

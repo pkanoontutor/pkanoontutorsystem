@@ -28,6 +28,7 @@ from openpyxl.utils import get_column_letter
 
 logger = logging.getLogger(__name__)
 
+from . import print_supplies
 from .models import (
     Student,
     School,
@@ -1530,7 +1531,9 @@ def sheet_inventory_dashboard(request: HttpRequest) -> HttpResponse:
                 spine_color = ""
 
             if custom_title and quantity > 0 and onedrive_url:
-                SheetPrintOrder.objects.create(
+                order = SheetPrintOrder.objects.create(
+                    print_sides=print_supplies.clean_sides(request.POST.get("print_sides")),
+                    content_pages=print_supplies.clean_pages(request.POST.get("content_pages")),
                     sheet=None,
                     custom_title=custom_title,
                     quantity=quantity,
@@ -1541,6 +1544,7 @@ def sheet_inventory_dashboard(request: HttpRequest) -> HttpResponse:
                     note=note,
                     requested_by=request.user if getattr(request.user, "is_authenticated", False) else None,
                 )
+                print_supplies.deduct_paper_for_order(order, request.user.get_username() if request.user.is_authenticated else "ระบบ")
             return redirect("core:sheet_inventory_dashboard")
 
         elif (
@@ -1713,6 +1717,7 @@ def sheet_inventory_dashboard(request: HttpRequest) -> HttpResponse:
                     onedrive_url = inventory.onedrive_url
 
                 order = SheetPrintOrder.objects.create(
+                    print_sides=print_supplies.clean_sides(request.POST.get("print_sides")),
                     sheet=sheet,
                     quantity=quantity,
                     due_date=due_date,
@@ -1722,6 +1727,7 @@ def sheet_inventory_dashboard(request: HttpRequest) -> HttpResponse:
                     note=note,
                     requested_by=request.user if getattr(request.user, "is_authenticated", False) else None,
                 )
+                print_supplies.deduct_paper_for_order(order, request.user.get_username() if request.user.is_authenticated else "ระบบ")
             except Exception as exc:
                 return _print_response(False, f"ส่งปรินท์ไม่สำเร็จ: {exc}", 400, sheet_id=sheet.id)
 
@@ -3332,8 +3338,10 @@ def print_shop_order_list(request: HttpRequest) -> HttpResponse:
     today = timezone.localdate()
     pending_list = list(pending_orders)
     ready_list = list(ready_orders)
+    spines = print_supplies.active_spines()
     for o in pending_list:
         o.is_overdue = bool(o.due_date and o.due_date < today and not o.can_mark_ready)
+        o.spine_choices = print_supplies.spine_options(o, spines)
     _attach_inventory_file_links(pending_list)
     _attach_inventory_file_links(ready_list)
     total_pending_books = sum(int(o.quantity or 0) for o in pending_list)
@@ -3346,6 +3354,7 @@ def print_shop_order_list(request: HttpRequest) -> HttpResponse:
         "total_pending_books": total_pending_books,
         "pending_count": len(pending_list),
         "overdue_count": overdue_count,
+        "supply_rows": print_supplies.stock_rows(),
     })
 
 
@@ -4188,16 +4197,17 @@ def attendance_details(request: HttpRequest) -> HttpResponse:
 # =========================================================
 # ✅ Remaining Attendance (ค้นหาเด็ก ดูครั้งเรียนคงเหลือ)
 # =========================================================
-def _attendance_edit_weeks(enrollment, weeks: int = 12) -> list[dict]:
-    """The class's lesson dates over the last `weeks` weeks (newest first)
-    plus any other dates that already have a check-in, each with its status,
-    for correcting attendance from the remaining-attendance page."""
+def _attendance_edit_weeks(enrollment) -> list[dict]:
+    """The class's lesson dates (newest first) back to the student's first
+    day -- the earlier of their first check-in and the enrollment date -- plus
+    any other dates that already have a check-in, each with its status, for
+    correcting attendance from the remaining-attendance page."""
     today = timezone.localdate()
     wd = _class_weekday(enrollment.tutoring_class)
     last = today - timedelta(days=(today.weekday() - wd) % 7)
-    dates = {last - timedelta(weeks=i) for i in range(weeks)}
-    records = {a.attendance_date: a for a in Attendance.objects.filter(
-        enrollment=enrollment, attendance_date__gte=last - timedelta(weeks=weeks - 1), attendance_date__lte=today)}
+    records = {a.attendance_date: a for a in Attendance.objects.filter(enrollment=enrollment, attendance_date__lte=today)}
+    first = min([*records, timezone.localtime(enrollment.created_at).date(), last])
+    dates = {last - timedelta(weeks=i) for i in range((last - first).days // 7 + 1)}
     dates |= set(records)
     labels = {"present": "มา", "excused": "ลา", "excused_half": "ลา½", "no_show": "ขาด"}
     out = []
@@ -8394,6 +8404,7 @@ _ADMIN_TOOL_DEFAULTS = [
     ("private", "c-teal",  "📖", "ระบบชีทสำหรับติวเตอร์", "ติวเตอร์เข้าด้วย PIN เปิดชีท PDF ทีละหน้า สลับเนื้อหา/เฉลย และกดจบคาบเพื่อบันทึกหน้า/ข้อเข้าระบบอัปเดตชีท", "/tutor-sheets/"),
     ("private", "c-lilac", "📚", "คลังหนังสือ", "บันทึกโปรไฟล์หนังสือต้นทางที่ใช้ทำชีท ชื่อ/รหัส/วิชา/ระดับชั้น ลิงก์ไฟล์ และรูปปก", "/books/"),
     ("private", "c-stone", "🔎", "Remaining Attendance", "เสิร์ชชื่อเด็ก ดูครั้งเรียนคงเหลือ คาดว่าจะครบคอร์สวันไหน ประวัติมา/ลา/ขาดล่าสุด และประวัติการชำระเงินต่อคอร์ส", "/remaining-attendance/"),
+    ("private", "c-teal",  "📦", "สินค้าคงคลังงานปรินท์", "กระดาษปก กระดาษ A4 สันสีต่างๆ หมึก Drum หักอัตโนมัติเมื่อสั่งปรินท์ พร้อมประวัติการแก้ไข", "/print-shop/supplies/"),
     ("private", "c-teal",  "🧩", "ระบบส่วนเสริม", "เครื่องมือส่วนตัวนอกเหนือระบบกวดวิชา เช่น งบตกแต่งบ้าน", "/extras/"),
     ("private", "c-lilac", "📝", "ใบสมัครสอบ Pre-test", "รายชื่อเด็กที่ฝากยื่นใบสมัคร เช็กลิสต์ปรินท์ · เซ็น · รับเงิน · ยื่น · ส่งกลับ และหมายเลขผู้สอบ", "/pretest-applications/"),
     ("private", "c-stone", "📄", "ออกเอกสารทางการ", "ใบสลิปค่าจ้างรายสัปดาห์ และหนังสือรับรองการหักภาษี ณ ที่จ่าย (50 ทวิ) ของติวเตอร์ พร้อมข้อมูลผู้ถูกหักภาษี", "/official-docs/"),
@@ -9024,7 +9035,8 @@ def admin_tool_create_print_order(request: HttpRequest) -> JsonResponse:
         spine_color = default_color
     due_date = _parse_optional_date(payload.get("due_date"))
 
-    SheetPrintOrder.objects.create(
+    order = SheetPrintOrder.objects.create(
+        print_sides=print_supplies.clean_sides(payload.get("print_sides")),
         sheet=sheet,
         quantity=quantity,
         due_date=due_date,
@@ -9034,6 +9046,7 @@ def admin_tool_create_print_order(request: HttpRequest) -> JsonResponse:
         note="สั่งปรินท์จากภาพรวมเรียลไทม์ (Admin Tool)",
         requested_by=request.user if getattr(request.user, "is_authenticated", False) else None,
     )
+    print_supplies.deduct_paper_for_order(order, request.user.get_username() if request.user.is_authenticated else "ระบบ")
     return JsonResponse({"ok": True, "message": f"ส่งปรินท์ {sheet.code} จำนวน {quantity} เล่มแล้ว"})
 
 

@@ -173,6 +173,8 @@
       <div class="field"><label>Link ไฟล์</label><input name="onedrive_url" placeholder="OneDrive link" required></div>
       <div class="field"><label>จำนวน</label><input name="quantity" type="number" min="1" value="1" required></div>
       <div class="field"><label>วันที่ต้องส่ง</label><input name="due_date" type="date" value="{{ default_print_due_date|date:'Y-m-d' }}"></div>
+      <div class="field"><label>จำนวนหน้าต่อเล่ม</label><input name="content_pages" type="number" min="1" required></div>
+      <div class="field"><label>การปรินท์</label><select name="print_sides"><option value="single" selected>ด้านเดียว</option><option value="double">หน้าหลัง</option></select></div>
       <div class="field"><label>ประเภทการเย็บ</label><select name="binding_type"><option value="side" selected>เย็บข้าง</option><option value="corner">เย็บมุม</option></select></div>
       <div class="field"><label>สีสันรูด</label><select name="spine_color"><option value="">ไม่ระบุสี</option>{% for c in spine_color_choices %}<option value="{{ c.value }}">{{ c.label }}</option>{% endfor %}</select></div>
       <div class="field"><label>&nbsp;</label><button class="btnx dark" type="submit">ส่งปรินท์</button></div>
@@ -392,6 +394,14 @@
             <div class="print-field">
               <label>วันที่ต้องทำเสร็จ</label>
               <input id="printDueDateInput" type="date" name="print_due_date" value="{{ default_print_due_date|date:'Y-m-d' }}">
+            </div>
+          </div>
+
+          <div class="print-field">
+            <label>การปรินท์</label>
+            <div class="print-choice-row">
+              <label class="print-radio-card"><input type="radio" name="print_sides" value="single" checked> ด้านเดียว</label>
+              <label class="print-radio-card"><input type="radio" name="print_sides" value="double"> หน้าหลัง</label>
             </div>
           </div>
 

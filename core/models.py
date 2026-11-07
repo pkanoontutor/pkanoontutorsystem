@@ -3846,6 +3846,16 @@ class MonthlyFixedExpense(models.Model):
         return self.description
 
 
+class PretestStatusColor(models.Model):
+    """สีตัวอักษรของแต่ละสถานะใบสมัคร (ไม่มีแถว = ใช้สีเริ่มต้น)."""
+
+    status = models.CharField("สถานะ", max_length=20, unique=True)
+    color = models.CharField("สี", max_length=7)
+
+    def __str__(self) -> str:
+        return f"{self.status} {self.color}"
+
+
 class PretestRound(models.Model):
     """รอบที่นำใบสมัครไปยื่น: ตั้งไว้ก่อน แล้วค่อยเลือกให้เด็กแต่ละคน."""
 

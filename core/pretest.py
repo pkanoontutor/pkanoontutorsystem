@@ -22,9 +22,12 @@ from django.utils import timezone
 from django.utils.dateparse import parse_date
 from django.views.decorators.http import require_POST
 
-from .models import Enrollment, PretestApplication, PretestRound, Student
+from .models import Enrollment, PretestApplication, PretestRound, PretestStatusColor, Student
 
 FEE = 200
+NOT_STARTED = "not_started"
+DEFAULT_STATUS_COLORS = {NOT_STARTED: "#94a3b8", "is_printed": "#6d28d9", "is_signed": "#6d28d9",
+                         "is_paid": "#6d28d9", "is_filed": "#6d28d9", "is_returned": "#15803d"}
 STEPS = [
     ("is_printed", "ปรินท์แล้ว"),
     ("is_signed", "ส่งเซ็นแล้ว"),
@@ -204,6 +207,7 @@ def pretest_page(request: HttpRequest) -> HttpResponse:
             messages.error(request, f"นำเข้าไม่สำเร็จ: {e}")
         return redirect("core:pretest_applications")
     apps = list(PretestApplication.objects.select_related("student").defer("application_pdf"))
+    colors = {**DEFAULT_STATUS_COLORS, **dict(PretestStatusColor.objects.values_list("status", "color"))}
     rounds = list(PretestRound.objects.all())
     for r in rounds:
         r.count = sum(1 for a in apps if a.round_id == r.id)
@@ -224,6 +228,8 @@ def pretest_page(request: HttpRequest) -> HttpResponse:
         "external": sum(1 for a in apps if a.is_external),
         "rooms": ROOMS,
         "rounds": rounds,
+        "status_colors": colors,
+        "status_color_rows": [{"key": k, "label": label, "color": colors[k]} for k, label in [(NOT_STARTED, "ยังไม่เริ่ม"), *STEPS]],
         "no_round": sum(1 for a in apps if not a.round_id),
         "class_options": sorted(
             ({"id": i, "name": n, "count": sum(1 for a in apps if i in classes.get(a.student_id, {}))}
@@ -301,6 +307,12 @@ def pretest_api(request: HttpRequest) -> JsonResponse:
         p = json.loads(request.body or "{}")
         if p.get("field") == "add":
             return _add_application(p.get("value") or {})
+        if p.get("field") == "status_color":
+            v = p.get("value") or {}
+            if v.get("status") not in DEFAULT_STATUS_COLORS or not re.fullmatch(r"#[0-9a-fA-F]{6}", str(v.get("color"))):
+                return JsonResponse({"ok": False, "error": "สีไม่ถูกต้อง"}, status=400)
+            PretestStatusColor.objects.update_or_create(status=v["status"], defaults={"color": v["color"]})
+            return JsonResponse({"ok": True})
         if p.get("field") in ("round_save", "round_delete", "bulk_round"):
             return _round_action(p.get("field"), p.get("value") or {})
         app = PretestApplication.objects.defer("application_pdf").get(id=int(p.get("id")))

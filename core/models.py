@@ -1393,6 +1393,7 @@ class SheetPrintOrder(models.Model):
         PINK = "pink", "สีชมพู"
         GREEN = "green", "สีเขียว"
         ORANGE = "orange", "สีส้ม"
+        YELLOW = "yellow", "สีเหลือง"
 
     sheet = models.ForeignKey(
         Sheet,
@@ -1512,6 +1513,7 @@ class SheetPrintOrder(models.Model):
             self.SpineColor.PINK: "#fce7f3",
             self.SpineColor.GREEN: "#dcfce7",
             self.SpineColor.ORANGE: "#ffedd5",
+            self.SpineColor.YELLOW: "#fef9c3",
         }.get(self.spine_color, "#ffffff")
 
     @property
@@ -1524,6 +1526,7 @@ class SheetPrintOrder(models.Model):
             self.SpineColor.PINK: "#f9a8d4",
             self.SpineColor.GREEN: "#86efac",
             self.SpineColor.ORANGE: "#fdba74",
+            self.SpineColor.YELLOW: "#fde047",
         }.get(self.spine_color, "#e2e8f0")
 
     @property

@@ -1,0 +1,80 @@
+{% extends "core/base.html" %}
+{% load humanize static %}
+{% block title %}ใบคืนเงิน {{ r.refund_no }}{% endblock %}
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<style>
+  .rd{max-width:860px;margin:0 auto;display:grid;gap:12px;}
+  .bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+  .btn{border:0;border-radius:12px;padding:9px 14px;font:inherit;font-size:14px;font-weight:900;cursor:pointer;background:#f1f5f9;color:#0f172a;text-decoration:none;}
+  .btn.red{background:#dc2626;color:#fff;} .btn.dark{background:#0f172a;color:#fff;}
+  .ok{background:#dcfce7;border:1px solid #86efac;color:#166534;border-radius:12px;padding:10px 12px;font-weight:800;font-size:13px;}
+  #slip{background:#fff;border-radius:18px;padding:30px 34px;box-shadow:0 8px 24px rgba(15,23,42,.12);color:#0f172a;position:relative;overflow:hidden;}
+  .s-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;border-bottom:3px solid #dc2626;padding-bottom:14px;}
+  .s-head img{height:74px;}
+  .s-title{text-align:right;} .s-title b{display:block;font-size:26px;font-weight:1000;color:#dc2626;} .s-title span{font-size:13px;font-weight:800;color:#475569;}
+  .s-info{display:grid;grid-template-columns:1fr 1fr;gap:6px 18px;margin:16px 0;font-size:14px;}
+  .s-info div{font-weight:700;} .s-info span{color:#64748b;font-weight:800;margin-right:6px;}
+  table.s-items{width:100%;border-collapse:collapse;font-size:14px;}
+  table.s-items th{background:#fef2f2;color:#991b1b;padding:9px;text-align:left;font-weight:900;}
+  table.s-items td{border-bottom:1px solid #f1f5f9;padding:9px;font-weight:700;}
+  .n{text-align:right;white-space:nowrap;}
+  .s-total td{font-size:17px;font-weight:1000;border-top:2px solid #0f172a;border-bottom:0;}
+  .s-reason{margin-top:14px;font-size:13px;font-weight:700;background:#f8fafc;border-radius:10px;padding:10px 12px;}
+  .s-sign{display:grid;grid-template-columns:1fr 1fr;gap:30px;margin-top:46px;text-align:center;font-size:13px;font-weight:800;color:#475569;}
+  .s-sign div{border-top:1px dotted #94a3b8;padding-top:6px;}
+  .void-stamp{position:absolute;top:40%;left:50%;transform:translate(-50%,-50%) rotate(-18deg);font-size:84px;font-weight:1000;color:rgba(220,38,38,.22);border:8px solid rgba(220,38,38,.22);border-radius:18px;padding:4px 26px;pointer-events:none;}
+  @media print{.bar,.ok,header,nav{display:none!important;} #slip{box-shadow:none;}}
+</style>
+{% endblock %}
+{% block content %}
+<div class="rd">
+  {% for m in messages %}<div class="ok">{{ m }}</div>{% endfor %}
+  <div class="bar">
+    <a class="btn" href="{% url 'core:refund_list' %}">← ใบคืนเงินทั้งหมด</a>
+    <button class="btn dark" id="dlImg">⬇️ ดาวน์โหลดรูป</button>
+    <button class="btn" id="cpImg">📋 Copy รูป</button>
+    <button class="btn" onclick="window.print()">🖨️ พิมพ์</button>
+    {% if not r.is_void %}
+    <form method="post" action="{% url 'core:refund_void' r.pk %}" style="margin-left:auto;">{% csrf_token %}
+      <button class="btn red" onclick="return confirm('ยกเลิกใบคืนเงินนี้? รายจ่ายที่บันทึกไว้จะถูกลบออก')">ยกเลิกใบคืนเงิน</button>
+    </form>
+    {% endif %}
+  </div>
+
+  <div id="slip">
+    {% if r.is_void %}<div class="void-stamp">ยกเลิก</div>{% endif %}
+    <div class="s-head">
+      <img src="{% static 'core/logo_transparent.png' %}" alt="">
+      <div class="s-title"><b>ใบคืนเงิน</b><span>REFUND RECEIPT</span><br><span>เลขที่ {{ r.refund_no }}</span></div>
+    </div>
+    <div class="s-info">
+      <div><span>ผู้รับเงินคืน</span>{{ r.recipient_name }}</div>
+      <div><span>วันที่</span>{{ r.refund_date|date:"d/m/Y" }}</div>
+      <div><span>ประเภท</span>{{ r.get_recipient_type_display }}{% if r.student %} · {{ r.student.nickname }} {{ r.student.student_code }}{% elif r.admission %} · {{ r.admission.nickname }}{% endif %}</div>
+      <div><span>วิธีคืนเงิน</span>{{ r.get_payment_method_display }}</div>
+      {% if r.recipient_phone %}<div><span>เบอร์ติดต่อ</span>{{ r.recipient_phone }}</div>{% endif %}
+    </div>
+    <table class="s-items">
+      <tr><th style="width:44px;">#</th><th>รายการคืนเงิน</th><th class="n">จำนวนเงิน (บาท)</th></tr>
+      {% for i in items %}<tr><td>{{ forloop.counter }}</td><td>{{ i.desc }}</td><td class="n">{{ i.amount|floatformat:2|intcomma }}</td></tr>{% endfor %}
+      <tr class="s-total"><td></td><td>ยอดคืนเงินรวม</td><td class="n">{{ r.amount|floatformat:2|intcomma }}</td></tr>
+    </table>
+    {% if r.reason %}<div class="s-reason"><b>เหตุผล:</b> {{ r.reason|linebreaksbr }}</div>{% endif %}
+    <div class="s-sign"><div>ผู้รับเงินคืน</div><div>ผู้คืนเงิน · สถาบันกวดวิชาพี่ขนุนติวเตอร์</div></div>
+  </div>
+</div>
+<script>
+(function(){
+  const shot = () => html2canvas(document.getElementById("slip"), {scale: 2, backgroundColor: "#ffffff"});
+  document.getElementById("dlImg").addEventListener("click", async () => {
+    const a = document.createElement("a"); a.href = (await shot()).toDataURL("image/png"); a.download = "{{ r.refund_no }}.png"; a.click();
+  });
+  document.getElementById("cpImg").addEventListener("click", () => {
+    if(!navigator.clipboard || !window.ClipboardItem){ alert("เบราว์เซอร์นี้ Copy รูปไม่ได้ ใช้ดาวน์โหลดแทน"); return; }
+    const blob = shot().then(c => new Promise(res => c.toBlob(res, "image/png")));
+    navigator.clipboard.write([new ClipboardItem({"image/png": blob})]).then(() => alert("Copy รูปแล้ว")).catch(() => alert("Copy ไม่สำเร็จ ใช้ดาวน์โหลดแทน"));
+  });
+})();
+</script>
+{% endblock %}

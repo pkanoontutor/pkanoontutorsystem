@@ -5,6 +5,7 @@ from . import official_docs
 from . import pretest
 from . import announcements
 from . import tutor_pay
+from . import refunds
 from . import print_supplies
 
 app_name = "core"
@@ -179,6 +180,9 @@ urlpatterns = [
     path("course-payments/voice/", views.course_payment_voice, name="course_payment_voice"),
     path("course-payments/voice/parse/", views.course_payment_voice_parse, name="course_payment_voice_parse"),
     path("course-payments/quick-pick/<int:pk>/dismiss/", views.course_payment_dismiss_quick_pick, name="course_payment_dismiss_quick_pick"),
+    path("course-payments/refunds/", refunds.refund_list, name="refund_list"),
+    path("course-payments/refunds/<int:pk>/", refunds.refund_detail, name="refund_detail"),
+    path("course-payments/refunds/<int:pk>/void/", refunds.refund_void, name="refund_void"),
     path("course-payments/<int:pk>/", views.course_payment_detail, name="course_payment_detail"),
     path("course-payments/<int:pk>/receipt-image/", views.course_payment_receipt_image, name="course_payment_receipt_image"),
     path("course-payments/<int:pk>/sessions-card-image/", views.course_payment_sessions_card_image, name="course_payment_sessions_card_image"),

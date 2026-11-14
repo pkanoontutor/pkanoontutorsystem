@@ -1,0 +1,161 @@
+{% extends "core/base.html" %}
+{% load humanize %}
+{% block title %}ใบคืนเงิน{% endblock %}
+{% block head %}
+<style>
+  .rf{max-width:1200px;margin:0 auto;display:grid;gap:14px;}
+  .rf-hero{background:linear-gradient(135deg,#7f1d1d,#dc2626,#f97316);color:#fff;border-radius:22px;padding:20px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:flex-start;}
+  .rf-hero h1{margin:0;font-size:24px;font-weight:1000;} .rf-hero p{margin:5px 0 0;font-size:13px;font-weight:700;color:#ffedd5;}
+  .rf-hero a{display:inline-flex;background:rgba(255,255,255,.18);color:#fff;text-decoration:none;font-weight:900;font-size:13px;border-radius:12px;padding:8px 12px;margin:2px;}
+  .card{background:#fff;border-radius:18px;padding:16px;box-shadow:0 6px 18px rgba(15,23,42,.08);}
+  .card h2{margin:0 0 12px;font-size:17px;font-weight:1000;}
+  .types{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+  .types label{border:2px solid #e2e8f0;border-radius:14px;padding:11px;font-weight:900;font-size:14px;cursor:pointer;display:flex;gap:8px;align-items:center;}
+  .types label:has(input:checked){border-color:#dc2626;background:#fef2f2;}
+  .grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:12px;}
+  .f{display:grid;gap:5px;} .f.wide{grid-column:1/-1;}
+  .f label{font-size:12px;font-weight:900;color:#475569;}
+  .f input,.f select,.f textarea{border:1px solid #cbd5e1;border-radius:11px;padding:9px 11px;font:inherit;font-weight:700;background:#fff;}
+  .search{position:relative;}
+  .results{position:absolute;left:0;right:0;top:100%;z-index:30;background:#fff;border:1px solid #cbd5e1;border-radius:12px;box-shadow:0 12px 26px rgba(15,23,42,.16);max-height:300px;overflow:auto;margin-top:4px;}
+  .results div{padding:9px 12px;font-size:13px;font-weight:800;cursor:pointer;border-bottom:1px solid #f1f5f9;}
+  .results div:hover,.results div.on{background:#fef2f2;}
+  .picked{margin-top:6px;font-size:13px;font-weight:900;color:#166534;}
+  .items{display:grid;gap:8px;}
+  .item{display:grid;grid-template-columns:1fr 160px 40px;gap:8px;}
+  .item input{border:1px solid #cbd5e1;border-radius:11px;padding:9px 11px;font:inherit;font-weight:700;}
+  .btn{border:0;border-radius:12px;padding:10px 15px;font:inherit;font-size:14px;font-weight:1000;cursor:pointer;background:#f1f5f9;color:#0f172a;}
+  .btn.red{background:#dc2626;color:#fff;} .btn.x{padding:6px;background:#fee2e2;color:#991b1b;}
+  .total{font-size:20px;font-weight:1000;color:#dc2626;}
+  .err{background:#fef2f2;border:1px solid #fecaca;color:#991b1b;border-radius:12px;padding:10px 12px;font-weight:800;font-size:13px;}
+  .ok{background:#dcfce7;border:1px solid #86efac;color:#166534;border-radius:12px;padding:10px 12px;font-weight:800;font-size:13px;}
+  table.list{width:100%;border-collapse:collapse;font-size:13px;}
+  table.list th{background:#f8fafc;text-align:left;padding:8px;font-size:12px;color:#475569;}
+  table.list td{border-top:1px solid #f1f5f9;padding:8px;font-weight:700;}
+  table.list tr.void td{color:#94a3b8;text-decoration:line-through;}
+  .n{text-align:right;white-space:nowrap;}
+  .hint{font-size:12px;color:#64748b;font-weight:700;}
+  @media(max-width:760px){.types,.grid{grid-template-columns:1fr}.item{grid-template-columns:1fr 110px 36px}}
+</style>
+{% endblock %}
+{% block content %}
+<div class="rf">
+  <div class="rf-hero">
+    <div>
+      <h1>↩️ ใบคืนเงิน</h1>
+      <p>ออกใบคืนเงินให้นักเรียน ผู้สมัคร หรือบุคคลภายนอก · ยอดคืนเงินบันทึกเป็นรายจ่ายหมวด "คืนเงิน" อัตโนมัติ จึงถูกหักก่อนคิดกำไรสุทธิ</p>
+      <p>คืนเงินเดือนนี้ {{ month_total|floatformat:2|intcomma }} บาท</p>
+    </div>
+    <div><a href="/course-payments/">← ใบเสร็จ</a><a href="/school-finance/">💰 รายรับรายจ่าย</a></div>
+  </div>
+
+  {% for m in messages %}<div class="ok">{{ m }}</div>{% endfor %}
+  {% if errors %}<div class="err">{% for e in errors %}<div>• {{ e }}</div>{% endfor %}</div>{% endif %}
+
+  <form method="post" class="card" id="rfForm">
+    {% csrf_token %}
+    <h2>➕ ออกใบคืนเงินใหม่</h2>
+    <div class="types">
+      {% for v, l in types %}<label><input type="radio" name="recipient_type" value="{{ v }}" {% if form.recipient_type == v or not form.recipient_type and forloop.first %}checked{% endif %}> {{ l }}</label>{% endfor %}
+    </div>
+
+    <div class="grid">
+      <div class="f wide search" data-for="student">
+        <label>ค้นหานักเรียน (ทั้ง active และ inactive)</label>
+        <input type="search" class="q" placeholder="พิมพ์ชื่อเล่น / ชื่อจริง / รหัสนักเรียน" autocomplete="off">
+        <input type="hidden" name="student_id" value="{{ form.student_id|default:'' }}">
+        <div class="results" hidden></div><div class="picked"></div>
+      </div>
+      <div class="f wide search" data-for="admission">
+        <label>ค้นหาผู้สมัครจากระบบ Student Admission</label>
+        <input type="search" class="q" placeholder="พิมพ์ชื่อเล่น / ชื่อจริง / เบอร์โทร" autocomplete="off">
+        <input type="hidden" name="admission_id" value="{{ form.admission_id|default:'' }}">
+        <div class="results" hidden></div><div class="picked"></div>
+      </div>
+      <div class="f"><label>ชื่อผู้รับเงินคืน</label><input name="recipient_name" id="rName" value="{{ form.recipient_name|default:'' }}" placeholder="ชื่อ-นามสกุล"></div>
+      <div class="f"><label>เบอร์ติดต่อ</label><input name="recipient_phone" id="rPhone" value="{{ form.recipient_phone|default:'' }}"></div>
+      <div class="f"><label>วันที่คืนเงิน</label><input type="date" name="refund_date" value="{% if form.refund_date %}{{ form.refund_date }}{% else %}{{ today|date:'Y-m-d' }}{% endif %}"></div>
+      <div class="f"><label>วิธีคืนเงิน</label><select name="payment_method">{% for v, l in methods %}<option value="{{ v }}" {% if form.payment_method == v or not form.payment_method and v == 'transfer' %}selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
+    </div>
+
+    <h2 style="margin-top:16px;">📋 รายการคืนเงิน</h2>
+    <div class="items" id="items"></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;flex-wrap:wrap;gap:8px;">
+      <button type="button" class="btn" id="addItem">+ เพิ่มรายการ</button>
+      <div>ยอดคืนเงินรวม <span class="total" id="total">0.00</span> บาท</div>
+    </div>
+
+    <div class="f wide" style="margin-top:12px;"><label>เหตุผล (ไม่บังคับ)</label><textarea name="reason" rows="2" placeholder="เช่น ย้ายโรงเรียน / ยกเลิกคอร์ส">{{ form.reason|default:'' }}</textarea></div>
+    <div style="margin-top:14px;text-align:right;"><button class="btn red" onclick="return confirm('ออกใบคืนเงินและบันทึกเป็นรายจ่าย?')">ออกใบคืนเงิน</button></div>
+  </form>
+
+  <div class="card">
+    <h2>🧾 ใบคืนเงินทั้งหมด</h2>
+    <div style="overflow-x:auto;"><table class="list">
+      <tr><th>เลขที่</th><th>วันที่</th><th>ผู้รับเงินคืน</th><th>ประเภท</th><th>รายการ</th><th class="n">ยอดคืน</th><th></th></tr>
+      {% for r in refunds %}
+      <tr class="{% if r.is_void %}void{% endif %}">
+        <td>{{ r.refund_no }}</td><td>{{ r.refund_date|date:"d/m/Y" }}</td><td>{{ r.recipient_name }}</td><td>{{ r.get_recipient_type_display }}</td>
+        <td>{% for i in r.items %}{{ i.desc }}{% if not forloop.last %}, {% endif %}{% endfor %}</td>
+        <td class="n">{{ r.amount|floatformat:2|intcomma }}</td>
+        <td><a href="{% url 'core:refund_detail' r.pk %}">เปิด</a>{% if r.is_void %} (ยกเลิก){% endif %}</td>
+      </tr>
+      {% empty %}<tr><td colspan="7" class="hint">ยังไม่มีใบคืนเงิน</td></tr>{% endfor %}
+    </table></div>
+  </div>
+</div>
+{{ students|json_script:"rfStudents" }}
+{{ admissions|json_script:"rfAdmissions" }}
+{{ form_items|json_script:"rfItems" }}
+<script>
+(function(){
+  const data = {student: JSON.parse(document.getElementById("rfStudents").textContent),
+                admission: JSON.parse(document.getElementById("rfAdmissions").textContent)};
+  const nameIn = document.getElementById("rName"), phoneIn = document.getElementById("rPhone");
+  const type = () => (document.querySelector('[name="recipient_type"]:checked') || {}).value;
+  function showType(){
+    document.querySelectorAll(".search").forEach(s => s.hidden = s.dataset.for !== type());
+  }
+  document.querySelectorAll('[name="recipient_type"]').forEach(r => r.addEventListener("change", showType));
+  showType();
+
+  document.querySelectorAll(".search").forEach(box => {
+    const list = data[box.dataset.for], q = box.querySelector(".q"), hid = box.querySelector('input[type=hidden]');
+    const res = box.querySelector(".results"), picked = box.querySelector(".picked");
+    const pick = p => {
+      hid.value = p.id; picked.textContent = "✓ เลือก: " + p.label; res.hidden = true; q.value = "";
+      nameIn.value = p.name; if(p.phone) phoneIn.value = p.phone;
+    };
+    if(hid.value){ const p = list.find(x => String(x.id) === hid.value); if(p) picked.textContent = "✓ เลือก: " + p.label; }
+    q.addEventListener("input", () => {
+      const t = q.value.trim().toLowerCase();
+      if(!t){ res.hidden = true; return; }
+      const hits = list.filter(p => p.label.toLowerCase().includes(t)).slice(0, 30);
+      res.innerHTML = "";
+      hits.forEach(p => { const d = document.createElement("div"); d.textContent = p.label; d.addEventListener("click", () => pick(p)); res.appendChild(d); });
+      if(!hits.length) res.innerHTML = '<div style="color:#94a3b8;cursor:default;">ไม่พบ</div>';
+      res.hidden = false;
+    });
+    q.addEventListener("keydown", e => { if(e.key === "Enter"){ e.preventDefault(); const f = res.querySelector("div"); if(f && !res.hidden) f.click(); } });
+    document.addEventListener("click", e => { if(!box.contains(e.target)) res.hidden = true; });
+  });
+
+  const wrap = document.getElementById("items"), totalEl = document.getElementById("total");
+  function recalc(){
+    const t = [...wrap.querySelectorAll('[name="item_amount"]')].reduce((s, i) => s + (parseFloat(i.value) || 0), 0);
+    totalEl.textContent = t.toLocaleString("en-US", {minimumFractionDigits: 2, maximumFractionDigits: 2});
+  }
+  function addItem(desc = "", amt = ""){
+    const row = document.createElement("div"); row.className = "item";
+    row.innerHTML = '<input name="item_desc" placeholder="รายการ เช่น คืนค่าคอร์ส ป.6 (คงเหลือ 4 ครั้ง)"><input name="item_amount" type="number" step="0.01" min="0" placeholder="ยอด (บาท)"><button type="button" class="btn x" title="ลบ">✕</button>';
+    row.children[0].value = desc; row.children[1].value = amt;
+    row.children[1].addEventListener("input", recalc);
+    row.children[2].addEventListener("click", () => { if(wrap.children.length > 1) row.remove(); else { row.children[0].value = row.children[1].value = ""; } recalc(); });
+    wrap.appendChild(row); recalc();
+  }
+  document.getElementById("addItem").addEventListener("click", () => addItem());
+  const prev = JSON.parse(document.getElementById("rfItems").textContent);
+  if(prev.length) prev.forEach(p => addItem(p[0], p[1])); else addItem();
+})();
+</script>
+{% endblock %}

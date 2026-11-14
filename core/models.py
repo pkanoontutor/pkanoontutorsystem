@@ -3926,3 +3926,35 @@ class PrintSupplyLog(models.Model):
 
     def __str__(self) -> str:
         return f"{self.supply} {self.delta:+d}"
+
+
+class RefundReceipt(models.Model):
+    """ใบคืนเงิน: each one books a matching SchoolExpense (category คืนเงิน),
+    so refunds come off revenue before net profit everywhere."""
+
+    class RecipientType(models.TextChoices):
+        STUDENT = "student", "นักเรียนในระบบ"
+        ADMISSION = "admission", "ผู้สมัคร (Student Admission)"
+        EXTERNAL = "external", "บุคคลภายนอก"
+
+    refund_no = models.CharField("เลขที่ใบคืนเงิน", max_length=20, unique=True, blank=True)
+    refund_date = models.DateField("วันที่คืนเงิน", default=timezone.localdate)
+    recipient_type = models.CharField("ผู้รับเงินคืน", max_length=20, choices=RecipientType.choices)
+    student = models.ForeignKey("Student", on_delete=models.SET_NULL, null=True, blank=True, related_name="refunds")
+    admission = models.ForeignKey("AdmissionInquiry", on_delete=models.SET_NULL, null=True, blank=True, related_name="refunds")
+    recipient_name = models.CharField("ชื่อผู้รับเงินคืน", max_length=255)
+    recipient_phone = models.CharField("เบอร์ติดต่อ", max_length=50, blank=True)
+    items = models.JSONField("รายการคืนเงิน", default=list)
+    amount = models.DecimalField("ยอดคืนเงินรวม", max_digits=12, decimal_places=2)
+    payment_method = models.CharField("วิธีคืนเงิน", max_length=20, choices=SchoolExpense.PaymentMethod.choices, default=SchoolExpense.PaymentMethod.TRANSFER)
+    reason = models.TextField("เหตุผล", blank=True)
+    expense = models.OneToOneField(SchoolExpense, on_delete=models.SET_NULL, null=True, blank=True, related_name="refund_receipt")
+    is_void = models.BooleanField("ยกเลิกแล้ว", default=False)
+    created_by = models.CharField("ผู้ออกใบ", max_length=150, blank=True)
+    created_at = models.DateTimeField("วันที่บันทึก", default=timezone.now)
+
+    class Meta:
+        ordering = ("-refund_date", "-id")
+
+    def __str__(self) -> str:
+        return f"{self.refund_no} {self.recipient_name} {self.amount}"

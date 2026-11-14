@@ -190,6 +190,13 @@
     font-size:11px;font-weight:800;color:#334155;white-space:nowrap;cursor:pointer;transition:.15s;z-index:2;}
   .card-shortcut:hover{border-color:var(--accent);color:var(--accent-strong);transform:scale(1.05);}
   .managing .card-shortcut{display:none;}
+  .mn-week-table{width:100%;border-collapse:collapse;font-size:13px;min-width:560px;}
+  .mn-week-table th{text-align:right;font-size:11px;font-weight:800;color:var(--ink-soft);padding:6px 8px;border-bottom:1px solid var(--line-strong);white-space:nowrap;}
+  .mn-week-table th:first-child,.mn-week-table td:first-child{text-align:left;}
+  .mn-week-table td{text-align:right;padding:7px 8px;border-bottom:1px solid var(--line-strong);font-weight:800;white-space:nowrap;}
+  .mn-week-table td.in{color:#15803d;} .mn-week-table td.out{color:#dc2626;}
+  .mn-week-table tr.cur td{background:var(--panel-2);}
+  .mn-week-now{font-size:10px;font-weight:900;background:var(--accent);color:#fff;border-radius:999px;padding:2px 7px;margin-left:4px;}
   .card-ctrls{display:none;position:absolute;top:8px;right:8px;gap:6px;}
   .managing .card-ctrls{display:flex;}
   .card-ctrls button{width:26px;height:26px;border-radius:8px;border:1px solid var(--line-strong);
@@ -555,6 +562,30 @@
           <div class="sub">กราฟ · ย้อนหลัง · export</div>
         </div>
       </div>
+
+      {% if money_weeks %}
+      <div class="mn-weeks">
+        <div class="rt-block-title" style="margin-bottom:8px;">🗓️ ยอดรวมรายสัปดาห์ (จันทร์–อาทิตย์)</div>
+        <div style="overflow-x:auto;">
+        <table class="mn-week-table">
+          <thead><tr><th>สัปดาห์</th><th>รับเงินสด</th><th>รับรู้รายได้</th><th>รายจ่าย</th><th>กระแสเงินสด</th><th>กำไรสุทธิ</th></tr></thead>
+          <tbody>
+          {% for w in money_weeks %}
+            <tr class="{% if w.current %}cur{% endif %}">
+              <td>{{ w.label }}{% if w.current %} <span class="mn-week-now">สัปดาห์นี้</span>{% endif %}</td>
+              <td class="in">{{ w.income|floatformat:0|intcomma }}</td>
+              <td class="in">{{ w.recognized|floatformat:0|intcomma }}</td>
+              <td class="out">{{ w.expense|floatformat:0|intcomma }}</td>
+              <td class="{% if w.cash_flow < 0 %}out{% else %}in{% endif %}">{{ w.cash_flow|floatformat:0|intcomma }}</td>
+              <td class="{% if w.net_profit < 0 %}out{% else %}in{% endif %}">{{ w.net_profit|floatformat:0|intcomma }}</td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+        </div>
+        <div class="mn-row-sub" style="margin-top:6px;">สัปดาห์แรก/สุดท้ายนับเต็มสัปดาห์ จึงอาจรวมวันของเดือนข้างเคียง</div>
+      </div>
+      {% endif %}
 
       <div>
         <div class="rt-block-title" style="margin-bottom:8px;">🧾 รายการล่าสุด</div>

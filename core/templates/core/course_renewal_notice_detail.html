@@ -59,27 +59,12 @@
     .combo .att-side .ar-badge{font-size:9.5px;padding:1px 6px}
     .combo .att-side .note{font-size:11px;padding:8px;margin-top:8px}
     @media(max-width:980px){.receipt.combo{width:min(100%,900px)}}
-    /* mascot footer */
-    .mfoot{position:relative;margin-top:16px;padding-top:30px}
-    .mfoot-band{position:relative;overflow:hidden;background:linear-gradient(120deg,#fff7ed 0%,#fef3c7 55%,#ecfccb 100%);
-      border:2px solid #fdba74;border-radius:22px;padding:12px 132px 12px 14px;min-height:112px}
-    .mfoot-dots span{position:absolute;border-radius:50%;background:#bbf7d0;opacity:.55}
-    .mfoot-dots span:nth-child(1){width:46px;height:46px;left:-14px;top:-16px}
-    .mfoot-dots span:nth-child(2){width:18px;height:18px;left:42%;top:8px;background:#fed7aa}
-    .mfoot-dots span:nth-child(3){width:30px;height:30px;left:58%;bottom:-12px;background:#fde68a}
-    .mfoot-dots span:nth-child(4){width:12px;height:12px;left:30%;bottom:10px}
-    .mfoot-dots span:nth-child(5){width:70px;height:70px;right:-20px;top:-26px;background:#fed7aa;opacity:.45}
-    .mfoot-dots span:nth-child(6){width:10px;height:10px;left:70%;top:22px;background:#fdba74}
-    .mfoot-text{position:relative;display:grid;gap:6px;justify-items:start}
-    .mfoot-bubble{position:relative;background:#fff;border:2px solid #fb923c;border-radius:16px;padding:7px 12px;
-      font-size:13px;font-weight:1000;color:#9a3412;line-height:1.4;box-shadow:0 3px 0 #fed7aa}
-    .mfoot-line{font-size:13px;font-weight:900;color:#166534}
-    .mfoot-line b{font-size:15px;color:#15803d}
-    .mfoot-chip{display:inline-block;background:#06c755;color:#fff;font-size:10px;font-weight:1000;border-radius:6px;padding:2px 6px;margin-right:2px;vertical-align:1px}
-    .mfoot-tag{font-size:11px;font-weight:800;font-style:italic;color:#ea580c}
-    .mfoot-stamp{font-size:10px;font-weight:800;color:#94a3b8}
-    .mfoot-mascot{position:absolute;right:4px;bottom:4px;height:150px;width:auto;pointer-events:none}
-    @media(max-width:480px){.mfoot-band{padding-right:104px}.mfoot-mascot{height:122px}}
+    /* mascot fills the blank space under the history column (never adds height) */
+    .combo-grid{align-items:stretch}
+    .combo .att-side{display:flex;flex-direction:column}
+    .combo .att-mascot-slot{flex:1 1 0;min-height:0;position:relative;overflow:hidden}
+    .combo .att-mascot{position:absolute;left:50%;bottom:0;transform:translateX(-50%);height:100%;max-height:230px;width:auto;display:none}
+    .combo .att-mascot-ground{position:absolute;left:12%;right:12%;bottom:4px;height:14px;border-radius:50%;background:#fde68a;opacity:.6;display:none}
     .card-label{width:min(100%,440px);font-size:13px;font-weight:1000;color:#0f172a;margin-top:10px}
     .att-count{width:min(100%,440px);display:flex;gap:6px;align-items:center;flex-wrap:wrap;background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:8px 10px}
     .att-count label{font-size:12px;font-weight:1000;color:#334155}
@@ -294,9 +279,10 @@
             <div class="att-side-title">📋 ประวัติการเข้าเรียน</div>
             <div style="margin-top:8px;">{% include "core/_attendance_round.html" with att=att %}</div>
             <div class="note" style="font-size:13px;">{{ notice.note_wording|line_id }}</div>
+            <div class="att-mascot-slot"><div class="att-mascot-ground"></div><img class="att-mascot" src="{% static 'core/mascot_walk.png' %}" alt=""></div>
           </div>
         </div>
-        {% now "d/m/Y H:i" as now_txt %}{% with stamp="ข้อมูล ณ วันที่ "|add:now_txt %}{% include "core/_notice_footer.html" %}{% endwith %}
+        <div class="foot">ข้อมูล ณ วันที่ {% now "d/m/Y H:i" %}</div>
       </div>
 
       <div class="card-label">🧾 ใบแจ้งต่อคอร์ส</div>
@@ -320,7 +306,7 @@
         </div>
 
         {% include "core/_renewal_notice_body.html" %}
-        {% with c=notice.created_at|date:"d/m/Y H:i" u=notice.updated_at|date:"d/m/Y H:i" %}{% with stamp="สร้างเมื่อ "|add:c|add:" · อัปเดตล่าสุด "|add:u %}{% include "core/_notice_footer.html" %}{% endwith %}{% endwith %}
+        <div class="foot">สร้างเมื่อ {{ notice.created_at|date:"d/m/Y H:i" }} · อัปเดตล่าสุด {{ notice.updated_at|date:"d/m/Y H:i" }}</div>
       </div>
 
       <div class="card-label">📋 ใบประวัติการเข้าเรียน</div>
@@ -361,7 +347,7 @@
           การลาที่แจ้งล่วงหน้าไม่หักครั้งเรียน ส่วนการลาแบบหักครึ่งจะหัก 0.5 ครั้งครับ{% if att.has_half_left %}
           <br>🎬 เศษ 0.5 ครั้งที่เหลือ ดูคลิปเรียนย้อนหลังเพิ่มได้ 1 คลิปครับ{% endif %}
         </div>
-        {% now "d/m/Y H:i" as now_txt %}{% with stamp="ข้อมูล ณ วันที่ "|add:now_txt %}{% include "core/_notice_footer.html" %}{% endwith %}
+        <div class="foot">ข้อมูล ณ วันที่ {% now "d/m/Y H:i" %}</div>
       </div>
     </div>
   </div>
@@ -462,15 +448,24 @@
       document.getElementById("endDateMinus7").addEventListener("click", function () { shiftEndBy(-7); });
     })();
 
+    function fitMascot() {
+      document.querySelectorAll(".att-mascot-slot").forEach(slot => {
+        const ok = slot.clientHeight >= 110;
+        slot.querySelector(".att-mascot").style.display = ok ? "block" : "none";
+        slot.querySelector(".att-mascot-ground").style.display = ok ? "block" : "none";
+      });
+    }
+    window.addEventListener("load", fitMascot);
+    window.addEventListener("resize", fitMascot);
     async function makeCanvas(id) {
       const el = document.getElementById(id || "receiptCard");
       // The combined card is always exported at full width (60/40 split),
       // even from a phone where it is shown narrower on screen.
       if (el.classList.contains("combo")) {
         const old = el.style.cssText;
-        el.style.width = "900px"; el.style.maxWidth = "none";
+        el.style.width = "900px"; el.style.maxWidth = "none"; fitMascot();
         try { return await html2canvas(el, {scale: 3, backgroundColor: "#ffffff", useCORS: true, windowWidth: 1300}); }
-        finally { el.style.cssText = old; }
+        finally { el.style.cssText = old; fitMascot(); }
       }
       return await html2canvas(el, {scale: 3, backgroundColor: "#ffffff", useCORS: true});
     }

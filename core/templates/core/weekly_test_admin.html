@@ -40,6 +40,28 @@
   .att-edit-menu .m-clear{background:#f8fafc;color:#64748b}
   .pill-row{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}.result-pill{cursor:pointer}.result-pill input{display:none}.pill-label{position:relative;display:inline-flex;align-items:center;justify-content:center;border-radius:999px;padding:8px 11px;font-weight:1000;font-size:12px;border:2px solid transparent;background:#fff;color:#334155;transition:.1s;min-width:58px}.result-pill input:checked+.pill-label{border:3px solid #0f172a!important;box-shadow:0 0 0 4px rgba(37,99,235,.24),0 7px 16px rgba(15,23,42,.22);transform:scale(1.05)}.result-pill input:checked+.pill-label:before{content:"✓";font-weight:1000;margin-right:5px}.result-pill input:disabled+.pill-label{opacity:.38;cursor:not-allowed;background:#f8fafc!important;color:#94a3b8!important;border-color:#e2e8f0!important;box-shadow:none;transform:none}.clear-pill{opacity:.78;background:#f8fafc!important;color:#475569!important;border-color:#cbd5e1!important}
   .score-full{background:#5f9b48!important;color:#fff!important}.score-great{background:#9add78!important;color:#12310f!important}.score-good{background:#c8efb2!important;color:#173b12!important}.score-medium{background:#ffe083!important;color:#4b3100!important}.score-fail{background:#e3a0a0!important;color:#5f1111!important}.score-empty{background:#f1f5f9!important;color:#64748b!important}.score-excused{background:#e5e7eb!important;color:#475569!important}.score-noshow{background:#fee2e2!important;color:#991b1b!important}.score-notchecked{background:#f8fafc!important;color:#94a3b8!important}
+  /* entry rows: photo + name on top, score buttons full width below */
+  .score-table td.row-cell{padding:10px 12px}
+  .row-top{display:flex;gap:11px;align-items:center}
+  .avatar{width:54px;height:54px;border-radius:16px;flex:0 0 54px;object-fit:cover;background:#e0e7ff;border:2px solid #fff;box-shadow:0 2px 8px rgba(15,23,42,.15)}
+  .avatar.ph{display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:1000;color:#4338ca;background:linear-gradient(135deg,#e0e7ff,#f5d0fe)}
+  tr.att-excused .avatar,tr.att-no-show .avatar,tr.att-not-checked .avatar{filter:grayscale(1);opacity:.6}
+  .row-names{min-width:0;flex:1}
+  .row-names .student-name{font-size:17px}
+  .row-cell .pill-row{justify-content:flex-start;margin-top:9px;padding-left:65px}
+  tr.row-filled .avatar{box-shadow:0 0 0 3px #22c55e}
+  .row-done-tick{display:none;color:#16a34a;font-weight:1000;font-size:18px}
+  tr.row-filled .row-done-tick{display:inline}
+  .class-jump{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px;width:100%}
+  .class-jump a{display:inline-flex;gap:6px;align-items:center;text-decoration:none;border:1px solid #e2e8f0;background:#f8fafc;color:#0f172a;border-radius:999px;padding:6px 11px;font-size:12px;font-weight:1000}
+  .class-jump a.complete{background:#dcfce7;border-color:#86efac;color:#166534}
+  .prog{font-size:11px;font-weight:1000;color:#64748b}
+  .class-jump a.complete .prog{color:#166534}
+  .chip.prog-chip{background:#e0e7ff;color:#3730a3}.chip.prog-chip.complete{background:#16a34a;color:#fff}
+  .dirty-dot{display:none;background:#f59e0b;color:#111827;border-radius:999px;padding:5px 10px;font-size:12px;font-weight:1000}
+  .dirty .dirty-dot{display:inline-flex}
+  .class-card{scroll-margin-top:110px}
+  @media(max-width:620px){.row-cell .pill-row{padding-left:0}.avatar{width:46px;height:46px;flex-basis:46px}}
   .class-save{padding:12px 14px;background:#f8fafc;text-align:right;border-top:1px solid #e2e8f0}
 
   /* ---- Shareable summary image (one per grade, 4 classes per row) ---- */
@@ -184,15 +206,21 @@
       </div>
     </div>
 
-    <div class="savebar">
+    <div class="savebar" id="savebar">
       <div>
         <strong>{{ selected_grade_label }}</strong> · สัปดาห์ {{ week_start|date:'d/m/Y' }} - {{ week_end|date:'d/m/Y' }}
         {% if saved_message %}<span class="saved-msg">{{ saved_message }}</span>{% endif %}
+        <span class="dirty-dot">● ยังไม่ได้บันทึก</span>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
         <a class="btn btn-soft" href="#capture-summary">ไปหน้าสรุปสำหรับแคป</a>
         <button class="btn btn-primary" type="submit" name="save_scope" value="all">บันทึกทั้งหมดของ {{ selected_grade_label }}</button>
       </div>
+      {% if class_blocks %}
+      <div class="class-jump">
+        {% for block in class_blocks %}<a href="#class-{{ block.class.id }}" data-jump="{{ block.class.id }}">{{ block.class.name }} <span class="prog"></span></a>{% endfor %}
+      </div>
+      {% endif %}
     </div>
 
     <div class="wt-card">
@@ -200,7 +228,7 @@
       {% if class_blocks %}
       <div class="class-grid">
         {% for block in class_blocks %}
-        <div class="class-card">
+        <div class="class-card" id="class-{{ block.class.id }}" data-class="{{ block.class.id }}">
           <div class="class-head">
             <div>
               <div class="class-name">{{ block.class.name }}</div>
@@ -211,14 +239,18 @@
               <span class="chip excused">ลา {{ block.excused_count }}</span>
               <span class="chip noshow">ขาด {{ block.no_show_count }}</span>
               {% if block.not_checked_count %}<span class="chip">ยังไม่เช็ค {{ block.not_checked_count }}</span>{% endif %}
+              <span class="chip prog-chip"></span>
             </div>
           </div>
           <table class="score-table">
             <tbody>
               {% for row in block.rows %}
               <tr class="{{ row.attendance_class }}">
-                <td>
-                  <div class="student-name">{{ row.student.nickname|default:row.student.full_name }}</div>
+                <td class="row-cell">
+                  <div class="row-top">
+                  {% if row.student.profile_image %}<img class="avatar" src="{{ row.student.profile_image.url }}" alt="{{ row.student.nickname }}" loading="lazy">{% else %}<div class="avatar ph">{{ row.student.nickname|default:row.student.full_name|slice:":1" }}</div>{% endif %}
+                  <div class="row-names">
+                  <div class="student-name">{{ row.student.nickname|default:row.student.full_name }} <span class="row-done-tick">✓</span></div>
                   <div class="student-full">{{ row.student.full_name }}</div>
                   <span class="att-edit-wrap">
                     <span class="status-mini {{ row.attendance_class }}">{{ row.attendance_label }}</span>
@@ -232,8 +264,8 @@
                       <button type="button" data-status="clear" class="m-clear">ล้าง</button>
                     </span>
                   </span>
-                </td>
-                <td style="width:60%;">
+                  </div>
+                  </div>
                   <div class="pill-row">
                     {% for choice in result_choices %}
                     <label class="result-pill">
@@ -456,6 +488,41 @@
       alert(err && err.message ? err.message : 'สร้างรูปไม่สำเร็จ ลองใช้ปุ่มดาวน์โหลด PNG แทนครับ');
     });
   });
+})();
+
+// ---- entry helpers: per-class progress, jump bar, unsaved warning ----
+(function(){
+  var cards = document.querySelectorAll('.class-card[data-class]');
+  if(!cards.length) return;
+  var dirty = false;
+  function refresh(){
+    cards.forEach(function(card){
+      var rows = card.querySelectorAll('tbody tr'), able = 0, done = 0;
+      rows.forEach(function(tr){
+        var radios = tr.querySelectorAll('input[type="radio"]');
+        var canEdit = radios.length && !radios[0].disabled;
+        var picked = tr.querySelector('input[type="radio"]:checked');
+        var filled = !!(picked && picked.value);
+        tr.classList.toggle('row-filled', filled);
+        if(canEdit){ able++; if(filled) done++; }
+      });
+      var complete = able > 0 && done === able, txt = 'กรอกแล้ว ' + done + '/' + able;
+      var chip = card.querySelector('.prog-chip');
+      chip.textContent = txt; chip.classList.toggle('complete', complete);
+      var jump = document.querySelector('.class-jump a[data-jump="' + card.dataset.class + '"]');
+      if(jump){ jump.querySelector('.prog').textContent = done + '/' + able; jump.classList.toggle('complete', complete); }
+    });
+  }
+  document.addEventListener('change', function(e){
+    if(e.target.matches('.score-table input[type="radio"]')){
+      dirty = true; document.getElementById('savebar').classList.add('dirty'); refresh();
+    }
+  });
+  // attendance fixes enable/disable radios asynchronously
+  new MutationObserver(refresh).observe(document.querySelector('.class-grid'), {subtree: true, attributes: true, attributeFilter: ['disabled', 'class']});
+  document.querySelectorAll('form[method="post"]').forEach(function(f){ f.addEventListener('submit', function(){ dirty = false; }); });
+  window.addEventListener('beforeunload', function(e){ if(dirty){ e.preventDefault(); e.returnValue = ''; } });
+  refresh();
 })();
 
 // ---- fix a student's check-in for this week without leaving the page ----

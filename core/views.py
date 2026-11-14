@@ -13410,6 +13410,22 @@ def student_portal_claim_phone(request: HttpRequest) -> HttpResponse:
 # =========================================================
 # ✅ Widget บันทึกรายรับ-รายจ่ายด่วน (ในหน้า Admin Tool)
 # =========================================================
+def _money_period_figures(start: date, end: date) -> dict:
+    """Cash in, recognised revenue and spending between two dates (inclusive)."""
+    from .analytics import recognized_revenue_rows
+    cash = (CoursePayment.objects.filter(payment_date__range=(start, end), status=CoursePayment.ReceiptStatus.ISSUED)
+            .aggregate(t=Sum("amount_paid"))["t"] or Decimal("0"))
+    other = OtherIncome.objects.filter(income_date__range=(start, end)).aggregate(t=Sum("amount"))["t"] or Decimal("0")
+    general = (SchoolExpense.objects.filter(expense_date__range=(start, end)).exclude(category__is_tutor_payroll=True)
+               .aggregate(t=Sum("amount"))["t"] or Decimal("0"))
+    payroll = TutorPayrollEntry.objects.filter(work_date__range=(start, end)).aggregate(t=Sum("total_amount"))["t"] or Decimal("0")
+    recognized = sum((r["revenue"] for r in recognized_revenue_rows(start, end)), Decimal("0")) + Decimal(other)
+    income = Decimal(cash) + Decimal(other)
+    expense = Decimal(general) + Decimal(payroll)
+    return {"income": income, "recognized": recognized, "expense": expense,
+            "cash_flow": income - expense, "net_profit": recognized - expense}
+
+
 def _money_widget_context() -> dict:
     """Month-to-date figures plus the last few entries, for the admin-tool
     widget. Deliberately month-scoped: the widget is for "did I record
@@ -13438,6 +13454,17 @@ def _money_widget_context() -> dict:
     from .analytics import recognized_revenue_rows
     recognized_course = sum((r["revenue"] for r in recognized_revenue_rows(month_start, today)), Decimal("0"))
     recognized_total = Decimal(recognized_course) + Decimal(other_income)
+
+    # One line per Monday-Sunday week touching this month (whole weeks, so the
+    # first/last line may include days of the neighbouring month).
+    weeks = []
+    wk = month_start - timedelta(days=month_start.weekday())
+    while wk <= today:
+        f = _money_period_figures(wk, wk + timedelta(days=6))
+        end = wk + timedelta(days=6)
+        label = f"{wk.day}/{wk.month} – {end.day}/{end.month}/{(end.year + 543) % 100:02d}"
+        weeks.append({"label": label, "start": wk, "end": end, "current": wk <= today <= wk + timedelta(days=6), **f})
+        wk += timedelta(days=7)
 
     recent = []
     for e in OtherIncome.objects.select_related("category")[:6]:
@@ -13471,6 +13498,7 @@ def _money_widget_context() -> dict:
         "money_cash_flow": income_total - expense_total,
         "money_net_profit": recognized_total - expense_total,
         "money_recent": recent[:8],
+        "money_weeks": weeks,
         "money_payment_methods": SchoolExpense.PaymentMethod.choices,
         "money_fixed_status": _fixed_month_status(month_start),
     }

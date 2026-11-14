@@ -268,11 +268,11 @@
           <div class="school">พี่ขนุนติวเตอร์</div>
         </div>
         <div class="combo-grid">
-          <div>{% include "core/_renewal_notice_body.html" %}</div>
+          <div>{% include "core/_renewal_notice_body.html" with hide_note=True %}</div>
           <div class="att-side">
             <div class="att-side-title">📋 ประวัติการเข้าเรียน</div>
             <div style="margin-top:8px;">{% include "core/_attendance_round.html" with att=att %}</div>
-            <div class="note">การลาที่แจ้งล่วงหน้าไม่หักครั้งเรียน ส่วนการลาแบบหักครึ่งจะหัก 0.5 ครั้งครับ</div>
+            <div class="note" style="font-size:13px;">{{ notice.note_wording|line_id }}</div>
           </div>
         </div>
         <div class="foot">ข้อมูล ณ วันที่ {% now "d/m/Y H:i" %}</div>

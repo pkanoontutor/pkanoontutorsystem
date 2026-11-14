@@ -58,4 +58,4 @@
             น้องสามารถดูคลิปเรียนย้อนหลังเพิ่มอีก 1 คลิปเพื่อเรียนให้ครบส่วนที่เหลือได้ครับ
           </div>
         {% endif %}
-        <div class="note">{{ notice.note_wording }}</div>
+        {% if not hide_note %}<div class="note">{{ notice.note_wording|line_id }}</div>{% endif %}

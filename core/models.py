@@ -1056,7 +1056,7 @@ class CourseRenewalNotice(models.Model):
 
     note_wording = models.TextField(
         "ข้อความท้ายใบแจ้ง",
-        default="ผู้ปกครองสามารถขอชะลอจ่าย เลื่อนจ่ายเป็นสิ้นเดือนได้โดยนักเรียนไม่ต้องเว้นวรรคการเรียนครับ ติดต่อแจ้งพี่ขนุนทาง Line @ ครับ",
+        default="ผู้ปกครองสามารถขอชะลอจ่าย เลื่อนจ่ายเป็นสิ้นเดือนได้โดยนักเรียนไม่ต้องเว้นวรรคการเรียนครับ ติดต่อแจ้งพี่ขนุนทาง Line ID : @pkanoontutor ครับ",
     )
 
     referral_credit_used = models.DecimalField(

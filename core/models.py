@@ -1333,6 +1333,7 @@ class PrintSupply(models.Model):
         SPINE = "spine", "สันรูด"
         INK = "ink", "หมึก"
         DRUM = "drum", "Drum หมึก"
+        OTHER = "other", "สินค้าอื่นๆ"
 
     category = models.CharField("ประเภท", max_length=20, choices=Category.choices)
     name = models.CharField("ชื่อ", max_length=100)
@@ -1345,7 +1346,7 @@ class PrintSupply(models.Model):
 
     class Meta:
         ordering = ("order", "spine_color", "spine_size")
-        constraints = [models.UniqueConstraint(fields=("category", "spine_color", "spine_size"), name="uniq_print_supply")]
+        constraints = [models.UniqueConstraint(fields=("category", "spine_color", "spine_size", "name"), name="uniq_print_supply_v2")]
 
     def __str__(self) -> str:
         return self.name
@@ -1360,7 +1361,8 @@ class PrintSupply(models.Model):
 
     @property
     def is_low(self) -> bool:
-        return self.quantity < self.LOW_BELOW[self.category]
+        limit = self.LOW_BELOW.get(self.category)  # free-form items have no fixed rule
+        return limit is not None and self.quantity < limit
 
     @property
     def quantity_label(self) -> str:

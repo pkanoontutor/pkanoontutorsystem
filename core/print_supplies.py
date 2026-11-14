@@ -185,8 +185,24 @@ def print_supply_update(request: HttpRequest) -> HttpResponse:
             if qty:
                 _change(spine.id, qty, PrintSupplyLog.Reason.ADJUST, actor, note or "ตั้งต้นขนาดสันใหม่")
         return _back(request)
+    if action == "add_item":
+        name = " ".join((request.POST.get("name") or "").split())[:100]
+        unit = request.POST.get("unit") or ""
+        if unit == "other":
+            unit = " ".join((request.POST.get("unit_other") or "").split())
+        unit = unit[:20]
+        if name and unit:
+            item, created = PrintSupply.objects.get_or_create(category=C.OTHER, name=name, defaults={"unit": unit, "order": 90})
+            if not created:
+                item.is_active = True
+                item.unit = unit
+                item.save(update_fields=["is_active", "unit"])
+            qty = clean_pages(request.POST.get("quantity"))
+            if qty:
+                _change(item.id, qty, PrintSupplyLog.Reason.ADJUST, actor, note or "เพิ่มรายการสินค้าใหม่")
+        return _back(request)
     supply = get_object_or_404(PrintSupply, id=clean_pages(request.POST.get("supply")))
-    if action == "hide" and supply.category == C.SPINE:
+    if action == "hide" and supply.category in (C.SPINE, C.OTHER):
         supply.is_active = False
         supply.save(update_fields=["is_active"])
     elif action in ("add", "remove", "set"):

@@ -31,11 +31,11 @@
         <button class="ps-btn add" name="action" value="add">+ เพิ่ม</button>
         <button class="ps-btn rm" name="action" value="remove">− ลด</button>
         <button class="ps-btn" name="action" value="set">ตั้งยอดเป็น</button>
-        {% if s.category == "spine" %}<button class="ps-btn" name="action" value="hide" formnovalidate onclick="return confirm('ซ่อนขนาดสันนี้?')">ซ่อน</button>{% endif %}
+        {% if s.category == "spine" or s.category == "other" %}<button class="ps-btn" name="action" value="hide" formnovalidate onclick="return confirm('ซ่อนรายการนี้?')">ซ่อน</button>{% endif %}
       </form>
     </div>
   {% empty %}
-    <div class="ps-actor">ยังไม่มีรายการ เพิ่มสันได้จากฟอร์มด้านล่าง</div>
+    <div class="ps-actor">ยังไม่มีรายการ เพิ่มได้จากฟอร์มด้านล่าง</div>
   {% endfor %}
 {% endfor %}
 <div class="ps-group">➕ เพิ่มสันสี/ขนาดใหม่</div>
@@ -48,6 +48,26 @@
   <input type="number" min="0" name="quantity" placeholder="จำนวนตั้งต้น">
   <button class="ps-btn dark">เพิ่ม</button>
 </form>
+<div class="ps-group">➕ เพิ่มสินค้าอื่นๆ</div>
+<form class="ps-form" method="post" action="{% url 'core:print_supply_update' %}" style="margin-top:8px;">
+  {% csrf_token %}
+  <input type="hidden" name="next" value="{{ supply_next }}">
+  <input type="hidden" name="action" value="add_item"><input type="hidden" name="actor" class="ps-actor-field">
+  <input name="name" placeholder="ชื่อสินค้า เช่น แม็กเย็บ" maxlength="100" required style="min-width:180px">
+  <select name="unit" class="ps-unit">
+    <option value="แผ่น">แผ่น</option><option value="ชิ้น" selected>ชิ้น</option><option value="other">อื่นๆ (กรอกเอง)</option>
+  </select>
+  <input name="unit_other" class="ps-unit-other" placeholder="หน่วย เช่น กล่อง" maxlength="20" hidden style="width:120px">
+  <input type="number" min="0" name="quantity" placeholder="จำนวนตั้งต้น">
+  <button class="ps-btn dark">เพิ่มสินค้า</button>
+</form>
+<script>
+  document.querySelectorAll(".ps-unit").forEach(sel => sel.addEventListener("change", () => {
+    const other = sel.form.querySelector(".ps-unit-other");
+    other.hidden = sel.value !== "other"; other.required = sel.value === "other";
+    if(!other.hidden) other.focus();
+  }));
+</script>
 <script>
   // remember who is editing on this device, and send the name with each stock change
   (function(){

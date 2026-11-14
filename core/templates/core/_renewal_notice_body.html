@@ -1,0 +1,61 @@
+{% load static humanize extras %}
+        <div class="student-card">
+          <div class="student-name">{{ student.nickname|default:"-" }} · {{ student.full_name }}</div>
+          <div class="meta">
+            คอร์สที่เรียน: {{ tutoring_class.name }}<br>
+            ระดับชั้น: {{ student.grade_level|default:"-" }}<br>
+            เลขที่ Enrollment: {{ enrollment.sale_run_no|default:enrollment.id }}
+          </div>
+        </div>
+
+        <div class="date-row">
+          <div class="date-box end"><div class="k">คาดว่าจะครบคอร์ส</div><div class="v js-end-view">{{ notice.expected_course_end_date|date:"d/m/Y" }}</div></div>
+          <div class="date-box start"><div class="k">เริ่มเรียนรอบใหม่</div><div class="v js-start-view">{{ notice.next_course_start_date|date:"d/m/Y" }}</div></div>
+        </div>
+
+        {% if notice.notice_type == "installment" %}
+          <div class="installment-box">
+            <div class="money-row"><span class="k">ยอดเต็ม</span><span class="v">{{ notice.installment_full_amount|floatformat:0|intcomma }} บาท</span></div>
+            <div class="money-row"><span class="k">ชำระแล้ว</span><span class="v">{{ notice.installment_paid_amount|floatformat:0|intcomma }} บาท</span></div>
+            {% if notice.referral_credit_used > 0 %}
+              <div class="money-row"><span class="k">🎁 เครดิตชวนเพื่อน</span><span class="v" style="color:#dc2626;">-{{ notice.referral_credit_used|floatformat:0|intcomma }} บาท</span></div>
+            {% endif %}
+            {% if notice.installment_count > notice.installment_no %}
+              <div class="money-row"><span class="k">ยอดคงเหลือทั้งหมด</span><span class="v">{{ notice.installment_remaining_amount|floatformat:0|intcomma }} บาท</span></div>
+              <div class="money-row remaining"><span class="k">ยอดชำระงวดที่ {{ notice.installment_no }} / {{ notice.installment_count }}</span><span class="v">{{ notice.installment_due_amount|floatformat:0|intcomma }} บาท</span></div>
+              {% if notice.installment_due_date %}<div class="money-row"><span class="k">กำหนดชำระงวดนี้</span><span class="v">{{ notice.installment_due_date|date:"d/m/Y" }}</span></div>{% endif %}
+              <div class="money-row"><span class="k">จำนวนครั้งที่ได้รับจากงวดนี้</span><span class="v">{{ notice.installment_sessions }} ครั้ง</span></div>
+              <div class="money-row" style="background:#fff7ed;border-radius:12px;padding:8px 10px;border-bottom:0;"><span class="k" style="color:#c2410c;">งวดที่ {{ notice.installment_no|add:1 }} ขาดอีก{% if notice.next_installment_due_date %} · กำหนดชำระ {{ notice.next_installment_due_date|date:"d/m/Y" }}{% endif %}</span><span class="v" style="color:#c2410c;">{{ notice.next_installment_amount|floatformat:0|intcomma }} บาท</span></div>
+            {% else %}
+              <div class="money-row remaining"><span class="k">ยอดคงเหลือต้องชำระ{% if notice.installment_count %} (งวดสุดท้าย){% endif %}</span><span class="v">{{ notice.installment_remaining_amount|floatformat:0|intcomma }} บาท</span></div>
+              {% if notice.installment_due_date %}<div class="money-row"><span class="k">กำหนดชำระ</span><span class="v">{{ notice.installment_due_date|date:"d/m/Y" }}</span></div>{% endif %}
+              <div class="money-row"><span class="k">จำนวนครั้งที่ได้รับจากงวดนี้</span><span class="v">{{ notice.installment_sessions }} ครั้ง</span></div>
+            {% endif %}
+          </div>
+        {% else %}
+          <div class="packages">
+            {% for p in packages %}
+              <div class="pkg {{ p.accent }}">
+                <div class="pkg-head"><div class="pkg-name">{{ p.label }}</div><div class="net">{{ p.net_price|floatformat:0|intcomma }} บาท</div></div>
+                <div class="price-line"><span>ราคาเต็ม</span><span class="full">{{ p.full_price|floatformat:0|intcomma }} บาท</span></div>
+                <div class="price-line"><span>ส่วนลด</span><span class="discount">-{{ p.discount|floatformat:0|intcomma }} บาท</span></div>
+                {% if notice.referral_credit_used > 0 %}
+                  <div class="price-line"><span>🎁 เครดิตชวนเพื่อน</span><span class="discount">-{{ notice.referral_credit_used|floatformat:0|intcomma }} บาท</span></div>
+                {% endif %}
+              </div>
+            {% endfor %}
+          </div>
+        {% endif %}
+
+        <div class="qr-zone">
+          <img class="qr" src="{% static 'core/QRPromptpay.png' %}" alt="QR PromptPay">
+          <div class="qr-title">ผู้ปกครองสามารถสแกนชำระด้วย QR Code นี้ได้เลยครับ</div>
+        </div>
+
+        {% if att.has_half_left %}
+          <div class="note" style="background:#eff6ff;border-color:#bfdbfe;color:#1d4ed8;">
+            🎬 คอร์สนี้เหลือ {{ att.remaining|sessions }} ครั้ง — เศษ 0.5 ครั้งไม่ถูกนำมาคิดเงินในราคาต่อคอร์สด้านบน
+            น้องสามารถดูคลิปเรียนย้อนหลังเพิ่มอีก 1 คลิปเพื่อเรียนให้ครบส่วนที่เหลือได้ครับ
+          </div>
+        {% endif %}
+        <div class="note">{{ notice.note_wording }}</div>

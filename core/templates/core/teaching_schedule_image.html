@@ -28,13 +28,17 @@
       border-radius:12px;padding:10px 14px;font-weight:600;text-align:center;}
 
     /* ===== The exportable card ===== */
-    .sched{width:1280px;max-width:100%;margin:0 auto;background:#ffffff;border:8px solid #efa53c;
-      border-radius:28px;padding:22px 26px 26px;}
+    .sched{width:1280px;max-width:100%;margin:0 auto;background:var(--card-bg,#ffffff);border:8px solid var(--frame,#efa53c);
+      border-radius:28px;padding:22px 26px 26px;position:relative;overflow:hidden;}
+    .sched>*{position:relative;z-index:1}
+    .sched .decor{position:absolute;inset:0;z-index:0;pointer-events:none}
+    .sched .decor span{position:absolute;line-height:1;opacity:.9}
+    .sched .decor .bg{opacity:.13}
     .head{text-align:center;}
     .logo{height:78px;object-fit:contain;margin:2px auto 4px;display:block;}
-    .title{font-size:30px;font-weight:700;color:#e0322f;margin:2px 0 16px;text-shadow:0 2px 4px rgba(0,0,0,.18);}
-    .title.day-sat{color:#5b21b6;}
-    .title.day-sun{color:#7f1d1d;}
+    .title{font-size:30px;font-weight:700;color:var(--title,#e0322f);margin:2px 0 16px;text-shadow:0 2px 4px rgba(0,0,0,.18);}
+    .title.day-sat{color:var(--title,#5b21b6);}
+    .title.day-sun{color:var(--title,#7f1d1d);}
 
     table.grid{width:100%;border-collapse:separate;border-spacing:7px;table-layout:fixed;}
     table.grid th,table.grid td{border-radius:12px;}
@@ -42,11 +46,11 @@
     .room-h{padding:12px 6px;font-size:16.5px;font-weight:700;color:#3f3a2f;text-align:center;
       box-shadow:0 2px 4px rgba(0,0,0,.05);overflow:hidden;}
     .room-h .ric{font-size:15px;margin-right:4px;}
-    .time-c{background:#e19a2e;color:#fff;font-weight:700;font-size:16px;text-align:center;padding:12px 6px;white-space:nowrap;}
-    .cell{background:#ffeb9a;padding:11px 13px;text-align:left;font-size:15px;font-weight:500;
+    .time-c{background:var(--time,#e19a2e);color:#fff;font-weight:700;font-size:16px;text-align:center;padding:12px 6px;white-space:nowrap;}
+    .cell{background:var(--cell,#ffeb9a);padding:11px 13px;text-align:left;font-size:15px;font-weight:500;
       height:54px;line-height:1.35;color:#3a3527;vertical-align:middle;overflow:hidden;}
-    .cell.empty{background:#7ed2f2;}
-    .row-break td.cell{background:#7ed2f2;}
+    .cell.empty{background:var(--empty,#7ed2f2);}
+    .row-break td.cell{background:var(--empty,#7ed2f2);}
     .cell .tutor{font-weight:700;}
     .cell.conflict{outline:3px solid #dc2626;position:relative;}
     .cell.conflict::after{content:"⚠";position:absolute;top:2px;right:5px;font-size:13px;color:#dc2626;}
@@ -75,8 +79,26 @@
       box-shadow:0 4px 0 rgba(0,0,0,.18);flex:none;}
     .cd .badge .n{font-size:24px;font-weight:700;line-height:1;}
     .cd .badge .lbl{font-size:10.5px;font-weight:700;letter-spacing:.1em;}
-    .tagline{text-align:center;color:#f2994a;font-weight:600;font-size:18px;margin-top:16px;font-style:italic;}
+    .tagline{text-align:center;color:var(--tag,#f2994a);font-weight:600;font-size:18px;margin-top:16px;font-style:italic;}
     @media(max-width:1320px){.sched{width:100%}}
+
+    /* ===== Themes (colours only + emoji in empty corners: no extra space) ===== */
+    .sched.th-christmas{--frame:#c0262d;--title:#b91c1c;--time:#15803d;--cell:#fff1e6;--empty:#cdeccf;--tag:#b91c1c;--card-bg:#fffdf8;}
+    .sched.th-loykrathong{--frame:#1e3a8a;--title:#1e40af;--time:#2547a8;--cell:#fff4c2;--empty:#c7d7fb;--tag:#c48a12;--card-bg:#fbfcff;}
+    .sched.th-songkran{--frame:#0ea5e9;--title:#0369a1;--time:#0891b2;--cell:#fff3cf;--empty:#b6eef7;--tag:#0ea5e9;--card-bg:#fbfeff;}
+    .sched.th-halloween{--frame:#ea580c;--title:#c2410c;--time:#6b21a8;--cell:#ffe2c4;--empty:#e4d4fb;--tag:#7e22ce;--card-bg:#fffaf5;}
+    .theme-bar{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;align-items:center;margin:-4px 0 14px;font-size:14px;font-weight:600;}
+    .theme-bar select{border:1px solid #cbd5e1;border-radius:10px;padding:8px 10px;font:inherit;background:#fff;}
+    .theme-bar label{display:inline-flex;gap:6px;align-items:center;background:#fff;border:1px solid #cbd5e1;border-radius:10px;padding:7px 11px;cursor:pointer;}
+
+    /* ===== Compact countdown in the header's empty top-right corner ===== */
+    .cd-mini{position:absolute;top:2px;right:0;display:grid;gap:6px;justify-items:end;z-index:2}
+    .cd-mini .p{display:flex;align-items:center;gap:8px;background:#fff;border:2px solid var(--frame,#efa53c);border-radius:999px;padding:3px 4px 3px 12px;box-shadow:0 2px 0 rgba(0,0,0,.08)}
+    .cd-mini .g{font-size:15px;font-weight:700;color:#1f2937;white-space:nowrap}
+    .cd-mini .d{font-size:11px;font-weight:600;color:#6b7280;white-space:nowrap}
+    .cd-mini .n{background:var(--title,#e11d2a);color:#fff;border-radius:999px;padding:3px 10px;font-size:15px;font-weight:700;white-space:nowrap}
+    .cd-mini .n small{font-size:10px;font-weight:600;margin-left:3px}
+    .head{position:relative}
 
     /* ===== Payroll modal ===== */
     .pay-bg{position:fixed;inset:0;background:rgba(15,23,42,.5);display:none;align-items:center;justify-content:center;z-index:60;padding:14px;}
@@ -106,6 +128,17 @@
       <button class="btn green" type="button" onclick="copyImage()">Copy Image</button>
       <button class="btn" type="button" onclick="downloadImage()">Download PNG</button>
     </div>
+    <div class="theme-bar">
+      🎨 ธีม
+      <select id="themeSel">
+        <option value="">ปกติ</option>
+        <option value="christmas">🎄 คริสต์มาส</option>
+        <option value="loykrathong">🪷 ลอยกระทง</option>
+        <option value="songkran">💦 สงกรานต์</option>
+        <option value="halloween">🎃 ฮาโลวีน</option>
+      </select>
+      {% if countdowns %}<label><input type="checkbox" id="cdToggle" {% if countdown_default_on %}checked{% endif %}> ⏳ แสดงนับถอยหลังวันสอบ</label>{% endif %}
+    </div>
 
     {% if online_sent %}
       <div class="ok-banner">✅ ส่งค่าติวเตอร์ออนไลน์เข้าระบบแล้ว {{ online_sent }} คน (ลงวันที่ {{ schedule.date|date:"d/m/Y" }})</div>
@@ -119,7 +152,15 @@
 
     {% endif %}
     <div class="sched {% if version == 'tutor' %}tutor-mode{% endif %}" id="schedCard">
+      <div class="decor" id="decor"></div>
       <div class="head">
+        {% if countdowns %}
+        <div class="cd-mini" id="cdMini" {% if not countdown_default_on %}hidden{% endif %}>
+          {% for c in countdowns %}
+          <div class="p"><span class="g">{{ c.grade_label }}</span><span class="d">{{ c.exam_date_th }}</span><span class="n">{{ c.days }}<small>วัน</small></span></div>
+          {% endfor %}
+        </div>
+        {% endif %}
         <img class="logo" src="{% static 'core/logo2.png' %}" alt="พี่ขนุนติวเตอร์">
         <div class="title {% if is_sunday %}day-sun{% else %}day-sat{% endif %}">ตารางเรียน {{ thai_date }}{% if version == "tutor" %} (ฉบับติวเตอร์){% endif %}</div>
       </div>
@@ -152,21 +193,6 @@
       </table>
 
       <div class="footer">
-        {% if countdowns %}
-          <div class="foot-note">{% if footer_note %}{{ footer_note }}{% else %}นับถอยหลังสู่วันสอบ{% endif %}</div>
-          {% for c in countdowns %}
-            <div class="cd">
-              <div class="info">
-                <span class="grade">{{ c.grade_label }}</span>
-                <span class="date">{{ c.exam_date_th }}</span>
-              </div>
-              <div class="badge">
-                <div class="n">{{ c.days }}</div>
-                <div class="lbl">DAYS TO GO</div>
-              </div>
-            </div>
-          {% endfor %}
-        {% endif %}
       </div>
 
       <div class="tagline">Where we learn to grow up with smile :)</div>
@@ -327,6 +353,42 @@
       if(ob) ob.addEventListener("click",function(e){ if(e.target===ob) closeOnlinePay(); });
       if(location.hash==="#online") openOnlinePay();
     })();
+    // ---- themes: colours via CSS class, emoji only in empty margins ----
+    (function(){
+      const card = document.getElementById("schedCard"), decor = document.getElementById("decor");
+      const sel = document.getElementById("themeSel");
+      if(!card || !decor || !sel) return;
+      const KEY = "schedTheme:{{ schedule.id }}";
+      const SETS = {
+        christmas:   {corner:["🎄","🎅","🎁","⭐"], scatter:["❄️","✨","❄️","🔔","❄️","✨"]},
+        loykrathong: {corner:["🪷","🌕","🏮","🪷"], scatter:["✨","🕯️","⭐","✨","🌸","✨"]},
+        songkran:    {corner:["💦","🐘","🌸","💦"], scatter:["💧","🌼","💧","☀️","💧","🌼"]},
+        halloween:   {corner:["🎃","👻","🦇","🕸️"], scatter:["🦇","🍬","🕯️","🦇","🍭","🌙"]},
+      };
+      function put(txt, css, cls){
+        const sp = document.createElement("span"); sp.textContent = txt; sp.style.cssText = css;
+        if(cls) sp.className = cls; decor.appendChild(sp);
+      }
+      function paint(t){
+        card.classList.remove("th-christmas", "th-loykrathong", "th-songkran", "th-halloween");
+        decor.innerHTML = "";
+        const set = SETS[t]; if(!set) return;
+        card.classList.add("th-" + t);
+        // beside the logo (left of header) and beside the tagline (bottom corners)
+        put(set.corner[0], "left:22px;top:14px;font-size:58px");
+        put(set.corner[1], "left:98px;top:34px;font-size:36px");
+        put(set.corner[2], "left:26px;bottom:12px;font-size:38px");
+        put(set.corner[3], "right:26px;bottom:12px;font-size:38px");
+        // faint pattern across the top band, behind the title
+        set.scatter.forEach((e, i) => put(e, "left:" + (20 + i * 10) + "%;top:" + (i % 2 ? 8 : 60) + "px;font-size:" + (i % 2 ? 20 : 26) + "px", "bg"));
+      }
+      let saved = ""; try { saved = localStorage.getItem(KEY) || ""; } catch(e) {}
+      sel.value = saved; paint(saved);
+      sel.addEventListener("change", () => { paint(sel.value); try { localStorage.setItem(KEY, sel.value); } catch(e) {} });
+      const cd = document.getElementById("cdToggle"), mini = document.getElementById("cdMini");
+      if(cd && mini) cd.addEventListener("change", () => { mini.hidden = !cd.checked; });
+    })();
+
     function openPay(){document.getElementById("payBg").classList.add("show");}
     function closePay(){document.getElementById("payBg").classList.remove("show");}
     function toggleAll(cb){document.querySelectorAll(".payrow").forEach(function(x){x.checked=cb.checked;});}

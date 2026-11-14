@@ -11842,8 +11842,9 @@ def teaching_schedule_image(request: HttpRequest, pk: int) -> HttpResponse:
                 rc["progress"] = progress.get(c.subject_template_id) if (c and c.subject_template_id) else None
 
     is_saturday_schedule = schedule.date.weekday() == 5
-    countdown_qs = ScheduleExamCountdown.objects.filter(is_active=True)
-    countdown_qs = countdown_qs.filter(show_on_saturday=True) if is_saturday_schedule else countdown_qs.filter(show_on_sunday=True)
+    # All active countdowns; the page shows them by default on Saturday only,
+    # with a tick box to show/hide them before exporting.
+    countdown_qs = ScheduleExamCountdown.objects.filter(is_active=True).order_by("exam_date")
 
     countdowns = []
     for e in countdown_qs:
@@ -11885,6 +11886,7 @@ def teaching_schedule_image(request: HttpRequest, pk: int) -> HttpResponse:
         "grid": grid,
         "has_conflict": has_conflict,
         "countdowns": countdowns,
+        "countdown_default_on": is_saturday_schedule,
         "footer_note": footer_note,
         "payroll_rows": payroll_rows,
         "payroll_sent": payroll_sent,

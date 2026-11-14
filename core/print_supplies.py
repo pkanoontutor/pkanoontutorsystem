@@ -44,7 +44,7 @@ def sheets_for_pages(pages: int, sides: str) -> int:
 
 
 def clean_sides(raw) -> str:
-    return raw if raw in dict(SheetPrintOrder.PrintSides.choices) else SheetPrintOrder.PrintSides.SINGLE
+    return raw if raw in dict(SheetPrintOrder.PrintSides.choices) else SheetPrintOrder.PrintSides.DOUBLE
 
 
 def clean_pages(raw) -> int:

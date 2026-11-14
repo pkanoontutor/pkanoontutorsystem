@@ -54,3 +54,9 @@ def sessions(value):
     if d == d.to_integral_value():
         return str(int(d))
     return f"{d:.1f}"
+
+
+@register.filter
+def line_id(text):
+    """Old notices say 'Line @'; show the real Line ID instead."""
+    return (text or "").replace("Line @ ", "Line ID : @pkanoontutor ").replace("Line @", "Line ID : @pkanoontutor")

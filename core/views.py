@@ -12070,6 +12070,13 @@ def _schedule_tutor_day_summary(schedule) -> list:
         gap = sum(1 for i in range(lo, hi + 1) if i not in idxs and i not in break_idx)
         gap_fee = _schedule_gap_fee(taught, gap)
         entry = existing.get(tutor.payroll_tutor_id) if tutor.payroll_tutor_id else None
+        # An entry with no onsite hours was created by the weekend online-pay
+        # send (online week paid on Sat), not by this popup -- its 325 box,
+        # rate and travel fee were never chosen here, so use the defaults.
+        if entry is not None and not entry.teaching_hours:
+            online_entry, entry = entry, None
+        else:
+            online_entry = entry
 
         payroll_tutor = tutor.payroll_tutor if tutor.payroll_tutor_id else by_name.get(tutor.name.strip())
         # An entry saved earlier wins, so re-opening the popup shows what was
@@ -12094,9 +12101,9 @@ def _schedule_tutor_day_summary(schedule) -> list:
         travel_fee = travel_override if travel_override is not None else default_travel_fee
         # Online hours aren't derivable from the onsite schedule grid, so they
         # are always typed in here; a saved entry's values come back on reopen.
-        online_hours = entry.online_teaching_hours if entry is not None else None
-        online_rate_override = entry.online_hourly_rate_override if entry is not None else None
-        withhold_3 = (bool(entry.withholding_3) if entry is not None
+        online_hours = online_entry.online_teaching_hours if online_entry is not None else None
+        online_rate_override = online_entry.online_hourly_rate_override if online_entry is not None else None
+        withhold_3 = (bool(online_entry.withholding_3) if online_entry is not None
                       else bool(getattr(payroll_tutor, "default_withhold_3", False)))
         rows.append({
             "withhold_3": withhold_3,
@@ -14403,8 +14410,11 @@ def teaching_schedule_send_online_payroll(request: HttpRequest, pk: int) -> Http
                 line += " · เฉลยเทส +%s ชม." % (int(row["test"]) if row["test"] == int(row["test"]) else row["test"])
             if line not in (entry.note or ""):
                 entry.note = (entry.note + "\n" + line).strip() if entry.note else line
-            if not entry.teaching_hours:
-                entry.travel_fee_override = Decimal("0")   # online only: no travel
+            # no travel override here: travel is computed from onsite hours
+            # (0 onsite hours -> 0 travel), and forcing 0 would wipe the
+            # onsite travel fee when that day's schedule is sent afterwards.
+            if not entry.teaching_hours and entry.travel_fee_override == 0:
+                entry.travel_fee_override = None
             entry.save()
             sent += 1
         if sent:

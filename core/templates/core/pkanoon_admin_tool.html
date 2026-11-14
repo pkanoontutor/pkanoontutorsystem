@@ -760,8 +760,8 @@
     <div class="pk-field">
       <label>การปรินท์</label>
       <div class="rt-choice-row">
-              <label class="rt-radio-card"><input type="radio" name="rtPrintSides" value="single" checked> ด้านเดียว</label>
-              <label class="rt-radio-card"><input type="radio" name="rtPrintSides" value="double"> หน้าหลัง</label>
+              <label class="rt-radio-card"><input type="radio" name="rtPrintSides" value="single"> ด้านเดียว</label>
+              <label class="rt-radio-card"><input type="radio" name="rtPrintSides" value="double" checked> หน้าหลัง</label>
       </div>
     </div>
     <div class="pk-field">
@@ -1152,7 +1152,7 @@
       quantity: qty,
       due_date: $("rtPrintDueDate").value||"",
       binding_type: binding ? binding.value : "side",
-      print_sides: (document.querySelector('input[name="rtPrintSides"]:checked') || {}).value || "single",
+      print_sides: (document.querySelector('input[name="rtPrintSides"]:checked') || {}).value || "double",
       spine_color: color ? color.value : ""
     };
     var submitBtn=$("rtPrintSubmit");

@@ -1432,7 +1432,7 @@ class SheetPrintOrder(models.Model):
         help_text="ใช้เฉพาะกรณีเย็บข้าง",
     )
     note = models.TextField("หมายเหตุ", blank=True)
-    print_sides = models.CharField("การปรินท์", max_length=10, choices=PrintSides.choices, default=PrintSides.SINGLE)
+    print_sides = models.CharField("การปรินท์", max_length=10, choices=PrintSides.choices, default=PrintSides.DOUBLE)
     content_pages = models.PositiveIntegerField("จำนวนหน้าเนื้อหาต่อเล่ม", default=0)
     covers_used = models.PositiveIntegerField("กระดาษปกที่หัก", default=0)
     a4_used = models.PositiveIntegerField("กระดาษ A4 ที่หัก", default=0)

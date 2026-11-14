@@ -14,7 +14,7 @@
   <style>
     *{box-sizing:border-box}
     body{margin:0;background:#e0f2fe;font-family:"IBM Plex Sans Thai",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:#0f172a}
-    .page{min-height:100vh;padding:14px;display:grid;gap:14px;grid-template-columns:minmax(320px,430px) minmax(360px,520px);justify-content:center;align-items:start}
+    .page{min-height:100vh;padding:14px;display:grid;gap:14px;grid-template-columns:minmax(320px,430px) minmax(360px,940px);justify-content:center;align-items:start}
     .editor,.receipt{background:#fff;border-radius:26px;box-shadow:0 14px 32px rgba(15,23,42,.16);border:1px solid rgba(255,255,255,.9)}
     .editor{padding:16px;display:grid;gap:12px;position:sticky;top:12px}
     .editor h1{font-size:20px;margin:0;color:#0f172a}.hint{font-size:12px;color:#64748b;line-height:1.45;font-weight:800}
@@ -33,15 +33,32 @@
     .btnrow{display:flex;gap:8px;flex-wrap:wrap}.btn{border:0;border-radius:999px;padding:11px 15px;font-weight:1000;cursor:pointer;background:#0f172a;color:#fff;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:6px;line-height:1.2}
     .btn.icon{width:38px;height:38px;padding:0;font-size:18px}.btn.primary{background:#ea580c}.btn.soft{background:#fff;color:#0f172a;border:1px solid #cbd5e1}.btn.green{background:#16a34a}.btn.red{background:#dc2626}.btn.blue{background:#2563eb}
     .statusbox{border-radius:18px;padding:12px;border:1px solid #e2e8f0;background:#f8fafc;font-size:13px;font-weight:900;line-height:1.5}.statusbox.sent{background:#dcfce7;border-color:#86efac;color:#166534}.statusbox.unsent{background:#fffbeb;border-color:#fde68a;color:#92400e}
-    .preview-wrap{display:grid;gap:10px;justify-items:center}.toolbar{width:min(100%,520px);display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+    .preview-wrap{display:grid;gap:10px;justify-items:center}.toolbar{width:min(100%,900px);display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
     .receipt{width:440px;max-width:100%;padding:20px;background:#fff}
     .top{text-align:center;border-bottom:2px solid #e2e8f0;padding-bottom:12px}.logo{max-height:74px;max-width:190px;object-fit:contain}.doc{font-size:24px;font-weight:1000;margin-top:8px;color:#ea580c}.school{font-size:13px;font-weight:900;color:#475569;margin-top:3px}
     .student-card{margin-top:12px;background:linear-gradient(135deg,#fff7ed,#fffbeb);border:1px solid #fed7aa;border-radius:20px;padding:12px;display:grid;gap:7px}.student-name{font-size:20px;font-weight:1000;color:#0f172a;line-height:1.25}.meta{font-size:12px;color:#475569;font-weight:900;line-height:1.5}
     .date-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}.date-box{border-radius:18px;padding:11px;text-align:center}.date-box.end{background:#fee2e2;border:1px solid #fecaca}.date-box.start{background:#dcfce7;border:1px solid #bbf7d0}.date-box .k{font-size:11px;font-weight:1000;text-transform:uppercase}.date-box.end .k{color:#991b1b}.date-box.start .k{color:#166534}.date-box .v{font-size:17px;font-weight:1000;margin-top:4px}
     .packages{display:grid;gap:8px;margin-top:12px}.pkg{border-radius:18px;border:1px solid #e2e8f0;padding:11px;background:#f8fafc}.pkg.blue{background:#eff6ff;border-color:#bfdbfe}.pkg.green{background:#f0fdf4;border-color:#bbf7d0}.pkg.purple{background:#f5f3ff;border-color:#ddd6fe}.pkg-head{display:flex;justify-content:space-between;gap:8px;align-items:center}.pkg-name{font-weight:1000;font-size:15px}.net{font-size:20px;font-weight:1000;color:#15803d}.price-line{display:flex;justify-content:space-between;gap:8px;font-size:12px;font-weight:900;color:#475569;margin-top:5px}.full{text-decoration:line-through;color:#94a3b8}.discount{color:#dc2626}
     .installment-box{display:grid;gap:8px;margin-top:12px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:20px;padding:12px}.money-row{display:flex;justify-content:space-between;gap:12px;font-weight:1000;border-bottom:1px dashed #bfdbfe;padding-bottom:7px}.money-row:last-child{border-bottom:0;padding-bottom:0}.money-row .k{color:#1d4ed8}.money-row .v{color:#0f172a}.money-row.remaining .v{font-size:24px;color:#15803d}
-    .qr-zone{margin-top:12px;display:grid;grid-template-columns:130px 1fr;gap:12px;align-items:center;background:#f8fafc;border:1px solid #e2e8f0;border-radius:20px;padding:12px}.qr{width:130px;height:130px;object-fit:contain;background:#fff;border-radius:16px;padding:6px}.qr-title{font-size:15px;font-weight:1000}.qr-sub{font-size:12px;color:#64748b;font-weight:800;line-height:1.45;margin-top:4px}
+    .qr-zone{margin-top:12px;display:grid;justify-items:center;text-align:center;gap:10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:20px;padding:14px}.qr{width:260px;height:260px;max-width:100%;object-fit:contain;background:#fff;border-radius:16px;padding:8px}.qr-title{font-size:15px;font-weight:1000}.qr-sub{font-size:12px;color:#64748b;font-weight:800;line-height:1.45;margin-top:4px}
     .note{margin-top:12px;border-radius:18px;background:#fff7ed;border:1px solid #fed7aa;padding:12px;color:#9a3412;font-size:13px;font-weight:900;line-height:1.55}.foot{text-align:center;margin-top:12px;color:#64748b;font-size:11px;font-weight:800}
+    .receipt.combo{width:900px}
+    .combo-grid{display:grid;grid-template-columns:60fr 40fr;gap:14px;align-items:start}
+    .combo .att-side{border-left:2px dashed #e2e8f0;padding-left:12px}
+    .combo .att-side-title{font-size:14px;font-weight:1000;color:#ea580c;margin-top:12px}
+    .combo .att-side .ar-sum{gap:5px}.combo .att-side .ar-sum>div{padding:6px 3px;border-radius:12px}
+    .combo .att-side .ar-sum .k{font-size:10px}.combo .att-side .ar-sum .v{font-size:16px}
+    .combo .att-side .ar-meta{margin-top:7px;font-size:11px}
+    .combo .att-side .ar-group{margin-top:6px;border-radius:12px}
+    .combo .att-side .ar-head{padding:5px 8px}.combo .att-side .ar-head .t{font-size:11.5px}.combo .att-side .ar-head .s{font-size:10px}.combo .att-side .ar-head .amt{font-size:12px}
+    .combo .att-side .ar-body{padding:4px;gap:3px}
+    .combo .att-side .ar-row{grid-template-columns:20px 1fr auto;gap:6px;padding:3px 7px;border-radius:9px}
+    .combo .att-side .ar-dot{width:20px;height:20px;font-size:10px}
+    .combo .att-side .ar-date{font-size:11px;line-height:1.2}.combo .att-side .ar-sub{font-size:9.5px}
+    .combo .att-side .ar-tag{font-size:9.5px;padding:1px 7px}
+    .combo .att-side .ar-badge{font-size:9.5px;padding:1px 6px}
+    .combo .att-side .note{font-size:11px;padding:8px;margin-top:8px}
+    @media(max-width:980px){.receipt.combo{width:min(100%,900px)}}
     .card-label{width:min(100%,440px);font-size:13px;font-weight:1000;color:#0f172a;margin-top:10px}
     .att-count{width:min(100%,440px);display:flex;gap:6px;align-items:center;flex-wrap:wrap;background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:8px 10px}
     .att-count label{font-size:12px;font-weight:1000;color:#334155}
@@ -77,7 +94,7 @@
     .tl-row.remain .tl-date{color:#16a34a}.tl-row.remain .tl-tag{background:#dcfce7;color:#15803d}
     .att-empty{border-radius:16px;border:1.5px dashed #cbd5e1;padding:18px;text-align:center;font-size:13px;font-weight:900;color:#94a3b8;margin-top:8px}
     @media(max-width:980px){.page{grid-template-columns:1fr}.editor{position:static}.receipt{width:min(100%,440px)}.btn{flex:1}.btn.icon{flex:0 0 38px}}
-    @media(max-width:480px){.page{padding:8px}.editor{border-radius:20px;padding:12px}.receipt{border-radius:0;width:100%;padding:16px}.toolbar{position:sticky;top:6px;z-index:5}.date-row{grid-template-columns:1fr}.qr-zone{grid-template-columns:1fr;justify-items:center;text-align:center}.grid{grid-template-columns:1fr}}
+    @media(max-width:480px){.page{padding:8px}.editor{border-radius:20px;padding:12px}.receipt{border-radius:0;width:100%;padding:16px}.toolbar{position:sticky;top:6px;z-index:5}.date-row{grid-template-columns:1fr}.qr{width:220px;height:220px}.grid{grid-template-columns:1fr}}
   </style>
 </head>
 <body>
@@ -238,6 +255,30 @@
     </div>
 
     <div class="preview-wrap">
+      <div class="card-label" style="width:min(100%,900px);">🧾📋 ใบแจ้ง + ประวัติการเรียน (ใบเดียว)</div>
+      <div class="toolbar">
+        <button class="btn blue" type="button" onclick="openImage('comboCard')">Open Image in New Tab</button>
+        <button class="btn green" type="button" onclick="copyImage('comboCard')">Copy Image</button>
+        <button class="btn soft" type="button" onclick="downloadImage('comboCard','course-renewal-combo-{{ notice.id }}.png')">Save Image</button>
+      </div>
+      <div class="receipt combo" id="comboCard">
+        <div class="top">
+          <img class="logo" src="{% static 'core/logo2.png' %}" alt="logo">
+          <div class="doc">{% if notice.notice_type == "installment" %}ใบแจ้งชำระงวดที่ {{ notice.installment_no|default:"2" }}{% else %}ใบแจ้งต่อคอร์ส{% endif %}</div>
+          <div class="school">พี่ขนุนติวเตอร์</div>
+        </div>
+        <div class="combo-grid">
+          <div>{% include "core/_renewal_notice_body.html" %}</div>
+          <div class="att-side">
+            <div class="att-side-title">📋 ประวัติการเข้าเรียน</div>
+            <div style="margin-top:8px;">{% include "core/_attendance_round.html" with att=att %}</div>
+            <div class="note">การลาที่แจ้งล่วงหน้าไม่หักครั้งเรียน ส่วนการลาแบบหักครึ่งจะหัก 0.5 ครั้งครับ</div>
+          </div>
+        </div>
+        <div class="foot">ข้อมูล ณ วันที่ {% now "d/m/Y H:i" %}</div>
+      </div>
+
+      <div class="card-label">🧾 ใบแจ้งต่อคอร์ส</div>
       <div class="toolbar">
         <button class="btn blue" type="button" onclick="openImage('receiptCard')">Open Image in New Tab</button>
         <button class="btn green" type="button" onclick="copyImage('receiptCard')">Copy Image</button>
@@ -257,69 +298,7 @@
           <div class="school">พี่ขนุนติวเตอร์</div>
         </div>
 
-        <div class="student-card">
-          <div class="student-name">{{ student.nickname|default:"-" }} · {{ student.full_name }}</div>
-          <div class="meta">
-            คอร์สที่เรียน: {{ tutoring_class.name }}<br>
-            ระดับชั้น: {{ student.grade_level|default:"-" }}<br>
-            เลขที่ Enrollment: {{ enrollment.sale_run_no|default:enrollment.id }}
-          </div>
-        </div>
-
-        <div class="date-row">
-          <div class="date-box end"><div class="k">คาดว่าจะครบคอร์ส</div><div class="v" id="endDateView">{{ notice.expected_course_end_date|date:"d/m/Y" }}</div></div>
-          <div class="date-box start"><div class="k">เริ่มเรียนรอบใหม่</div><div class="v" id="startDateView">{{ notice.next_course_start_date|date:"d/m/Y" }}</div></div>
-        </div>
-
-        {% if notice.notice_type == "installment" %}
-          <div class="installment-box">
-            <div class="money-row"><span class="k">ยอดเต็ม</span><span class="v">{{ notice.installment_full_amount|floatformat:0|intcomma }} บาท</span></div>
-            <div class="money-row"><span class="k">ชำระแล้ว</span><span class="v">{{ notice.installment_paid_amount|floatformat:0|intcomma }} บาท</span></div>
-            {% if notice.referral_credit_used > 0 %}
-              <div class="money-row"><span class="k">🎁 เครดิตชวนเพื่อน</span><span class="v" style="color:#dc2626;">-{{ notice.referral_credit_used|floatformat:0|intcomma }} บาท</span></div>
-            {% endif %}
-            {% if notice.installment_count > notice.installment_no %}
-              <div class="money-row"><span class="k">ยอดคงเหลือทั้งหมด</span><span class="v">{{ notice.installment_remaining_amount|floatformat:0|intcomma }} บาท</span></div>
-              <div class="money-row remaining"><span class="k">ยอดชำระงวดที่ {{ notice.installment_no }} / {{ notice.installment_count }}</span><span class="v">{{ notice.installment_due_amount|floatformat:0|intcomma }} บาท</span></div>
-              {% if notice.installment_due_date %}<div class="money-row"><span class="k">กำหนดชำระงวดนี้</span><span class="v">{{ notice.installment_due_date|date:"d/m/Y" }}</span></div>{% endif %}
-              <div class="money-row"><span class="k">จำนวนครั้งที่ได้รับจากงวดนี้</span><span class="v">{{ notice.installment_sessions }} ครั้ง</span></div>
-              <div class="money-row" style="background:#fff7ed;border-radius:12px;padding:8px 10px;border-bottom:0;"><span class="k" style="color:#c2410c;">งวดที่ {{ notice.installment_no|add:1 }} ขาดอีก{% if notice.next_installment_due_date %} · กำหนดชำระ {{ notice.next_installment_due_date|date:"d/m/Y" }}{% endif %}</span><span class="v" style="color:#c2410c;">{{ notice.next_installment_amount|floatformat:0|intcomma }} บาท</span></div>
-            {% else %}
-              <div class="money-row remaining"><span class="k">ยอดคงเหลือต้องชำระ{% if notice.installment_count %} (งวดสุดท้าย){% endif %}</span><span class="v">{{ notice.installment_remaining_amount|floatformat:0|intcomma }} บาท</span></div>
-              {% if notice.installment_due_date %}<div class="money-row"><span class="k">กำหนดชำระ</span><span class="v">{{ notice.installment_due_date|date:"d/m/Y" }}</span></div>{% endif %}
-              <div class="money-row"><span class="k">จำนวนครั้งที่ได้รับจากงวดนี้</span><span class="v">{{ notice.installment_sessions }} ครั้ง</span></div>
-            {% endif %}
-          </div>
-        {% else %}
-          <div class="packages">
-            {% for p in packages %}
-              <div class="pkg {{ p.accent }}">
-                <div class="pkg-head"><div class="pkg-name">{{ p.label }}</div><div class="net">{{ p.net_price|floatformat:0|intcomma }} บาท</div></div>
-                <div class="price-line"><span>ราคาเต็ม</span><span class="full">{{ p.full_price|floatformat:0|intcomma }} บาท</span></div>
-                <div class="price-line"><span>ส่วนลด</span><span class="discount">-{{ p.discount|floatformat:0|intcomma }} บาท</span></div>
-                {% if notice.referral_credit_used > 0 %}
-                  <div class="price-line"><span>🎁 เครดิตชวนเพื่อน</span><span class="discount">-{{ notice.referral_credit_used|floatformat:0|intcomma }} บาท</span></div>
-                {% endif %}
-              </div>
-            {% endfor %}
-          </div>
-        {% endif %}
-
-        <div class="qr-zone">
-          <img class="qr" src="{% static 'core/QRPromptpay.png' %}" alt="QR PromptPay">
-          <div>
-            <div class="qr-title">สแกน QR เพื่อชำระเงิน</div>
-            <div class="qr-sub">หลังชำระแล้วสามารถส่งสลิปผ่าน Line Official ได้เลยครับ</div>
-          </div>
-        </div>
-
-        {% if att.has_half_left %}
-          <div class="note" style="background:#eff6ff;border-color:#bfdbfe;color:#1d4ed8;">
-            🎬 คอร์สนี้เหลือ {{ att.remaining|sessions }} ครั้ง — เศษ 0.5 ครั้งไม่ถูกนำมาคิดเงินในราคาต่อคอร์สด้านบน
-            น้องสามารถดูคลิปเรียนย้อนหลังเพิ่มอีก 1 คลิปเพื่อเรียนให้ครบส่วนที่เหลือได้ครับ
-          </div>
-        {% endif %}
-        <div class="note">{{ notice.note_wording }}</div>
+        {% include "core/_renewal_notice_body.html" %}
         <div class="foot">สร้างเมื่อ {{ notice.created_at|date:"d/m/Y H:i" }} · อัปเดตล่าสุด {{ notice.updated_at|date:"d/m/Y H:i" }}</div>
       </div>
 
@@ -381,8 +360,10 @@
     (function () {
       const endInput = document.getElementById("expEndDate");
       const startInput = document.getElementById("nextStartDate");
-      const endView = document.getElementById("endDateView");
-      const startView = document.getElementById("startDateView");
+      // the notice body appears in two cards, so update every copy
+      const multi = (sel) => ({ set textContent(v){ document.querySelectorAll(sel).forEach(e => e.textContent = v); } });
+      const endView = multi(".js-end-view");
+      const startView = multi(".js-start-view");
       const savedHint = document.getElementById("dateAutoSaveHint");
       const form = document.getElementById("editForm");
       let startTouchedManually = false;
@@ -462,6 +443,14 @@
 
     async function makeCanvas(id) {
       const el = document.getElementById(id || "receiptCard");
+      // The combined card is always exported at full width (60/40 split),
+      // even from a phone where it is shown narrower on screen.
+      if (el.classList.contains("combo")) {
+        const old = el.style.cssText;
+        el.style.width = "900px"; el.style.maxWidth = "none";
+        try { return await html2canvas(el, {scale: 3, backgroundColor: "#ffffff", useCORS: true, windowWidth: 1300}); }
+        finally { el.style.cssText = old; }
+      }
       return await html2canvas(el, {scale: 3, backgroundColor: "#ffffff", useCORS: true});
     }
     function canvasToBlob(canvas) {

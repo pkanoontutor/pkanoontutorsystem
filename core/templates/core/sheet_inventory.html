@@ -189,7 +189,10 @@
           <div class="tool-title">✅ ชีทปรินท์เสร็จแล้ว รอตรวจรับเข้าคลัง</div>
           <div class="hint">ขึ้นเฉพาะรายการที่ร้านกด “ปรินท์เสร็จแล้วพร้อมส่ง” แล้วเท่านั้น กดตรวจรับแล้วระบบจะบันทึกและอัปเดตยอดในหน้านี้ทันที</div>
         </div>
-        <a class="btnx soft" href="/print-shop/" target="_blank">ดูหน้าร้านปรินท์</a>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btnx" type="button" id="receiveAllBtn" style="background:#16a34a;color:#fff;border:0;font-weight:900;cursor:pointer;">✅ ตรวจรับทั้งหมด ({{ ready_to_receive_orders|length }} รายการ)</button>
+          <a class="btnx soft" href="/print-shop/" target="_blank">ดูหน้าร้านปรินท์</a>
+        </div>
       </div>
       <div class="receive-grid" data-receive-grid>
         {% for o in ready_to_receive_orders %}
@@ -732,6 +735,39 @@ document.addEventListener('DOMContentLoaded', function(){
       });
     });
   });
+
+  const receiveAllBtn = document.getElementById('receiveAllBtn');
+  if(receiveAllBtn){
+    receiveAllBtn.addEventListener('click', async function(){
+      const forms = Array.from(document.querySelectorAll('[data-receive-form]'));
+      if(!forms.length) return;
+      const total = forms.reduce(function(n, f){ return n + (parseInt(f.dataset.defaultQty, 10) || 0); }, 0);
+      if(!confirm('ตรวจรับทั้งหมด ' + forms.length + ' รายการ เต็มจำนวนที่สั่ง (รวม ' + total + ' เล่ม) และเพิ่มเข้า Stock ใช่ไหม?')) return;
+      receiveAllBtn.disabled = true;
+      let done = 0, failed = 0;
+      for(const form of forms){
+        const fullBtn = form.querySelector("button[value^='receive_print_order_full:']");
+        if(!fullBtn) continue;
+        receiveAllBtn.textContent = '⏳ กำลังตรวจรับ ' + (done + failed + 1) + '/' + forms.length;
+        const fd = new FormData(form);
+        fd.set('action', fullBtn.value);
+        form.classList.add('receiving');
+        try {
+          const resp = await fetch(window.location.href, {method: 'POST', body: fd, headers: {'X-Requested-With': 'XMLHttpRequest'}});
+          const data = await resp.json().catch(function(){ return {ok:false}; });
+          if(!resp.ok || !data.ok) throw new Error(data.message || 'ตรวจรับไม่สำเร็จ');
+          updateStockCard(data.sheet_id, data.new_balance);
+          form.remove(); done++;
+        } catch(err) {
+          form.classList.remove('receiving'); failed++;
+        }
+      }
+      hideReceiveSectionIfEmpty();
+      receiveAllBtn.disabled = false;
+      receiveAllBtn.textContent = '✅ ตรวจรับทั้งหมด (' + document.querySelectorAll('[data-receive-form]').length + ' รายการ)';
+      toast('ตรวจรับแล้ว ' + done + ' รายการ' + (failed ? ' · ไม่สำเร็จ ' + failed + ' รายการ (ยังค้างอยู่ในหน้านี้)' : ''), failed > 0);
+    });
+  }
 
   const printModal = document.getElementById('printOrderModal');
   const printForm = document.getElementById('printOrderForm');

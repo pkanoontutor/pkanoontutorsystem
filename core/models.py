@@ -3595,7 +3595,7 @@ class SheetReservation(models.Model):
 class HomeworkStar(models.Model):
     """One star for handing in homework for one lesson. lesson_date is the
     class's own day in the chosen weekend (same rule as check-in), and a
-    student earns at most one star per enrollment per lesson. redeemed_at is
+    student can earn several stars per lesson (several sheets handed in at once). redeemed_at is
     reserved for using stars as a renewal discount later."""
 
     student = models.ForeignKey(Student, verbose_name="นักเรียน", on_delete=models.CASCADE, related_name="homework_stars")
@@ -3616,9 +3616,6 @@ class HomeworkStar(models.Model):
         verbose_name = "Homework Star"
         verbose_name_plural = "Homework Stars"
         ordering = ("-lesson_date", "-created_at")
-        constraints = [
-            models.UniqueConstraint(fields=["enrollment", "lesson_date"], name="uniq_homework_star_per_lesson"),
-        ]
 
     def __str__(self) -> str:
         return f"⭐ {self.student_id} {self.lesson_date}"

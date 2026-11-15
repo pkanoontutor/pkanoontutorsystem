@@ -38,10 +38,14 @@
   .att.present{background:#dcfce7;color:#166534;} .att.leave{background:#fef3c7;color:#92400e;} .att.no_show{background:#fee2e2;color:#991b1b;}
   .stu.sel{border-color:#f97316;background:#fff7ed;box-shadow:0 0 0 3px rgba(249,115,22,.15);}
   .stu.sel .n::before{content:"✓ ";color:#f97316;}
-  .stu.done{opacity:.55;cursor:default;background:#fefce8;}
+  .stu.done{background:#fefce8;}
   .tray{position:fixed;left:0;right:0;bottom:0;z-index:50;background:#0f172a;color:#fff;padding:12px 16px;display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap;box-shadow:0 -8px 20px rgba(15,23,42,.25);}
   .tray .names{font-size:12.5px;font-weight:700;color:#cbd5e1;max-width:620px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .tray b{font-size:15px;}
+  .tray .picks{display:flex;gap:6px;flex-wrap:wrap;max-width:760px;max-height:92px;overflow:auto;}
+  .tray .pk{display:inline-flex;align-items:center;gap:4px;background:#1e293b;border-radius:999px;padding:3px 5px 3px 10px;font-size:12.5px;font-weight:800;}
+  .tray .pk button{border:0;border-radius:999px;width:24px;height:24px;font-weight:1000;cursor:pointer;background:#334155;color:#fff;}
+  .tray .pk .q{color:#fde047;min-width:28px;text-align:center;}
   .save-btn{border:0;border-radius:14px;padding:11px 20px;font-size:15px;font-weight:1000;background:#f59e0b;color:#0f172a;cursor:pointer;font-family:inherit;}
   .save-btn:disabled{opacity:.45;cursor:default;}
   .clear-btn{border:1px solid #475569;background:transparent;color:#e2e8f0;border-radius:12px;padding:9px 12px;font-weight:800;cursor:pointer;font-family:inherit;}
@@ -106,7 +110,7 @@
 
 <div class="tray">
   <b id="trayCount">ยังไม่ได้เลือก</b>
-  <span class="names" id="trayNames"></span>
+  <span class="picks" id="trayNames"></span>
   <button class="clear-btn" type="button" id="clearBtn">ล้าง</button>
   <button class="save-btn" type="button" id="saveBtn" disabled>⭐ บันทึกดาว</button>
 </div>
@@ -120,7 +124,7 @@
   const CSRF = "{{ csrf_token }}";
   const LS_KEY = "pk_hs_classes";
   const byId = {}; STUDENTS.forEach(s => byId[s.id] = s);
-  const selected = new Set();
+  const selected = new Map();   // enrollment id -> stars to add (several sheets handed in at once)
   let openClasses = [];
   try { openClasses = JSON.parse(localStorage.getItem(LS_KEY) || "[]").filter(id => CLASSES.some(c => c.id === id)); } catch(e) {}
 
@@ -133,9 +137,10 @@
 
   function stuButton(s){
     const att = ATT[s.att] ? '<span class="att ' + ATT[s.att][1] + '">' + ATT[s.att][0] + '</span>' : '';
-    return '<button type="button" class="stu' + (s.done ? ' done' : '') + (selected.has(s.id) ? ' sel' : '') + '" data-enr="' + s.id + '"' + (s.done ? ' disabled title="ได้ดาวของรอบนี้แล้ว"' : '') + '>' +
+    const q = selected.get(s.id);
+    return '<button type="button" class="stu' + (s.done ? ' done' : '') + (q ? ' sel' : '') + '" data-enr="' + s.id + '"' + (s.done ? ' title="รอบนี้ได้แล้ว ' + s.done + ' ดาว กดเพื่อเพิ่มอีก"' : '') + '>' +
       '<span><span class="n">' + esc(s.nickname || s.full_name) + '</span><br><span class="f">' + esc(s.full_name) + '</span></span>' +
-      '<span class="r">' + att + (s.done ? '<span class="cnt">⭐ ได้แล้ว</span>' : '') + '<span class="cnt">⭐' + s.stars + '</span></span></button>';
+      '<span class="r">' + att + (q ? '<span class="cnt">+' + q + '</span>' : '') + (s.done ? '<span class="cnt">รอบนี้ ⭐' + s.done + '</span>' : '') + '<span class="cnt">⭐' + s.stars + '</span></span></button>';
   }
 
   // Grade read from the class name ("ป.5 ห้อง A" -> "ป.5").
@@ -177,14 +182,16 @@
     }).join("");
   }
   function renderTray(){
-    const names = [...selected].map(id => byId[id] && (byId[id].nickname || byId[id].full_name));
-    document.getElementById("trayCount").textContent = selected.size ? ("เลือกแล้ว " + selected.size + " คน") : "ยังไม่ได้เลือก";
-    document.getElementById("trayNames").textContent = names.join(", ");
+    let sum = 0; selected.forEach(q => sum += q);
+    document.getElementById("trayCount").textContent = selected.size ? ("เลือกแล้ว " + selected.size + " คน · " + sum + " ดาว") : "ยังไม่ได้เลือก";
+    document.getElementById("trayNames").innerHTML = [...selected].map(([id, q]) =>
+      '<span class="pk">' + esc(byId[id] && (byId[id].nickname || byId[id].full_name)) +
+      '<button type="button" data-dec="' + id + '">−</button><span class="q">⭐' + q + '</span><button type="button" data-inc="' + id + '">+</button></span>').join("");
     document.getElementById("saveBtn").disabled = !selected.size;
   }
   function toggle(id){
-    const s = byId[id]; if(!s || s.done) return;
-    selected.has(id) ? selected.delete(id) : selected.add(id);
+    const s = byId[id]; if(!s) return;
+    selected.has(id) ? selected.delete(id) : selected.set(id, 1);
     renderCards(); renderTray();
   }
 
@@ -200,7 +207,7 @@
     if(all){
       const list = STUDENTS.filter(s => s.class_id === +all.dataset.all && !s.done);
       const every = list.every(s => selected.has(s.id));
-      list.forEach(s => every ? selected.delete(s.id) : selected.add(s.id));
+      list.forEach(s => every ? selected.delete(s.id) : (selected.has(s.id) || selected.set(s.id, 1)));
       renderCards(); renderTray(); return;
     }
     const b = e.target.closest("[data-enr]"); if(b) toggle(+b.dataset.enr);
@@ -211,15 +218,24 @@
     const q = box.value.trim().toLowerCase();
     if(!q){ res.hidden = true; return; }
     const hits = STUDENTS.filter(s => (s.nickname + " " + s.full_name).toLowerCase().includes(q)).slice(0, 15);
-    res.innerHTML = hits.map(s => '<button type="button" data-pick="' + s.id + '"' + (s.done ? ' disabled' : '') + '><span>' + (selected.has(s.id) ? "✓ " : "") + esc(s.nickname || s.full_name) + ' <small>' + esc(s.full_name) + '</small></span><small>' + esc(s.class_name) + (s.done ? " · ได้ดาวแล้ว" : "") + '</small></button>').join("") || '<div class="empty">ไม่พบชื่อนี้</div>';
+    res.innerHTML = hits.map(s => '<button type="button" data-pick="' + s.id + '"' + '><span>' + (selected.has(s.id) ? "✓ " : "") + esc(s.nickname || s.full_name) + ' <small>' + esc(s.full_name) + '</small></span><small>' + esc(s.class_name) + (s.done ? " · รอบนี้ ⭐" + s.done : "") + '</small></button>').join("") || '<div class="empty">ไม่พบชื่อนี้</div>';
     res.hidden = false;
   });
   res.addEventListener("click", e => {
-    const b = e.target.closest("[data-pick]"); if(!b || b.disabled) return;
+    const b = e.target.closest("[data-pick]"); if(!b) return;
     const id = +b.dataset.pick; if(!selected.has(id)) toggle(id);
     box.value = ""; res.hidden = true; box.focus();
   });
   document.addEventListener("click", e => { if(!e.target.closest(".hs-search")) res.hidden = true; });
+
+  document.getElementById("trayNames").addEventListener("click", e => {
+    const inc = e.target.closest("[data-inc]"), dec = e.target.closest("[data-dec]");
+    const id = +(inc ? inc.dataset.inc : (dec ? dec.dataset.dec : 0));
+    if(!id || !selected.has(id)) return;
+    const q = selected.get(id) + (inc ? 1 : -1);
+    q > 0 ? selected.set(id, Math.min(q, 20)) : selected.delete(id);
+    renderCards(); renderTray();
+  });
 
   document.getElementById("clearBtn").addEventListener("click", () => { selected.clear(); renderCards(); renderTray(); });
 
@@ -231,10 +247,10 @@
 
   document.getElementById("saveBtn").addEventListener("click", () => {
     const btn = document.getElementById("saveBtn"); btn.disabled = true;
-    post({weekend: WEEKEND, enrollment_ids: [...selected]}).then(j => {
-      selected.forEach(id => { byId[id].done = true; });
+    post({weekend: WEEKEND, counts: Object.fromEntries(selected)}).then(j => {
+      selected.forEach((q, id) => { byId[id].done = (byId[id].done || 0) + q; byId[id].stars += q; });
       selected.clear(); renderCards(); renderTray();
-      toast("⭐ บันทึกแล้ว " + j.added.length + " คน" + (j.skipped.length ? (" · ได้ดาวรอบนี้อยู่แล้ว " + j.skipped.length + " คน") : ""));
+      toast("⭐ บันทึกแล้ว " + j.added.length + " คน รวม " + j.stars + " ดาว");
       setTimeout(() => location.reload(), 1600);
     }).catch(e => { alert("บันทึกไม่สำเร็จ: " + e.message); btn.disabled = false; });
   });

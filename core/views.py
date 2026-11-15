@@ -13768,19 +13768,32 @@ def homework_stars(request: HttpRequest) -> HttpResponse:
         weekend = _parse_date(payload.get("weekend")) if payload.get("weekend") else None
         if not weekend or weekend.weekday() != 5:
             return JsonResponse({"ok": False, "error": "กรุณาเลือกรอบวันที่เรียน"}, status=400)
-        ids = [i for i in (_id_or_none(x) for x in (payload.get("enrollment_ids") or [])) if i]
+        counts: dict[int, int] = {}
+        for k, v in (payload.get("counts") or {}).items():
+            try:
+                n = int(v)
+            except (TypeError, ValueError):
+                continue
+            if _id_or_none(k) and n > 0:
+                counts[_id_or_none(k)] = min(n, 20)
+        for x in (payload.get("enrollment_ids") or []):
+            if _id_or_none(x):
+                counts.setdefault(_id_or_none(x), 1)
+        ids = list(counts)
         if not ids:
             return JsonResponse({"ok": False, "error": "ยังไม่ได้เลือกนักเรียน"}, status=400)
-        added, skipped = [], []
+        added, total = [], 0
         for e in Enrollment.objects.select_related("student", "tutoring_class").filter(id__in=ids):
             lesson = _lesson_date_in_weekend(e.tutoring_class, weekend)
-            star, created = HomeworkStar.objects.get_or_create(
-                enrollment=e, lesson_date=lesson,
-                defaults={"student": e.student, "tutoring_class": e.tutoring_class,
-                          "created_by": request.user},
-            )
-            (added if created else skipped).append(e.student.nickname or e.student.full_name)
-        return JsonResponse({"ok": True, "added": added, "skipped": skipped})
+            n = counts[e.id]
+            HomeworkStar.objects.bulk_create([
+                HomeworkStar(enrollment=e, lesson_date=lesson, student=e.student,
+                             tutoring_class=e.tutoring_class, created_by=request.user)
+                for _ in range(n)
+            ])
+            added.append(e.student.nickname or e.student.full_name)
+            total += n
+        return JsonResponse({"ok": True, "added": added, "stars": total, "skipped": []})
 
     weekend = _parse_date(request.GET.get("weekend")) if request.GET.get("weekend") else None
     if not weekend or weekend.weekday() != 5:
@@ -13794,10 +13807,10 @@ def homework_stars(request: HttpRequest) -> HttpResponse:
         cls_id: _lesson_date_in_weekend(cls, weekend)
         for cls_id, cls in {e.tutoring_class_id: e.tutoring_class for e in enrollments}.items()
     }
-    starred = set(
-        HomeworkStar.objects.filter(lesson_date__in=set(lesson_dates.values()))
-        .values_list("enrollment_id", "lesson_date")
-    )
+    starred: dict = {}
+    for key in (HomeworkStar.objects.filter(lesson_date__in=set(lesson_dates.values()))
+                .values_list("enrollment_id", "lesson_date")):
+        starred[key] = starred.get(key, 0) + 1
     present = set(
         Attendance.objects.filter(attendance_date__in=set(lesson_dates.values()))
         .values_list("enrollment_id", "status")
@@ -13815,7 +13828,7 @@ def homework_stars(request: HttpRequest) -> HttpResponse:
             "class_id": e.tutoring_class_id,
             "class_name": e.tutoring_class.name,
             "stars": totals.get(e.student_id, 0),
-            "done": (e.id, ld) in starred,
+            "done": starred.get((e.id, ld), 0),
             "att": att_status.get(e.id, ""),
         }
         students_json.append(row)

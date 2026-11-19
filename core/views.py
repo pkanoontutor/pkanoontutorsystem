@@ -8669,16 +8669,24 @@ def _near_end_sheet_flags() -> list[dict]:
     latest: dict[int, TeachingProgressUpdate] = {}
     for u in (
         TeachingProgressUpdate.objects
-        .select_related("assignment__tutoring_class", "assignment__subject_template", "assignment__tutor")
+        .select_related("assignment__tutoring_class", "assignment__subject_template",
+                        "assignment__subject_template__next_sheet", "assignment__tutor")
         .filter(teaching_date__gte=since, no_teaching=False, assignment__tutoring_class__is_active=True)
         .order_by("-teaching_date", "-updated_at")
     ):
         latest.setdefault(u.assignment.subject_template_id, u)
+    grade_codes = {v: k for k, v in Sheet.GradeLevel.choices}   # "ป.5" -> "p5"
+    sheets_by_grade: dict[str, list] = {}
+    for sh in Sheet.objects.filter(is_active=True).exclude(grade_level="").order_by("code"):
+        sheets_by_grade.setdefault(sh.grade_level, []).append(sh)
     rows = []
     for u in latest.values():
         if not u.sheet_near_end:
             continue
         sheet = _sheet_by_text(u.sheet_name)
+        tmpl = u.assignment.subject_template
+        grade = (sheet.grade_level if sheet and sheet.grade_level else
+                 grade_codes.get(_grade_from_class_name(u.assignment.tutoring_class.name) or "", ""))
         progress = " · ".join(x for x in [
             f"หน้า {u.page_to}" if u.page_to else "",
             f"ข้อ {u.question_to}" if u.question_to else "",
@@ -8691,9 +8699,32 @@ def _near_end_sheet_flags() -> list[dict]:
             "tutor": u.updated_by_name or (u.assignment.tutor.name if u.assignment.tutor_id else ""),
             "date": u.teaching_date,
             "stock": _sheet_stock(sheet) if sheet else None,
+            "template_id": tmpl.id,
+            "grade_label": _sheet_grade_label(grade) if grade else "",
+            "next_sheet_id": tmpl.next_sheet_id,
+            "next_choices": [s for s in sheets_by_grade.get(grade, []) if not sheet or s.id != sheet.id],
         })
     rows.sort(key=lambda r: r["date"], reverse=True)
     return rows
+
+
+@require_POST
+def admin_tool_set_next_sheet(request: HttpRequest) -> HttpResponse:
+    """Dropdown on a "ใกล้จบชีท" row: remember which book the subject moves on to."""
+    denied = _admin_tool_staff_denied(request)
+    if denied:
+        return denied
+    payload = _admin_tool_card_payload(request)
+    tmpl = TeachingClassSubjectTemplate.objects.filter(id=_id_or_none(payload.get("template_id"))).first()
+    if not tmpl:
+        return JsonResponse({"ok": False, "error": "ไม่พบวิชานี้"}, status=404)
+    sheet_id = _id_or_none(payload.get("sheet_id"))
+    sheet = Sheet.objects.filter(id=sheet_id, is_active=True).first() if sheet_id else None
+    if sheet_id and not sheet:
+        return JsonResponse({"ok": False, "error": "ไม่พบชีทนี้"}, status=404)
+    tmpl.next_sheet = sheet
+    tmpl.save(update_fields=["next_sheet", "updated_at"])
+    return JsonResponse({"ok": True, "label": f"{sheet.code} {sheet.title}" if sheet else ""})
 
 
 def _active_classes_for_assign() -> list[TutoringClass]:
@@ -10541,8 +10572,15 @@ def _sheet_progress_sections(week_start) -> list[dict]:
 SHEET_PICK_RESET_AT = datetime(2026, 10, 17, 0, 0)
 
 
-def _sheet_prefill_for(curr, prev) -> str:
+def _sheet_prefill_for(curr, prev, template=None) -> str:
     cutoff = timezone.make_aware(SHEET_PICK_RESET_AT) if timezone.is_naive(SHEET_PICK_RESET_AT) else SHEET_PICK_RESET_AT
+    # Last update said "ใกล้จบชีท" and staff picked the next book on the admin
+    # tool: start this week on that book. A stale pick (the book now ending)
+    # is ignored.
+    nxt = getattr(template, "next_sheet", None) if template is not None else None
+    if curr is None and prev is not None and prev.sheet_near_end and nxt is not None:
+        if _sheet_code_from_text(prev.sheet_name).lower() != (nxt.code or "").lower():
+            return f"{nxt.code} {nxt.title}".strip()
     for upd in (curr, prev):
         if upd is not None and not upd.no_teaching:
             return upd.sheet_name if (upd.updated_at and upd.updated_at >= cutoff) else ""
@@ -10665,7 +10703,7 @@ def tutor_teaching_update(request: HttpRequest) -> HttpResponse:
         for upd in curr_qs:
             current_updates.setdefault(upd.assignment_id, upd)
     for a in all_assignments:
-        a.sheet_prefill = _sheet_prefill_for(current_updates.get(a.id), previous_updates.get(a.subject_template_id))
+        a.sheet_prefill = _sheet_prefill_for(current_updates.get(a.id), previous_updates.get(a.subject_template_id), a.subject_template)
 
     tutor_choices = list(TeachingTutor.objects.filter(is_active=True).order_by("name"))
 

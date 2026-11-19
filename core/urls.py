@@ -26,6 +26,7 @@ urlpatterns = [
     path("pkanoon-admin-tool/cards/reorder/", views.admin_tool_card_reorder, name="admin_tool_card_reorder"),
     path("pkanoon-admin-tool/cards/reset/", views.admin_tool_card_reset, name="admin_tool_card_reset"),
     path("pkanoon-admin-tool/low-stock-sheets/dismiss/", views.admin_tool_dismiss_low_stock_sheet, name="admin_tool_dismiss_low_stock_sheet"),
+    path("pkanoon-admin-tool/near-end/next-sheet/", views.admin_tool_set_next_sheet, name="admin_tool_set_next_sheet"),
     path("pkanoon-admin-tool/admissions/action/", views.admin_tool_admission_action, name="admin_tool_admission_action"),
     path("pkanoon-admin-tool/admissions/sheet/", views.admin_tool_admission_sheet, name="admin_tool_admission_sheet"),
     path("pkanoon-admin-tool/admissions/<int:pk>/sheet-checklist/", views.admission_sheet_checklist, name="admission_sheet_checklist"),

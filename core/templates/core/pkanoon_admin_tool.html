@@ -664,12 +664,19 @@
           <div class="rt-block-title">📘 ติวเตอร์แจ้งใกล้จบชีท <span class="n">{{ near_end_sheets|length }}</span></div>
           <div class="rt-list" style="margin-bottom:18px;">
             {% for n in near_end_sheets %}
-              <div class="rt-row near">
+              <div class="rt-row near" style="flex-wrap:wrap;">
                 <div class="rt-row-main">
                   <div class="rt-row-name">{{ n.sheet_name }} <span class="rt-tag">{{ n.subject }}</span></div>
                   <div class="rt-row-meta">{{ n.class_name }}{% if n.progress %} · {{ n.progress }}{% endif %} · {{ n.date|date:"d/m/Y" }}{% if n.tutor %} · {{ n.tutor }}{% endif %}</div>
                 </div>
                 {% if n.stock is not None %}<div class="rt-qty-soft" title="คงเหลือในคลัง">เหลือ {{ n.stock }}</div>{% endif %}
+                {% if can_edit %}
+                <select class="rt-next-sheet" data-next-sheet="{{ n.template_id }}" title="ชีทเล่มถัดไป (ขึ้นให้ติวเตอร์อัตโนมัติครั้งหน้า)"
+                        style="flex-basis:100%;margin-top:6px;border:1px solid #cbd5e1;border-radius:10px;padding:6px 8px;font:inherit;font-size:12px;font-weight:700;background:{% if n.next_sheet_id %}#ecfdf5{% else %}#fff{% endif %};">
+                  <option value="">➡️ เลือกชีทเล่มต่อไป{% if n.grade_label %} ({{ n.grade_label }}){% endif %}</option>
+                  {% for s in n.next_choices %}<option value="{{ s.id }}"{% if s.id == n.next_sheet_id %} selected{% endif %}>{{ s.code }} · {{ s.title }}</option>{% empty %}<option value="" disabled>ไม่พบชีท active ของระดับชั้นนี้</option>{% endfor %}
+                </select>
+                {% endif %}
               </div>
             {% empty %}
               <div class="rt-empty-mini">ยังไม่มีวิชาที่ติวเตอร์แจ้งใกล้จบชีท</div>
@@ -843,8 +850,19 @@
     updateSheetLink: "{% url 'core:admin_tool_update_sheet_link' %}",
     createPrintOrder: "{% url 'core:admin_tool_create_print_order' %}",
     moneyAdd: "{% url 'core:admin_tool_money_add' %}",
-    moneyDelete: "{% url 'core:admin_tool_money_delete' %}"
+    moneyDelete: "{% url 'core:admin_tool_money_delete' %}",
+    nextSheet: "{% url 'core:admin_tool_set_next_sheet' %}"
   };
+  document.addEventListener("change", function(e){
+    var sel = e.target.closest && e.target.closest("[data-next-sheet]"); if(!sel) return;
+    sel.disabled = true;
+    fetch(window.PK_URLS.nextSheet, {method:"POST", headers:{"Content-Type":"application/json","X-CSRFToken":window.PK_CSRF},
+      body: JSON.stringify({template_id: sel.dataset.nextSheet, sheet_id: sel.value || null})})
+      .then(function(r){ return r.json().then(function(j){ if(!r.ok || !j.ok) throw new Error(j.error || ("HTTP " + r.status)); return j; }); })
+      .then(function(){ sel.style.background = sel.value ? "#ecfdf5" : "#fff"; })
+      .catch(function(err){ alert("บันทึกชีทเล่มต่อไปไม่สำเร็จ: " + err.message); })
+      .finally(function(){ sel.disabled = false; });
+  });
 </script>
 
 {% verbatim %}

@@ -2373,6 +2373,15 @@ class TeachingClassSubjectTemplate(models.Model):
             "ตั้งค่านี้เมื่ออยากบังคับให้ใช้ชีทเล่มนี้คิด % แทนการจับคู่อัตโนมัติ"
         ),
     )
+    next_sheet = models.ForeignKey(
+        Sheet,
+        verbose_name="ชีทเล่มถัดไป",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="next_for_subject_templates",
+        help_text="เลือกจากภาพรวมเรียลไทม์เมื่อติวเตอร์แจ้งใกล้จบชีท จะขึ้นให้ติวเตอร์อัตโนมัติในการอัปเดตครั้งถัดไป",
+    )
     display_order = models.PositiveIntegerField("ลำดับแสดงผล", default=1)
     is_active = models.BooleanField("ใช้งาน", default=True)
     created_at = models.DateTimeField("วันที่สร้าง", default=timezone.now)

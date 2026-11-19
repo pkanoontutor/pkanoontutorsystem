@@ -216,7 +216,7 @@
       (drawZone && zoneById(+drawZone) && zoneById(+drawZone).rect ? '<button class="btn sm red" id="clearRect">ลบกรอบโซนนี้</button>' : '') +
       '<span style="color:#64748b">· กดที่ห้องเพื่อดูรายการของห้องนั้น</span></div>';
     const zonesHtml = floorZones.filter(z => z.rect).map(z => '<div class="plan-zone' + (fZone == z.id ? ' on' : '') + '" data-zone="' + z.id + '" style="--zc:' + esc(z.color) +
-      ';left:' + z.rect[0] + '%;top:' + z.rect[1] + '%;width:' + z.rect[2] + '%;height:' + z.rect[3] + '%">' + esc(z.name) + '<small>' + baht(z.spent) + ' ฿</small></div>').join("");
+      ';left:' + z.rect[0] + '%;top:' + z.rect[1] + '%;width:' + z.rect[2] + '%;height:' + z.rect[3] + '%">' + esc(z.name) + '<small>งบ ' + baht(z.planned) + ' ฿</small><small>จ่าย ' + baht(z.spent) + ' ฿</small></div>').join("");
     area.innerHTML = tools + '<div class="plan-box' + (drawZone ? ' drawing' : '') + '" id="planBox"><img src="' + esc(plan) + '" alt="แปลนบ้าน ชั้น ' + floor + '" draggable="false">' + zonesHtml + '</div>' +
       '<div style="font-size:12px;color:#64748b;margin-top:6px">ชั้น ' + floor + ' ลงทุนไปแล้ว ' + baht(spentOf(floorZones)) + ' ฿ · กดห้องเพื่อดูรายการของห้องนั้น</div>';
     area.querySelectorAll("[data-floor]").forEach(b => b.onclick = () => { floor = b.dataset.floor; drawZone = ""; renderPlan(); });

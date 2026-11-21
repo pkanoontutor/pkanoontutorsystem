@@ -1,6 +1,7 @@
 {% extends "core/base.html" %}
 {% block title %}Report ดาวสะสม{% endblock %}
-{% block head %}
+{% block head %}{% load static %}
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 <style>
   .hr-wrap{max-width:1000px;margin:0 auto;display:grid;gap:12px;}
   .hr-hero{background:linear-gradient(135deg,#f59e0b,#f97316);color:#fff;border-radius:22px;padding:18px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center;}
@@ -22,6 +23,15 @@
   .star{font-size:17px;font-weight:1000;color:#ea580c;}
   .muted{color:#94a3b8;font-size:12px;font-weight:700;}
   .off{opacity:.6;}
+  .img-bar{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;}
+  .btn{border:0;border-radius:12px;padding:9px 14px;font:inherit;font-size:13.5px;font-weight:900;cursor:pointer;background:#f1f5f9;color:#0f172a;}
+  .btn.main{background:#f97316;color:#fff;}
+  .shot-head{display:none;align-items:center;gap:14px;border-bottom:3px solid #f97316;padding-bottom:10px;margin-bottom:12px;}
+  .shot-head img{height:58px;}
+  .shot-head b{display:block;font-size:22px;font-weight:1000;color:#ea580c;}
+  .shot-head span{font-size:14px;font-weight:800;color:#475569;}
+  #shot.capturing{width:760px;padding:22px 26px;box-shadow:none;border-radius:0;background:#fff;}
+  #shot.capturing .shot-head{display:flex;}
   .tag{font-size:11px;font-weight:900;background:#f1f5f9;color:#64748b;border-radius:999px;padding:1px 7px;margin-left:4px;}
 </style>
 {% endblock %}
@@ -56,7 +66,16 @@
     <div><label>ค้นหาชื่อ</label><input type="text" name="q" value="{{ q }}" placeholder="ชื่อเล่น / ชื่อจริง / รหัส"></div>
   </form>
 
-  <section class="hr-panel">
+  <div class="img-bar">
+    <button type="button" class="btn main js-img" data-act="copy">📋 Copy รูป</button>
+    <button type="button" class="btn js-img" data-act="save">⬇️ ดาวน์โหลด PNG</button>
+    <button type="button" class="btn js-img" data-act="open">🔍 เปิดรูป</button>
+  </div>
+  <section class="hr-panel" id="shot">
+    <div class="shot-head">
+      <img src="{% static 'core/logo_transparent.png' %}" alt="">
+      <div><b>⭐ ดาวสะสมการบ้าน</b><span>{{ filter_label }} · ข้อมูล ณ {{ today|date:"d/m/Y" }}</span></div>
+    </div>
     <div class="stats" style="margin-bottom:10px;">
       <span>นักเรียน <b>{{ rows|length }}</b> คน</span>
       <span>· มีดาวแล้ว <b>{{ with_stars }}</b> คน</span>
@@ -81,6 +100,34 @@
   </section>
 </div>
 <script>
+(function(){
+  const node = document.getElementById("shot");
+  function shot(){
+    if(typeof html2canvas !== "function") return Promise.reject(new Error("โหลดตัวสร้างรูปไม่สำเร็จ ลองรีเฟรชหน้า"));
+    node.classList.add("capturing");
+    return html2canvas(node, {scale: 2, backgroundColor: "#ffffff", useCORS: true, windowWidth: 1200})
+      .finally(() => node.classList.remove("capturing"));
+  }
+  const NAME = "homework-stars-{{ today|date:'Y-m-d' }}.png";
+  document.querySelectorAll(".js-img").forEach(btn => btn.addEventListener("click", () => {
+    const act = btn.dataset.act, old = btn.textContent;
+    btn.disabled = true; btn.textContent = "กำลังสร้างรูป...";
+    let p;
+    if(act === "copy"){
+      if(!(navigator.clipboard && window.ClipboardItem)){ alert("เบราว์เซอร์นี้ Copy รูปไม่ได้ ใช้ดาวน์โหลด PNG แทนครับ"); btn.disabled = false; btn.textContent = old; return; }
+      const blob = shot().then(c => new Promise((res, rej) => c.toBlob(b => b ? res(b) : rej(new Error("สร้างรูปไม่สำเร็จ")), "image/png")));
+      p = navigator.clipboard.write([new ClipboardItem({"image/png": blob})]).then(() => { btn.textContent = "✅ Copy แล้ว"; setTimeout(() => btn.textContent = old, 1800); });
+    } else {
+      p = shot().then(c => {
+        const url = c.toDataURL("image/png");
+        if(act === "save"){ const a = document.createElement("a"); a.href = url; a.download = NAME; a.click(); }
+        else { const w = window.open(); if(w) w.document.write('<img src="' + url + '" style="max-width:100%;height:auto;">'); else alert("เบราว์เซอร์บล็อกแท็บใหม่ ใช้ดาวน์โหลดแทนครับ"); }
+        btn.textContent = old;
+      });
+    }
+    p.catch(err => { btn.textContent = old; alert((err && err.message) || "สร้างรูปไม่สำเร็จ"); }).finally(() => { btn.disabled = false; });
+  }));
+})();
 document.querySelectorAll("[data-status]").forEach(function(a){
   a.addEventListener("click", function(e){ e.preventDefault(); var f = document.getElementById("f");
     f.status.value = a.dataset.status; f.submit(); });

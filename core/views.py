@@ -13953,6 +13953,11 @@ def homework_stars_report(request: HttpRequest) -> HttpResponse:
     return render(request, "core/homework_stars_report.html", {
         "classes": class_list, "grades": grades, "cls_id": cls_id, "grade": grade,
         "status": status, "q": request.GET.get("q") or "", "rows": rows,
+        "filter_label": " · ".join(x for x in [
+            (all_classes[cls_id].name if cls_id in all_classes else "") or grade or "ทุกห้อง",
+            {"active": "", "inactive": "Inactive", "all": "รวม Inactive"}[status],
+        ] if x),
+        "today": timezone.localdate(),
         "sum_stars": sum(r["total"] for r in rows),
         "with_stars": sum(1 for r in rows if r["total"]),
     })

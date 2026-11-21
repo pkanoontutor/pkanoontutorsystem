@@ -959,7 +959,8 @@
   }
 
   // card url -> small extra link shown top-right of that card
-  var CARD_SHORTCUTS={"/teaching-schedule/":{url:"/tutor-teaching-update/",label:"📝 อัปเดตการสอน"}};
+  var CARD_SHORTCUTS={"/teaching-schedule/":{url:"/tutor-teaching-update/",label:"📝 อัปเดตการสอน"},
+    "/course-renewal-notices/":{url:"/new-student-payment-notices/",label:"+นักเรียนใหม่"}};
   function cardEl(c){
     var sc=CARD_SHORTCUTS[c.url];
     var a=document.createElement("a");

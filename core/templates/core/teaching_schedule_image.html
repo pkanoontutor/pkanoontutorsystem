@@ -60,6 +60,23 @@
        of leaving empty space or clipping text. */
     .sched.tutor-mode .cell{height:auto;min-height:58px;font-size:13px;padding:9px 12px;vertical-align:top;overflow:visible;}
     .sched.tutor-mode .time-c{font-size:14px;}
+
+    /* Black & white for printing: no fills (saves ink, no grey wash),
+       a thin outline per cell instead. */
+    .sched.bw{background:#fff!important;border:2px solid #000;box-shadow:none;}
+    .sched.bw .decor{display:none;}
+    .sched.bw table.grid th,.sched.bw table.grid td,.sched.bw .room-h,.sched.bw .time-c,.sched.bw .cell,
+    .sched.bw .cell.empty,.sched.bw .row-break td.cell{background:#fff!important;color:#000!important;
+      border:1px solid #000;box-shadow:none!important;text-shadow:none!important;}
+    .sched.bw .time-h{border:0!important;}
+    .sched.bw, .sched.bw *{color:#000!important;}
+    .sched.bw .title{color:#000!important;text-shadow:none;}
+    .sched.bw .prog,.sched.bw .prog .fresh,.sched.bw .prog .stale{color:#000!important;}
+    .sched.bw *{text-shadow:none!important;}
+    .sched.bw [style*="background"]{background:#fff!important;}
+    .sched.bw .logo{filter:grayscale(1) contrast(1.2);}
+    .sched.bw .cd-mini,.sched.bw .cd-mini *{background:#fff!important;color:#000!important;border-color:#000!important;}
+    .sched.bw .cd,.sched.bw .cd *{background:#fff!important;color:#000!important;border-color:#000!important;}
     .prog{margin-top:4px;font-size:13px;line-height:1.35;color:#57534e;font-weight:400;}
     .prog div{white-space:normal;overflow-wrap:break-word;word-break:break-word;}
     .prog .sheet{font-weight:700;}
@@ -123,6 +140,7 @@
       <a class="btn soft" href="/teaching-schedule/">📅 ทั้งหมด</a>
       <a class="btn soft {% if version == 'parent' %}on{% endif %}" href="/teaching-schedule/image/{{ schedule.id }}/">👨‍👩‍👧 ผู้ปกครอง</a>
       <a class="btn soft {% if version == 'tutor' %}on{% endif %}" href="/teaching-schedule/image/{{ schedule.id }}/?v=tutor">👩‍🏫 ติวเตอร์</a>
+      <button class="btn soft" type="button" id="bwBtn" onclick="var c=document.getElementById('schedCard');c.classList.toggle('bw');this.classList.toggle('on',c.classList.contains('bw'));">🖨️ ขาวดำสำหรับปรินท์</button>
       {% if payroll_rows %}<button class="btn amber" type="button" onclick="openPay()">💸 ส่งค่าติวเตอร์</button>{% endif %}
       <button class="btn" type="button" onclick="openOnlinePay()" style="background:#7c3aed;">💻 ส่งค่าติวเตอร์ตารางออนไลน์</button>
       <button class="btn green" type="button" onclick="copyImage()">Copy Image</button>

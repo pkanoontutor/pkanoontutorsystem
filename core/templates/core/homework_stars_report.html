@@ -1,0 +1,89 @@
+{% extends "core/base.html" %}
+{% block title %}Report ดาวสะสม{% endblock %}
+{% block head %}
+<style>
+  .hr-wrap{max-width:1000px;margin:0 auto;display:grid;gap:12px;}
+  .hr-hero{background:linear-gradient(135deg,#f59e0b,#f97316);color:#fff;border-radius:22px;padding:18px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center;}
+  .hr-title{font-size:24px;font-weight:1000;}
+  .chip{border:1px solid #e2e8f0;background:#fff;border-radius:999px;padding:7px 12px;font-size:12.5px;font-weight:900;color:#334155;text-decoration:none;}
+  .hr-panel{background:#fff;border-radius:18px;padding:14px;box-shadow:0 4px 12px rgba(15,23,42,.07);}
+  .hr-filters{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;align-items:end;}
+  .hr-filters label{display:block;font-size:11px;font-weight:1000;color:#334155;margin-bottom:4px;}
+  .hr-filters select,.hr-filters input{width:100%;box-sizing:border-box;border:1px solid #e2e8f0;border-radius:12px;padding:9px 11px;font:inherit;font-size:14px;font-weight:800;}
+  .seg{display:flex;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;}
+  .seg a{flex:1;text-align:center;padding:9px 6px;font-size:13px;font-weight:900;color:#334155;text-decoration:none;}
+  .seg a.on{background:#f97316;color:#fff;}
+  .stats{display:flex;gap:10px;flex-wrap:wrap;font-size:13px;font-weight:800;color:#475569;}
+  .stats b{color:#ea580c;font-size:18px;}
+  table{width:100%;border-collapse:collapse;font-size:14px;}
+  th{background:#fff7ed;color:#9a3412;text-align:left;padding:9px;font-weight:900;}
+  td{border-bottom:1px solid #f1f5f9;padding:9px;font-weight:700;}
+  .n{text-align:right;white-space:nowrap;}
+  .star{font-size:17px;font-weight:1000;color:#ea580c;}
+  .muted{color:#94a3b8;font-size:12px;font-weight:700;}
+  .off{opacity:.6;}
+  .tag{font-size:11px;font-weight:900;background:#f1f5f9;color:#64748b;border-radius:999px;padding:1px 7px;margin-left:4px;}
+</style>
+{% endblock %}
+{% block content %}
+<div class="hr-wrap">
+  <section class="hr-hero">
+    <div><div class="hr-title">📊 Report ดาวสะสมการบ้าน</div></div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;">
+      <a class="chip" href="{% url 'core:homework_stars' %}">⭐ ให้ดาว</a>
+      <a class="chip" href="{% url 'core:pkanoon_admin_tool' %}">← Admin Tool</a>
+    </div>
+  </section>
+
+  <form class="hr-panel hr-filters" method="get" id="f">
+    <input type="hidden" name="status" value="{{ status }}">
+    <div><label>สถานะนักเรียน</label>
+      <div class="seg">
+        <a href="#" data-status="active" class="{% if status == 'active' %}on{% endif %}">Active</a>
+        <a href="#" data-status="inactive" class="{% if status == 'inactive' %}on{% endif %}">Inactive</a>
+        <a href="#" data-status="all" class="{% if status == 'all' %}on{% endif %}">ทั้งหมด</a>
+      </div></div>
+    <div><label>ระดับชั้น</label>
+      <select name="grade" onchange="this.form.class.value='';this.form.submit()">
+        <option value="">ทุกระดับชั้น</option>
+        {% for g in grades %}<option value="{{ g }}"{% if g == grade %} selected{% endif %}>{{ g }}</option>{% endfor %}
+      </select></div>
+    <div><label>ห้อง / คลาส</label>
+      <select name="class" onchange="this.form.grade.value='';this.form.submit()">
+        <option value="">ทุกห้อง</option>
+        {% for c in classes %}<option value="{{ c.id }}"{% if c.id == cls_id %} selected{% endif %}>{{ c.name }}{% if not c.is_active %} (ปิดแล้ว){% endif %}</option>{% endfor %}
+      </select></div>
+    <div><label>ค้นหาชื่อ</label><input type="text" name="q" value="{{ q }}" placeholder="ชื่อเล่น / ชื่อจริง / รหัส"></div>
+  </form>
+
+  <section class="hr-panel">
+    <div class="stats" style="margin-bottom:10px;">
+      <span>นักเรียน <b>{{ rows|length }}</b> คน</span>
+      <span>· มีดาวแล้ว <b>{{ with_stars }}</b> คน</span>
+      <span>· ดาวรวม <b>{{ sum_stars }}</b> ดวง</span>
+    </div>
+    <div style="overflow-x:auto;">
+    <table>
+      <tr><th style="width:46px;">อันดับ</th><th>นักเรียน</th><th>ห้อง</th><th class="n">ดาวสะสม</th><th class="n">ได้ดาวล่าสุด</th></tr>
+      {% for r in rows %}
+      <tr class="{% if not r.student.is_active %}off{% endif %}">
+        <td>{{ r.rank }}</td>
+        <td>{{ r.student.nickname|default:r.student.full_name }}{% if not r.student.is_active %}<span class="tag">inactive</span>{% endif %}<br><span class="muted">{{ r.student.full_name }}</span></td>
+        <td class="muted">{{ r.classes }}</td>
+        <td class="n star">⭐ {{ r.total }}</td>
+        <td class="n muted">{{ r.last|date:"d/m/Y"|default:"-" }}</td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="5" class="muted" style="text-align:center;padding:20px;">ไม่พบนักเรียนตามตัวกรองนี้</td></tr>
+      {% endfor %}
+    </table>
+    </div>
+  </section>
+</div>
+<script>
+document.querySelectorAll("[data-status]").forEach(function(a){
+  a.addEventListener("click", function(e){ e.preventDefault(); var f = document.getElementById("f");
+    f.status.value = a.dataset.status; f.submit(); });
+});
+</script>
+{% endblock %}

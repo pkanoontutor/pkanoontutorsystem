@@ -13892,6 +13892,73 @@ def homework_stars(request: HttpRequest) -> HttpResponse:
 
 
 @login_required
+def homework_stars_report(request: HttpRequest) -> HttpResponse:
+    """Stars collected per student; filter by class or grade and by student
+    status (active / inactive / all)."""
+    if not request.user.is_staff:
+        return HttpResponse(status=403)
+    status = request.GET.get("status") or "active"
+    if status not in ("active", "inactive", "all"):
+        status = "active"
+    cls_id = _id_or_none(request.GET.get("class"))
+    grade = (request.GET.get("grade") or "").strip()
+    q = (request.GET.get("q") or "").strip().lower()
+
+    students = Student.objects.all()
+    if status != "all":
+        students = students.filter(is_active=(status == "active"))
+    students = {s.id: s for s in students}
+
+    # classes per student: current (active) enrolments for active students,
+    # every enrolment ever for inactive ones (so they still group by room).
+    enr_qs = Enrollment.objects.select_related("tutoring_class").filter(student_id__in=students.keys())
+    by_student: dict[int, list] = {}
+    for e in enr_qs.order_by("-is_active", "-created_at"):
+        st = students[e.student_id]
+        if st.is_active and not e.is_active:
+            continue
+        lst = by_student.setdefault(e.student_id, [])
+        if e.tutoring_class not in lst:
+            lst.append(e.tutoring_class)
+
+    all_classes = {c.id: c for lst in by_student.values() for c in lst}
+    slot_rank = {s: i for i, s in enumerate(TIME_SLOT_ORDER)}
+    class_list = sorted(all_classes.values(), key=lambda c: (not c.is_active, slot_rank.get(c.time_slot, 99), c.name))
+    grade_order = ["ป.1", "ป.2", "ป.3", "ป.4", "ป.5", "ป.6", "ม.1", "ม.2", "ม.3", "ม.4", "ม.5", "ม.6"]
+    grades = sorted({g for g in (_grade_from_class_name(c.name) for c in all_classes.values()) if g},
+                    key=lambda g: grade_order.index(g) if g in grade_order else 99)
+
+    totals = dict(HomeworkStar.objects.values("student_id").annotate(n=Count("id")).values_list("student_id", "n"))
+    last = dict(HomeworkStar.objects.values("student_id").annotate(d=Max("lesson_date")).values_list("student_id", "d"))
+
+    rows = []
+    for sid, st in students.items():
+        classes = by_student.get(sid, [])
+        if cls_id and not any(c.id == cls_id for c in classes):
+            continue
+        if grade and not any(_grade_from_class_name(c.name) == grade for c in classes):
+            continue
+        if (cls_id or grade or status == "active") and not classes:
+            continue
+        if q and q not in f"{st.nickname} {st.full_name} {st.student_code}".lower():
+            continue
+        rows.append({"student": st, "classes": ", ".join(c.name for c in classes) or "-",
+                     "total": totals.get(sid, 0), "last": last.get(sid)})
+    rows.sort(key=lambda r: (-r["total"], r["student"].nickname or r["student"].full_name or ""))
+    rank = 0
+    for i, r in enumerate(rows):
+        if i == 0 or r["total"] != rows[i - 1]["total"]:
+            rank = i + 1
+        r["rank"] = rank
+    return render(request, "core/homework_stars_report.html", {
+        "classes": class_list, "grades": grades, "cls_id": cls_id, "grade": grade,
+        "status": status, "q": request.GET.get("q") or "", "rows": rows,
+        "sum_stars": sum(r["total"] for r in rows),
+        "with_stars": sum(1 for r in rows if r["total"]),
+    })
+
+
+@login_required
 def admission_sheet_checklist(request: HttpRequest, pk: int) -> HttpResponse:
     """Copyable checklist image of the sheets to prepare for one incoming
     student: code, title and shelf location; sheets can be added/removed

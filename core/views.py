@@ -13943,6 +13943,7 @@ def homework_stars_report(request: HttpRequest) -> HttpResponse:
         if q and q not in f"{st.nickname} {st.full_name} {st.student_code}".lower():
             continue
         rows.append({"student": st, "classes": ", ".join(c.name for c in classes) or "-",
+                     "class_ids": {c.id for c in classes},
                      "total": totals.get(sid, 0), "last": last.get(sid)})
     rows.sort(key=lambda r: (-r["total"], r["student"].nickname or r["student"].full_name or ""))
     rank = 0
@@ -13950,7 +13951,26 @@ def homework_stars_report(request: HttpRequest) -> HttpResponse:
         if i == 0 or r["total"] != rows[i - 1]["total"]:
             rank = i + 1
         r["rank"] = rank
+    # A grade picked: one block per class of that grade (every class, even
+    # with nobody listed), ranked within the class -- like the weekly test.
+    groups = []
+    if grade and not cls_id:
+        grade_classes = [c for c in class_list if _grade_from_class_name(c.name) == grade]
+        if status != "inactive":
+            for c in TutoringClass.objects.filter(is_active=True):
+                if _grade_from_class_name(c.name) == grade and c not in grade_classes:
+                    grade_classes.append(c)
+            grade_classes.sort(key=lambda c: (not c.is_active, slot_rank.get(c.time_slot, 99), c.name))
+        for c in grade_classes:
+            members = [dict(r) for r in rows if c.id in r["class_ids"]]
+            rk = 0
+            for i, m in enumerate(members):
+                if i == 0 or m["total"] != members[i - 1]["total"]:
+                    rk = i + 1
+                m["rank"] = rk
+            groups.append({"cls": c, "rows": members, "stars": sum(m["total"] for m in members)})
     return render(request, "core/homework_stars_report.html", {
+        "groups": groups,
         "classes": class_list, "grades": grades, "cls_id": cls_id, "grade": grade,
         "status": status, "q": request.GET.get("q") or "", "rows": rows,
         "filter_label": " · ".join(x for x in [

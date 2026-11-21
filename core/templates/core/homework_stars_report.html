@@ -32,6 +32,15 @@
   .shot-head span{font-size:14px;font-weight:800;color:#475569;}
   #shot.capturing{width:760px;padding:22px 26px;box-shadow:none;border-radius:0;background:#fff;}
   #shot.capturing .shot-head{display:flex;}
+  .grp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px;}
+  .grp{border:1px solid #fed7aa;border-radius:14px;overflow:hidden;align-self:start;}
+  .grp-head{display:flex;justify-content:space-between;gap:6px;background:#fff7ed;padding:8px 10px;}
+  .grp-head b{font-size:14.5px;font-weight:1000;color:#9a3412;}
+  .grp-head span{font-size:12px;font-weight:900;color:#ea580c;white-space:nowrap;}
+  .grp td{padding:5px 10px;font-size:13.5px;}
+  .grp .star{font-size:14px;}
+  #shot.capturing.wide{width:1060px;}
+  #shot.capturing.wide .grp-grid{grid-template-columns:repeat(4,1fr);}
   .tag{font-size:11px;font-weight:900;background:#f1f5f9;color:#64748b;border-radius:999px;padding:1px 7px;margin-left:4px;}
 </style>
 {% endblock %}
@@ -71,7 +80,7 @@
     <button type="button" class="btn js-img" data-act="save">⬇️ ดาวน์โหลด PNG</button>
     <button type="button" class="btn js-img" data-act="open">🔍 เปิดรูป</button>
   </div>
-  <section class="hr-panel" id="shot">
+  <section class="hr-panel{% if groups %} wide{% endif %}" id="shot">
     <div class="shot-head">
       <img src="{% static 'core/logo_transparent.png' %}" alt="">
       <div><b>⭐ ดาวสะสมการบ้าน</b><span>{{ filter_label }} · ข้อมูล ณ {{ today|date:"d/m/Y" }}</span></div>
@@ -81,6 +90,26 @@
       <span>· มีดาวแล้ว <b>{{ with_stars }}</b> คน</span>
       <span>· ดาวรวม <b>{{ sum_stars }}</b> ดวง</span>
     </div>
+    {% if groups %}
+    <div class="grp-grid">
+      {% for g in groups %}
+      <div class="grp">
+        <div class="grp-head"><b>{{ g.cls.name }}</b><span>{{ g.rows|length }} คน · ⭐ {{ g.stars }}</span></div>
+        <table>
+          {% for r in g.rows %}
+          <tr class="{% if not r.student.is_active %}off{% endif %}">
+            <td style="width:26px;">{{ r.rank }}</td>
+            <td>{{ r.student.nickname|default:r.student.full_name }}{% if not r.student.is_active %}<span class="tag">inactive</span>{% endif %}</td>
+            <td class="n star">⭐ {{ r.total }}</td>
+          </tr>
+          {% empty %}
+          <tr><td class="muted" style="text-align:center;">ไม่มีนักเรียน</td></tr>
+          {% endfor %}
+        </table>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
     <div style="overflow-x:auto;">
     <table>
       <tr><th style="width:46px;">อันดับ</th><th>นักเรียน</th><th>ห้อง</th><th class="n">ดาวสะสม</th><th class="n">ได้ดาวล่าสุด</th></tr>
@@ -97,6 +126,7 @@
       {% endfor %}
     </table>
     </div>
+    {% endif %}
   </section>
 </div>
 <script>
@@ -105,7 +135,7 @@
   function shot(){
     if(typeof html2canvas !== "function") return Promise.reject(new Error("โหลดตัวสร้างรูปไม่สำเร็จ ลองรีเฟรชหน้า"));
     node.classList.add("capturing");
-    return html2canvas(node, {scale: 2, backgroundColor: "#ffffff", useCORS: true, windowWidth: 1200})
+    return html2canvas(node, {scale: 2, backgroundColor: "#ffffff", useCORS: true, windowWidth: 1400})
       .finally(() => node.classList.remove("capturing"));
   }
   const NAME = "homework-stars-{{ today|date:'Y-m-d' }}.png";

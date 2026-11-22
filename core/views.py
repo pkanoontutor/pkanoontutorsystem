@@ -9161,6 +9161,8 @@ def admin_tool_card_save(request: HttpRequest) -> JsonResponse:
         card.desc = desc
         card.url = url[:300]
         card.quick_add_url = quick_add_url
+        if data.get("size") in ("s", "m", "l"):
+            card.size = data["size"]
         card.save()
     else:
         max_order = (

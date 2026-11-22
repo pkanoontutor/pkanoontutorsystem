@@ -616,8 +616,16 @@ def recognized_revenue_rows(start: date, end: date, class_ids=None) -> list[dict
     That matches how the service is actually delivered, and is what makes
     weekly revenue meaningful. A half-day leave earns half a session's hours,
     so `deducted_units` scales the row rather than counting it as a full one.
+
+    Only sessions covered by what the enrolment has bought count: once a
+    finished course goes negative, further attendance earns nothing. When the
+    student renews (sessions_total grows) those sessions become covered and
+    show up again on their own dates -- i.e. recognised back in the weeks
+    that were skipped. Coverage is first-come: the earliest sessions use the
+    bought hours first.
     """
-    from .models import Attendance
+    from django.db.models import Sum
+    from .models import Attendance, Enrollment, SessionAdjustment
 
     qs = (
         Attendance.objects
@@ -626,11 +634,35 @@ def recognized_revenue_rows(start: date, end: date, class_ids=None) -> list[dict
     if class_ids:
         qs = qs.filter(enrollment__tutoring_class_id__in=list(class_ids))
 
-    rows = list(qs.values_list(
+    raw = list(qs.order_by("attendance_date", "id").values_list(
         "student_id", "attendance_date",
         "enrollment__tutoring_class_id", "enrollment__tutoring_class__name",
-        "deducted_units",
+        "deducted_units", "enrollment_id",
     ))
+    enr_ids = {r[5] for r in raw if r[5]}
+    capacity = {
+        eid: _d(total)
+        for eid, total in Enrollment.objects.filter(id__in=enr_ids).values_list("id", "sessions_total")
+    }
+    for eid, delta in (SessionAdjustment.objects.filter(enrollment_id__in=enr_ids)
+                       .values("enrollment_id").annotate(n=Sum("delta")).values_list("enrollment_id", "n")):
+        capacity[eid] = capacity.get(eid, ZERO) + _d(delta)
+    used = {
+        eid: _d(n)
+        for eid, n in (Attendance.objects.filter(enrollment_id__in=enr_ids, deducted=True, attendance_date__lt=start)
+                       .values("enrollment_id").annotate(n=Sum("deducted_units")).values_list("enrollment_id", "n"))
+    }
+    rows = []
+    for student_id, att_date, cls_id, cls_name, units, eid in raw:
+        units = _d(units if units is not None else 1)
+        if eid is None:
+            rows.append((student_id, att_date, cls_id, cls_name, units))
+            continue
+        before = used.get(eid, ZERO)
+        used[eid] = before + units
+        covered = min(units, max(capacity.get(eid, ZERO) - before, ZERO))
+        if covered > 0:
+            rows.append((student_id, att_date, cls_id, cls_name, covered))
     timeline = build_rate_timeline({r[0] for r in rows if r[0]})
     fallback = school_average_hourly_rate(timeline)
 

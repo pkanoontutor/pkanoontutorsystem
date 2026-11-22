@@ -13882,7 +13882,18 @@ def homework_stars(request: HttpRequest) -> HttpResponse:
         HomeworkStar.objects.select_related("student", "tutoring_class")
         .order_by("-created_at")[:30]
     )
+    # Stars keyed in today (by entry time), to tally against the pile of sheets.
+    tz_today = timezone.localdate()
+    start = timezone.make_aware(datetime.combine(tz_today, datetime.min.time()))
+    today_qs = HomeworkStar.objects.filter(created_at__gte=start, created_at__lt=start + timedelta(days=1))
+    today_by_class = list(
+        today_qs.values("tutoring_class__name").annotate(n=Count("id"), kids=Count("student", distinct=True))
+        .order_by("tutoring_class__name")
+    )
     return render(request, "core/homework_stars.html", {
+        "today_count": today_qs.count(),
+        "today_kids": today_qs.values("student").distinct().count(),
+        "today_by_class": today_by_class,
         "weekends": weekends,
         "weekend": weekend.isoformat(),
         "classes_json": json.dumps(class_list, ensure_ascii=False),

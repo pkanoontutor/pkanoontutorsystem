@@ -2742,6 +2742,7 @@ class AdminToolCard(models.Model):
         help_text="ถ้าใส่ จะมีปุ่ม + ที่มุมขวาบนของ card เพื่อลัดไปหน้าสร้างรายการใหม่",
     )
     color = models.CharField("สีไอคอน", max_length=20, default="c-sky")
+    size = models.CharField("ขนาดปุ่ม", max_length=1, default="m", help_text="s = เล็ก, m = กลาง, l = ใหญ่")
     order = models.IntegerField("ลำดับ", default=0)
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
@@ -2764,6 +2765,7 @@ class AdminToolCard(models.Model):
             "url": self.url,
             "quick_add_url": self.quick_add_url,
             "color": self.color,
+            "size": self.size or "m",
             "order": self.order,
         }
 

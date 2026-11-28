@@ -69,6 +69,10 @@
     .sched.bw .cell.empty,.sched.bw .row-break td.cell{background:#fff!important;color:#000!important;
       border:1px solid #000;box-shadow:none!important;text-shadow:none!important;}
     .sched.bw .time-h{border:0!important;}
+    /* BW print: tutor name on its own line at 2x size, shrunk to fit one line */
+    .sched.bw .cell{height:auto;}
+    .sched.bw .cell .tsep{display:none;}
+    .sched.bw .cell .tutor{display:block;font-size:30px;line-height:1.15;white-space:nowrap;overflow:hidden;}
     .sched.bw, .sched.bw *{color:#000!important;}
     .sched.bw .title{color:#000!important;text-shadow:none;}
     .sched.bw .prog,.sched.bw .prog .fresh,.sched.bw .prog .stale{color:#000!important;}
@@ -140,7 +144,7 @@
       <a class="btn soft" href="/teaching-schedule/">📅 ทั้งหมด</a>
       <a class="btn soft {% if version == 'parent' %}on{% endif %}" href="/teaching-schedule/image/{{ schedule.id }}/">👨‍👩‍👧 ผู้ปกครอง</a>
       <a class="btn soft {% if version == 'tutor' %}on{% endif %}" href="/teaching-schedule/image/{{ schedule.id }}/?v=tutor">👩‍🏫 ติวเตอร์</a>
-      <button class="btn soft" type="button" id="bwBtn" onclick="var c=document.getElementById('schedCard');c.classList.toggle('bw');this.classList.toggle('on',c.classList.contains('bw'));">🖨️ ขาวดำสำหรับปรินท์</button>
+      <button class="btn soft" type="button" id="bwBtn" onclick="var c=document.getElementById('schedCard');c.classList.toggle('bw');fitBwTutors();this.classList.toggle('on',c.classList.contains('bw'));">🖨️ ขาวดำสำหรับปรินท์</button>
       {% if payroll_rows %}<button class="btn amber" type="button" onclick="openPay()">💸 ส่งค่าติวเตอร์</button>{% endif %}
       <button class="btn" type="button" onclick="openOnlinePay()" style="background:#7c3aed;">💻 ส่งค่าติวเตอร์ตารางออนไลน์</button>
       <button class="btn green" type="button" onclick="copyImage()">Copy Image</button>
@@ -201,7 +205,7 @@
                   <td class="cell"></td>
                 {% else %}
                   <td class="cell {% if not rc.cell %}empty{% endif %} {% if rc.conflict %}conflict{% endif %}">
-                    {% if rc.cell %}{% if rc.cell.grade_label %}{{ rc.cell.grade_label }}{% endif %}{% if rc.cell.subject_label %} / {{ rc.cell.subject_label }}{% endif %}{% if rc.tutor_name %} / <span class="tutor" style="color:{{ rc.tutor_color }};">{{ rc.tutor_name }}</span>{% endif %}{% if version == "tutor" and rc.progress %}<div class="prog"><div class="sheet">ชีท: {{ rc.progress.sheet_name }}</div><div>ถึง: {{ rc.progress.position }} · ล่าสุด: {{ rc.progress.last_teacher }}</div>{% if rc.progress.last_update_date %}<div class="{% if rc.progress.is_fresh %}fresh{% else %}stale{% endif %}">อัพเดทล่าสุด วันที่ {{ rc.progress.last_update_date|date:"d/m/y" }}</div>{% endif %}</div>{% endif %}{% endif %}
+                    {% if rc.cell %}{% if rc.cell.grade_label %}{{ rc.cell.grade_label }}{% endif %}{% if rc.cell.subject_label %} / {{ rc.cell.subject_label }}{% endif %}{% if rc.tutor_name %}<span class="tsep"> / </span><span class="tutor" style="color:{{ rc.tutor_color }};">{{ rc.tutor_name }}</span>{% endif %}{% if version == "tutor" and rc.progress %}<div class="prog"><div class="sheet">ชีท: {{ rc.progress.sheet_name }}</div><div>ถึง: {{ rc.progress.position }} · ล่าสุด: {{ rc.progress.last_teacher }}</div>{% if rc.progress.last_update_date %}<div class="{% if rc.progress.is_fresh %}fresh{% else %}stale{% endif %}">อัพเดทล่าสุด วันที่ {{ rc.progress.last_update_date|date:"d/m/y" }}</div>{% endif %}</div>{% endif %}{% endif %}
                   </td>
                 {% endif %}
               {% endfor %}
@@ -463,5 +467,16 @@
       }catch(e){ alert("Browser นี้อาจไม่รองรับ Copy Image ใช้ Download PNG แทนครับ"); }
     }
   </script>
+<script>
+function fitBwTutors(){
+  var c=document.getElementById("schedCard"), bw=c.classList.contains("bw");
+  c.querySelectorAll(".cell .tutor").forEach(function(t){
+    t.style.fontSize="";
+    if(!bw) return;
+    var fs=30;
+    while(t.scrollWidth>t.clientWidth && fs>9){ fs-=1; t.style.fontSize=fs+"px"; }
+  });
+}
+</script>
 </body>
 </html>

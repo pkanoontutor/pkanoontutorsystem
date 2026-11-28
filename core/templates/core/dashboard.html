@@ -425,6 +425,8 @@
     box-shadow: 0 2px 6px rgba(0,0,0,.08);
   }
   /* "ไม่ต่อคอร์ส" cards: grey, half size, at the back of the class */
+  .pay-after-badge{display:inline-block;margin:1px auto 2px;font-size:10.5px;font-weight:900;color:#7c2d12;
+    background:linear-gradient(90deg,#fde68a,#fdba74);border:1px solid #f59e0b;border-radius:999px;padding:1px 7px;white-space:nowrap;}
   .nr-card{display:flex;flex-direction:column;align-items:center;gap:2px;padding:5px 2px;border-radius:11px;
     background:#f1f5f9;border:1px dashed #cbd5e1;filter:grayscale(1);opacity:.7;align-self:start;
     font-size:10px;color:#64748b;}
@@ -1109,13 +1111,14 @@
                       </span>
                     </button>
 
-                    <div class="stu-nick {% if e.remaining_sessions <= 0 %}danger{% endif %}" title="{{ e.student.nickname|default:'-' }}">
+                    <div class="stu-nick {% if e.completion_remaining <= 0 %}danger{% endif %}" title="{{ e.student.nickname|default:'-' }}">
                       {{ e.student.nickname|default:"-" }}
                     </div>
+                    {% if e.pay_after_class %}<div class="pay-after-badge" title="คอร์สแบบจ่ายหลังเรียน · เรียนเกินได้ {{ e.pay_after_sessions }} ครั้งก่อนครบคอร์ส">💸 จ่ายหลังเรียน</div>{% endif %}
                     <div class="stu-full" title="{{ e.student.full_name|default:'-' }}">{{ e.student.full_name|default:"-" }}</div>
 
                     <div class="stu-sessions">
-                      <span id="remaining-{{ e.id }}" class="stu-remain {% if e.remaining_sessions <= 0 %}danger{% endif %}">{{ e.remaining_sessions|sessions }}</span><span class="stu-total">/{{ e.effective_sessions_total|sessions }}</span>
+                      <span id="remaining-{{ e.id }}" class="stu-remain {% if e.completion_remaining <= 0 %}danger{% endif %}">{{ e.remaining_sessions|sessions }}</span><span class="stu-total">/{{ e.effective_sessions_total|sessions }}</span>
                     </div>
 
                     <div class="stu-last" id="last-{{ e.id }}">

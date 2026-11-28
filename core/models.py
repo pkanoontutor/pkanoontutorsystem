@@ -567,6 +567,14 @@ class Enrollment(models.Model):
 
     # ❗ จะ inactive ก็ต่อเมื่อกดจบคอร์สเท่านั้น
     is_active = models.BooleanField("Active", default=True)
+    pay_after_class = models.BooleanField(
+        "คอร์สแบบจ่ายหลังเรียน", default=False,
+        help_text="นักเรียนเรียนก่อนแล้วจ่ายทีหลัง -- ระบบจะนับว่าครบคอร์สเมื่อเรียนเกินไปแล้วตามจำนวนครั้งด้านล่าง",
+    )
+    pay_after_sessions = models.PositiveIntegerField(
+        "จ่ายหลังเรียน: เรียนเกินได้กี่ครั้งก่อนครบคอร์ส", default=10,
+        help_text="เช่น 10 = แจ้งต่อคอร์สเมื่อคงเหลือติดลบใกล้ -10",
+    )
     not_renewed_at = models.DateTimeField(
         "กดไม่ต่อคอร์สเมื่อ", null=True, blank=True,
         help_text="ตั้งจากปุ่ม 🚫 บน dashboard -- การ์ดจะแสดงเป็นสีเทาท้ายห้อง และกด ↩ ดึงกลับได้",
@@ -696,6 +704,16 @@ class Enrollment(models.Model):
     @property
     def remaining_sessions(self):
         return self.effective_sessions_total - self.used_sessions()
+
+    @property
+    def completion_remaining(self):
+        """Sessions left before the course counts as "ครบคอร์ส". For a
+        จ่ายหลังเรียน course the student may run pay_after_sessions into the
+        negative first, so the renewal point moves out by that much."""
+        r = self.remaining_sessions
+        if self.pay_after_class:
+            r += Decimal(self.pay_after_sessions or 0)
+        return r
 
 
 # -----------------------

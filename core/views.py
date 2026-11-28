@@ -6,6 +6,7 @@ import csv
 import logging
 import os
 import re
+from django.utils.dateparse import parse_date
 from datetime import date, timedelta, datetime
 from decimal import Decimal, ROUND_CEILING, ROUND_FLOOR
 from io import BytesIO
@@ -8932,6 +8933,15 @@ def admin_tool_admission_action(request: HttpRequest) -> JsonResponse:
         ])
         return JsonResponse({"ok": True, "result": "cancelled"})
 
+    if action == "reschedule":
+        # เปลี่ยนวันนัดทดลอง/เริ่มเรียน (admin tool + voice command)
+        new_date = parse_date(str(payload.get("date") or ""))
+        if not new_date:
+            return JsonResponse({"ok": False, "error": "วันที่ไม่ถูกต้อง"}, status=400)
+        inquiry.first_lesson_date = new_date
+        inquiry.save(update_fields=["first_lesson_date"])
+        return JsonResponse({"ok": True, "date": new_date.isoformat(), "date_label": _thai_schedule_date(new_date)})
+
     if action == "done":
         # ดำเนินการเสร็จแล้ว: everything for this student is sorted.
         inquiry.is_completed = True
@@ -14749,6 +14759,54 @@ def course_payment_voice(request: HttpRequest) -> HttpResponse:
     })
 
 
+def _admission_row_brief(inq) -> dict:
+    return {
+        "id": inq.id, "nickname": inq.nickname, "full_name": inq.full_name,
+        "grade": inq.get_grade_level_display(), "type": inq.get_request_type_display(),
+        "slot": inq.get_preferred_time_slot_display(),
+        "date": inq.first_lesson_date.isoformat() if inq.first_lesson_date else "",
+        "date_label": _thai_schedule_date(inq.first_lesson_date) if inq.first_lesson_date else "-",
+    }
+
+
+def _voice_reschedule_draft(text: str) -> dict:
+    """"เปลี่ยนวันนัดหมายทดลองเรียนของ X เป็นวันที่ 2 พฤศจิกายน 2569"."""
+    from .voice_receipt import normalize_numbers, parse_command, parse_thai_date
+    new_date = parse_thai_date(text, timezone.localdate())
+    pending = list(AdmissionInquiry.objects.filter(is_completed=False).order_by("first_lesson_date"))
+    compact = re.sub(r"\s+", "", text)
+    hits = [a for a in pending if a.nickname and a.nickname.strip() and a.nickname.strip() in compact]
+    if hits:  # prefer the longest nickname heard (มิ้น vs มิ้นท์)
+        best = max(len(a.nickname.strip()) for a in hits)
+        hits = [a for a in hits if len(a.nickname.strip()) == best]
+    grade = parse_command(normalize_numbers(text))["grade"]
+    if grade and len(hits) > 1:
+        narrowed = [a for a in hits if a.get_grade_level_display().replace(" ", "").startswith(grade)]
+        hits = narrowed or hits
+    warnings = []
+    if not hits:
+        warnings.append("ไม่พบชื่อเล่นนี้ในรายการที่จองไว้ (ที่ยังไม่ปิด) — ลองพิมพ์ชื่อเล่นให้ตรง")
+    if not new_date:
+        warnings.append("ไม่ได้ยินวันที่ใหม่ — เลือกวันเองในช่องด้านล่างได้")
+    return {"ok": True, "mode": "reschedule", "new_date": new_date.isoformat() if new_date else "",
+            "new_date_label": _thai_schedule_date(new_date) if new_date else "",
+            "admissions": [_admission_row_brief(a) for a in hits[:20]], "warnings": warnings}
+
+
+@login_required
+def admin_tool_admission_search(request: HttpRequest) -> JsonResponse:
+    """Search pending bookings (any date) by nickname / name / phone."""
+    if not request.user.is_staff:
+        return JsonResponse({"ok": False, "error": "forbidden"}, status=403)
+    q = (request.GET.get("q") or "").strip()
+    if not q:
+        return JsonResponse({"ok": True, "rows": []})
+    qs = (AdmissionInquiry.objects.filter(is_completed=False)
+          .filter(Q(nickname__icontains=q) | Q(first_name__icontains=q) | Q(last_name__icontains=q) | Q(contact_phone__icontains=q))
+          .order_by("first_lesson_date", "nickname")[:30])
+    return JsonResponse({"ok": True, "rows": [_admission_row_brief(a) for a in qs]})
+
+
 @require_POST
 @login_required
 def course_payment_voice_parse(request: HttpRequest) -> JsonResponse:
@@ -14762,6 +14820,9 @@ def course_payment_voice_parse(request: HttpRequest) -> JsonResponse:
     text = (payload.get("text") or "").strip()
     if not text:
         return JsonResponse({"ok": False, "error": "ยังไม่มีคำสั่ง"}, status=400)
+    from .voice_receipt import is_reschedule, parse_thai_date
+    if is_reschedule(text):
+        return JsonResponse(_voice_reschedule_draft(text))
     parsed = parse_command(text)
     enrollments = list(_active_enrollments_for_payment())
     rooms = list(ScheduleRoom.objects.filter(is_active=True))

@@ -40,7 +40,8 @@
 <div class="vc-wrap">
   <div class="vc-hero">
     <h1>🎙️ สร้างใบเสร็จด้วยเสียง</h1>
-    <p>กดไมค์แล้วพูด เช่น “สร้างใบเสร็จต่อคอร์สให้คอปเตอร์ ป.6 เสาร์บ่าย ห้องมะม่วง 10 ครั้ง ยอด 3890 บาท” → ระบบทำดราฟให้ตรวจ → กดอนุมัติจึงออกใบเสร็จจริง</p>
+    <p>กดไมค์แล้วพูด เช่น “สร้างใบเสร็จต่อคอร์สให้คอปเตอร์ ป.6 เสาร์บ่าย ห้องมะม่วง 10 ครั้ง ยอด 3890 บาท” → ระบบทำดราฟให้ตรวจ → กดอนุมัติจึงออกใบเสร็จจริง<br>
+    หรือ “เปลี่ยนวันนัดหมายทดลองเรียนของน้องมะปราง เป็นวันที่ 2 พฤศจิกายน 2569” → เลือกเด็ก → กดยืนยัน</p>
   </div>
 
   <div class="panel">
@@ -54,6 +55,15 @@
     <div style="margin-top:10px;display:flex;gap:8px;"><button class="btn" type="button" id="parseBtn">📝 สร้างดราฟ</button></div>
     <div id="warns"></div>
     <div class="chips" id="chips"></div>
+  </div>
+
+  <div class="panel" id="reschedPanel" hidden>
+    <h3>📅 เปลี่ยนวันนัดทดลองเรียน / สมัครเรียน</h3>
+    <div class="cands" id="admCands"></div>
+    <div class="draft" style="margin-top:10px;">
+      <div><label>วันที่ใหม่</label><input type="date" id="rDate"></div>
+      <div style="display:flex;align-items:flex-end;justify-content:flex-end;"><button class="btn green" type="button" id="rSave">✅ ยืนยันเปลี่ยนวันนัด</button></div>
+    </div>
   </div>
 
   <div class="panel" id="candPanel" hidden>
@@ -123,6 +133,8 @@
     fetch(PARSE, {method:"POST", headers:{"Content-Type":"application/json","X-CSRFToken":CSRF}, body:JSON.stringify({text})})
       .then(r => r.json()).then(j => {
         if(!j.ok) throw new Error(j.error || "error");
+        $("reschedPanel").hidden = true;
+        if(j.mode === "reschedule"){ showResched(j); return; }
         const p = j.parsed;
         $("chips").innerHTML = chip("ระดับชั้น", p.grade) + chip("รอบ", SLOT_TH[p.slot]) + chip("ห้อง", p.room_word) + chip("จำนวนครั้ง", p.sessions) + chip("ยอด", p.amount);
         $("warns").innerHTML = j.warnings.map(w => '<div class="warn">⚠ ' + esc(w) + '</div>').join("");
@@ -139,6 +151,34 @@
       .catch(e => alert("สร้างดราฟไม่สำเร็จ: " + e.message))
       .finally(() => { $("parseBtn").disabled = false; });
   }
+  let adms = [];
+  function showResched(j){
+    $("candPanel").hidden = true; $("draftPanel").hidden = true;
+    $("chips").innerHTML = chip("คำสั่ง", "เปลี่ยนวันนัด") + chip("วันที่ใหม่", j.new_date_label);
+    $("warns").innerHTML = j.warnings.map(w => '<div class="warn">⚠ ' + esc(w) + '</div>').join("");
+    adms = j.admissions;
+    $("admCands").innerHTML = adms.map((a, i) =>
+      '<label class="cand"><input type="radio" name="adm" value="' + i + '"' + (adms.length === 1 ? ' checked' : '') + '>' +
+      '<span><b>' + esc(a.nickname) + '</b> · ' + esc(a.full_name) + '<small>' + esc(a.grade) + ' · ' + esc(a.type) + ' · ' + esc(a.slot) +
+      ' · นัดเดิม ' + esc(a.date_label) + '</small></span></label>').join("");
+    $("rDate").value = j.new_date || "";
+    $("rSave").disabled = false; $("rSave").textContent = "✅ ยืนยันเปลี่ยนวันนัด";
+    $("reschedPanel").hidden = false;
+  }
+  $("rSave").addEventListener("click", () => {
+    const sel = document.querySelector('input[name="adm"]:checked');
+    if(!sel){ alert("เลือกนักเรียนก่อน"); return; }
+    const a = adms[+sel.value], d = $("rDate").value;
+    if(!d){ alert("เลือกวันที่ใหม่ก่อน"); return; }
+    if(!confirm("เปลี่ยนวันนัดของ " + a.nickname + " จาก " + a.date_label + " เป็น " + d + " ?")) return;
+    $("rSave").disabled = true;
+    fetch("{% url 'core:admin_tool_admission_action' %}", {method:"POST", headers:{"Content-Type":"application/json","X-CSRFToken":CSRF},
+      body:JSON.stringify({admission_id:a.id, "do":"reschedule", date:d})})
+      .then(r => r.json()).then(j => {
+        if(!j.ok) throw new Error(j.error || "error");
+        $("rSave").textContent = "✅ เปลี่ยนเป็น " + j.date_label + " แล้ว";
+      }).catch(e => { $("rSave").disabled = false; alert("บันทึกไม่สำเร็จ: " + e.message); });
+  });
   function pick(i){
     chosen = cands[i];
     $("fStudent").value = chosen.student_id;

@@ -83,6 +83,52 @@ def parse_command(text: str) -> dict:
     return out
 
 
+_MONTHS = [
+    ("มกราคม", "ม.ค.", "มค"), ("กุมภาพันธ์", "ก.พ.", "กพ"), ("มีนาคม", "มี.ค.", "มีค"),
+    ("เมษายน", "เม.ย.", "เมย"), ("พฤษภาคม", "พ.ค.", "พค"), ("มิถุนายน", "มิ.ย.", "มิย"),
+    ("กรกฎาคม", "ก.ค.", "กค"), ("สิงหาคม", "ส.ค.", "สค"), ("กันยายน", "ก.ย.", "กย"),
+    ("ตุลาคม", "ต.ค.", "ตค"), ("พฤศจิกายน", "พ.ย.", "พย"), ("ธันวาคม", "ธ.ค.", "ธค"),
+]
+
+
+def _year(y: int | None, month: int, day: int, today):
+    from datetime import date
+    if y is None:
+        d = date(today.year, month, day)
+        return d if d >= today else date(today.year + 1, month, day)
+    if y < 100:
+        y += 2500
+    if y > 2400:
+        y -= 543
+    return date(y, month, day)
+
+
+def parse_thai_date(text: str, today=None):
+    """'2 พฤศจิกายน 2569' / '2 พ.ย. 69' / '2/11/2569' / '2 พย' -> date (no year = next one)."""
+    from datetime import date
+    today = today or date.today()
+    norm = normalize_numbers(text or "")
+    try:
+        m = re.search(r"(\d{1,2})\s*/\s*(\d{1,2})(?:\s*/\s*(\d{2,4}))?", norm)
+        if m:
+            return _year(int(m.group(3)) if m.group(3) else None, int(m.group(2)), int(m.group(1)), today)
+        names = sorted(((w, i + 1) for i, ws in enumerate(_MONTHS) for w in ws), key=lambda t: -len(t[0]))
+        alt = "|".join(re.escape(w) for w, _ in names)
+        m = re.search(r"(\d{1,2})\s*(" + alt + r")\s*(?:(?:พ\.?ศ\.?|ปี)\s*)?(\d{2,4})?", norm)
+        if m:
+            month = dict(names)[m.group(2)]
+            return _year(int(m.group(3)) if m.group(3) else None, month, int(m.group(1)), today)
+    except ValueError:
+        return None
+    return None
+
+
+def is_reschedule(text: str) -> bool:
+    c = re.sub(r"\s+", "", text or "")
+    return ("นัด" in c or "ทดลองเรียน" in c or "สมัครเรียน" in c or "เริ่มเรียน" in c) and any(
+        w in c for w in ("เปลี่ยนวัน", "เลื่อน", "แก้วัน", "ย้ายวัน", "เปลี่ยนนัด"))
+
+
 def find_candidates(parsed: dict, enrollments, rooms) -> tuple[list, list[str]]:
     """Enrollments whose student's nickname appears in the command, narrowed
     by grade / slot / room. Falls back to a looser match (with a warning)

@@ -34,6 +34,17 @@
           </div>
         {% else %}
           <div class="packages">
+            {% if notice.per_session_count > 0 %}
+              <div class="pkg orange" style="border-color:#fdba74;background:#fff7ed;">
+                <div class="pkg-head"><div class="pkg-name">ต่อเป็นรายครั้ง {{ notice.per_session_count|floatformat:"-1" }} ครั้ง</div><div class="net">{{ notice.per_session_net|floatformat:0|intcomma }} บาท</div></div>
+                <div class="price-line"><span>ราคาต่อครั้ง</span><span class="full" style="text-decoration:none;">{{ notice.per_session_price|floatformat:0|intcomma }} บาท × {{ notice.per_session_count|floatformat:"-1" }} ครั้ง</span></div>
+                {% if notice.referral_credit_used > 0 %}
+                  <div class="price-line"><span>ยอดรวม</span><span>{{ notice.per_session_total|floatformat:0|intcomma }} บาท</span></div>
+                  <div class="price-line"><span>🎁 เครดิตชวนเพื่อน</span><span class="discount">-{{ notice.referral_credit_used|floatformat:0|intcomma }} บาท</span></div>
+                {% endif %}
+              </div>
+            {% endif %}
+            {% if not notice.per_session_only %}
             {% for p in packages %}
               <div class="pkg {{ p.accent }}">
                 <div class="pkg-head"><div class="pkg-name">{{ p.label }}</div><div class="net">{{ p.net_price|floatformat:0|intcomma }} บาท</div></div>
@@ -44,6 +55,7 @@
                 {% endif %}
               </div>
             {% endfor %}
+            {% endif %}
           </div>
         {% endif %}
 

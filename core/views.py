@@ -6813,6 +6813,11 @@ def course_renewal_notice_detail(request: HttpRequest, pk: int) -> HttpResponse:
         notice.package_30_full_price = _decimal_from_post(request.POST.get("package_30_full_price"), notice.package_30_full_price)
         notice.package_30_discount = _decimal_from_post(request.POST.get("package_30_discount"), notice.package_30_discount)
 
+        if "per_session_count" in request.POST:
+            notice.per_session_count = max(_decimal_from_post(request.POST.get("per_session_count"), Decimal("0")), Decimal("0"))
+            notice.per_session_price = max(_decimal_from_post(request.POST.get("per_session_price"), Decimal("0")), Decimal("0"))
+            notice.per_session_only = request.POST.get("per_session_only") == "1" and notice.per_session_count > 0
+
         notice.installment_full_amount = _decimal_from_post(request.POST.get("installment_full_amount"), notice.installment_full_amount)
         notice.installment_paid_amount = _decimal_from_post(request.POST.get("installment_paid_amount"), notice.installment_paid_amount)
         try:

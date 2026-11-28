@@ -200,7 +200,25 @@
               <div class="field"><label>ส่วนลด</label><input name="package_30_discount" value="{{ notice.package_30_discount }}"></div>
             </div>
           </div>
+          <div class="pkg-edit" style="background:#fff7ed;border-color:#fed7aa;">
+            <div class="pkg-title">➕ ต่อเป็นรายครั้ง <span style="font-weight:700;font-size:11px;color:#64748b;">(ใส่ 0 ครั้ง = ไม่แสดง)</span></div>
+            <div class="grid">
+              <div class="field"><label>จำนวนครั้ง</label><input type="number" min="0" step="0.5" name="per_session_count" id="psCount" value="{{ notice.per_session_count|floatformat:'-1' }}"></div>
+              <div class="field"><label>ราคาต่อครั้ง</label><input type="number" min="0" step="1" name="per_session_price" id="psPrice" value="{{ notice.per_session_price|floatformat:'-2' }}"></div>
+            </div>
+            <div style="font-weight:900;font-size:13px;margin-top:6px;color:#c2410c;">ยอดรวม: <span id="psTotal">-</span> บาท</div>
+            <label style="display:flex;gap:6px;align-items:center;font-size:12.5px;font-weight:800;margin-top:6px;">
+              <input type="checkbox" name="per_session_only" value="1" {% if notice.per_session_only %}checked{% endif %}> แสดงเฉพาะรายครั้งในใบแจ้ง (ซ่อนแพ็กเกจ 10/20/30)
+            </label>
+          </div>
         </div>
+        <script>
+          (function(){
+            var c=document.getElementById("psCount"), p=document.getElementById("psPrice"), t=document.getElementById("psTotal");
+            function upd(){ var v=(parseFloat(c.value)||0)*(parseFloat(p.value)||0); t.textContent=v.toLocaleString(undefined,{maximumFractionDigits:2}); }
+            c.addEventListener("input",upd); p.addEventListener("input",upd); upd();
+          })();
+        </script>
 
         <div id="installmentEditor">
           <div class="pkg-edit">

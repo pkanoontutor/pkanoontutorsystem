@@ -1016,6 +1016,11 @@ class CourseRenewalNotice(models.Model):
     package_30_discount = models.DecimalField("30 สัปดาห์ - ส่วนลด", max_digits=10, decimal_places=2, default=1000)
     package_30_net_price = models.DecimalField("30 สัปดาห์ - ราคาสุทธิ", max_digits=10, decimal_places=2, default=10970)
 
+    # ต่อเป็นรายครั้ง: N ครั้ง x ราคาต่อครั้ง (0 ครั้ง = ไม่แสดง)
+    per_session_count = models.DecimalField("รายครั้ง - จำนวนครั้ง", max_digits=6, decimal_places=1, default=0)
+    per_session_price = models.DecimalField("รายครั้ง - ราคาต่อครั้ง", max_digits=10, decimal_places=2, default=0)
+    per_session_only = models.BooleanField("แสดงเฉพาะรายครั้ง (ซ่อนแพ็กเกจ)", default=False)
+
     installment_full_amount = models.DecimalField(
         "แบ่งชำระ - ยอดเต็ม",
         max_digits=10,
@@ -1102,6 +1107,14 @@ class CourseRenewalNotice(models.Model):
 
     def __str__(self) -> str:
         return f"{self.get_notice_type_display()} | {self.student} | {self.tutoring_class} | {self.expected_course_end_date}"
+
+    @property
+    def per_session_total(self):
+        return Decimal(str(self.per_session_count or 0)) * Decimal(str(self.per_session_price or 0))
+
+    @property
+    def per_session_net(self):
+        return max(self.per_session_total - Decimal(str(self.referral_credit_used or 0)), Decimal("0"))
 
     def save(self, *args, **kwargs):
         credit = Decimal(str(self.referral_credit_used or 0))

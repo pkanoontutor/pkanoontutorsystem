@@ -560,7 +560,7 @@ def dashboard(request: HttpRequest) -> HttpResponse:
         }
 
     THRESHOLD = 2
-    near_complete = [e for e in enrollments if (e.remaining_sessions or 0) < THRESHOLD]
+    near_complete = [e for e in enrollments if (e.completion_remaining or 0) < THRESHOLD]
 
     # The roster renders one card per student, sorted by nickname. Done here
     # rather than in the queryset so Thai leading vowels order correctly --
@@ -6484,7 +6484,8 @@ def course_renewal_notice_list(request: HttpRequest) -> HttpResponse:
     notified_rows = []
 
     for enrollment in enrollments_qs:
-        remaining_sessions = Decimal(enrollment.remaining_sessions or 0)
+        remaining_sessions = Decimal(enrollment.completion_remaining or 0)
+        # จ่ายหลังเรียน courses count from their allowed overrun (completion_remaining).
         # Half-day leave can leave 1.5 on the clock, which still means "this
         # course is nearly done" -- so the cut-off is 1.5, not 2.
         if remaining_sessions > RENEWAL_NOTICE_REMAINING_MAX:

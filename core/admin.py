@@ -308,6 +308,7 @@ class EnrollmentAdmin(admin.ModelAdmin):
         "tutoring_class",
         "sessions_total",
         "is_active",
+        "pay_after_class",
         "payment_type",
         "course_price",
         "net_price",
@@ -317,6 +318,7 @@ class EnrollmentAdmin(admin.ModelAdmin):
     list_filter = (
         "tutoring_class",
         "is_active",
+        "pay_after_class",
         "payment_type",
     )
 
@@ -352,6 +354,8 @@ class EnrollmentAdmin(admin.ModelAdmin):
         }),
         ("การชำระเงิน", {
             "fields": (
+                "pay_after_class",
+                "pay_after_sessions",
                 "payment_type",
                 "installments_count",
                 "course_price",

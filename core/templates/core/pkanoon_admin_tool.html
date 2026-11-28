@@ -690,6 +690,10 @@
             <span>🧒 มาทดลอง/เริ่มเรียน เสาร์-อาทิตย์นี้ <span class="n" id="rtAdmissionCount">{{ upcoming_admissions|length }}</span></span>
             <a href="{% url 'core:admission_history' %}" style="font-size:11px;font-weight:700;color:var(--accent);text-decoration:none;">📋 ประวัติทั้งหมด →</a>
           </div>
+          <div class="adm-search">
+            <input type="search" id="admSearch" placeholder="🔍 ค้นหาชื่อเล่นนักเรียนที่จองไว้ (ทุกวัน) แล้วแก้วันนัดได้" autocomplete="off">
+            <div id="admSearchResults"></div>
+          </div>
           <div class="rt-list" id="rtAdmissionList">
             {% for a in upcoming_admissions %}
               <div class="rt-row admission {% if a.attended_first_lesson %}attended{% endif %}{% if a.paid_on_signup %} paid{% endif %}" data-admission-id="{{ a.id }}">
@@ -697,7 +701,8 @@
                         title="ปิดรายการนี้ (สร้างซ้ำ / สร้างเกิน)" aria-label="ปิดรายการนี้">✕</button>
                 <div class="rt-row-main">
                   <div class="rt-row-name">{{ a.nickname }} <span class="rt-tag">{{ a.request_type_label }}</span>{% if a.attended_first_lesson %}<span class="rt-tag attended-tag">มาแล้ว · รอใบเสร็จ</span>{% endif %}{% if a.paid_on_signup %}<span class="rt-tag paid-tag">สมัครและจ่ายแล้ว</span>{% endif %}</div>
-                  <div class="rt-row-meta">{{ a.full_name }} · {{ a.grade_label }} · {{ a.date_label }} · {{ a.time_slot_label }}</div>
+                  <div class="rt-row-meta">{{ a.full_name }} · {{ a.grade_label }} · <span data-date-label>{{ a.date_label }}</span> · {{ a.time_slot_label }}</div>
+                  <div class="resched-box" hidden><input type="date" value="{{ a.date|date:'Y-m-d' }}"><button type="button" data-resched-save data-admission-id="{{ a.id }}">💾 บันทึกวันใหม่</button></div>
                 </div>
                 {% include "core/_admission_sheet_panel.html" %}
                 <div class="card-memos" data-card-memos>
@@ -712,6 +717,7 @@
                   <div class="rt-more">
                     <button class="rt-mini-btn rt-more-btn" type="button" data-more-toggle aria-label="ตัวเลือกเพิ่มเติม">⋯</button>
                     <div class="rt-more-menu" hidden>
+                      <button type="button" data-resched-open data-admission-id="{{ a.id }}" data-date="{{ a.date|date:'Y-m-d' }}">📅 เปลี่ยนวันนัด</button>
                       <button type="button" data-card-memo data-admission-id="{{ a.id }}" data-nickname="{{ a.nickname }}">📝 เพิ่มโน้ต / งานที่ต้องทำ</button>
                       <button type="button" data-mark-attended data-admission-id="{{ a.id }}">✅ มาแล้ว</button>
                       <a href="/course-payments/new/?admission_id={{ a.id }}">🧾 สร้างใบเสร็จ</a>
@@ -1595,6 +1601,54 @@
 })();
 </script>
 {% endverbatim %}
+<style>
+  .adm-search{margin:6px 0 8px;}
+  .adm-search input{width:100%;box-sizing:border-box;border:1px solid var(--line,#e2e8f0);border-radius:12px;padding:8px 11px;font:inherit;font-size:13px;}
+  .adm-hit{display:flex;flex-wrap:wrap;gap:6px;align-items:center;justify-content:space-between;border:1px dashed var(--line-strong,#cbd5e1);border-radius:12px;padding:7px 10px;margin-top:6px;font-size:13px;}
+  .adm-hit small{color:#64748b;}
+  .resched-box{display:flex;gap:6px;align-items:center;margin-top:5px;}
+  .resched-box input,.adm-hit input{border:1px solid #cbd5e1;border-radius:9px;padding:4px 7px;font:inherit;font-size:13px;}
+  .resched-box button,.adm-hit button{border:0;border-radius:9px;padding:5px 10px;font:inherit;font-size:12.5px;font-weight:700;background:#cc785c;color:#fff;cursor:pointer;}
+</style>
+<script>
+(function(){
+  function esc(v){ return String(v==null?"":v).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];}); }
+  function resched(id, d){
+    return fetch(window.PK_URLS.admissionAction,{method:"POST",headers:{"Content-Type":"application/json","X-CSRFToken":window.PK_CSRF},
+      body:JSON.stringify({admission_id:id,"do":"reschedule",date:d})}).then(function(r){return r.json();}).then(function(j){
+        if(!j.ok) throw new Error(j.error||"บันทึกไม่สำเร็จ"); return j; });
+  }
+  document.addEventListener("click",function(e){
+    var o=e.target.closest("[data-resched-open]");
+    if(o){ var box=o.closest(".rt-row").querySelector(".resched-box"); box.hidden=!box.hidden; var m=o.closest(".rt-more-menu"); if(m) m.hidden=true; return; }
+    var b=e.target.closest("[data-resched-save]"); if(!b) return;
+    var wrap=b.closest(".resched-box,.adm-hit"), d=wrap.querySelector("input[type=date]").value;
+    if(!d){ alert("เลือกวันที่ก่อน"); return; }
+    b.disabled=true;
+    resched(b.getAttribute("data-admission-id"), d).then(function(j){
+      var row=b.closest(".rt-row");
+      if(row){ var l=row.querySelector("[data-date-label]"); if(l) l.textContent=j.date_label+" (เปลี่ยนแล้ว)"; wrap.hidden=true; }
+      else { var s=wrap.querySelector("[data-hit-date]"); if(s) s.textContent=j.date_label; }
+      b.textContent="✅ บันทึกแล้ว";
+    }).catch(function(err){ alert(err.message); }).finally(function(){ b.disabled=false; });
+  });
+  var inp=document.getElementById("admSearch"), out=document.getElementById("admSearchResults"), t=null;
+  if(!inp) return;
+  inp.addEventListener("input",function(){
+    clearTimeout(t); var q=inp.value.trim();
+    if(!q){ out.innerHTML=""; return; }
+    t=setTimeout(function(){
+      fetch("{% url 'core:admin_tool_admission_search' %}?q="+encodeURIComponent(q)).then(function(r){return r.json();}).then(function(j){
+        if(inp.value.trim()!==q) return;
+        out.innerHTML = (j.rows||[]).length ? j.rows.map(function(a){
+          return '<div class="adm-hit"><span><b>'+esc(a.nickname)+'</b> <small>'+esc(a.full_name)+' · '+esc(a.grade)+' · '+esc(a.type)+' · '+esc(a.slot)+'<br>นัด: <b data-hit-date>'+esc(a.date_label)+'</b></small></span>'+
+            '<span><input type="date" value="'+esc(a.date)+'"> <button type="button" data-resched-save data-admission-id="'+a.id+'">💾 เปลี่ยนวัน</button></span></div>';
+        }).join("") : '<div class="adm-hit"><small>ไม่พบนักเรียนที่จองไว้ชื่อนี้ (เฉพาะรายการที่ยังไม่ปิด)</small></div>';
+      });
+    }, 250);
+  });
+})();
+</script>
 
 <script>
 (function(){

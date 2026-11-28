@@ -164,7 +164,9 @@
 
           <div class="action-row">
             {% if row.latest_unsent_notice %}
-              <a class="btnx blue" href="{% url 'core:course_renewal_notice_detail' row.latest_unsent_notice.id %}">เปิดใบแจ้ง</a>
+              <button type="button" class="btnx blue" data-notice-pop="{% url 'core:course_renewal_notice_detail' row.latest_unsent_notice.id %}?embed=1"
+                      data-notice-title="{{ row.student.nickname|default:row.student.full_name }} · {{ row.tutoring_class.name }}">⚡ ใบแจ้ง (แก้ไข / Copy รูป)</button>
+              <a class="btnx soft" href="{% url 'core:course_renewal_notice_detail' row.latest_unsent_notice.id %}" title="เปิดแบบเต็มหน้า">↗</a>
               <form class="inline" method="post" action="{% url 'core:course_renewal_notice_mark_sent' row.latest_unsent_notice.id %}">
                 {% csrf_token %}
                 <button class="btnx green" type="submit">ส่งแจ้งผู้ปกครองแล้ว</button>
@@ -283,4 +285,27 @@
     </div>
   </section>
 </div>
+<div id="noticePop" style="display:none;position:fixed;inset:0;z-index:1000;background:rgba(15,23,42,.55);padding:2vh 1vw;">
+  <div style="background:#fff;border-radius:18px;max-width:1320px;margin:0 auto;height:96vh;display:flex;flex-direction:column;overflow:hidden;">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid #e2e8f0;">
+      <b id="noticePopTitle" style="font-size:15px;"></b>
+      <button type="button" id="noticePopClose" style="border:0;background:#f1f5f9;border-radius:999px;padding:7px 14px;font-weight:900;cursor:pointer;font-family:inherit;">✕ ปิด</button>
+    </div>
+    <iframe id="noticePopFrame" title="ใบแจ้งต่อคอร์ส" style="flex:1;border:0;width:100%;"></iframe>
+  </div>
+</div>
+<script>
+(function(){
+  const pop = document.getElementById("noticePop"), frame = document.getElementById("noticePopFrame");
+  document.addEventListener("click", function(e){
+    const b = e.target.closest("[data-notice-pop]"); if(!b) return;
+    document.getElementById("noticePopTitle").textContent = b.dataset.noticeTitle || "";
+    frame.src = b.dataset.noticePop; pop.style.display = "block"; document.body.style.overflow = "hidden";
+  });
+  function close(){ pop.style.display = "none"; frame.src = "about:blank"; document.body.style.overflow = ""; }
+  document.getElementById("noticePopClose").addEventListener("click", close);
+  pop.addEventListener("click", function(e){ if(e.target === pop) close(); });
+  document.addEventListener("keydown", function(e){ if(e.key === "Escape" && pop.style.display === "block") close(); });
+})();
+</script>
 {% endblock %}

@@ -101,19 +101,26 @@
     .att-empty{border-radius:16px;border:1.5px dashed #cbd5e1;padding:18px;text-align:center;font-size:13px;font-weight:900;color:#94a3b8;margin-top:8px}
     @media(max-width:980px){.page{grid-template-columns:1fr}.editor{position:static}.receipt{width:min(100%,440px)}.btn{flex:1}.btn.icon{flex:0 0 38px}}
     @media(max-width:480px){.page{padding:8px}.editor{border-radius:20px;padding:12px}.receipt{border-radius:0;width:100%;padding:16px}.toolbar{position:sticky;top:6px;z-index:5}.date-row{grid-template-columns:1fr}.qr{width:220px;height:220px}.grid{grid-template-columns:1fr}}
+    /* embed=1: shown in a popup on the list page -- compact editor + the combined card only */
+    body.embed{background:#f8fafc;}
+    .embed .page{min-height:0;padding:10px;grid-template-columns:minmax(260px,330px) minmax(320px,940px);}
+    .embed .editor{position:static;padding:12px;gap:8px;box-shadow:none;border:1px solid #e2e8f0;}
+    .embed .editor .hint,.embed .editor h1,.embed .js-full-only{display:none;}
+    .embed .preview-wrap > :nth-child(n+4){display:none;}
+    @media(max-width:980px){.embed .page{grid-template-columns:1fr}}
   </style>
 </head>
-<body>
+<body{% if embed %} class="embed"{% endif %}>
   <div class="page">
     <div class="editor">
       <div class="btnrow">
         {% if notice.is_sent_to_parent %}
-          <form method="post" action="{% url 'core:course_renewal_notice_unmark_sent' notice.id %}" style="flex:1;">
+          <form method="post" action="{% url 'core:course_renewal_notice_unmark_sent' notice.id %}" style="flex:1;"{% if embed %} target="_top"{% endif %}>
             {% csrf_token %}
             <button class="btn red" type="submit" style="width:100%;">ยกเลิกสถานะส่งแล้ว</button>
           </form>
         {% else %}
-          <form method="post" action="{% url 'core:course_renewal_notice_mark_sent' notice.id %}" style="flex:1;">
+          <form method="post" action="{% url 'core:course_renewal_notice_mark_sent' notice.id %}" style="flex:1;"{% if embed %} target="_top"{% endif %}>
             {% csrf_token %}
             <button class="btn green" type="submit" style="width:100%;">ส่งแจ้งผู้ปกครองแล้ว และกลับหน้า list</button>
           </form>
@@ -122,6 +129,7 @@
 
       <form method="post" id="editForm" style="display:grid;gap:12px;">
         {% csrf_token %}
+        {% if embed %}<input type="hidden" name="embed" value="1">{% endif %}
         <div>
           <h1>{{ notice.get_notice_type_display }}{% if notice.notice_type == "installment" and notice.installment_no %} งวดที่ {{ notice.installment_no }}{% endif %}</h1>
           <div class="hint">เลือกประเภทใบแจ้งและแก้ข้อมูลด้านล่างได้เลย จากนั้นกดบันทึก ภาพ preview ด้านขวาจะอัปเดตหลังบันทึก</div>
@@ -134,7 +142,7 @@
         {% endif %}
 
         <div class="btnrow">
-          <a class="btn soft" href="/course-renewal-notices/">← กลับหน้า list</a>
+          <a class="btn soft js-full-only" href="/course-renewal-notices/">← กลับหน้า list</a>
           {% if notice.notice_type == "installment" and notice.enrollment_id %}
             <a class="btn soft" style="background:#ecfdf5;color:#15803d;" href="/course-payments/new/?enrollment_id={{ notice.enrollment_id }}&pay_installment=1" title="ออกใบเสร็จงวดนี้">🧾 ออกใบเสร็จงวดนี้</a>
           {% endif %}

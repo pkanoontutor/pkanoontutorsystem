@@ -567,6 +567,10 @@ class Enrollment(models.Model):
 
     # ❗ จะ inactive ก็ต่อเมื่อกดจบคอร์สเท่านั้น
     is_active = models.BooleanField("Active", default=True)
+    not_renewed_at = models.DateTimeField(
+        "กดไม่ต่อคอร์สเมื่อ", null=True, blank=True,
+        help_text="ตั้งจากปุ่ม 🚫 บน dashboard -- การ์ดจะแสดงเป็นสีเทาท้ายห้อง และกด ↩ ดึงกลับได้",
+    )
 
     class PaymentType(models.TextChoices):
         FULL = "full", "ชำระเต็ม"

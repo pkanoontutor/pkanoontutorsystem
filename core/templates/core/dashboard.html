@@ -424,6 +424,16 @@
     transform: translateY(-1px);
     box-shadow: 0 2px 6px rgba(0,0,0,.08);
   }
+  /* "ไม่ต่อคอร์ส" cards: grey, half size, at the back of the class */
+  .nr-card{display:flex;flex-direction:column;align-items:center;gap:2px;padding:5px 2px;border-radius:11px;
+    background:#f1f5f9;border:1px dashed #cbd5e1;filter:grayscale(1);opacity:.7;align-self:start;
+    font-size:10px;color:#64748b;}
+  .nr-card .avatar{width:26px;height:26px;font-size:11px;}
+  .nr-card .avatar img{width:100%;height:100%;object-fit:cover;border-radius:50%;}
+  .nr-card .nr-nick{font-weight:800;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .nr-card .nr-tag{font-size:10px;font-weight:800;}
+  .nr-card .nr-return{border:1px solid #94a3b8;background:#fff;border-radius:999px;padding:1px 8px;font-size:10.5px;font-weight:900;cursor:pointer;color:#334155;font-family:inherit;}
+  .nr-card:hover{opacity:1;filter:none;}
   .not-renew-btn:hover { background:#fee2e2; border-color:#fecaca; color:#991b1b; }
 
   /* ---- ไม่ต่อคอร์ส confirm popup (page-native, not window.confirm) ---- */
@@ -1145,6 +1155,14 @@
                   {% endwith %}
                 {% endif %}
               {% endfor %}
+              {% for e in closed_enrollments %}{% if e.tutoring_class_id == cls.id %}
+                <div class="nr-card" id="nr-{{ e.id }}" title="ไม่ต่อคอร์ส · {{ e.student.full_name|default:'' }}">
+                  <span class="avatar">{% if e.student.profile_image %}<img src="{{ e.student.profile_image.url }}" alt="">{% else %}<span class="avatar-fallback">{{ e.student.nickname|first|upper|default:"?" }}</span>{% endif %}</span>
+                  <div class="nr-nick">{{ e.student.nickname|default:"-" }}</div>
+                  <div class="nr-tag">🚫 ไม่ต่อคอร์ส</div>
+                  <button type="button" class="nr-return" onclick="return returnEnrollment({{ e.id }}, this);">↩ return</button>
+                </div>
+              {% endif %}{% endfor %}
             </div>
           </div>
 
@@ -1306,14 +1324,46 @@
       if(!res.ok || !data.ok) throw new Error(data.error || "บันทึกไม่สำเร็จ");
       const row = document.getElementById("row-" + nrPendingEnrollmentId);
       const cid = row ? row.dataset.class : null;
-      if(row) row.remove();
-      if(cid){ updateSelectionSummary(cid); }
+      if(row){
+        // turn it into a grey half-size card at the back of the class
+        const card = document.createElement("div");
+        card.className = "nr-card"; card.id = "nr-" + nrPendingEnrollmentId;
+        const av = row.querySelector(".avatar");
+        const nick = row.querySelector(".stu-nick");
+        card.innerHTML = (av ? av.outerHTML : "") + '<div class="nr-nick"></div><div class="nr-tag">🚫 ไม่ต่อคอร์ส</div>' +
+          '<button type="button" class="nr-return" onclick="return returnEnrollment(' + Number(nrPendingEnrollmentId) + ', this);">↩ return</button>';
+        card.querySelector(".nr-nick").textContent = nick ? nick.textContent.trim() : "";
+        const grid = row.parentNode;
+        row.remove(); grid.appendChild(card);
+      }
+      if(cid){
+        if(typeof picks !== "undefined" && picks[cid]) delete picks[cid][nrPendingEnrollmentId];
+        updateSelectionSummary(cid);
+      }
       closeNotRenewModal();
     }catch(err){
       confirmBtn.disabled = false;
       confirmBtn.textContent = "ยืนยันไม่ต่อคอร์ส";
       alert(err.message || "บันทึกไม่สำเร็จ");
     }
+  }
+  async function returnEnrollment(eid, btn){
+    if(!confirm("ดึงนักเรียนคนนี้กลับมาเรียน (เปิด Enrollment นี้อีกครั้ง)?")) return false;
+    btn.disabled = true; btn.textContent = "กำลังบันทึก...";
+    try{
+      const res = await fetch("/enrollment/return/", {
+        method: "POST",
+        headers: {"Content-Type":"application/json","X-CSRFToken":csrftoken,"X-Requested-With":"XMLHttpRequest"},
+        body: JSON.stringify({enrollment_id: eid}),
+      });
+      const data = await res.json();
+      if(!res.ok || !data.ok) throw new Error(data.error || "บันทึกไม่สำเร็จ");
+      location.reload();
+    }catch(err){
+      btn.disabled = false; btn.textContent = "↩ return";
+      alert(err.message || "บันทึกไม่สำเร็จ");
+    }
+    return false;
   }
   document.getElementById("nrModalCancel").addEventListener("click", closeNotRenewModal);
   document.getElementById("nrModalConfirm").addEventListener("click", confirmNotRenew);

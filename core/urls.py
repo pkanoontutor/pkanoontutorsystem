@@ -50,6 +50,7 @@ urlpatterns = [
     # Attendance
     path("attendance/submit/", views.attendance_submit, name="attendance_submit"),
     path("enrollment/mark-not-renewing/", views.enrollment_mark_not_renewing, name="enrollment_mark_not_renewing"),
+    path("enrollment/return/", views.enrollment_return, name="enrollment_return"),
     path("attendance-details/", views.attendance_details, name="attendance_details"),
     path("remaining-attendance/", views.remaining_attendance_search, name="remaining_attendance_search"),
     path("session-adjustments/", views.session_adjustment_page, name="session_adjustment_page"),

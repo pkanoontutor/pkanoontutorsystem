@@ -5172,28 +5172,20 @@ class AdmissionInquiryForm(forms.ModelForm):
             "last_name",
             "contact_phone",
             "school_name",
-            "latest_gpa",
             "first_lesson_date",
             "grade_level",
             "preferred_time_slot",
         ]
         widgets = {
             "request_type": forms.RadioSelect,
-            "nickname": forms.TextInput(attrs={"placeholder": "เช่น น้องข้าวหอม", "autocomplete": "given-name"}),
-            "first_name": forms.TextInput(attrs={"placeholder": "ชื่อจริงของนักเรียน", "autocomplete": "given-name"}),
+            "nickname": forms.TextInput(attrs={"placeholder": "เช่น ต้นข้าว", "autocomplete": "given-name"}),
+            "first_name": forms.TextInput(attrs={"placeholder": "ไม่ต้องมีคำนำหน้า", "autocomplete": "given-name"}),
             "last_name": forms.TextInput(attrs={"placeholder": "นามสกุลของนักเรียน", "autocomplete": "family-name"}),
-            "school_name": forms.TextInput(attrs={"placeholder": "ชื่อโรงเรียน", "autocomplete": "organization"}),
+            "school_name": forms.TextInput(attrs={"placeholder": "พิมพ์แล้วเลือกจากรายการ หรือพิมพ์เองได้", "autocomplete": "off", "list": "schoolOptions"}),
             "contact_phone": forms.TextInput(attrs={
                 "placeholder": "เบอร์ผู้ปกครอง / เบอร์ติดต่อ",
                 "inputmode": "tel",
                 "autocomplete": "tel",
-            }),
-            "latest_gpa": forms.NumberInput(attrs={
-                "placeholder": "เช่น 3.50",
-                "step": "0.01",
-                "min": "0",
-                "max": "4",
-                "inputmode": "decimal",
             }),
             "first_lesson_date": forms.DateInput(attrs={
                 "type": "date",
@@ -5201,6 +5193,13 @@ class AdmissionInquiryForm(forms.ModelForm):
                 "data-native-picker": "date",
             }),
         }
+
+    def clean_nickname(self):
+        return strip_nong_prefix(self.cleaned_data.get("nickname"))
+
+    def clean_school_name(self):
+        s = re.sub(r"\s+", " ", (self.cleaned_data.get("school_name") or "").strip())
+        return re.sub(r"^(?:โรงเรียน|รร\.?)\s*", "", s)
 
     def clean_contact_phone(self):
         phone = (self.cleaned_data.get("contact_phone") or "").strip()
@@ -5221,7 +5220,31 @@ def admission_inquiry(request: HttpRequest) -> HttpResponse:
 
     return render(request, "core/admission_inquiry.html", {
         "form": form,
+        "school_options": _school_options(),
     })
+
+
+def strip_nong_prefix(name) -> str:
+    """'น้องต้นข้าว' / 'น้อง ต้นข้าว' -> 'ต้นข้าว' (keeps a bare 'น้อง')."""
+    name = (name or "").strip()
+    rest = re.sub(r"^น้อง\s*", "", name).strip()
+    return rest or name
+
+
+def _school_options() -> list[str]:
+    """Starter list of Bangkok / Samut Prakan schools + every school already
+    in the system (School table, earlier admissions)."""
+    import os
+    names = set()
+    path = os.path.join(os.path.dirname(__file__), "data", "schools_bkk_spk.txt")
+    try:
+        with open(path, encoding="utf-8") as fh:
+            names.update(l.strip() for l in fh if l.strip() and not l.startswith("#"))
+    except OSError:
+        pass
+    names.update(School.objects.filter(is_active=True).values_list("name", flat=True))
+    names.update(AdmissionInquiry.objects.exclude(school_name="").values_list("school_name", flat=True).distinct()[:2000])
+    return sorted({n.strip() for n in names if n and n.strip()})
 
 
 def admission_thank_you(request: HttpRequest, pk: int) -> HttpResponse:
@@ -14769,16 +14792,50 @@ def _admission_row_brief(inq) -> dict:
     }
 
 
+def _nick_key(n) -> str:
+    return re.sub(r"\s+", "", strip_nong_prefix(n or ""))
+
+
+def _spoken_name(text: str) -> str:
+    """The name part of "...ของ(น้อง)X เป็น(วันที่)..." if the sentence has one."""
+    c = re.sub(r"\s+", "", text or "")
+    m = re.search(r"(?:ของ|ให้)(?:น้อง)?(.+?)(?:เป็น|ไปวัน|วันที่|$)", c)
+    return m.group(1) if m else ""
+
+
+def _fuzzy_admission_hits(text: str, pending: list) -> list:
+    """Bookings whose nickname matches the command, ignoring "น้อง" on either
+    side. Exact hits first (longest wins); otherwise partial matches -- the
+    spoken name inside the nickname or vice versa, or a close spelling."""
+    import difflib
+    compact = re.sub(r"\s+", "", text or "").replace("น้อง", "")
+    keyed = [(a, _nick_key(a.nickname)) for a in pending]
+    keyed = [(a, k) for a, k in keyed if k]
+    exact = [(a, k) for a, k in keyed if k in compact]
+    if exact:
+        best = max(len(k) for _, k in exact)
+        return [a for a, k in exact if len(k) == best]
+    spoken = _nick_key(_spoken_name(text))
+    if not spoken:
+        return []
+    scored = []
+    for a, k in keyed:
+        if len(k) >= 2 and (k in spoken or spoken in k):
+            scored.append((1.0, a))
+            continue
+        r = difflib.SequenceMatcher(None, spoken, k).ratio()
+        if r >= 0.6:
+            scored.append((r, a))
+    scored.sort(key=lambda t: -t[0])
+    return [a for _, a in scored]
+
+
 def _voice_reschedule_draft(text: str) -> dict:
     """"เปลี่ยนวันนัดหมายทดลองเรียนของ X เป็นวันที่ 2 พฤศจิกายน 2569"."""
     from .voice_receipt import normalize_numbers, parse_command, parse_thai_date
     new_date = parse_thai_date(text, timezone.localdate())
     pending = list(AdmissionInquiry.objects.filter(is_completed=False).order_by("first_lesson_date"))
-    compact = re.sub(r"\s+", "", text)
-    hits = [a for a in pending if a.nickname and a.nickname.strip() and a.nickname.strip() in compact]
-    if hits:  # prefer the longest nickname heard (มิ้น vs มิ้นท์)
-        best = max(len(a.nickname.strip()) for a in hits)
-        hits = [a for a in hits if len(a.nickname.strip()) == best]
+    hits = _fuzzy_admission_hits(text, pending)
     grade = parse_command(normalize_numbers(text))["grade"]
     if grade and len(hits) > 1:
         narrowed = [a for a in hits if a.get_grade_level_display().replace(" ", "").startswith(grade)]
@@ -14786,6 +14843,8 @@ def _voice_reschedule_draft(text: str) -> dict:
     warnings = []
     if not hits:
         warnings.append("ไม่พบชื่อเล่นนี้ในรายการที่จองไว้ (ที่ยังไม่ปิด) — ลองพิมพ์ชื่อเล่นให้ตรง")
+    elif len(hits) > 1:
+        warnings.append(f"พบชื่อใกล้เคียง {len(hits)} คน — เลือกคนที่ถูกต้อง")
     if not new_date:
         warnings.append("ไม่ได้ยินวันที่ใหม่ — เลือกวันเองในช่องด้านล่างได้")
     return {"ok": True, "mode": "reschedule", "new_date": new_date.isoformat() if new_date else "",
@@ -14798,7 +14857,7 @@ def admin_tool_admission_search(request: HttpRequest) -> JsonResponse:
     """Search pending bookings (any date) by nickname / name / phone."""
     if not request.user.is_staff:
         return JsonResponse({"ok": False, "error": "forbidden"}, status=403)
-    q = (request.GET.get("q") or "").strip()
+    q = strip_nong_prefix(request.GET.get("q") or "")
     if not q:
         return JsonResponse({"ok": True, "rows": []})
     qs = (AdmissionInquiry.objects.filter(is_completed=False)

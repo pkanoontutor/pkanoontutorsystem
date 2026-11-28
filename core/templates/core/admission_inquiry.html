@@ -255,13 +255,8 @@
           <div class="field">
             <label for="{{ form.school_name.id_for_label }}">โรงเรียน</label>
             {{ form.school_name }}
+            <datalist id="schoolOptions">{% for s in school_options %}<option value="{{ s }}">{% endfor %}</datalist>
             {% for error in form.school_name.errors %}<div class="err">{{ error }}</div>{% endfor %}
-          </div>
-
-          <div class="field">
-            <label for="{{ form.latest_gpa.id_for_label }}">เกรดเฉลี่ยเทอมล่าสุด</label>
-            {{ form.latest_gpa }}
-            {% for error in form.latest_gpa.errors %}<div class="err">{{ error }}</div>{% endfor %}
           </div>
 
           <div class="field">

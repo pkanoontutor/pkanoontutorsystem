@@ -573,6 +573,12 @@ def dashboard(request: HttpRequest) -> HttpResponse:
         ),
     )
     _annotate_leave_stats(roster, selected_date)
+    # "ไม่ต่อคอร์ส" closes: shown greyed at the back of their class, with ↩.
+    closed_enrollments = list(
+        Enrollment.objects.select_related("student", "tutoring_class")
+        .filter(is_active=False, not_renewed_at__isnull=False, tutoring_class__is_active=True)
+        .order_by("-not_renewed_at")
+    )
 
     context = {
         "selected_date": selected_date,
@@ -580,6 +586,7 @@ def dashboard(request: HttpRequest) -> HttpResponse:
         "classes_by_time_slot": classes_by_time_slot,
 
         "enrollments": roster,
+        "closed_enrollments": closed_enrollments,
         "att_map": att_map,
         "summary_by_class_id": summary_by_class_id,
         "seats_summary_by_class_id": seats_summary_by_class_id,
@@ -4109,7 +4116,8 @@ def enrollment_mark_not_renewing(request: HttpRequest) -> JsonResponse:
 
     with transaction.atomic():
         enrollment.is_active = False
-        enrollment.save(update_fields=["is_active"])
+        enrollment.not_renewed_at = timezone.now()
+        enrollment.save(update_fields=["is_active", "not_renewed_at"])
 
         student = enrollment.student
         has_other_active = Enrollment.objects.filter(student=student, is_active=True).exclude(pk=enrollment.pk).exists()
@@ -4124,6 +4132,27 @@ def enrollment_mark_not_renewing(request: HttpRequest) -> JsonResponse:
         "enrollment_id": enrollment.id,
         "student_deactivated": student_deactivated,
     })
+
+
+@require_POST
+@login_required
+def enrollment_return(request: HttpRequest) -> JsonResponse:
+    """↩ on a greyed "ไม่ต่อคอร์ส" card: the student is back, reopen it."""
+    try:
+        payload = json.loads(request.body.decode("utf-8"))
+    except Exception:
+        return JsonResponse({"ok": False, "error": "Invalid JSON"}, status=400)
+    enrollment = Enrollment.objects.select_related("student").filter(id=payload.get("enrollment_id")).first()
+    if not enrollment:
+        return JsonResponse({"ok": False, "error": "ไม่พบ Enrollment นี้"}, status=404)
+    with transaction.atomic():
+        enrollment.is_active = True
+        enrollment.not_renewed_at = None
+        enrollment.save(update_fields=["is_active", "not_renewed_at"])
+        if not enrollment.student.is_active:
+            enrollment.student.is_active = True
+            enrollment.student.save(update_fields=["is_active"])
+    return JsonResponse({"ok": True, "enrollment_id": enrollment.id})
 
 
 @login_required
@@ -6467,6 +6496,16 @@ def course_renewal_notice_list(request: HttpRequest) -> HttpResponse:
 
         latest_notice = notices_qs.first()
         latest_unsent_notice = notices_qs.filter(is_sent_to_parent=False).first()
+        if latest_notice is None:
+            # Pre-create the notice so it opens straight away (popup on this
+            # page) -- no extra "create" click per student.
+            exp_end, nxt_start = _default_renewal_dates(enrollment)
+            latest_notice = latest_unsent_notice = CourseRenewalNotice.objects.create(
+                notice_type=CourseRenewalNotice.NoticeType.RENEWAL,
+                enrollment=enrollment, student=enrollment.student, tutoring_class=enrollment.tutoring_class,
+                expected_course_end_date=exp_end, next_course_start_date=nxt_start,
+                created_by=request.user if request.user.is_authenticated else None,
+            )
         latest_sent_notice = (
             notices_qs
             .filter(is_sent_to_parent=True)
@@ -6717,6 +6756,7 @@ def course_renewal_notice_unmark_sent(request: HttpRequest, pk: int) -> HttpResp
     return redirect(request.META.get("HTTP_REFERER") or "core:course_renewal_notice_list")
 
 
+@xframe_options_sameorigin
 @login_required
 def course_renewal_notice_detail(request: HttpRequest, pk: int) -> HttpResponse:
     notice = get_object_or_404(
@@ -6777,6 +6817,8 @@ def course_renewal_notice_detail(request: HttpRequest, pk: int) -> HttpResponse:
         notice.referral_credit_used = max(min(requested_credit, available_before_this), Decimal("0"))
 
         notice.save()
+        if request.POST.get("embed") == "1":
+            return redirect(reverse("core:course_renewal_notice_detail", args=[notice.pk]) + "?embed=1")
         return redirect("core:course_renewal_notice_detail", pk=notice.pk)
 
     notice_kind = "renewal"
@@ -6789,6 +6831,7 @@ def course_renewal_notice_detail(request: HttpRequest, pk: int) -> HttpResponse:
     referral_credit_max = referral_credit_available + notice.referral_credit_used
 
     return render(request, "core/course_renewal_notice_detail.html", {
+        "embed": request.GET.get("embed") == "1",
         "notice": notice,
         "notice_kind": notice_kind,
         "student": notice.student,
@@ -9898,7 +9941,8 @@ def course_payment_create(request: HttpRequest) -> HttpResponse:
                         # A paying student is back: undo a "ไม่ต่อคอร์ส" close.
                         if enrollment and not enrollment.is_active:
                             enrollment.is_active = True
-                            enrollment.save(update_fields=["is_active"])
+                            enrollment.not_renewed_at = None
+                            enrollment.save(update_fields=["is_active", "not_renewed_at"])
                         if student and not student.is_active:
                             student.is_active = True
                             student.save(update_fields=["is_active"])
